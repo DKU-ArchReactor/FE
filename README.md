@@ -1,73 +1,79 @@
-# React + TypeScript + Vite
+# ArchReactor: An Educational RISC-V Architecture Simulator for Computer Engineering Freshmen
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**ArchReactor** is an educational RISC-V architecture simulation platform  
+designed for computer engineering freshmen.
 
-Currently, two official plugins are available:
+This project helps students understand how instructions are executed  
+inside a CPU, step by step and cycle by cycle.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## Architecture Overview
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+![Arch-Reactor Architecture](architecture.png)
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Motivation
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Many computer engineering students find it difficult to understand:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- How C or assembly code is executed inside a CPU
+- How instructions move through pipeline stages
+- Why similar code can have different execution times
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+ArchReactor was created to visualize these processes clearly  
+and help students learn computer architecture more intuitively.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Key Features
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- RISC-V (RV32I) instruction simulation
+- Pipeline visualization (IF, ID, EX, MEM, WB)
+- Cycle-by-cycle execution view
+- Register and memory state tracking
+- Stall, forwarding, and flush explanation
+- Code saving and reloading
+- Execution statistics (cycles, CPI)
+
+_(C language support and AI-based optimization advice are planned features.)_
+
+---
+
+## System Architecture
+
+ArchReactor is built with three main components:
+
+- **Core (Python)**
+  - RISC-V instruction execution logic
+  - Pipeline and hazard simulation
+
+- **Backend (FastAPI)**
+  - API server
+  - Code and execution history management
+  - Core integration
+
+- **Frontend (React)**
+  - Code editor
+  - Pipeline and state visualization
+
+---
+
+## Target Users
+
+- Computer Engineering freshmen
+- Students learning computer architecture
+- Anyone interested in how code runs on hardware
+
+---
+
+## How to Run (Development)
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
