@@ -1,4 +1,4 @@
-import CodeArea from "./components/CodeArea";
+import SourceArea from "./components/Source";
 import AIAgentArea from "./components/AIAgentArea";
 import PipelineVisualizer from "./components/PipelineVisualizer";
 import RegisterVisualizer from "./components/RegisterVisualizer";
@@ -11,7 +11,7 @@ const MainPage = () => {
     <main className="flex-1 flex px-4 pb-4 pt-4 w-full" style={{ minHeight: 'calc(100vh - 4rem)' }}>
       <div className="flex w-full gap-4">
         <div className="w-1/5 flex flex-col">
-          <CodeArea />
+          <SourceArea />
         </div>
         
         <div className="w-3/5 flex flex-col gap-4">
