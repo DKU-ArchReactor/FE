@@ -4,12 +4,14 @@ interface SourceHeaderProps {
   activeTab: 'c' | 'asm';
   setActiveTab: (tab: 'c' | 'asm') => void;
   onFileAdded?: (file: File) => void;
+  onCompile?: () => void;
 }
 
 const SourceHeader: React.FC<SourceHeaderProps> = ({
   activeTab,
   setActiveTab,
   onFileAdded,
+  onCompile,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,9 +61,19 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
       <div className="flex items-center space-x-3">
         <button
           onClick={handleAddFileClick}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-1.5"
         >
-          파일 추가
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1} className="w-4 h-4">
+            <path fillRule="evenodd" d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z" clipRule="evenodd" />
+          </svg>
+        </button>
+        <button
+          onClick={onCompile}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-1.5"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+          </svg>
         </button>
         <input
           type="file"

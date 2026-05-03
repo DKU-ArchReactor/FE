@@ -8,7 +8,7 @@ import ControlPanel from "./components/ControlPanel";
 const MainPage = () => {
 
   return (
-    <main className="flex-1 flex px-4 pb-4 pt-4 w-full" style={{ minHeight: 'calc(100vh - 4rem)' }}>
+    <main className="flex-1 flex px-4 pb-4 pt-4 w-full h-full" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
       <div className="flex w-full gap-4">
         <div className="w-1/5 flex flex-col min-w-0">
           <SourceArea />
