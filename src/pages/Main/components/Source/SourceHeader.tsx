@@ -34,13 +34,13 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
     fileInputRef.current?.click();
   };
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-      <div className="flex space-x-2">
+    <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 bg-slate-50/50 shrink-0">
+      <div className="flex space-x-1.5">
         <button
           onClick={() => setActiveTab('c')}
-          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
             activeTab === 'c'
-              ? 'bg-blue-50 text-blue-600'
+              ? 'bg-blue-50 text-blue-600 shadow-xs'
               : 'text-slate-500 hover:bg-slate-100'
           }`}
         >
@@ -48,9 +48,9 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('asm')}
-          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
             activeTab === 'asm'
-              ? 'bg-blue-50 text-blue-600'
+              ? 'bg-blue-50 text-blue-600 shadow-xs'
               : 'text-slate-500 hover:bg-slate-100'
           }`}
         >
@@ -58,23 +58,38 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
         </button>
       </div>
       
-      <div className="flex items-center space-x-3">
-        <button
-          onClick={handleAddFileClick}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-1.5"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1} className="w-4 h-4">
-            <path fillRule="evenodd" d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z" clipRule="evenodd" />
-          </svg>
-        </button>
-        <button
-          onClick={onCompile}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-1.5"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-          </svg>
-        </button>
+      <div className="flex items-center space-x-2">
+        <div className="relative group">
+          <button
+            onClick={handleAddFileClick}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1} className="w-3.5 h-3.5">
+              <path fillRule="evenodd" d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z" clipRule="evenodd" />
+            </svg>
+          </button>
+          <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover:flex items-center pointer-events-none z-30">
+            <div className="bg-slate-900 text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg whitespace-nowrap">
+              C 소스 파일 업로드
+            </div>
+          </div>
+        </div>
+
+        <div className="relative group">
+          <button
+            onClick={onCompile}
+            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1 shadow-xs"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-3.5 h-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+          </button>
+          <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover:flex items-center pointer-events-none z-30">
+            <div className="bg-slate-900 text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg whitespace-nowrap">
+              C 코드 컴파일 및 어셈블리 변환
+            </div>
+          </div>
+        </div>
         <input
           type="file"
           accept=".c"
