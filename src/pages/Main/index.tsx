@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
 import SourceArea from "./components/Source";
 import TutorArea from "./components/TutorArea";
 import AIAgentArea from "./components/AIAgentArea";
@@ -16,6 +17,13 @@ import { PANEL_METAS, ALL_PANEL_KEYS, getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 
 const MainPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const initialFileId =
+    searchParams.get("fileId") ||
+    (location.state as { fileId?: string } | null)?.fileId ||
+    null;
+
   const [simulationData, setSimulationData] = useState<SimulationResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const totalCycles = simulationData?.history?.length ?? 0;
@@ -172,6 +180,7 @@ const MainPage: React.FC = () => {
       case 'source':
         return (
           <SourceArea 
+            fileId={initialFileId}
             onStartSimulation={handleStartSimulation}
             onSimulationComplete={handleSimulationComplete}
             onLoadingChange={setLoadingMessage}
