@@ -4,6 +4,7 @@ import SourceArea from "./components/Source";
 import TutorArea from "./components/TutorArea";
 import AIAgentArea from "./components/AIAgentArea";
 import PipelineVisualizer from "./components/PipelineVisualizer";
+import StateVisualizer from "./components/StateVisualizer";
 import RegisterVisualizer from "./components/RegisterVisualizer";
 import MemoryVisualizer from "./components/MemoryVisualizer";
 import ControlPanel from "./components/ControlPanel";
@@ -197,6 +198,14 @@ const MainPage: React.FC = () => {
             loadingMessage={loadingMessage}
             selectedCodeLine={selectedCodeLine}
             onClearSelectedCodeLine={() => setSelectedCodeLine(null)}
+          />
+        );
+      case 'state':
+        return (
+          <StateVisualizer
+            currentData={currentData}
+            prevData={prevData}
+            simulationData={simulationData}
           />
         );
       case 'registers':
