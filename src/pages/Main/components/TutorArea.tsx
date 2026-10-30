@@ -37,6 +37,7 @@ const getLineInfoFromPc = (pc?: string | null) => {
 export interface TutorAreaProps {
   simulationData: SimulationResult | null;
   currentCycleData: CycleHistoryItem | null;
+  loadingMessage?: string | null;
   selectedCodeLine?: CodeLineSelectInfo | null;
   onClearSelectedCodeLine?: () => void;
 }
@@ -44,12 +45,22 @@ export interface TutorAreaProps {
 const TutorArea: React.FC<TutorAreaProps> = ({
   simulationData,
   currentCycleData,
+  loadingMessage,
   selectedCodeLine,
   onClearSelectedCodeLine,
 }) => {
+  if (loadingMessage) {
+    return (
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col items-center justify-center text-center gap-2.5">
+        <div className="w-7 h-7 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
+      </div>
+    );
+  }
+
   if (!simulationData || !currentCycleData) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col items-center justify-center text-center text-slate-400">
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col items-center justify-center text-center text-slate-400 text-xs">
         시뮬레이션 대기 중...
       </div>
     );

@@ -128,23 +128,34 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
   const hasContent = !!content;
   const activeLineRef = useRef<HTMLDivElement | null>(null);
 
-  // PC별 활성화된 파이프라인 단계 매핑 (어셈블리용)
-  const activeStagesByPc = useMemo(() => {
-    const map: Record<string, StageBadgeInfo[]> = {};
-    if (!stageBuffers) return map;
+  // PC별 및 명령어 텍스트별 활성화된 파이프라인 단계 매핑 (어셈블리용)
+  const { activeStagesByPc, activeStagesByInst } = useMemo(() => {
+    const pcMap: Record<string, StageBadgeInfo[]> = {};
+    const instMap: Record<string, StageBadgeInfo[]> = {};
+    if (!stageBuffers) return { activeStagesByPc: pcMap, activeStagesByInst: instMap };
 
     STAGES_CONFIG.forEach(({ key, name, textColor, bgColor, borderColor, badgeBg }) => {
       const buf = stageBuffers[key];
-      if (buf && buf.pc && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
-        const pcKey = buf.pc.toLowerCase();
-        if (!map[pcKey]) {
-          map[pcKey] = [];
+      if (buf && buf.assembly && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
+        const badge: StageBadgeInfo = { stage: name, badgeBg, textColor, bgColor, borderColor };
+        if (buf.pc) {
+          const pcKey = buf.pc.toLowerCase();
+          if (!pcMap[pcKey]) {
+            pcMap[pcKey] = [];
+          }
+          pcMap[pcKey].push(badge);
         }
-        map[pcKey].push({ stage: name, badgeBg, textColor, bgColor, borderColor });
+        const normInst = buf.assembly.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (normInst) {
+          if (!instMap[normInst]) {
+            instMap[normInst] = [];
+          }
+          instMap[normInst].push(badge);
+        }
       }
     });
 
-    return map;
+    return { activeStagesByPc: pcMap, activeStagesByInst: instMap };
   }, [stageBuffers]);
 
   // C언어 라인 인덱스별 활성화된 파이프라인 단계 매핑 (C언어용)
@@ -223,7 +234,14 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
               if (activeTab === 'asm') {
                 const pcMatch = line.match(/(0x[0-9a-fA-F]+)/);
                 const linePc = pcMatch ? pcMatch[1].toLowerCase() : null;
-                activeStages = linePc ? activeStagesByPc[linePc] : null;
+                if (linePc && activeStagesByPc[linePc]) {
+                  activeStages = activeStagesByPc[linePc];
+                } else {
+                  const trimmedLine = line.replace(/#.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+                  if (trimmedLine && !trimmedLine.startsWith('.') && !trimmedLine.endsWith(':')) {
+                    activeStages = activeStagesByInst[trimmedLine] || null;
+                  }
+                }
               } else {
                 activeStages = activeStagesByCLine[i] || null;
               }

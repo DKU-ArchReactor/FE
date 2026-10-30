@@ -91,6 +91,13 @@ export interface CycleHistoryItem {
   global_result: GlobalResult;
 }
 
+export interface SimulationRunRequest {
+  build_id?: string;
+  simulation_token?: string;
+  mode?: string;
+  max_cycles?: number;
+}
+
 export interface SimulationResult {
   schema_version: string;
   simulator: {

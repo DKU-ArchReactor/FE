@@ -9,7 +9,6 @@ import ControlPanel from "./components/ControlPanel";
 import LayoutModal from "./components/LayoutModal";
 import FlyoutPanel from "./components/FlyoutPanel";
 
-import rawSimulationData from "@/data/simulation_result.json";
 import type { SimulationResult } from "@/type/simulation";
 import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
@@ -17,8 +16,9 @@ import { PANEL_METAS, ALL_PANEL_KEYS, getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 
 const MainPage: React.FC = () => {
-  const simulationData = rawSimulationData as unknown as SimulationResult;
-  const totalCycles = simulationData.history.length;
+  const [simulationData, setSimulationData] = useState<SimulationResult | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+  const totalCycles = simulationData?.history?.length ?? 0;
 
   // ========================================================
   // 1. 시뮬레이션 제어 상태 관리
@@ -29,6 +29,13 @@ const MainPage: React.FC = () => {
   const [selectedCodeLine, setSelectedCodeLine] = useState<CodeLineSelectInfo | null>(null);
 
   const timerRef = useRef<number | null>(null);
+
+  const handleSimulationComplete = (data: SimulationResult) => {
+    setIsPlaying(false);
+    setCurrentCycle(0);
+    setSelectedCodeLine(null);
+    setSimulationData(data);
+  };
 
   // 자동 재생 타이머
   useEffect(() => {
@@ -152,8 +159,8 @@ const MainPage: React.FC = () => {
 
   const unplacedPanels: PanelKey[] = ALL_PANEL_KEYS.filter((key) => !placedPanelsSet.has(key));
 
-  const currentData = simulationData.history[currentCycle] ?? null;
-  const prevData = currentCycle > 0 ? simulationData.history[currentCycle - 1] : null;
+  const currentData = simulationData?.history?.[currentCycle] ?? null;
+  const prevData = currentCycle > 0 ? simulationData?.history?.[currentCycle - 1] ?? null : null;
 
   // ========================================================
   // 3. 컴포넌트 공통 렌더러 (슬롯 및 말풍선에서 공용 렌더링)
@@ -161,11 +168,13 @@ const MainPage: React.FC = () => {
   const renderPanelComponent = (panelKey: PanelKey) => {
     switch (panelKey) {
       case 'pipeline':
-        return <PipelineVisualizer currentData={currentData} />;
+        return <PipelineVisualizer currentData={currentData} loadingMessage={loadingMessage} />;
       case 'source':
         return (
           <SourceArea 
-            onStartSimulation={handleStartSimulation} 
+            onStartSimulation={handleStartSimulation}
+            onSimulationComplete={handleSimulationComplete}
+            onLoadingChange={setLoadingMessage}
             stageBuffers={currentData?.buffers}
             selectedLine={selectedCodeLine}
             onSelectLine={setSelectedCodeLine}
@@ -176,6 +185,7 @@ const MainPage: React.FC = () => {
           <TutorArea 
             simulationData={simulationData}
             currentCycleData={currentData}
+            loadingMessage={loadingMessage}
             selectedCodeLine={selectedCodeLine}
             onClearSelectedCodeLine={() => setSelectedCodeLine(null)}
           />
