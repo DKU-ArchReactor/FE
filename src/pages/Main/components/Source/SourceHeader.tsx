@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 interface SourceHeaderProps {
   activeTab: 'c' | 'asm';
@@ -6,6 +6,9 @@ interface SourceHeaderProps {
   onFileAdded?: (file: File) => void;
   onCompile?: () => void;
   isCompiling?: boolean;
+  onOpenSaveModal?: () => void;
+  onDeleteCurrentFile?: () => void;
+  onOpenDownloadModal?: () => void;
 }
 
 const SourceHeader: React.FC<SourceHeaderProps> = ({
@@ -14,8 +17,23 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
   onFileAdded,
   onCompile,
   isCompiling = false,
+  onOpenSaveModal,
+  onDeleteCurrentFile,
+  onOpenDownloadModal,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,6 +119,59 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
             </div>
           </div>
         </div>
+
+        {/* 삼선(☰) 더보기 메뉴 버튼 */}
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            title="파일 메뉴 (저장 / 삭제 / 다운로드)"
+            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center shadow-2xs cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
+
+          {isMenuOpen && (
+            <div className="absolute bottom-full right-0 mb-2 w-36 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-40 flex flex-col text-xs font-semibold text-slate-700">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenSaveModal?.();
+                }}
+                className="px-3.5 py-2 text-left hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <span>💾</span>
+                <span>파일 저장</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onDeleteCurrentFile?.();
+                }}
+                className="px-3.5 py-2 text-left hover:bg-rose-50 text-rose-600 transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <span>🗑️</span>
+                <span>파일 삭제</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenDownloadModal?.();
+                }}
+                className="px-3.5 py-2 text-left hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <span>⬇️</span>
+                <span>파일 다운로드</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         <input
           type="file"
           accept=".c"

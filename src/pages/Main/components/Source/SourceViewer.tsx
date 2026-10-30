@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import type { StageBuffer } from '@/type/simulation';
+import type { FileSummary } from '@/type/file';
 
 export interface CodeLineSelectInfo {
   tab: 'c' | 'asm';
@@ -13,6 +14,10 @@ interface SourceViewerProps {
   activeTab: 'c' | 'asm';
   fileName?: string;
   content?: string;
+  isLoggedIn?: boolean;
+  savedFiles?: FileSummary[];
+  selectedFileId?: string | null;
+  onSelectSavedFile?: (fileId: string) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
     ID?: StageBuffer | null;
@@ -121,6 +126,10 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
   activeTab, 
   fileName, 
   content, 
+  isLoggedIn = false,
+  savedFiles = [],
+  selectedFileId = null,
+  onSelectSavedFile,
   stageBuffers,
   selectedLine,
   onSelectLine,
@@ -215,10 +224,39 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 text-left min-h-0">
-      {hasContent && fileName && (
-        <div className="px-4 py-2 border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 flex items-center justify-between shrink-0">
-          <span>{fileName}</span>
-          <span className="text-[10px] text-slate-400 font-normal">
+      {(isLoggedIn || (hasContent && fileName)) && (
+        <div className="px-3 py-2 border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 flex items-center justify-between gap-2 shrink-0">
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <select
+                value={selectedFileId || ''}
+                onChange={(e) => {
+                  if (e.target.value && onSelectSavedFile) {
+                    onSelectSavedFile(e.target.value);
+                  }
+                }}
+                className="max-w-full min-w-[160px] flex-1 px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer truncate"
+              >
+                <option value="" disabled>
+                  {fileName && !selectedFileId
+                    ? `[로컬 파일] ${fileName}`
+                    : savedFiles.length > 0
+                    ? '내 저장 파일 선택...'
+                    : '저장된 파일 없음'}
+                </option>
+                {savedFiles.map((f) => (
+                  <option key={f.file_id} value={f.file_id}>
+                    {activeTab === 'asm' && selectedFileId === f.file_id && fileName
+                      ? `${f.title} (${fileName})`
+                      : f.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <span className="truncate">{fileName}</span>
+          )}
+          <span className="text-[10px] text-slate-400 font-normal shrink-0">
             더블클릭 시 튜터 해설 연동
           </span>
         </div>
