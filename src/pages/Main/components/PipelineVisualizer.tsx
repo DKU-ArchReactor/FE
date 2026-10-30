@@ -3,15 +3,26 @@ import type { CycleHistoryItem } from '@/type/simulation';
 
 interface PipelineVisualizerProps {
   currentData: CycleHistoryItem | null;
+  loadingMessage?: string | null;
 }
 
-const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData }) => {
+const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, loadingMessage }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+
+  if (loadingMessage) {
+    return (
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center gap-3 text-center">
+        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-blue-700">{loadingMessage}</p>
+        <p className="text-xs text-slate-400">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
+      </div>
+    );
+  }
 
   if (!currentData) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center text-slate-400">
-        시뮬레이션 데이터가 없습니다.
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center text-slate-400 text-sm">
+        C 소스 파일을 추가하고 변환 버튼을 눌러 시뮬레이션을 실행해 주세요.
       </div>
     );
   }

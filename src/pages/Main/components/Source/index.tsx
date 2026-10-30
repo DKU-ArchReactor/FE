@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import SourceHeader from './SourceHeader';
 import SourceViewer from './SourceViewer';
+import { compileCode } from '@/api/build';
+import { runSimulation } from '@/api/simulation';
 
-import type { StageBuffer } from '@/type/simulation';
+import type { StageBuffer, SimulationResult } from '@/type/simulation';
 import type { CodeLineSelectInfo } from './SourceViewer';
 
 interface SourceAreaProps {
+  fileId?: string | null;
   onStartSimulation?: () => void;
+  onSimulationComplete?: (data: SimulationResult) => void;
+  onLoadingChange?: (loadingMessage: string | null) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
     ID?: StageBuffer | null;
@@ -18,104 +24,143 @@ interface SourceAreaProps {
   onSelectLine?: (info: CodeLineSelectInfo) => void;
 }
 
-const DEFAULT_C_CODE = `// MIPS / RISC-V Pipeline Simulation Example
-#include <stdio.h>
-
-int main() {
-    int a = 50;
-    int b = 100;
-    int c = 500;
-    int d = 0;
-
-    int div = c / d; // Zero division test
-    if (a == 50 && b == 100) {
-        printf("Pipeline Check OK\\n");
-    }
-
-    return 0;
-}
-`;
-
-const DEFAULT_ASM_CODE = `# Disassembled Instructions (from simulation_result.json)
-.globl main
-main:
-  0x00010094:  addi sp, sp, -48
-  0x00010098:  lui a5, 65536
-  0x0001009c:  sw ra, 44(sp)
-  0x000100a0:  addi a5, a5, 388
-  0x000100a4:  addi a0, a5, 0
-  0x000100a8:  addi a7, zero, 4
-  0x000100ac:  ecall
-  0x000100b0:  addi a5, zero, 50
-  0x000100b4:  sw a5, 16(sp)
-  0x000100b8:  sw a5, 24(sp)
-  0x000100bc:  addi a5, zero, 100
-  0x000100c0:  sw a5, 20(sp)
-  0x000100c4:  lw a3, 16(sp)
-  0x000100c8:  sw a5, 28(sp)
-  0x000100cc:  lw a2, 20(sp)
-  0x000100d0:  addi a4, zero, 500
-  0x000100d4:  addi a5, zero, 0
-  0x000100d8:  div a1, a4, a5
-  0x000100dc:  addi a3, a3, -50
-  0x000100e0:  addi a2, a2, -100
-  0x000100e4:  sltiu a3, a3, 1
-  0x000100e8:  sltiu a2, a2, 1
-  0x000100ec:  and a3, a3, a2
-  0x000100f0:  beq a3, zero, 64
-  0x000100f4:  addi a0, zero, 60
-  0x000100f8:  sw a1, 12(sp)
-  0x000100fc:  jal ra, 128
-  0x00010100:  lw a1, 12(sp)
-  0x00010104:  addi a1, a1, 1
-  0x00010108:  bne a1, zero, 40
-  0x0001010c:  addi a0, a0, -1552
-  0x00010110:  addi a0, a0, -2048
-  0x00010114:  bne a0, zero, 28
-  0x00010118:  lui a5, 65536
-  0x0001011c:  addi a5, a5, 424
-  0x00010120:  addi a0, a5, 0
-  0x00010124:  addi a7, zero, 4
-  0x00010128:  ecall
-  0x0001012c:  jal zero, 24
-  0x00010130:  lui a5, 65536
-  0x00010134:  addi a5, a5, 456
-  0x00010144:  addi a7, zero, 10
-  0x00010148:  ecall
-  0x0001014c:  lw ra, 44(sp)
-  0x00010150:  addi a0, zero, 0
-  0x00010154:  addi sp, sp, 48
-  0x00010158:  jalr zero, ra, 0
-`;
-
 const SourceArea: React.FC<SourceAreaProps> = ({ 
+  fileId: externalFileId = null,
+  onSimulationComplete,
+  onLoadingChange,
   stageBuffers,
   selectedLine,
   onSelectLine,
 }) => {
-  const [activeTab, setActiveTab] = useState<'c' | 'asm'>('asm');
-  const [cFileName, setCFileName] = useState<string>('sample.c');
-  const [cContent, setCContent] = useState<string>(DEFAULT_C_CODE);
-  const [asmFileName] = useState<string>('sample.s');
-  const [asmContent] = useState<string>(DEFAULT_ASM_CODE);
+  const [activeTab, setActiveTab] = useState<'c' | 'asm'>('c');
+  const [fileId, setFileId] = useState<string | null>(externalFileId);
+  const [cFileName, setCFileName] = useState<string>('');
+  const [cContent, setCContent] = useState<string>('');
+  const [asmFileName, setAsmFileName] = useState<string>('');
+  const [asmContent, setAsmContent] = useState<string>('');
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const updateLoading = (msg: string | null) => {
+    setLoadingMessage(msg);
+    onLoadingChange?.(msg);
+  };
 
   const handleFileAdded = (file: File) => {
+    setErrorMsg(null);
+    setFileId(null);
     setCFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
       setCContent(result);
+      setActiveTab('c');
     };
     reader.readAsText(file);
   };
 
-  const handleCompile = () => {
-    // 변환 시 ASM 탭으로 전환만 수행하고 시뮬레이션은 자동 시작하지 않음
-    setActiveTab('asm');
+  const handleCompile = async () => {
+    const activeFileId = externalFileId ?? fileId;
+
+    if (!activeFileId && !cContent) {
+      setErrorMsg('먼저 + 버튼을 눌러 C 소스 파일을 추가해 주세요.');
+      return;
+    }
+
+    setErrorMsg(null);
+    updateLoading('1/2 C 코드를 어셈블리로 컴파일하는 중...');
+
+    try {
+      // file_id가 있는 경우와 없는 경우(직접 입력 모드)로 분기하여 컴파일 요청
+      const compilePayload = activeFileId
+        ? {
+            file_id: activeFileId,
+            compile_profile: 'rv32im',
+            compiler_opt: '',
+          }
+        : {
+            content: cContent,
+            lang: 'c',
+            compile_profile: 'rv32im',
+            compiler_opt: '',
+          };
+
+      const result = await compileCode(compilePayload);
+      console.log("Compile Result:", result);
+
+      if (result.status === 'success' && result.assembly_url) {
+        try {
+          let fetchUrl = result.assembly_url;
+          if (import.meta.env.DEV && import.meta.env.VITE_S3_BUCKET_URL) {
+            fetchUrl = fetchUrl.replace(import.meta.env.VITE_S3_BUCKET_URL, '/s3-proxy');
+          }
+
+          let asmResponse = await fetch(fetchUrl);
+          if (!asmResponse.ok && fetchUrl !== result.assembly_url) {
+            asmResponse = await fetch(result.assembly_url);
+          }
+          const asmText = await asmResponse.text();
+
+          setAsmContent(asmText);
+          setAsmFileName(cFileName ? cFileName.replace(/\.c$/i, '.s') : 'assembly.s');
+          setActiveTab('asm');
+        } catch (asmErr) {
+          console.error("Assembly Fetch Error:", asmErr);
+        }
+
+        // file_id 기반으로 컴파일하여 build_id가 있는 경우 build_id 사용,
+        // file_id 없이 직접 입력으로 컴파일하여 simulation_token이 있는 경우 simulation_token 사용
+        if (result.build_id) {
+          updateLoading('2/2 파이프라인 시뮬레이션 실행 중...');
+          const simResult = await runSimulation({
+            build_id: result.build_id,
+            mode: 'pipeline',
+            max_cycles: 2000,
+          });
+          console.log("Simulation Result:", simResult);
+          onSimulationComplete?.(simResult);
+        } else if (result.simulation_token) {
+          updateLoading('2/2 파이프라인 시뮬레이션 실행 중...');
+          const simResult = await runSimulation({
+            simulation_token: result.simulation_token,
+            mode: 'pipeline',
+            max_cycles: 2000,
+          });
+          console.log("Simulation Result:", simResult);
+          onSimulationComplete?.(simResult);
+        } else {
+          setErrorMsg('시뮬레이션 실행에 필요한 build_id 또는 simulation_token이 반환되지 않았습니다.');
+        }
+      } else {
+        setErrorMsg(result.log || '컴파일에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error("Compile/Simulation Error:", error);
+      if (axios.isAxiosError(error) && error.response?.status === 410) {
+        setErrorMsg('시뮬레이션 토큰이 만료되었습니다. 다시 컴파일해 주세요.');
+      } else {
+        setErrorMsg('컴파일 또는 시뮬레이션 요청 중 오류가 발생했습니다.');
+      }
+    } finally {
+      updateLoading(null);
+    }
   };
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden min-h-0">
+    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden min-h-0 relative">
+      {errorMsg && (
+        <div className="px-3 py-2 bg-rose-50 border-b border-rose-200 text-rose-600 text-xs font-medium flex items-center justify-between shrink-0">
+          <span>{errorMsg}</span>
+          <button
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            className="text-rose-400 hover:text-rose-700 ml-2 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <SourceViewer 
         activeTab={activeTab} 
         fileName={activeTab === 'c' ? cFileName : asmFileName}
@@ -124,11 +169,21 @@ const SourceArea: React.FC<SourceAreaProps> = ({
         selectedLine={selectedLine}
         onSelectLine={onSelectLine}
       />
+
+      {loadingMessage && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center gap-3 p-4 text-center">
+          <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="text-xs font-semibold text-blue-700">{loadingMessage}</div>
+          <div className="text-[11px] text-slate-500">잠시만 기다려 주세요...</div>
+        </div>
+      )}
+
       <SourceHeader 
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
         onFileAdded={handleFileAdded}
         onCompile={handleCompile}
+        isCompiling={!!loadingMessage}
       />
     </div>
   );
