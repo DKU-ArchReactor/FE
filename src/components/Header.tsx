@@ -1,10 +1,37 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { getMe } from "@/api/auth";
+import type { UserMeResponse } from "@/type/auth";
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [user, setUser] = useState<UserMeResponse | null>(null);
 
   const isActive = (path: string) => location.pathname === path;
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      setUser(null);
+      return;
+    }
+
+    getMe()
+      .then((data) => setUser(data))
+      .catch(() => {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("token_type");
+        setUser(null);
+      });
+  }, [location.pathname]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("token_type");
+    setUser(null);
+    navigate("/login");
+  };
 
   const navItems = [
     { label: "C → 어셈블리 변환", path: "/c-to-asm" },
@@ -38,25 +65,45 @@ const Header = () => {
             ))}
           </div>
         </div>
-        <nav className="flex items-center gap-6">
-          <button 
-            onClick={() => navigate("/login")}
-            className={`text-sm font-medium transition-colors hover:text-sky-600 ${isActive('/login') ? 'text-sky-600' : 'text-slate-600'}`}
-          >
-            로그인
-          </button>
-          <button 
-            onClick={() => navigate("/signup")}
-            className={`text-sm font-medium transition-colors hover:text-sky-600 ${isActive('/signup') ? 'text-sky-600' : 'text-slate-600'}`}
-          >
-            회원가입
-          </button>
-          <button 
-            onClick={() => navigate("/my")}
-            className={`text-sm font-medium text-white bg-sky-500 hover:bg-sky-600 px-4 py-2 rounded-full shadow-md shadow-sky-200 transition-all active:scale-95`}
-          >
-            마이페이지
-          </button>
+        <nav className="flex items-center gap-5">
+          {user ? (
+            <>
+              <span className="text-sm font-medium text-slate-700">
+                <strong className="text-sky-600 font-semibold">{user.name}</strong>님 반갑습니다.
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm font-medium text-slate-500 hover:text-rose-500 transition-colors cursor-pointer"
+              >
+                로그아웃
+              </button>
+              <button 
+                type="button"
+                onClick={() => navigate("/my")}
+                className="text-sm font-medium text-white bg-sky-500 hover:bg-sky-600 px-4 py-2 rounded-full shadow-md shadow-sky-200 transition-all active:scale-95 cursor-pointer"
+              >
+                마이페이지
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                type="button"
+                onClick={() => navigate("/login")}
+                className={`text-sm font-medium transition-colors hover:text-sky-600 cursor-pointer ${isActive('/login') ? 'text-sky-600' : 'text-slate-600'}`}
+              >
+                로그인
+              </button>
+              <button 
+                type="button"
+                onClick={() => navigate("/signup")}
+                className={`text-sm font-medium transition-colors hover:text-sky-600 cursor-pointer ${isActive('/signup') ? 'text-sky-600' : 'text-slate-600'}`}
+              >
+                회원가입
+              </button>
+            </>
+          )}
         </nav>
       </div>
     </header>
