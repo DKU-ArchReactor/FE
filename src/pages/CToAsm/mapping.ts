@@ -3,6 +3,7 @@ export type AssemblyRow = {
   text: string;
   kind: 'instruction' | 'label';
   sourceLine: number | null;
+  functionName: string | null;
 };
 
 // The compile API writes uploaded C content to source.c. Never infer mapping
@@ -23,6 +24,8 @@ export function parseAssembly(assembly: string, sourceLineCount: number): Assemb
   let previousExecutable = false;
   const sectionStack: boolean[] = [];
   let sourceLine: number | null = null;
+  let pendingFunction: string | null = null;
+  let activeFunction: string | null = null;
   lines.forEach((raw, index) => {
     const text = raw.replace(/#.*/, '').trim();
     const section = text.match(/^\.(section|pushsection)\s+([^,\s]+)(?:\s*,\s*"([^"]*)")?/);
@@ -53,15 +56,18 @@ export function parseAssembly(assembly: string, sourceLineCount: number): Assemb
         ? lineNumber : null;
       return;
     }
-    if (/^\.(?:cfi_endproc|size)\b/.test(text)) { sourceLine = null; return; }
+    const functionType = text.match(/^\.type\s+([\w.$]+)\s*,\s*[@%]function\b/);
+    if (functionType) { pendingFunction = functionType[1]; return; }
+    if (/^\.(?:cfi_endproc|size)\b/.test(text)) { sourceLine = null; if (/^\.size\b/.test(text)) activeFunction = null; return; }
     if (!executable || !text) return;
     if (/^[.$\w]+:$/.test(text)) {
+      if (pendingFunction) { activeFunction = pendingFunction; pendingFunction = null; }
       // Keep branch targets and public function labels, hide debug-only labels.
       if (!/^\.L(?:FB|FE|VL|BB|BE|text|etext|debug)/.test(text)) {
-        rows.push({ assemblyLine: index + 1, text, kind: 'label', sourceLine: null });
+        rows.push({ assemblyLine: index + 1, text, kind: 'label', sourceLine: null, functionName: activeFunction });
       }
     } else if (/^[a-zA-Z][\w.]*\s*[^=]*$/.test(text) && !text.startsWith('.')) {
-      rows.push({ assemblyLine: index + 1, text, kind: 'instruction', sourceLine });
+      rows.push({ assemblyLine: index + 1, text, kind: 'instruction', sourceLine, functionName: activeFunction });
     }
   });
   return rows;

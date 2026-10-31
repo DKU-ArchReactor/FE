@@ -1,14 +1,14 @@
 import type { AssemblyRow } from './mapping';
 
-export type CodeBlock = { sourceLine: number | null; rows: AssemblyRow[] };
+export type CodeBlock = { sourceLine: number | null; functionName: string | null; rows: AssemblyRow[] };
 
 // Only adjacent output rows are grouped. Sorting by C line would change control flow.
 export function groupAssembly(rows: AssemblyRow[]): CodeBlock[] {
   const blocks: CodeBlock[] = [];
   for (const row of rows) {
     const previous = blocks.at(-1);
-    if (previous && previous.sourceLine === row.sourceLine) previous.rows.push(row);
-    else blocks.push({ sourceLine: row.sourceLine, rows: [row] });
+    if (previous && previous.sourceLine === row.sourceLine && previous.functionName === row.functionName) previous.rows.push(row);
+    else blocks.push({ sourceLine: row.sourceLine, functionName: row.functionName, rows: [row] });
   }
   return blocks;
 }

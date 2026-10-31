@@ -8,6 +8,7 @@ type Props = { source: string; assembly?: string; selection?: SourceSelection | 
 export default function CodeComparison({ source, assembly, selection: controlledSelection, onSelectionChange }: Props) {
   const [localSelection, setSelection] = useState<SourceSelection | null>(null);
   const [selectedUnmapped, setSelectedUnmapped] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const selection = controlledSelection === undefined ? localSelection : controlledSelection;
   const anchor = useRef(1);
   const lines = source.split('\n');
@@ -33,24 +34,41 @@ export default function CodeComparison({ source, assembly, selection: controlled
 
   const displayBlocks: (typeof blocks[number] & { contextLine?: number })[] = [];
   let lastContextLine = 0;
+  let currentFunction: string | null = null;
   for (const block of blocks) {
     if (block.sourceLine !== null) {
       for (let line = lastContextLine + 1; line < block.sourceLine; line += 1) {
-        if (lines[line - 1]?.trim() && !mappedLines.has(line)) displayBlocks.push({ sourceLine: null, contextLine: line, rows: [] });
+        if (lines[line - 1]?.trim() && !mappedLines.has(line)) displayBlocks.push({ sourceLine: null, functionName: currentFunction, contextLine: line, rows: [] });
       }
       lastContextLine = Math.max(lastContextLine, block.sourceLine);
     }
+    currentFunction = block.functionName || currentFunction;
     displayBlocks.push(block);
   }
   for (let line = lastContextLine + 1; line <= lines.length; line += 1) {
-    if (lines[line - 1]?.trim() && !mappedLines.has(line)) displayBlocks.push({ sourceLine: null, contextLine: line, rows: [] });
+    if (lines[line - 1]?.trim() && !mappedLines.has(line)) displayBlocks.push({ sourceLine: null, functionName: currentFunction, contextLine: line, rows: [] });
   }
+  const functionGroups = new Map<string, typeof displayBlocks>();
+  for (const block of displayBlocks) {
+    const name = block.functionName || '전역 코드';
+    functionGroups.set(name, [...(functionGroups.get(name) || []), block]);
+  }
+  const matchingGroups = [...functionGroups].map(([name, groupBlocks]) => [name, groupBlocks.filter(block => {
+    if (!query.trim()) return true;
+    const needle = query.trim().toLocaleLowerCase();
+    const sourceText = block.contextLine ? lines[block.contextLine - 1] : block.sourceLine ? lines[block.sourceLine - 1] : '';
+    return `${sourceText} ${block.rows.map(row => row.text).join(' ')}`.toLocaleLowerCase().includes(needle);
+  })] as const).filter(([, groupBlocks]) => groupBlocks.length > 0);
+  const firstFunction = Math.max(0, matchingGroups.findIndex(([name]) => name !== '전역 코드'));
 
   return <section className="compile-comparison" aria-label="C와 어셈블리 대응 블록">
-    <div className="compile-block-header"><h2>C 소스</h2><h2>대응 어셈블리 <span>명령어별 역할</span></h2></div>
-    <p className="compile-block-guide">{assembly ? '같은 블록의 C와 명령어가 함께 보입니다. 명령어는 컴파일 출력 순서를 따릅니다.' : '컴파일하면 각 C 줄 옆에 해당 명령어와 역할이 함께 표시됩니다.'}</p>
+    <div className="compile-block-header"><h2>C 코드 <span>클릭하면 연결된 줄 강조</span></h2><h2>대응 어셈블리 <span>명령어별 역할</span></h2></div>
+    {assembly && <label className="compile-code-search">함수·코드·명령어 찾기<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="예: sum, lw, node->next" /></label>}
+    <p className="compile-block-guide">{assembly ? '함수별로 접고 펼칠 수 있습니다. 같은 블록의 C와 명령어가 함께 보입니다.' : '컴파일하면 각 C 줄 옆에 해당 명령어와 역할이 함께 표시됩니다.'}</p>
     {!assembly ? <div className="compile-before">{lines.map((_, i) => <div key={i}>{sourceButton(i + 1)}</div>)}</div> : <>
-      {displayBlocks.map((block, index) => {
+      {matchingGroups.map(([functionName, functionBlocks], groupIndex) => <details key={functionName} className="compile-function" open={groupIndex === firstFunction}>
+        <summary><strong>{functionName}</strong><span>{functionBlocks.length}개 코드 블록</span></summary>
+        {functionBlocks.map((block, index) => {
         const sourceLine = block.sourceLine;
         const contextLine = block.contextLine;
         const repeated = sourceLine !== null && blocks.filter(item => item.sourceLine === sourceLine).length > 1;
@@ -66,7 +84,9 @@ export default function CodeComparison({ source, assembly, selection: controlled
             </div>)}
           </div>
         </article>;
-      })}
+        })}
+      </details>)}
+      {matchingGroups.length === 0 && <p className="compile-no-results">“{query}”에 해당하는 코드나 명령어가 없습니다.</p>}
       {mappedLines.size === 0 && <p className="compile-warning" role="status">C 줄 정보가 없어 대응 관계를 표시할 수 없습니다. 명령어 순서만 표시하며, 연결을 추측하지 않습니다.</p>}
     </>}
     {selection && <div className="compile-selection" role="status"><h2>C {selection.start}{selection.end !== selection.start ? `–${selection.end}` : ''}행 → {selectedRows.length}개 어셈블리 명령</h2><p>같은 C 위치의 블록이 함께 강조됩니다. Shift+클릭으로 범위를 선택할 수 있습니다.</p></div>}
