@@ -130,8 +130,8 @@ export default function CToAsmPage() {
       <div className="compile-heading">
         <div>
           <p className="compile-eyebrow">ARCHREACTOR / COMPILE</p>
-          <h1>C 컴파일 결과</h1>
-          <p>생성된 RISC-V 어셈블리를 C 코드와 나란히 확인해 보세요.</p>
+          <h1>C 컴파일 · RISC-V 어셈블리</h1>
+          <p>C 코드와 컴파일 결과인 어셈블리 명령어를 함께 확인해 보세요.</p>
         </div>
       </div>
       <div className="compile-toolbar">
@@ -150,9 +150,10 @@ export default function CToAsmPage() {
             </section>}
           </div>
         </details>
-        <span className="compile-filename">{fileName}</span>
-        <button className="compile-new-code" title="편집기를 비우고 새 코드를 작성" disabled={busy} onClick={resetEditor}>새 코드</button>
-        <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
+        <div className="compile-run-actions">
+          <button className="compile-reset-button" title="편집기와 컴파일 결과를 비웁니다" disabled={busy} onClick={resetEditor}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 8a6 6 0 1 1-.1 4" /><path d="M4 3.8v4.5h4.5" /></svg>초기화</button>
+          <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
+        </div>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
           void openFile(event.target.files?.[0]); event.target.value = '';
         }} />

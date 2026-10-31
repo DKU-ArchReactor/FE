@@ -114,7 +114,7 @@ export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'gr
     return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
   };
   return <div className="compile-object-graph" ref={graphRef}>
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', minWidth: Math.min(width, 280), maxWidth: width, height: 'auto' }} role="img" aria-label={treeShape ? '트리 구조와 실제 포인터 연결' : listShape ? '연결 리스트와 실제 포인터 연결' : '구조체와 실제 포인터 연결'}>
+    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', minWidth: Math.min(width, 280), maxWidth: width, height: 'auto' }} role="img" aria-label={treeShape ? '트리형 포인터 연결 그림' : listShape ? '연결 리스트형 포인터 연결 그림' : '포인터 연결 그림'}>
       <defs><marker id={markerId} markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#0284c7" /></marker><marker id={`${markerId}-changed`} markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#d97706" /></marker></defs>
       {visibleEdges.map((edge, index) => {
         const from = positions.get(edge.from)!, to = positions.get(edge.to)!;
@@ -140,6 +140,6 @@ export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'gr
         </g>;
       })}
     </svg>
-    {nodes.length > 40 && <p>노드는 앞 40개까지 표시합니다.</p>}
+    {(nodes.length > 40 || visible.some(node => node.fields.length > 8)) && <p>{nodes.length > 40 ? '노드는 앞 40개까지 표시합니다. ' : ''}{visible.some(node => node.fields.length > 8) ? '노드마다 필드는 앞 8개까지 표시합니다.' : ''}</p>}
   </div>;
 }

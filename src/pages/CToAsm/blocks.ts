@@ -24,12 +24,15 @@ export function operandExplanation(text: string): string | null {
   if (op === 'li' && operands.length === 2) return `${dest} ← 상수 ${left}`;
   if (op === 'mv' && operands.length === 2) return `${dest} ← ${left} · 레지스터 값 복사`;
   const operator: Record<string, string> = { add: '+', addi: '+', sub: '−', mul: '×' };
-  if (operator[op] && operands.length === 3) return `${dest} ← ${left} ${operator[op]} ${right}`;
+  if (operator[op] && operands.length === 3) {
+    const operation = op === 'addi' && /^-\d+$/.test(right) ? `− ${right.slice(1)}` : `${operator[op]} ${right}`;
+    return `${dest} ← ${left} ${operation}`;
+  }
   if (op === 'ret') return '복귀 주소 ra로 이동';
   if (op === 'jr' && operands.length === 1) return `${dest}가 가리키는 위치로 이동`;
   if (op === 'j' && operands.length === 1) return `${dest} 레이블로 이동`;
-  if (op === 'lui' && operands.length === 2) return `${dest} ← ${left}의 상위 즉시값 · 하위 12비트는 0`;
-  if (op === 'auipc' && operands.length === 2) return `${dest} ← 현재 명령어 주소 + 상위 즉시값 ${left}`;
+  if (op === 'lui' && operands.length === 2) return `${dest} ← ${left} << 12 · 하위 12비트는 0`;
+  if (op === 'auipc' && operands.length === 2) return `${dest} ← 현재 명령어 주소 + (${left} << 12)`;
   if (/^(sll|slli|srl|srli|sra|srai)$/.test(op) && operands.length === 3) return `${dest} ← ${left}를 ${right}비트 ${op.startsWith('sll') ? '왼쪽' : '오른쪽'} 이동${op.startsWith('sra') ? ' · 부호 유지' : ''}`;
   const comparisons: Record<string, string> = { beq: '=', bne: '≠', blt: '<', bge: '≥', bltu: '< (부호 없음)', bgeu: '≥ (부호 없음)' };
   if (comparisons[op] && operands.length === 3) return `${dest} ${comparisons[op]} ${left}이면 ${right}로 분기`;

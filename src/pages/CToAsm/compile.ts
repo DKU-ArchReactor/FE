@@ -39,7 +39,13 @@ export function compileError(error: unknown): string {
   }
   const message = error instanceof Error ? error.message : '컴파일 중 오류가 발생했습니다.';
   const header = message.match(/fatal error:\s*([^:\n]+): No such file or directory/);
-  if (header) return `컴파일 환경에 ${header[1].trim()} 헤더가 없습니다.\n현재 RV32IM 환경에서는 stdio.h와 printf 같은 표준 입출력을 사용할 수 없습니다. 헤더 없이 정수 연산·배열·포인터를 사용하고, 계산 결과를 main에서 return하는 코드로 시험해 주세요.\n파일은 편집기에 정상적으로 불러왔으며, 해당 헤더를 처리하는 단계에서 컴파일이 중단됐습니다.`;
+  if (header) {
+    const name = header[1].trim();
+    const hint = name === 'stdio.h'
+      ? '현재 환경은 stdio.h와 printf 같은 표준 입출력을 지원하지 않습니다. 헤더 없이 정수 연산·배열·포인터를 사용하고, 계산 결과를 main에서 return하는 코드로 시험해 주세요.'
+      : `현재 컴파일 환경에서 ${name} 파일을 찾지 못했습니다. 필요한 기능을 지원하는 헤더 없이 작성할 수 있는지 확인해 주세요.`;
+    return `컴파일 환경에서 ${name} 헤더를 찾지 못했습니다.\n${hint}\n편집기 내용은 유지되며, 해당 헤더를 처리하는 단계에서 컴파일이 중단됐습니다.`;
+  }
   if (message.includes('source.c:')) {
     return message.split('\n').filter(line => !line.startsWith('$ ') && !/^\[exit /.test(line)).join('\n').replace(/(?:[A-Za-z]:)?[^\s:]*[\\/]source\.c/g, '편집기');
   }

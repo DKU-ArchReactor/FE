@@ -33,7 +33,7 @@ it('keeps the final recorded memory scene and distinguishes retained scalar valu
   expect(finalScene.changes.length).toBeGreaterThan(0);
   const view=inspectMemory(debug,snapshotForCycle(trace.history[finalScene.index]));
   const {container}=render(<MemoryDiagram view={view} changes={finalScene.changes} finished onSelectLine={vi.fn()} />);
-  expect(screen.getByText('마지막 기록의 독립 변수')).toBeTruthy();
+  expect(screen.getByText('마지막 표시 단계의 독립 변수')).toBeTruthy();
   expect(container.querySelector('.compile-memory-cell.is-final')).toBeTruthy();
   expect(screen.getByRole('region',{name:'포인터 연결 그림'})).toBeTruthy();
 });

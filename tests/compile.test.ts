@@ -10,7 +10,8 @@ describe('compilation transport', () => {
   it('explains missing library headers without presenting a shell command as the error', () => {
     const message = compileError(new Error('$ gcc source.c\n/tmp/build/source.c:1:10: fatal error: stdio.h: No such file or directory'));
     expect(message).toContain('stdio.h');
-    expect(message).toContain('정상적으로 불러왔으며');
+    expect(message).toContain('편집기 내용은 유지되며');
+    expect(message).toContain('표준 입출력을 지원하지 않습니다');
     expect(message).not.toContain('$ gcc');
   });
   it('requests real debug mapping and downloads assembly without forwarding credentials', async () => {

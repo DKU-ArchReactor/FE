@@ -93,19 +93,19 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
           <input aria-label="메모리 변화 단계 선택" type="range" min={0} max={scenes.length - 1} value={step} onChange={event => { setPlaying(false); setStep(Number(event.target.value)); }} />
           <span>단계 {step + 1} / {scenes.length}</span>
         </div>
-        <p className="compile-step-guide">변수의 메모리 값이 바뀐 단계와 시작·종료 지점을 모았습니다. CPU 사이클 {cycle?.clock}의 모습입니다.</p>
+        <p className="compile-step-guide">초기 상태와 메모리 변화가 기록된 시점을 모았습니다. 현재 CPU 사이클 {cycle?.clock}의 모습입니다.</p>
         <div className="compile-memory-flow">
           <article><span>연결된 C 소스</span>{sourceLine ? <button onClick={() => onSelectLine(sourceLine)}><b>C {sourceLine}행 ↗</b><code>{sourceText || '소스 위치 보기'}</code></button> : <p>C 코드 진입 전 또는 함수 복귀 후</p>}</article>
           <span className="compile-flow-arrow" aria-hidden="true">→</span>
-          <article><span>현재 RISC-V 어셈블리</span><code>{instruction || '다음 명령 대기'}</code>{instruction && <p>{operandExplanation(instruction) || instructionExplanation(instruction)}</p>}</article>
+          <article><span>현재 RISC-V 어셈블리</span><code>{instruction || (trace.executionStatus === 'COMPLETED' ? '실행 중인 명령어 없음' : '다음 명령 대기')}</code>{instruction && <p>{operandExplanation(instruction) || instructionExplanation(instruction)}</p>}</article>
           <span className="compile-flow-arrow" aria-hidden="true">→</span>
-          <article className="compile-flow-change"><span>메모리에 남은 변화</span>{scene.changes.length ? <ul>{scene.changes.slice(0, 6).map(change => <li key={`${change.name}-${change.address}`}><b>{change.name}</b><span>{change.pointer ? pointerName(change.before, change.targetType) : change.before} → <strong>{change.pointer ? pointerName(change.after, change.targetType) : change.after}</strong></span></li>)}</ul> : <p>{step === 0 ? '아직 기록된 변수 변화가 없습니다.' : '실행이 끝나거나 변수 범위를 벗어난 지점입니다.'}</p>}</article>
+          <article className="compile-flow-change"><span>메모리에 남은 변화</span>{scene.changes.length ? <><ul>{scene.changes.slice(0, 6).map(change => <li key={`${change.name}-${change.address}`}><b>{change.name}</b><span>{change.pointer ? pointerName(change.before, change.targetType) : change.before} → <strong>{change.pointer ? pointerName(change.after, change.targetType) : change.after}</strong></span></li>)}</ul>{scene.changes.length > 6 && <p>그 밖의 변화 {scene.changes.length - 6}개</p>}</> : <p>{step === 0 ? '아직 기록된 변수 변화가 없습니다.' : '이 시점에는 새 메모리 변화가 없습니다.'}</p>}</article>
         </div>
       </>}
       {view && <>{view.warnings.map(message => <p className="compile-warning" key={message}>{message}</p>)}
         <MemoryDiagram key={scene.index} view={view} changes={scene.changes} finished={step === scenes.length - 1} playing={playing} onSelectLine={onSelectLine} />
-        <details className="compile-runtime-values"><summary>주소·타입과 전체 값 자세히 보기</summary><p>CPU 사이클 {cycle?.clock} · 명령 위치 {snapshot?.current_pc} · single 모드</p><ul>{view.variables.map((value, index) => <ValueTree key={`${value.name}-${index}`} value={value} previous={previous?.variables.find(old => old.name === value.name && old.address === value.address)} />)}</ul></details>
-        <p className="compile-footnote">현재 함수 범위에서 위치를 확인할 수 있는 변수만 표시합니다. 회색은 값 또는 위치를 확인하지 못했다는 뜻입니다. 초기화 완료·할당 해제 여부를 보장하지 않으며, 배열은 앞 32개 원소·그래프는 최대 40개 노드를 표시합니다.</p>
+        <details className="compile-runtime-values"><summary>주소·타입과 변수 값 자세히 보기</summary><p>CPU 사이클 {cycle?.clock} · 명령 위치 {snapshot?.current_pc} · 단일 명령 실행 모드</p><ul>{view.variables.map((value, index) => <ValueTree key={`${value.name}-${index}`} value={value} previous={previous?.variables.find(old => old.name === value.name && old.address === value.address)} />)}</ul></details>
+        <p className="compile-footnote">현재 위치에서 주소나 레지스터를 확인할 수 있는 변수만 표시합니다. 그림에는 독립 변수 최대 24개, 배열 최대 8개(각 앞 32개 원소), 포인터 그래프 최대 40개 노드를 표시합니다. 회색은 값 또는 위치를 확인하지 못했다는 뜻입니다. 초기화 완료·할당 해제 여부는 보장하지 않습니다.</p>
       </>}
       {trace.console_output && <pre className="compile-console">{trace.console_output}</pre>}
     </>}
