@@ -5,34 +5,38 @@ import CToAsmPage from '../src/pages/CToAsm';
 import { compileSource } from '../src/pages/CToAsm/compile';
 
 vi.mock('../src/pages/CToAsm/compile', () => ({ compileSource: vi.fn(), compileError: (error: Error) => error.message }));
+vi.mock('@monaco-editor/react', () => ({ default: (props: { value: string; onChange: (value: string) => void }) => <textarea aria-label="C 소스 편집기" value={props.value} onChange={event => props.onChange(event.target.value)} /> }));
 beforeAll(() => { HTMLElement.prototype.scrollTo = vi.fn(); });
 afterEach(cleanup);
 
 describe('compilation page', () => {
-  it('compiles once, connects the result, and clears stale results when the example changes', async () => {
+  it('hides assembly headings before compilation and connects the compiled source', async () => {
     vi.mocked(compileSource).mockResolvedValue({ assembly: readFileSync('tests/fixtures/arithmetic.s', 'utf8'), log: 'ok' });
     render(<CToAsmPage />);
+    expect(screen.getByRole('heading', { name: '컴파일 결과가 여기에 표시됩니다' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /대응 어셈블리/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '컴파일하기 →' }));
     await screen.findByText(/컴파일 완료/);
     fireEvent.click(screen.getByRole('button', { name: 'C 4행: int sum = a + b;' }));
     expect(screen.getByText('C 4행 → 4개 어셈블리 명령')).toBeTruthy();
-    fireEvent.change(screen.getByRole('combobox', { name: '학습 예제' }), { target: { value: 'list' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'C 소스 편집기' }), { target: { value: 'int main(){return 1;}' } });
     expect(screen.queryByText(/컴파일 완료/)).toBeNull();
     expect(screen.queryByRole('button', { name: /ASM / })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'head: C 10행 선택' }));
-    expect(screen.getByRole('button', { name: 'C 10행: node = node->next;' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'middle: C 11행 선택' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: '컴파일하기 →' }));
+    await screen.findByText(/컴파일 완료/);
+    expect(compileSource).toHaveBeenLastCalledWith('int main(){return 1;}', expect.any(AbortSignal));
   });
 
-  it('opens an uploaded C file and removes curated structure diagrams', async () => {
+  it('opens an uploaded C file and inspects its actual aggregate declarations', async () => {
     render(<CToAsmPage />);
-    fireEvent.change(screen.getByRole('combobox', { name: '학습 예제' }), { target: { value: 'tree' } });
-    const file = new File(['int main(){return 42;}'], 'custom.c', { type: 'text/plain' });
-    Object.defineProperty(file, 'text', { value: async () => 'int main(){return 42;}' });
+    const fileSource = 'struct Link { int value; struct Link *next; };\nstruct Link head;\nint scores[3];';
+    const file = new File([fileSource], 'custom.c', { type: 'text/plain' });
+    Object.defineProperty(file, 'text', { value: async () => fileSource });
     fireEvent.change(screen.getByLabelText('C 파일 열기', { selector: 'input' }), { target: { files: [file] } });
     await screen.findByText('custom.c');
-    expect(screen.queryByLabelText('자료구조 설명')).toBeNull();
-    expect(screen.getByRole('button', { name: 'C 1행: int main(){return 42;}' })).toBeTruthy();
+    expect(screen.getByText('struct Link')).toBeTruthy();
+    expect(screen.getByText('int scores')).toBeTruthy();
+    expect(screen.getByText(/실행 중 대상 미확정/)).toBeTruthy();
   });
 
   it('shows failures and permits retry without keeping a stale result', async () => {
@@ -49,7 +53,7 @@ describe('compilation page', () => {
     vi.mocked(compileSource).mockClear().mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     render(<CToAsmPage />);
     fireEvent.click(screen.getByRole('button', { name: '컴파일하기 →' }));
-    fireEvent.click(screen.getByRole('button', { name: '처리 중…' }));
+    fireEvent.click(screen.getByRole('button', { name: '컴파일 중…' }));
     expect(compileSource).toHaveBeenCalledTimes(1);
     finish({ assembly: '.text\nret', log: '' });
     await screen.findByText(/컴파일 완료/);
