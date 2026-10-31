@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { arithmeticSource } from './examples';
+import { arithmeticSource, examples } from './examples';
 import { compileError, compileSource } from './compile';
 import type { Compilation } from './compile';
 import CodeComparison from './CodeComparison';
+import StructureDiagram from './StructureDiagram';
+import type { SourceSelection } from './mapping';
 import './compile.css';
 
 export default function CToAsmPage() {
@@ -11,6 +13,8 @@ export default function CToAsmPage() {
   const [result, setResult] = useState<Compilation | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [exampleId, setExampleId] = useState('arithmetic');
+  const [selection, setSelection] = useState<SourceSelection | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<AbortController | null>(null);
 
@@ -21,6 +25,7 @@ export default function CToAsmPage() {
     setFileName(name);
     setResult(null);
     setError('');
+    setSelection(null);
   }
 
   async function openFile(file?: File) {
@@ -28,7 +33,7 @@ export default function CToAsmPage() {
     if (!/\.c$/i.test(file.name)) { setError('.c 파일을 선택해 주세요.'); return; }
     if (file.size > 64 * 1024) { setError('학습용 C 파일은 64 KiB 이하로 열어 주세요.'); return; }
     setBusy(true);
-    try { replaceSource(await file.text(), file.name); }
+    try { replaceSource(await file.text(), file.name); setExampleId(''); }
     catch { setError('파일을 읽지 못했습니다. UTF-8 C 파일을 다시 선택해 주세요.'); }
     finally { setBusy(false); }
   }
@@ -40,6 +45,7 @@ export default function CToAsmPage() {
     setBusy(true);
     setError('');
     setResult(null);
+    setSelection(null);
     try {
       const compiled = await compileSource(source, controller.signal);
       if (!controller.signal.aborted) setResult(compiled);
@@ -63,7 +69,13 @@ export default function CToAsmPage() {
       </div>
       <div className="compile-toolbar">
         <button disabled={busy} onClick={() => inputRef.current?.click()}>C 파일 열기</button>
-        <button disabled={busy} onClick={() => replaceSource(arithmeticSource, 'arithmetic.c')}>산술 예제</button>
+        <select aria-label="학습 예제" disabled={busy} value={exampleId} onChange={event => {
+          const example = examples.find(item => item.id === event.target.value);
+          if (example) { replaceSource(example.source, `${example.id}.c`); setExampleId(example.id); }
+        }}>
+          <option value="" disabled>업로드한 파일</option>
+          {examples.map(example => <option key={example.id} value={example.id}>{example.name}</option>)}
+        </select>
         <span className="compile-filename">{fileName}</span>
         <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '처리 중…' : '컴파일하기 →'}</button>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
@@ -72,7 +84,8 @@ export default function CToAsmPage() {
       </div>
       <p className="compile-status" role="status">{busy ? '파일과 컴파일 결과를 준비하고 있습니다.' : result ? '컴파일 완료 · 아래에서 결과를 확인하세요.' : '예제를 컴파일하거나 UTF-8 C 파일을 열어 시작하세요.'}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
-      <CodeComparison key={source + Boolean(result)} source={source} assembly={result?.assembly} />
+      <CodeComparison key={source + Boolean(result)} source={source} assembly={result?.assembly} selection={selection} onSelectionChange={setSelection} />
+      <StructureDiagram example={examples.find(example => example.id === exampleId)} selection={selection} onSelect={setSelection} />
       <p className="compile-footnote">이 페이지는 컴파일 결과를 비교합니다. CPU 내부 실행은 데이터패스 페이지에서 확인할 수 있습니다.</p>
       {result && <details className="compile-log"><summary>컴파일 로그</summary><pre>{result.log || '추가 메시지가 없습니다.'}</pre></details>}
     </main>
