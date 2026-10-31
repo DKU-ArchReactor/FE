@@ -388,6 +388,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-array-caption { display: flex; gap: 12px; align-items: baseline; margin: 8px 0; font-size: 12px; }
 .compile-array-caption span { color: #64748b; }
 .compile-container-state { margin: 0 0 8px; color: #475569; font-size: 12px; }
+.compile-container-ended { margin-top: 12px; padding: 9px 11px; border: 1px solid #fed7aa; border-radius: 7px; background: #fff7ed; color: #9a3412; font-size: 11px; line-height: 1.6; }
 .compile-container-slot { flex: 0 0 auto; display: flex; min-width: 88px; flex-direction: column; align-items: center; gap: 4px; }
 .compile-container-marker { min-height: 16px; color: #0369a1; font-size: 10px; font-weight: 700; }
 .compile-container-slot.is-active .compile-memory-cell { border-color: #0284c7; box-shadow: 0 0 0 2px #bae6fd; }
@@ -413,6 +414,8 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-pointer-board { scroll-margin-top: 88px; }
 .compile-pointer-board > p { margin: -4px 0 8px; }
 @media (max-width: 800px) {
+  .compile-memory-diagram.has-stack { grid-template-columns: minmax(0, 1fr); }
+  .compile-memory-diagram.has-stack > .compile-array-board, .compile-memory-diagram.has-stack > .compile-variable-board { grid-column: 1; }
   .compile-memory-flow { grid-template-columns: 1fr; }
   .compile-flow-arrow { transform: rotate(90deg); line-height: 1; }
   .compile-memory-diagram { padding: 12px; }
@@ -420,6 +423,10 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 }
 .compile-function-jump { white-space: nowrap; }
 .compile-memory-diagram { display: flex; flex-direction: column; }
+.compile-memory-diagram.has-stack { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(220px, 1fr); column-gap: 20px; align-items: start; }
+.compile-memory-diagram.has-stack > .compile-diagram-playing, .compile-memory-diagram.has-stack > .compile-memory-legend, .compile-memory-diagram.has-stack > .compile-pointer-board, .compile-memory-diagram.has-stack > .compile-memory-intro, .compile-memory-diagram.has-stack > .compile-footnote { grid-column: 1 / -1; }
+.compile-memory-diagram.has-stack > .compile-array-board { grid-column: 1; }
+.compile-memory-diagram.has-stack > .compile-variable-board { grid-column: 2; }
 .compile-memory-legend { order: 0; }
 .compile-variable-board { order: 20; }
 .compile-array-board { order: 10; min-height: 190px; }

@@ -69,6 +69,8 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
   const status = trace?.executionStatus === 'COMPLETED' ? '실행 완료' : trace?.executionStatus === 'CYCLE_LIMIT' ? '실행 한도 도달 · 이후 변화는 기록되지 않았을 수 있습니다' : trace?.executionStatus === 'SIMULATION_ERROR' ? '실행 중 오류' : trace?.executionStatus || '';
   const instruction = Object.values(cycle?.buffers || {}).find(buffer => buffer && buffer.pc === snapshot?.current_pc && !['empty', 'bubble', 'flushed'].includes(buffer.status))?.assembly;
   const sourceLine = view?.line;
+  const activeFunction = sourceLine ? sourceStructures.functions.find(fn => sourceLine >= fn.line && sourceLine <= fn.end)?.name : undefined;
+  const endedContainers = sourceStructures.arrays.filter(array => array.container && array.scope !== '<global>' && activeFunction && array.scope !== activeFunction && scenes.slice(0, step + 1).some(scene => scene.changes.some(change => change.name.startsWith(`${array.name}[`)))).map(array => ({ name: array.name, scope: array.scope }));
   const sourceText = sourceLine ? source.split('\n')[sourceLine - 1]?.trim() : undefined;
   const pointerName = (value: string, typeId?: number) => {
     if (!value.startsWith('0x')) return value;
@@ -104,7 +106,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
         </div>
       </>}
       {view && <>{view.warnings.map(message => <p className="compile-warning" key={message}>{message}</p>)}
-        <MemoryDiagram key={scene.index} view={view} changes={scene.changes} structures={sourceStructures} finished={step === scenes.length - 1} playing={playing} onSelectLine={onSelectLine} />
+        <MemoryDiagram key={scene.index} view={view} changes={scene.changes} structures={sourceStructures} endedContainers={endedContainers} finished={step === scenes.length - 1} playing={playing} onSelectLine={onSelectLine} />
         <p className="compile-footnote">현재 위치에서 주소나 레지스터를 확인할 수 있는 변수만 표시합니다. 그림에는 독립 변수 최대 24개, 배열 최대 8개(각 앞 32개 원소), 포인터 그래프 최대 40개 노드를 표시합니다. 회색은 값 또는 위치를 확인하지 못했다는 뜻입니다. 초기화 완료·할당 해제 여부는 보장하지 않습니다.</p>
       </>}
       {trace.console_output && <pre className="compile-console">{trace.console_output}</pre>}

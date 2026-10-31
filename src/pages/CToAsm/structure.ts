@@ -2,7 +2,7 @@ import { parser } from '@lezer/cpp';
 import type { SyntaxNode } from '@lezer/common';
 export type CField = { name: string; type: string; pointer: boolean; array: string; line: number };
 export type CStruct = { name: string; line: number; fields: CField[]; instances: string[] };
-export type CArray = { name: string; type: string; dimensions: string[]; line: number; container?: { kind: 'stack' | 'queue'; primary: string; secondary?: string } };
+export type CArray = { name: string; type: string; dimensions: string[]; line: number; scope: string; container?: { kind: 'stack' | 'queue'; primary: string; secondary?: string } };
 export type CPointerLink = { from: string; field: string; to: string; line: number };
 export type CFunction = { name: string; line: number; end: number };
 export type CStructure = { structs: CStruct[]; arrays: CArray[]; links: CPointerLink[]; functions: CFunction[]; diagnostics: string[] };
@@ -71,7 +71,7 @@ export function analyzeCStructures(source: string): CStructure {
     for (const item of children(node).filter(child => kinds.includes(child.name))) {
       const id = find(item, ['Identifier']); if (!id) continue;
       const name = text(id); const sizes = dimensions(item);
-      if (sizes.length) arrays.push({ name, type: text(base), dimensions: sizes, line: line(id.from) });
+      if (sizes.length) arrays.push({ name, type: text(base), dimensions: sizes, line: line(id.from), scope });
       const type = structs.find(candidate => candidate.name === baseName);
       if (type && !source.slice(item.from, id.from).includes('*') && !sizes.length) {
         type.instances.push(name);
