@@ -85,9 +85,13 @@ export default function CToAsmPage() {
       </div>
       <p className="compile-status" role="status">{busy ? '파일과 컴파일 결과를 준비하고 있습니다.' : result ? '컴파일 완료 · 아래에서 결과를 확인하세요.' : '예제를 컴파일하거나 UTF-8 C 파일을 열어 시작하세요.'}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
-      <CodeComparison key={source + Boolean(result)} source={source} assembly={result?.assembly} selection={selection} onSelectionChange={setSelection} />
-      <StructureDiagram example={examples.find(example => example.id === exampleId)} selection={selection} onSelect={setSelection} />
-      <p className="compile-footnote">이 페이지는 컴파일 결과를 비교합니다. CPU 내부 실행은 데이터패스 페이지에서 확인할 수 있습니다.</p>
+      <div className="compile-learning-layout">
+        <CodeComparison key={source + Boolean(result)} source={source} assembly={result?.assembly} selection={selection} onSelectionChange={setSelection} />
+        <div className="compile-learning-sidebar">
+          <StructureDiagram example={examples.find(example => example.id === exampleId)} selection={selection} onSelect={setSelection} />
+          <p className="compile-footnote">CPU 실행 과정은 데이터패스 페이지에서 확인할 수 있습니다.</p>
+        </div>
+      </div>
       {result && <details className="compile-log" onToggle={event => setShowDetails(event.currentTarget.open)}><summary>상세 정보</summary>{showDetails && <><details><summary>컴파일 로그</summary><pre>{result.log || '추가 메시지가 없습니다.'}</pre></details><details><summary>원본 어셈블리</summary><pre>{result.assembly}</pre></details></>}</details>}
     </main>
   );
