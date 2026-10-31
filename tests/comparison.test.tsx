@@ -8,12 +8,19 @@ const source = 'int main() {\n  int a = 1;\n  return a;\n}';
 const assembly = '.file 1 "source.c"\n.text\nmain:\n.loc 1 2 0\nli a0,1\nsw a0,0(sp)\n.loc 1 3 0\nlw a0,0(sp)\n.loc 1 0 0\nret';
 
 describe('source / assembly interaction', () => {
-  it('keeps instructions visible while descriptions can be enabled separately', () => {
+  it('keeps declarations without instructions out of the executable mapping rows', () => {
+    render(<CodeComparison source={'struct Item { int value; };\nint main() { return 0; }'} assembly={'.file 1 "source.c"\n.text\n.loc 1 2 0\nli a0,0'} />);
+    expect(screen.queryByRole('article', { name: 'C 1행, 직접 연결된 명령어 없음' })).toBeNull();
+    expect(screen.getByRole('article', { name: 'C 2행 대응 블록' })).toBeTruthy();
+    expect(screen.getByText('직접 연결된 명령어가 없는 소스 · 1줄')).toBeTruthy();
+  });
+  it('shows descriptions by default and keeps instructions when descriptions are hidden', () => {
     render(<CodeComparison source={source} assembly={assembly} />);
     expect(screen.getByRole('button', { name: /ASM 5행/ })).toBeTruthy();
-    expect(screen.queryByText('a0 ← 상수 1')).toBeNull();
-    fireEvent.click(screen.getByRole('checkbox', { name: '명령어 설명' }));
     expect(screen.getByText('a0 ← 상수 1')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: '명령어 설명' }));
+    expect(screen.queryByText('a0 ← 상수 1')).toBeNull();
+    expect(screen.getByRole('button', { name: /ASM 5행/ })).toBeTruthy();
   });
   it('selects multiple instructions from C and selects the C line back from assembly', () => {
     render(<CodeComparison source={source} assembly={assembly} />);

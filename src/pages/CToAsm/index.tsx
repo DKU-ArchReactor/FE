@@ -106,6 +106,7 @@ export default function CToAsmPage() {
       </div>
       <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : result ? '컴파일 완료 · C 코드 옆에서 생성된 명령어를 확인하세요.' : `컴파일 대상: ${fileName} · 편집기에 보이는 내용이 컴파일됩니다.`}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
+      <p className="compile-environment-note">RV32IM용 C → 어셈블리 변환 · 현재 표준 입출력(stdio.h, printf)은 지원되지 않습니다. 이 페이지에서는 실행 결과 대신 생성된 명령어를 확인합니다.</p>
       <div className="compile-workspace">
         <div className="compile-workspace-editor">
           <section className="compile-editor-panel" aria-label="C 웹 IDE">
@@ -131,6 +132,7 @@ export default function CToAsmPage() {
                 lineNumbers: 'on',
                 padding: { top: 12, bottom: 12 },
                 readOnly: busy,
+                stickyScroll: { enabled: false },
               }}
             />
           </section>
@@ -139,8 +141,8 @@ export default function CToAsmPage() {
         <section className="compile-output-panel" aria-label="C 코드 컴파일 결과">
           {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} /> : <div className="compile-output-placeholder">
             <span>컴파일 결과</span>
-            <h2>{busy ? '컴파일 중입니다' : '명령어가 여기에 표시됩니다'}</h2>
-            <p>편집기의 C 코드를 컴파일하면 이곳에서 대응 관계를 보여줍니다.</p>
+            <h2>{busy ? '컴파일 중입니다' : error ? '컴파일 결과를 만들지 못했습니다' : '명령어가 여기에 표시됩니다'}</h2>
+            <p>{error ? '위 오류 안내에 따라 편집기 내용을 수정한 뒤 다시 컴파일해 주세요.' : '편집기의 C 코드를 컴파일하면 이곳에서 대응 관계를 보여줍니다.'}</p>
           </div>}
         </section>
       </div>

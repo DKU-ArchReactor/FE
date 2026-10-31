@@ -37,5 +37,11 @@ export function compileError(error: unknown): string {
     const detail: unknown = error.response?.data?.detail;
     return typeof detail === 'string' ? detail : '컴파일 서버에 연결하지 못했습니다. API 설정과 네트워크를 확인해 주세요.';
   }
-  return error instanceof Error ? error.message : '컴파일 중 오류가 발생했습니다.';
+  const message = error instanceof Error ? error.message : '컴파일 중 오류가 발생했습니다.';
+  const header = message.match(/fatal error:\s*([^:\n]+): No such file or directory/);
+  if (header) return `컴파일 환경에 ${header[1].trim()} 헤더가 없습니다.\n현재 RV32IM 환경에서는 stdio.h와 printf 같은 표준 입출력을 사용할 수 없습니다. 헤더 없이 정수 연산·배열·포인터를 사용하고, 계산 결과를 main에서 return하는 코드로 시험해 주세요.\n파일은 편집기에 정상적으로 불러왔으며, 해당 헤더를 처리하는 단계에서 컴파일이 중단됐습니다.`;
+  if (message.includes('source.c:')) {
+    return message.split('\n').filter(line => !line.startsWith('$ ') && !/^\[exit /.test(line)).join('\n').replace(/(?:[A-Za-z]:)?[^\s:]*[\\/]source\.c/g, '편집기');
+  }
+  return message;
 }

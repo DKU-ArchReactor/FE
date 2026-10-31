@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { compileCode } from '../src/api/build';
-import { compileSource } from '../src/pages/CToAsm/compile';
+import { compileError, compileSource } from '../src/pages/CToAsm/compile';
 
 vi.mock('../src/api/build', () => ({ compileCode: vi.fn() }));
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const result = { build_id: null, status: 'success', assembly_url: 'https://artifacts.example/assembly.s', binary_url: '', log: '', simulation_token: 'must-not-be-logged' };
 
 describe('compilation transport', () => {
+  it('explains missing library headers without presenting a shell command as the error', () => {
+    const message = compileError(new Error('$ gcc source.c\n/tmp/build/source.c:1:10: fatal error: stdio.h: No such file or directory'));
+    expect(message).toContain('stdio.h');
+    expect(message).toContain('정상적으로 불러왔으며');
+    expect(message).not.toContain('$ gcc');
+  });
   it('requests real debug mapping and downloads assembly without forwarding credentials', async () => {
     vi.mocked(compileCode).mockResolvedValue(result);
     const fetch = vi.fn().mockResolvedValue(new Response('.text\nmain:\nret'));
