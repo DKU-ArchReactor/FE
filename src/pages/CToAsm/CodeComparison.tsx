@@ -57,10 +57,10 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const mainFunction = matchingGroups.findIndex(([name]) => name === 'main');
   const firstFunction = mainFunction >= 0 ? mainFunction : Math.max(0, matchingGroups.findIndex(([name]) => name !== '전역 코드'));
 
-  return <section className="compile-comparison" aria-label="C와 어셈블리 대응 블록">
+  return <section className="compile-comparison" aria-label="C 코드와 어셈블리 연결 블록">
     {assembly && onOpenMemory && <div className="compile-result-title"><strong>컴파일 결과</strong><button onClick={onOpenMemory}>메모리 변화 시각화 ↓</button></div>}
     <div className="compile-block-header"><h2>C 소스 코드</h2><h2>생성된 RISC-V 어셈블리</h2></div>
-    {assembly && <div className="compile-comparison-tools"><label className="compile-code-search">코드 찾기<input type="search" value={query} onChange={event => { setQuery(event.target.value); setLimits({}); }} placeholder="함수, C 코드, 명령어 검색" /></label><label className="compile-explanation-toggle"><input type="checkbox" checked={showExplanations} onChange={event => setShowExplanations(event.target.checked)} />명령어 설명</label>{functionGroups.size > 1 && <label className="compile-function-filter">함수별 보기<select aria-label="대응표 함수 선택" value={functionFilter} onChange={event => { setFunctionFilter(event.target.value); setLimits({}); }}><option value="">전체 함수</option>{[...functionGroups.keys()].map(name => <option key={name} value={name}>{name === 'main' ? 'main() · 시작 함수' : `${name}()`}</option>)}</select></label>}</div>}
+    {assembly && <div className="compile-comparison-tools"><label className="compile-code-search">코드 찾기<input type="search" value={query} onChange={event => { setQuery(event.target.value); setLimits({}); }} placeholder="함수, C 코드, 명령어 검색" /></label><label className="compile-explanation-toggle"><input type="checkbox" checked={showExplanations} onChange={event => setShowExplanations(event.target.checked)} />명령어 설명</label>{functionGroups.size > 1 && <label className="compile-function-filter">함수별 보기<select aria-label="함수 필터" value={functionFilter} onChange={event => { setFunctionFilter(event.target.value); setLimits({}); }}><option value="">전체 함수</option>{[...functionGroups.keys()].map(name => <option key={name} value={name}>{name === 'main' ? 'main() · 시작 함수' : `${name}()`}</option>)}</select></label>}</div>}
     {!assembly ? <div className="compile-before">{lines.map((_, i) => <div key={i}>{sourceButton(i + 1)}</div>)}</div> : <>
       {matchingGroups.map(([functionName, functionBlocks], groupIndex) => {
         const sourceLineCount = new Set(functionBlocks.flatMap(block => block.sourceLine === null ? [] : [block.sourceLine])).size;
@@ -70,7 +70,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
         const sourceLine = block.sourceLine;
         const contextLine = block.contextLine;
         const selected = sourceLine !== null && selection !== null && sourceLine >= selection.start && sourceLine <= selection.end;
-        return <article key={index} className={`compile-block ${sourceLine === null ? 'compile-block-unmapped' : ''} ${selected ? 'is-selected' : ''}`} aria-label={contextLine ? `C ${contextLine}행, 직접 연결된 명령어 없음` : sourceLine === null ? '소스 위치 없는 출력' : `C ${sourceLine}행 대응 블록`}>
+        return <article key={index} className={`compile-block ${sourceLine === null ? 'compile-block-unmapped' : ''} ${selected ? 'is-selected' : ''}`} aria-label={contextLine ? `C ${contextLine}행, 직접 연결된 명령어 없음` : sourceLine === null ? '소스 위치 없는 출력' : `C ${sourceLine}행에서 생성된 명령어`}>
           <div className="compile-block-left">
             {sourceLine !== null ? sourceButton(sourceLine) : <><span className="compile-c-badge">{block.rows.every(row => row.kind === 'label') ? '이동 목적지' : '소스 줄 정보 없음'}</span><p className="compile-block-note">{block.rows.every(row => row.kind === 'label') ? '함수 시작이나 분기 대상을 표시합니다.' : '컴파일러가 C 줄 정보를 제공하지 않은 명령어입니다.'}</p></>}
           </div>
@@ -86,7 +86,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
       </details>;
       })}
       {matchingGroups.length === 0 && <p className="compile-no-results">“{query}”에 해당하는 코드나 명령어가 없습니다.</p>}
-      {mappedLines.size === 0 && <p className="compile-warning" role="status">C 줄 정보가 없어 대응 관계를 표시할 수 없습니다. 명령어 순서만 표시하며, 연결을 추측하지 않습니다.</p>}
+      {mappedLines.size === 0 && <p className="compile-warning" role="status">C 줄 정보가 없어 코드와 명령어를 직접 연결할 수 없습니다. 명령어 순서만 표시하며, 연결을 추측하지 않습니다.</p>}
     </>}
     {assembly && contextLines.length > 0 && <details className="compile-unmapped-source"><summary>직접 연결된 명령어가 없는 소스 · {contextLines.length}줄</summary><p>타입·구조체 정의와 주석 등은 실행 명령어를 직접 만들지 않습니다. 나머지 줄도 컴파일러가 위치 정보를 주지 않으면 연결하지 않습니다.</p><pre>{contextLines.map(item => `${item.line}  ${item.text}`).join('\n')}</pre></details>}
     {selection && <div className="compile-selection" role="status"><h2>선택한 코드: C {selection.start}{selection.end !== selection.start ? `–${selection.end}` : ''}행</h2><p>{selectedInstructionCount ? `이 코드에서 생성된 명령어 ${selectedInstructionCount}개를 강조했습니다.` : '연결된 명령어가 없습니다.'} Shift+클릭으로 여러 줄을 함께 선택할 수 있습니다.</p></div>}

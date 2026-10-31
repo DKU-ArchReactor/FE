@@ -65,6 +65,18 @@ export default function CToAsmPage() {
     setAnnouncement('');
   }
 
+  function resetEditor() {
+    setSource('');
+    setFileName('main.c');
+    setResult(null);
+    setError('');
+    setSelection(null);
+    setSelectedExampleId(null);
+    setExampleMessage('');
+    setAnnouncement('편집기를 비웠습니다. 새 코드를 작성하거나 C 파일을 불러오세요.');
+    if (examplePickerRef.current) examplePickerRef.current.open = false;
+  }
+
   async function openFile(file?: File) {
     if (!file) return;
     if (!/\.c$/i.test(file.name)) { setError('.c 파일을 선택해 주세요.'); return; }
@@ -118,13 +130,14 @@ export default function CToAsmPage() {
       <div className="compile-heading">
         <div>
           <p className="compile-eyebrow">ARCHREACTOR / COMPILE</p>
-          <h1>C와 RISC-V 어셈블리 대응</h1>
-          <p>편집한 C 코드와 컴파일 결과를 줄 단위로 비교해 보세요.</p>
+          <h1>C 코드가 RISC-V 어셈블리로 바뀌는 과정</h1>
+          <p>편집한 C 코드가 어떤 어셈블리 명령어로 바뀌는지 줄 단위로 확인해 보세요.</p>
         </div>
         <span className="compile-profile">RV32IM · 최적화 없음 (-O0)</span>
       </div>
       <div className="compile-toolbar">
         <button disabled={busy} onClick={() => inputRef.current?.click()}>C 파일 불러오기</button>
+        <button disabled={busy} onClick={resetEditor}>에디터 초기화</button>
         <details className="compile-example-picker" ref={examplePickerRef}>
           <summary>빠른 예제</summary>
           <div className="compile-example-menu">
@@ -184,11 +197,11 @@ export default function CToAsmPage() {
           {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} onOpenMemory={() => document.getElementById('compile-runtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} /> : <div className="compile-output-placeholder">
             <span>컴파일 결과</span>
             <h2>{busy ? '컴파일 중입니다' : error ? '컴파일 결과를 만들지 못했습니다' : '명령어가 여기에 표시됩니다'}</h2>
-            <p>{error ? '위 오류 안내에 따라 편집기 내용을 수정한 뒤 다시 컴파일해 주세요.' : '편집기의 C 코드를 컴파일하면 이곳에서 대응 관계를 보여줍니다.'}</p>
+            <p>{error ? '위 오류 안내에 따라 편집기 내용을 수정한 뒤 다시 컴파일해 주세요.' : '편집기의 C 코드를 컴파일하면 각 C 코드에서 생성된 명령어를 확인할 수 있습니다.'}</p>
           </div>}
         </section>
       </div>
-      {result && <RuntimeInspector compilation={result} source={source} onSelectLine={line => { setSelection({ start: line, end: line }); editorRef.current?.getDomNode()?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />}
+      {result && <RuntimeInspector key={result.buildId || result.simulationToken || 'compile'} compilation={result} source={source} onSelectLine={line => { setSelection({ start: line, end: line }); editorRef.current?.getDomNode()?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />}
       <p className="compile-footnote">소스의 수정 내용이 컴파일 요청에 그대로 전달됩니다. CPU 실행 흐름은 데이터패스 페이지에서 볼 수 있습니다.</p>
     </main>
   );
