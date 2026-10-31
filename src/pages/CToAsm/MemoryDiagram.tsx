@@ -3,8 +3,8 @@ import { hex } from './runtime';
 import type { MemoryChange } from './memoryTimeline';
 import StructureGraph from './StructureGraph';
 
-type Props = { view: MemoryView; changes: MemoryChange[]; onSelectLine: (line: number) => void; finished?: boolean };
-export default function MemoryDiagram({ view, changes, onSelectLine, finished = false }: Props) {
+type Props = { view: MemoryView; changes: MemoryChange[]; onSelectLine: (line: number) => void; finished?: boolean; playing?: boolean };
+export default function MemoryDiagram({ view, changes, onSelectLine, finished = false, playing = false }: Props) {
   const changed = new Set(changes.map(change => change.address));
   const targets = new Map(view.nodes.map(node => [hex(node.address!), node]));
   const incoming = new Set([...view.variables, ...view.nodes.flatMap(node => node.children)].filter(value => !value.unavailable && value.pointer).map(value => value.pointer));
@@ -22,6 +22,7 @@ export default function MemoryDiagram({ view, changes, onSelectLine, finished = 
   const nodeChanged = visibleNodes.some(node => node.children.some(field => field.address !== undefined && changed.has(field.address)));
   const arrayChanged = arrays.some(array => array.children.some(value => value.address !== undefined && changed.has(value.address)));
   return <div className={`compile-memory-diagram ${nodeChanged ? 'is-node-step' : arrayChanged ? 'is-array-step' : ''}`}>
+    {playing && <div className="compile-diagram-playing" role="status"><strong>메모리 변화 재생 중</strong><span>1.5초마다 다음 장면으로 이동합니다</span></div>}
     <div className="compile-memory-legend"><span><i className="known" />확인된 값</span><span><i className="changed" />이번에 바뀐 값·연결</span><span><i className="unknown" />기록·위치 미확인</span></div>
     {scalars.length > 0 && <section className="compile-variable-board" aria-label="변수 값 그림"><h3>변수에 담긴 값</h3><div className="compile-variable-cells">{scalars.map(value => cell(value, value.name))}</div></section>}
     {arrays.length > 0 && <section className="compile-array-board" aria-label="배열 메모리 그림"><h3>배열 — 원소가 차례로 놓인 공간</h3>{arrays.map(array => <div key={`${array.name}-${array.address}`} className="compile-array-strip"><div className="compile-array-caption"><strong>{array.name}</strong><span>{array.value}</span></div><div className="compile-array-cells">{array.children.map((value, index) => value.value === 'struct' ? <button className={`compile-memory-cell is-node ${value.children.every(field => field.unavailable) ? 'is-unknown' : ''} ${value.children.some(field => field.address !== undefined && changed.has(field.address)) ? 'is-changed' : ''}`} key={value.name} onClick={() => onSelectLine(value.line)}><span>[{index}]</span><strong>{value.children.find(field => field.pointer === undefined && !field.unavailable)?.value || '미기록'}</strong><small>{value.children.every(field => field.unavailable) ? '값이 기록되면 노드로 표시' : '아래 연결 그림에서 보기'}</small></button> : cell(value, `[${index}]`))}</div></div>)}</section>}

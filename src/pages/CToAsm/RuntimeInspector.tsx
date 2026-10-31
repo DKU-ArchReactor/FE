@@ -35,7 +35,11 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
   useEffect(() => { if (trace) section.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, [trace]);
   useEffect(() => {
     if (!playing || !scenes.length) return;
-    const timer = setInterval(() => setStep(current => { if (current >= scenes.length - 1) { setPlaying(false); return current; } return current + 1; }), 600);
+    const timer = setInterval(() => setStep(current => {
+      if (current >= scenes.length - 1) { setPlaying(false); return current; }
+      if (current === scenes.length - 2) setPlaying(false);
+      return current + 1;
+    }), 1500);
     return () => clearInterval(timer);
   }, [playing, scenes]);
   const scene = scenes[step];
@@ -55,7 +59,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
       const execution = await executeCompilation(compilation, maxCycles, controller.signal);
       if (!controller.signal.aborted) {
         const timeline = memoryTimeline(metadata, execution.history);
-        setDebug(metadata); setTrace(execution); setScenes(timeline); setStep(timeline.length > 1 ? 1 : 0);
+        setDebug(metadata); setTrace(execution); setScenes(timeline); setStep(0);
       }
     } catch (failure) { if (!controller.signal.aborted) setError(compileError(failure)); }
     finally { if (request.current === controller) { request.current = null; setBusy(false); } }
@@ -83,7 +87,13 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
       <div className="compile-execution-summary"><span role="status">{status}</span>{trace.executionStatus === 'COMPLETED' && trace.history.length > 0 && <strong title="종료 시 a0 레지스터에 남은 main 반환값입니다.">최종 반환값: {Number(trace.history.at(-1)!.global_result.registers.x10) | 0}</strong>}</div>
       {trace.executionStatus === 'SIMULATION_ERROR' && <p className="compile-error">{trace.history.at(-1)?.cycle_events?.runtime_error?.message || 'CORE 실행 중 오류가 발생했습니다.'}</p>}
       {!scenes.length ? <p>실행 기록이 없습니다.</p> : <>
-        <div className="compile-runtime-controls"><button disabled={step === 0} onClick={() => { setPlaying(false); setStep(step - 1); }}>이전 변화</button><button disabled={scenes.length < 2} onClick={() => { if (step === scenes.length - 1) setStep(0); setPlaying(!playing); }}>{playing ? '일시정지' : '자동 재생'}</button><button disabled={step >= scenes.length - 1} onClick={() => { setPlaying(false); setStep(step + 1); }}>다음 변화</button><input aria-label="메모리 변화 단계 선택" type="range" min={0} max={scenes.length - 1} value={step} onChange={event => { setPlaying(false); setStep(Number(event.target.value)); }} /><span>단계 {step + 1} / {scenes.length}</span></div>
+        <div className={`compile-runtime-controls${playing ? ' is-playing' : ''}`}>
+          <button disabled={step === 0} onClick={() => { setPlaying(false); setStep(step - 1); }}>이전 변화</button>
+          <button disabled={scenes.length < 2} onClick={() => { if (step === scenes.length - 1) setStep(0); setPlaying(!playing); }}>{playing ? '일시정지' : '자동 재생'}</button>
+          <button disabled={step >= scenes.length - 1} onClick={() => { setPlaying(false); setStep(step + 1); }}>다음 변화</button>
+          <input aria-label="메모리 변화 단계 선택" type="range" min={0} max={scenes.length - 1} value={step} onChange={event => { setPlaying(false); setStep(Number(event.target.value)); }} />
+          <span>단계 {step + 1} / {scenes.length}</span>
+        </div>
         <p className="compile-step-guide">변수의 메모리 값이 바뀐 단계와 시작·종료 지점을 모았습니다. CPU 사이클 {cycle?.clock}의 모습입니다.</p>
         <div className="compile-memory-flow">
           <article><span>연결된 C 소스</span>{sourceLine ? <button onClick={() => onSelectLine(sourceLine)}><b>C {sourceLine}행 ↗</b><code>{sourceText || '소스 위치 보기'}</code></button> : <p>C 코드 진입 전 또는 함수 복귀 후</p>}</article>
@@ -94,7 +104,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
         </div>
       </>}
       {view && <>{view.warnings.map(message => <p className="compile-warning" key={message}>{message}</p>)}
-        <MemoryDiagram key={scene.index} view={view} changes={scene.changes} finished={step === scenes.length - 1} onSelectLine={onSelectLine} />
+        <MemoryDiagram key={scene.index} view={view} changes={scene.changes} finished={step === scenes.length - 1} playing={playing} onSelectLine={onSelectLine} />
         <details className="compile-runtime-values"><summary>주소·타입과 전체 값 자세히 보기</summary><p>CPU 사이클 {cycle?.clock} · 명령 위치 {snapshot?.current_pc} · single 모드</p><ul>{view.variables.map((value, index) => <ValueTree key={`${value.name}-${index}`} value={value} previous={previous?.variables.find(old => old.name === value.name && old.address === value.address)} />)}</ul></details>
         <p className="compile-footnote">현재 함수 범위에서 위치를 확인할 수 있는 변수만 표시합니다. 회색은 값 또는 위치를 확인하지 못했다는 뜻입니다. 초기화 완료·할당 해제 여부를 보장하지 않으며, 배열은 앞 32개 원소·그래프는 최대 40개 노드를 표시합니다.</p>
       </>}
