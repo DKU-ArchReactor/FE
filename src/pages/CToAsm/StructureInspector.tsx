@@ -39,12 +39,15 @@ export default function StructureInspector({ structure, onSelectLine }: Props) {
     const type = structure.structs.find(candidate => candidate.instances.includes(link.from) && candidate.instances.includes(link.to));
     return type ? [{ from: `${type.name}:${link.from}`, to: `${type.name}:${link.to}`, label: link.field }] : [];
   });
-  const graphTitle = graphEdges.some(edge => edge.label === 'left' || edge.label === 'right') ? '트리 구조' : graphEdges.some(edge => edge.label === 'next') ? '연결 리스트 구조' : '구조체 인스턴스';
+  const treeShape = structure.structs.some(type => type.fields.some(field => field.pointer && ['left', 'right'].includes(field.name)));
+  const listShape = !treeShape && structure.structs.some(type => type.fields.some(field => field.pointer && field.name === 'next'));
+  const graphShape = treeShape ? 'tree' : listShape ? 'list' : 'graph';
+  const graphTitle = treeShape ? '트리 구조' : listShape ? '연결 리스트 구조' : '구조체 인스턴스';
   return <details className="compile-structure" aria-label="현재 C 코드의 자료구조">
     <summary className="compile-structure-summary"><span>코드에서 찾은 구조</span><span>{summary}</span></summary>
     <div className="compile-structure-list">
       {structure.diagnostics.map(message => <p className="compile-warning" key={message}>{message}</p>)}
-      {graphNodes.length > 0 && <section className="compile-static-graph"><h3>{graphTitle}</h3><p>선언의 초기값에서 확인한 필드와 연결을 표시합니다.</p><StructureGraph nodes={graphNodes} edges={graphEdges} onSelectLine={onSelectLine} /></section>}
+      {graphNodes.length > 0 && <section className="compile-static-graph"><h3>{graphTitle}</h3><p>선언의 초기값에서 확인한 필드와 연결을 표시합니다.</p><StructureGraph nodes={graphNodes} edges={graphEdges} shape={graphShape} onSelectLine={onSelectLine} /></section>}
       {structure.structs.map(type => <StructCard key={type.name} type={type} onSelectLine={onSelectLine} />)}
       {structure.arrays.map((array, index) => <ArrayCard key={`${array.name}-${array.line}-${index}`} array={array} onSelectLine={onSelectLine} />)}
       {structure.links.length > 0 && <section className="compile-structure-links" aria-label="선언 초기값의 포인터 연결">

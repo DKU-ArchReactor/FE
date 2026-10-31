@@ -2,11 +2,11 @@ import { useId } from 'react';
 
 export type GraphNode = { id: string; title: string; subtitle?: string; fields: { name: string; value: string; changed?: boolean }[]; line: number; changed?: boolean };
 export type GraphEdge = { from: string; to: string; label: string };
-type Props = { nodes: GraphNode[]; edges: GraphEdge[]; onSelectLine: (line: number) => void };
+type Props = { nodes: GraphNode[]; edges: GraphEdge[]; onSelectLine: (line: number) => void; shape?: 'tree' | 'list' | 'graph' };
 const CARD_WIDTH = 240;
 const COLUMN_GAP = 40;
 
-export default function StructureGraph({ nodes, edges, onSelectLine }: Props) {
+export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'graph' }: Props) {
   const markerId = useId().replace(/:/g, '') + '-pointer-arrow';
   const visible = nodes.slice(0, 40);
   if (!visible.length) return null;
@@ -16,8 +16,8 @@ export default function StructureGraph({ nodes, edges, onSelectLine }: Props) {
   const cardHeight = (node: GraphNode) => Math.max(96, 72 + Math.min(node.fields.length, 8) * 20);
   const positions = new Map<string, { x: number; y: number }>();
   const incoming = new Set(edges.map(edge => edge.to));
-  const treeShape = edges.some(edge => edge.label === 'left' || edge.label === 'right');
-  const listShape = !treeShape && edges.length > 0 && edges.every(edge => edge.label === 'next');
+  const treeShape = shape === 'tree' || edges.some(edge => edge.label === 'left' || edge.label === 'right');
+  const listShape = !treeShape && (shape === 'list' || edges.length > 0 && edges.every(edge => edge.label === 'next'));
 
   if (treeShape) {
     let leaf = 0;
@@ -43,8 +43,15 @@ export default function StructureGraph({ nodes, edges, onSelectLine }: Props) {
       placed.add(id);
       return center;
     };
-    for (const node of visible) if (!incoming.has(node.id)) place(node.id, 0);
-    for (const node of visible) if (!placed.has(node.id)) place(node.id, 0);
+    const roots = visible.filter(node => !incoming.has(node.id));
+    const activeRoots = roots.filter(node => childrenOf(node.id).length > 0);
+    for (const node of activeRoots) place(node.id, 0);
+    if (!activeRoots.length) {
+      visible.forEach((node, index) => positions.set(node.id, { x: 20 + index * (CARD_WIDTH + COLUMN_GAP), y: 16 }));
+    } else {
+      const lastDepth = Math.max(...[...positions.values()].map(pos => Math.floor((pos.y - 16) / rowHeight)));
+      visible.filter(node => !positions.has(node.id)).forEach((node, index) => positions.set(node.id, { x: 20 + (index % 2) * (CARD_WIDTH + COLUMN_GAP), y: (lastDepth + 1 + Math.floor(index / 2)) * rowHeight + 16 }));
+    }
   } else if (listShape) {
     const byId = new Map(visible.map(node => [node.id, node]));
     const next = new Map(edges.map(edge => [edge.from, edge.to]));
