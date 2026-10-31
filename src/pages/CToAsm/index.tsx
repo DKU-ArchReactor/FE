@@ -130,14 +130,12 @@ export default function CToAsmPage() {
       <div className="compile-heading">
         <div>
           <p className="compile-eyebrow">ARCHREACTOR / COMPILE</p>
-          <h1>C → RISC-V 어셈블리</h1>
-          <p>컴파일된 어셈블리를 C 코드와 나란히 확인해 보세요.</p>
+          <h1>C 컴파일 결과</h1>
+          <p>생성된 RISC-V 어셈블리를 C 코드와 나란히 확인해 보세요.</p>
         </div>
-        <span className="compile-profile">RV32IM · 최적화 없음 (-O0)</span>
       </div>
       <div className="compile-toolbar">
-        <button className="compile-file-button" title="컴퓨터에서 C 파일 선택" disabled={busy} onClick={() => inputRef.current?.click()}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h5l1.5 1.7h6.5v8.3h-13z" /><path d="M10 13V9m-1.8 1.8L10 9l1.8 1.8" /></svg>C 파일 선택</button>
-        <button disabled={busy} onClick={resetEditor}>에디터 초기화</button>
+        <button className="compile-file-button" title="컴퓨터에서 .c 파일 불러오기" disabled={busy} onClick={() => inputRef.current?.click()}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h5l1.5 1.7h6.5v8.3h-13z" /><path d="M10 13V9m-1.8 1.8L10 9l1.8 1.8" /></svg><span>C 파일 불러오기</span><small>.c</small></button>
         <details className="compile-example-picker" ref={examplePickerRef}>
           <summary>빠른 예제</summary>
           <div className="compile-example-menu">
@@ -153,18 +151,19 @@ export default function CToAsmPage() {
           </div>
         </details>
         <span className="compile-filename">{fileName}</span>
+        <button className="compile-new-code" title="편집기를 비우고 새 코드를 작성" disabled={busy} onClick={resetEditor}>새 코드</button>
         <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
           void openFile(event.target.files?.[0]); event.target.value = '';
         }} />
       </div>
-      {(busy || announcement || !result) && <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : announcement || `컴파일 대상: ${fileName} · 편집기에 보이는 내용이 컴파일됩니다.`}</p>}
+      {(busy || announcement) && <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : announcement}</p>}
       {error && <pre className="compile-error" role="alert">{error}</pre>}
-      <p className="compile-environment-note">RV32IM용 C → 어셈블리 변환 · 표준 입출력(stdio.h, printf)은 지원되지 않습니다. 컴파일 후 아래에서 CORE 실행 기록을 확인할 수 있습니다.</p>
+      <p className="compile-environment-note">컴파일 환경: RV32IM · 최적화 없음 (-O0) · 표준 입출력(stdio.h, printf) 미지원</p>
       <div className="compile-workspace">
         <div className="compile-workspace-editor">
           <section className="compile-editor-panel" aria-label="C 웹 IDE">
-            <div className="compile-panel-heading"><h2>C 소스 편집</h2><div className="compile-editor-heading-actions"><span>{source.split('\n').length}줄</span><button type="button" title="에디터 내용을 비우고 새로 작성" disabled={busy} onClick={resetEditor}>초기화</button></div></div>
+            <div className="compile-panel-heading"><h2>C 소스 편집</h2><div className="compile-editor-heading-actions"><span>{source.split('\n').length}줄</span></div></div>
             {structure.functions.length > 1 && <label className="compile-function-jump">함수 이동<select aria-label="편집기 함수 이동" value="" onChange={event => { const fn = structure.functions.find(fn => fn.line === Number(event.target.value)); if (fn) setSelection({ start: fn.line, end: fn.end }); }}><option value="">함수 선택</option>{structure.functions.map(fn => <option key={`${fn.name}-${fn.line}`} value={fn.line}>{fn.name} · {fn.line}–{fn.end}행</option>)}</select></label>}
             <Editor
               height="var(--compile-editor-height, 360px)"

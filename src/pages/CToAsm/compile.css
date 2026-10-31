@@ -9,8 +9,11 @@
 .compile-toolbar { position: relative; z-index: 4; }
 .compile-toolbar button, .compile-toolbar select { border: 1px solid #cbd5e1; background: white; padding: 8px 14px; border-radius: 8px; font-size: 13px; }
 .compile-toolbar button:hover:not(:disabled) { background: #f0f9ff; }
-.compile-toolbar .compile-file-button { display: inline-flex; align-items: center; gap: 8px; }
-.compile-file-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.compile-toolbar .compile-file-button { display: inline-flex; align-items: center; gap: 9px; min-height: 40px; padding-inline: 11px; border: 1px dashed #38bdf8; border-radius: 10px; background: #f0f9ff; color: #0369a1; font-weight: 650; }
+.compile-toolbar .compile-file-button:hover:not(:disabled) { border-style: solid; border-color: #0284c7; background: #e0f2fe; }
+.compile-file-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.compile-file-button small { padding: 2px 5px; border-radius: 4px; background: #dbeafe; color: #075985; font: 700 10px/1.3 Consolas, monospace; }
+.compile-toolbar .compile-new-code { color: #475569; }
 .compile-toolbar .compile-primary { color: white; background: #0284c7; border-color: #0284c7; margin-left: auto; font-weight: 650; }
 .compile-toolbar .compile-primary:hover:not(:disabled) { background: #0369a1; }
 .compile-toolbar button:disabled, .compile-toolbar select:disabled { opacity: .5; cursor: not-allowed; }
@@ -158,8 +161,6 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-editor-panel .compile-panel-heading > span { color: #94a3b8; }
 .compile-editor-heading-actions { display: flex; align-items: center; gap: 12px; }
 .compile-editor-heading-actions > span { color: #94a3b8; font-size: 11px; }
-.compile-editor-heading-actions > button { padding: 4px 8px; border: 1px solid #475569; border-radius: 6px; background: #303033; color: #cbd5e1; font-size: 11px; }
-.compile-editor-heading-actions > button:hover:not(:disabled) { background: #3b3b40; color: white; }
 .compile-editor-loading { display: grid; height: min(58vh, 560px); place-items: center; color: #94a3b8; font-size: 13px; }
 .compile-ide-layout > .compile-structure { margin-top: 0; }
 .compile-structure-list { display: grid; gap: 10px; max-height: min(64vh, 640px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 12px; }
@@ -199,7 +200,8 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
   .compile-toolbar .compile-example-picker { grid-column: 2; grid-row: 1; }
   .compile-toolbar .compile-example-picker > summary { padding-inline: 10px; }
   .compile-toolbar .compile-filename { grid-column: 1 / -1; grid-row: 2; min-width: 0; padding: 4px 2px 0; border-top: 1px solid #f1f5f9; }
-  .compile-toolbar .compile-primary { grid-column: 1 / -1; grid-row: 3; justify-self: end; align-self: center; margin-left: 0; padding-inline: 12px; }
+  .compile-toolbar .compile-new-code { grid-column: 1; grid-row: 3; justify-self: start; align-self: center; }
+  .compile-toolbar .compile-primary { grid-column: 2; grid-row: 3; justify-self: end; align-self: center; margin-left: 0; padding-inline: 12px; }
   .compile-status { line-height: 1.6; }
   .compile-ide-layout { gap: 12px; }
   .compile-editor-panel .compile-panel-heading { padding: 11px 13px; }
