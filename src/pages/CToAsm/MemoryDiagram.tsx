@@ -30,4 +30,3 @@ export default function MemoryDiagram({ view, changes, onSelectLine, finished = 
     {view.variables.length > 24 && <p className="compile-footnote">변수 상자는 앞 24개까지 표시합니다. 전체 확인 가능한 값은 아래 상세 값에 있습니다.</p>}
   </div>;
 }
-
