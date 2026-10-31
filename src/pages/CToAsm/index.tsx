@@ -15,6 +15,7 @@ export default function CToAsmPage() {
   const [error, setError] = useState('');
   const [exampleId, setExampleId] = useState('arithmetic');
   const [selection, setSelection] = useState<SourceSelection | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<AbortController | null>(null);
 
@@ -63,7 +64,7 @@ export default function CToAsmPage() {
         <div>
           <p className="compile-eyebrow">ARCHREACTOR / COMPILE</p>
           <h1>C 코드가 명령어가 되는 순간</h1>
-          <p>소스 코드와 RISC-V 어셈블리를 나란히 비교해 보세요.</p>
+          <p>C 한 줄이 어떤 명령어로 바뀌었는지, 연결된 블록으로 읽어 보세요.</p>
         </div>
         <span className="compile-profile">RV32IM · 최적화 없음 (-O0)</span>
       </div>
@@ -87,7 +88,7 @@ export default function CToAsmPage() {
       <CodeComparison key={source + Boolean(result)} source={source} assembly={result?.assembly} selection={selection} onSelectionChange={setSelection} />
       <StructureDiagram example={examples.find(example => example.id === exampleId)} selection={selection} onSelect={setSelection} />
       <p className="compile-footnote">이 페이지는 컴파일 결과를 비교합니다. CPU 내부 실행은 데이터패스 페이지에서 확인할 수 있습니다.</p>
-      {result && <details className="compile-log"><summary>컴파일 로그</summary><pre>{result.log || '추가 메시지가 없습니다.'}</pre></details>}
+      {result && <details className="compile-log" onToggle={event => setShowDetails(event.currentTarget.open)}><summary>상세 정보</summary>{showDetails && <><details><summary>컴파일 로그</summary><pre>{result.log || '추가 메시지가 없습니다.'}</pre></details><details><summary>원본 어셈블리</summary><pre>{result.assembly}</pre></details></>}</details>}
     </main>
   );
 }
