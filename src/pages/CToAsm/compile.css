@@ -307,7 +307,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-function-jump { display: flex; align-items: center; gap: 8px; padding: 7px 12px; color: #cbd5e1; background: #252526; font-size: 12px; }
 .compile-function-jump select { width: 100%; min-width: 0; color: #334155; background: white; border-radius: 5px; padding: 3px 6px; }
 .compile-editor-panel:has(.compile-function-jump) { height: auto; }
-.compile-object-graph { overflow: auto; max-height: 520px; padding: 12px; background: white; }
+.compile-object-graph { overflow: visible; padding: 12px; background: white; }
 .compile-object-graph svg { display: block; width: 100%; max-width: 840px; margin: auto; }
 .compile-object-graph g[role=button] { cursor: pointer; }
 .compile-object-graph g[role=button]:focus-visible rect { stroke: #0284c7; stroke-width: 3px; }
@@ -321,9 +321,6 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-runtime-controls { padding: 12px 0; }
 .compile-runtime-controls input { flex: 1; min-width: 140px; accent-color: #0284c7; }
 .compile-runtime-controls.is-playing { padding: 10px; border-radius: 8px; background: #f0f9ff; }
-.compile-runtime-values { margin-top: 12px; overflow-x: auto; font-size: 12px; }
-.compile-runtime-values summary { font-weight: 650; cursor: pointer; }
-.compile-runtime-values ul { list-style: none; padding-left: 12px; }
 .compile-memory-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
 .compile-memory-value strong { min-width: 90px; }
 .compile-memory-value code, .compile-memory-value span { color: #64748b; }
@@ -390,6 +387,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-array-cells .compile-memory-cell:last-child { border-radius: 0 8px 8px 0; }
 .compile-memory-intro { padding: 24px 12px; text-align: center; color: #64748b; font-size: 13px; }
 .compile-memory-intro p { margin-top: 8px; }
+.compile-pointer-board { scroll-margin-top: 88px; }
 .compile-pointer-board > p { margin: -4px 0 8px; }
 @media (max-width: 800px) {
   .compile-memory-flow { grid-template-columns: 1fr; }

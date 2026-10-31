@@ -4,8 +4,7 @@ import { compileError } from './compile';
 import { executeCompilation, loadDebugInfo } from './execution';
 import type { ExecutionTrace } from './execution';
 import type { DebugInfo } from './debug';
-import { hex, inspectMemory, snapshotForCycle } from './runtime';
-import type { MemoryValue } from './runtime';
+import { inspectMemory, snapshotForCycle } from './runtime';
 import { memoryTimeline } from './memoryTimeline';
 import type { MemoryStep } from './memoryTimeline';
 import MemoryDiagram from './MemoryDiagram';
@@ -14,13 +13,6 @@ import { operandExplanation } from './blocks';
 
 const MAX_EXECUTION_CYCLES = 2000;
 type Props = { compilation: Compilation; source?: string; onSelectLine: (line: number) => void };
-function ValueTree({ value, previous }: { value: MemoryValue; previous?: MemoryValue }) {
-  const changed = previous !== undefined && value.value !== previous.value;
-  return <li className={changed ? 'compile-memory-changed' : ''}>
-    <div className="compile-memory-value"><strong>{value.name}</strong><code>{value.type}</code><span>{value.address !== undefined ? hex(value.address) : '주소 미확인'}</span><b title={value.unavailable}>{value.unavailable || value.value}</b>{changed && <small>변경됨</small>}</div>
-    {value.children.length > 0 && <ul>{value.children.map((child, i) => <ValueTree key={`${child.name}-${i}`} value={child} previous={previous?.children.find(old => old.name === child.name)} />)}</ul>}
-  </li>;
-}
 export default function RuntimeInspector({ compilation, source = '', onSelectLine }: Props) {
   const [trace, setTrace] = useState<ExecutionTrace | null>(null);
   const [debug, setDebug] = useState<DebugInfo | null>(null);
@@ -44,12 +36,8 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
   }, [playing, scenes]);
   const scene = scenes[step];
   const cycle = scene ? trace?.history[scene.index] : undefined;
-  const previousScene = step > 0 ? scenes[step - 1] : undefined;
-  const previousCycle = previousScene ? trace?.history[previousScene.index] : undefined;
   const snapshot = useMemo(() => cycle ? snapshotForCycle(cycle) : undefined, [cycle]);
-  const previousSnapshot = useMemo(() => previousCycle ? snapshotForCycle(previousCycle) : undefined, [previousCycle]);
   const view = useMemo(() => debug && snapshot ? inspectMemory(debug, snapshot) : null, [debug, snapshot]);
-  const previous = useMemo(() => debug && previousSnapshot ? inspectMemory(debug, previousSnapshot) : null, [debug, previousSnapshot]);
   async function run() {
     if (request.current || !compilation.binaryUrl) return;
     const controller = new AbortController(); request.current = controller;
@@ -71,7 +59,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
   const sourceText = sourceLine ? source.split('\n')[sourceLine - 1]?.trim() : undefined;
   const pointerName = (value: string, typeId?: number) => {
     if (!value.startsWith('0x')) return value;
-    return [...(view?.nodes || []), ...(previous?.nodes || [])].find(node => node.address === Number(value) && node.typeId === typeId)?.name || '대상 미확인';
+    return (view?.nodes || []).find(node => node.address === Number(value) && node.typeId === typeId)?.name || '대상 미확인';
   };
   return <section ref={section} id="compile-runtime" className="compile-runtime" aria-label="실행 중 자료구조">
     <div className="compile-runtime-heading">
@@ -104,7 +92,6 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
       </>}
       {view && <>{view.warnings.map(message => <p className="compile-warning" key={message}>{message}</p>)}
         <MemoryDiagram key={scene.index} view={view} changes={scene.changes} finished={step === scenes.length - 1} playing={playing} onSelectLine={onSelectLine} />
-        <details className="compile-runtime-values"><summary>주소·타입과 변수 값 자세히 보기</summary><p>CPU 사이클 {cycle?.clock} · 명령 위치 {snapshot?.current_pc} · 단일 명령 실행 모드</p><ul>{view.variables.map((value, index) => <ValueTree key={`${value.name}-${index}`} value={value} previous={previous?.variables.find(old => old.name === value.name && old.address === value.address)} />)}</ul></details>
         <p className="compile-footnote">현재 위치에서 주소나 레지스터를 확인할 수 있는 변수만 표시합니다. 그림에는 독립 변수 최대 24개, 배열 최대 8개(각 앞 32개 원소), 포인터 그래프 최대 40개 노드를 표시합니다. 회색은 값 또는 위치를 확인하지 못했다는 뜻입니다. 초기화 완료·할당 해제 여부는 보장하지 않습니다.</p>
       </>}
       {trace.console_output && <pre className="compile-console">{trace.console_output}</pre>}
