@@ -36,21 +36,40 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
     }), 1500);
     return () => clearInterval(timer);
   }, [playing, scenes]);
-  useEffect(() => {
-    if (!playing) return;
-    const frame = requestAnimationFrame(() => {
-      const root = section.current;
-      const target = sourceStructures.arrays.some(array => array.container)
-        ? root?.querySelector('.compile-array-board')
-        : root?.querySelector('.compile-pointer-board, .compile-array-board, .compile-memory-diagram');
-      target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [playing, sourceStructures]);
   const scene = scenes[step];
   const cycle = scene ? trace?.history[scene.index] : undefined;
   const snapshot = useMemo(() => cycle ? snapshotForCycle(cycle) : undefined, [cycle]);
   const view = useMemo(() => debug && snapshot ? inspectMemory(debug, snapshot) : null, [debug, snapshot]);
+  useEffect(() => {
+    if (!trace || !scenes.length) return;
+    const frame = requestAnimationFrame(() => {
+      const root = section.current;
+      const page = root?.closest<HTMLElement>('.compile-page');
+      const pointerBoard = root?.querySelector<HTMLElement>('.compile-pointer-board');
+      const arrayBoard = root?.querySelector<HTMLElement>('.compile-array-board');
+      const variableBoard = root?.querySelector<HTMLElement>('.compile-variable-board');
+      const changedPointer = scene?.changes.some(change => change.pointer);
+      const target = changedPointer && pointerBoard
+        ? pointerBoard
+        : sourceStructures.arrays.some(array => array.container) && arrayBoard
+          ? arrayBoard
+          : view?.nodes.length && pointerBoard
+            ? pointerBoard
+            : view?.variables.some(value => value.children.length > 0) && arrayBoard
+              ? arrayBoard
+              : variableBoard || pointerBoard || arrayBoard || root;
+      if (!target || !page) { target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); return; }
+      const pageRect = page.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const margin = 16;
+      const available = pageRect.height - margin * 2;
+      let delta = 0;
+      if (targetRect.height > available || targetRect.top < pageRect.top + margin) delta = targetRect.top - pageRect.top - margin;
+      else if (targetRect.bottom > pageRect.bottom - margin) delta = targetRect.bottom - pageRect.bottom + margin;
+      if (Math.abs(delta) > 2) page.scrollTo({ top: page.scrollTop + delta, behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [playing, step, trace, scenes.length, sourceStructures, scene, view]);
   async function run() {
     if (request.current || !compilation.binaryUrl) return;
     const controller = new AbortController(); request.current = controller;
