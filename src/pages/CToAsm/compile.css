@@ -292,3 +292,67 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-more-blocks { display: block; margin: 12px auto; background: #f0f9ff; }
 @media (min-width: 1101px) { .compile-workspace-editor { max-height: calc(100vh - 100px); overflow-y: auto; scrollbar-gutter: stable; } }
 .compile-runtime { scroll-margin-top: 80px; }
+.compile-result-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+.compile-result-title button { border: 1px solid #bae6fd; border-radius: 6px; padding: 6px 10px; background: #f0f9ff; color: #0369a1; font-size: 12px; }
+.compile-function-filter { display: flex; align-items: center; gap: 6px; color: #475569; font-size: 12px; }
+.compile-runtime .compile-runtime-eyebrow { margin-bottom: 4px; color: #0284c7; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.compile-runtime .compile-run-button { background: #0284c7; color: white; border-color: #0284c7; padding: 9px 14px; font-weight: 650; }
+.compile-runtime-options { position: relative; color: #64748b; }
+.compile-runtime-options summary { cursor: pointer; padding: 6px; }
+.compile-runtime-options label { display: block; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
+.compile-runtime-empty { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; padding: 30px 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; }
+.compile-runtime-empty > div { display: flex; align-items: center; gap: 8px; color: #334155; font-size: 13px; }
+.compile-runtime-empty strong { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #0369a1; background: #e0f2fe; }
+.compile-runtime-empty p { flex-basis: 100%; text-align: center; margin-top: 8px; }
+.compile-execution-summary { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; background: #f0f9ff; border-radius: 7px; color: #075985; font-size: 13px; }
+.compile-execution-summary strong { color: #0f172a; }
+.compile-runtime .compile-step-guide { color: #64748b; margin: 0 0 12px; }
+.compile-memory-flow { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); gap: 8px; align-items: stretch; margin-bottom: 16px; }
+.compile-memory-flow article { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 14px; background: #f8fafc; border: 1px solid #dbe4ef; border-radius: 10px; }
+.compile-memory-flow article > span { color: #64748b; font-size: 11px; font-weight: 650; }
+.compile-memory-flow article > code, .compile-memory-flow button code { font: 13px/1.65 Consolas, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
+.compile-memory-flow button { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; text-align: left; border: 0; background: transparent; }
+.compile-memory-flow button b { font-size: 12px; color: #0284c7; }
+.compile-flow-arrow { display: grid; place-items: center; color: #38bdf8; font-size: 24px; }
+.compile-memory-flow article.compile-flow-change { border-color: #fcd34d; background: #fffbeb; }
+.compile-flow-change ul { list-style: none; }
+.compile-flow-change li { display: flex; flex-direction: column; gap: 3px; padding: 3px 0; color: #92400e; font: 12px/1.6 Consolas, monospace; overflow-wrap: anywhere; }
+.compile-memory-diagram { padding: 16px; border: 1px solid #dbe4ef; border-radius: 12px; background: #fcfdff; }
+.compile-memory-diagram h3 { margin-bottom: 12px; font-size: 13px; font-weight: 650; color: #334155; }
+.compile-memory-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; font-size: 11px; color: #64748b; }
+.compile-memory-legend span { display: inline-flex; gap: 5px; align-items: center; }
+.compile-memory-legend i { width: 10px; height: 10px; border: 1px solid #94a3b8; border-radius: 2px; }
+.compile-memory-legend .known { background: #e0f2fe; border-color: #7dd3fc; }
+.compile-memory-legend .changed { background: #fef3c7; border-color: #f59e0b; }
+.compile-memory-legend .unknown { background: #e2e8f0; }
+.compile-variable-board, .compile-array-board { margin-bottom: 22px; }
+.compile-variable-cells { display: flex; flex-wrap: wrap; gap: 10px; }
+.compile-runtime .compile-memory-cell { display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 100px; max-width: 220px; min-height: 82px; padding: 10px 14px; text-align: center; color: #0c4a6e; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; }
+.compile-memory-cell > span { color: #64748b; font: 12px Consolas, monospace; overflow-wrap: anywhere; }
+.compile-memory-cell > strong { font: 700 18px/1.3 Consolas, monospace; overflow-wrap: anywhere; }
+.compile-memory-cell small { font-size: 10px; color: #64748b; }
+.compile-runtime .compile-memory-cell.is-unknown { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
+.compile-runtime .compile-memory-cell.is-changed { background: #fef3c7; border-color: #f59e0b; color: #92400e; box-shadow: 0 0 0 2px #fffbeb; }
+.compile-array-caption { display: flex; gap: 12px; align-items: baseline; margin: 8px 0; font-size: 12px; }
+.compile-array-caption span { color: #64748b; }
+.compile-array-cells { display: flex; overflow-x: auto; padding: 4px 2px 10px; }
+.compile-array-cells .compile-memory-cell { flex-shrink: 0; border-radius: 0; margin-left: -1px; }
+.compile-array-cells .compile-memory-cell:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+.compile-array-cells .compile-memory-cell:last-child { border-radius: 0 8px 8px 0; }
+.compile-memory-intro { padding: 24px 12px; text-align: center; color: #64748b; font-size: 13px; }
+.compile-memory-intro p { margin-top: 8px; }
+.compile-pointer-board > p { margin: -4px 0 8px; }
+@media (max-width: 800px) {
+  .compile-memory-flow { grid-template-columns: 1fr; }
+  .compile-flow-arrow { transform: rotate(90deg); line-height: 1; }
+  .compile-memory-diagram { padding: 12px; }
+  .compile-runtime { padding: 14px; }
+}
+.compile-function-jump { white-space: nowrap; }
+.compile-memory-diagram { display: flex; flex-direction: column; }
+.compile-memory-legend { order: 0; }
+.compile-variable-board { order: 20; }
+.compile-array-board { order: 30; }
+.compile-pointer-board { order: 40; }
+.compile-memory-diagram.is-node-step .compile-pointer-board, .compile-memory-diagram.is-array-step .compile-array-board { order: 10; }
+.compile-memory-diagram > .compile-footnote { order: 50; }

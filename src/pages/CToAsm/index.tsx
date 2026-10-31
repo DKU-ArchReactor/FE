@@ -100,7 +100,6 @@ export default function CToAsmPage() {
       <div className="compile-toolbar">
         <button disabled={busy} onClick={() => inputRef.current?.click()}>C 파일 불러오기</button>
         <span className="compile-filename">{fileName}</span>
-        {result && <button onClick={() => document.getElementById('compile-runtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>실행·메모리 보기</button>}
         <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
           void openFile(event.target.files?.[0]); event.target.value = '';
@@ -142,14 +141,14 @@ export default function CToAsmPage() {
           {structure.structs.length + structure.arrays.length + structure.diagnostics.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
         </div>
         <section className="compile-output-panel" aria-label="C 코드 컴파일 결과">
-          {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} /> : <div className="compile-output-placeholder">
+          {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} onOpenMemory={() => document.getElementById('compile-runtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} /> : <div className="compile-output-placeholder">
             <span>컴파일 결과</span>
             <h2>{busy ? '컴파일 중입니다' : error ? '컴파일 결과를 만들지 못했습니다' : '명령어가 여기에 표시됩니다'}</h2>
             <p>{error ? '위 오류 안내에 따라 편집기 내용을 수정한 뒤 다시 컴파일해 주세요.' : '편집기의 C 코드를 컴파일하면 이곳에서 대응 관계를 보여줍니다.'}</p>
           </div>}
         </section>
       </div>
-      {result && <RuntimeInspector compilation={result} onSelectLine={line => { setSelection({ start: line, end: line }); editorRef.current?.getDomNode()?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />}
+      {result && <RuntimeInspector compilation={result} source={source} onSelectLine={line => { setSelection({ start: line, end: line }); editorRef.current?.getDomNode()?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />}
       <p className="compile-footnote">소스의 수정 내용이 컴파일 요청에 그대로 전달됩니다. CPU 실행 흐름은 데이터패스 페이지에서 볼 수 있습니다.</p>
     </main>
   );

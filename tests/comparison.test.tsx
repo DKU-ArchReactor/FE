@@ -52,3 +52,12 @@ it('supports function search and selected-source filtering on a real long compil
   expect(screen.getByText('tree_find', {selector:'strong'})).toBeTruthy();
   expect(screen.queryByText('sum_array', {selector:'strong'})).toBeNull();
 });
+
+it('omits redundant single-function filters and keeps selection as a highlight',()=>{
+  render(<CodeComparison source={source} assembly={assembly} />);
+  expect(screen.queryByRole('combobox',{name:'대응표 함수 선택'})).toBeNull();
+  expect(screen.queryByRole('button',{name:'선택 줄 보기'})).toBeNull();
+  expect(screen.getByRole('heading',{name:'생성된 RISC-V 어셈블리'})).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'C 2행: int a = 1;'}));
+  expect(screen.getByRole('button',{name:'C 3행: return a;'})).toBeTruthy();
+});

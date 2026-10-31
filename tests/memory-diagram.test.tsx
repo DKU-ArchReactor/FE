@@ -1,0 +1,26 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { parseDebugInfo } from '../src/pages/CToAsm/debug';
+import { inspectMemory, snapshotForCycle } from '../src/pages/CToAsm/runtime';
+import { memoryTimeline } from '../src/pages/CToAsm/memoryTimeline';
+import type { SimulationResult } from '../src/type/simulation';
+import MemoryDiagram from '../src/pages/CToAsm/MemoryDiagram';
+afterEach(cleanup);
+it('draws real array values, resolves pointer names, and highlights the rewired edge',()=>{
+  const bytes=readFileSync('tests/fixtures/long.elf');
+  const debug=parseDebugInfo(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+  const trace=JSON.parse(readFileSync('tests/fixtures/long-trace.json','utf8')) as SimulationResult;
+  const scene=memoryTimeline(debug,trace.history).find(step=>step.changes.some(change=>change.name==='list[0].next' && change.before.startsWith('0x')))!;
+  expect(scene).toBeDefined();
+  const view=inspectMemory(debug,snapshotForCycle(trace.history[scene.index]));
+  const select=vi.fn();
+  const result=render(<MemoryDiagram view={view} changes={scene.changes} onSelectLine={select} />);
+  expect(screen.getByRole('region',{name:'배열 메모리 그림'})).toBeTruthy();
+  const cell=screen.getByRole('button',{name:'values[0]: 1'});
+  fireEvent.click(cell);
+  expect(select).toHaveBeenCalledWith(113);
+  expect(screen.getAllByText('next: list[2]').length).toBeGreaterThanOrEqual(1);
+  expect(screen.queryByText(/next: 0x/)).toBeNull();
+  expect(result.container.querySelector('path[stroke="#d97706"]')).toBeTruthy();
+});

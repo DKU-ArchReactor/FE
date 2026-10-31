@@ -3,15 +3,14 @@ import { instructionExplanation, isMappedToSelection, parseAssembly } from './ma
 import { groupAssembly, operandExplanation } from './blocks';
 import type { SourceSelection } from './mapping';
 
-type Props = { source: string; assembly?: string; selection?: SourceSelection | null; onSelectionChange?: (selection: SourceSelection | null) => void };
+type Props = { source: string; assembly?: string; selection?: SourceSelection | null; onSelectionChange?: (selection: SourceSelection | null) => void; onOpenMemory?: () => void };
 
-export default function CodeComparison({ source, assembly, selection: controlledSelection, onSelectionChange }: Props) {
+export default function CodeComparison({ source, assembly, selection: controlledSelection, onSelectionChange, onOpenMemory }: Props) {
   const [localSelection, setSelection] = useState<SourceSelection | null>(null);
   const [selectedUnmapped, setSelectedUnmapped] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [showExplanations, setShowExplanations] = useState(true);
   const [functionFilter, setFunctionFilter] = useState('');
-  const [onlySelected, setOnlySelected] = useState(false);
   const [limits, setLimits] = useState<Record<string, number>>({});
   const selection = controlledSelection === undefined ? localSelection : controlledSelection;
   const anchor = useRef(1);
@@ -50,7 +49,6 @@ export default function CodeComparison({ source, assembly, selection: controlled
   }
   const matchingGroups = [...functionGroups].map(([name, groupBlocks]) => [name, groupBlocks.filter(block => {
     if (functionFilter && name !== functionFilter) return false;
-    if (onlySelected && (!selection || block.sourceLine === null || block.sourceLine < selection.start || block.sourceLine > selection.end)) return false;
     if (!query.trim()) return true;
     const needle = query.trim().toLocaleLowerCase();
     const sourceText = block.contextLine ? lines[block.contextLine - 1] : block.sourceLine ? lines[block.sourceLine - 1] : '';
@@ -60,8 +58,9 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const firstFunction = mainFunction >= 0 ? mainFunction : Math.max(0, matchingGroups.findIndex(([name]) => name !== '전역 코드'));
 
   return <section className="compile-comparison" aria-label="C와 어셈블리 대응 블록">
-    <div className="compile-block-header"><h2>C 소스 코드</h2><h2>생성된 RISC-V 명령어</h2></div>
-    {assembly && <div className="compile-comparison-tools"><label className="compile-code-search">코드 찾기<input type="search" value={query} onChange={event => { setQuery(event.target.value); setLimits({}); }} placeholder="함수, C 코드, 명령어 검색" /></label><label className="compile-explanation-toggle"><input type="checkbox" checked={showExplanations} onChange={event => setShowExplanations(event.target.checked)} />명령어 설명</label><select aria-label="대응표 함수 선택" value={functionFilter} onChange={event => { setFunctionFilter(event.target.value); setLimits({}); }}><option value="">모든 함수</option>{[...functionGroups.keys()].map(name => <option key={name}>{name}</option>)}</select><button disabled={!selection && !onlySelected} onClick={() => { setOnlySelected(!onlySelected); setQuery(''); setFunctionFilter(''); }}>{onlySelected ? '전체 줄 보기' : '선택 줄 보기'}</button></div>}
+    {assembly && onOpenMemory && <div className="compile-result-title"><strong>컴파일 결과</strong><button onClick={onOpenMemory}>메모리 변화 시각화 ↓</button></div>}
+    <div className="compile-block-header"><h2>C 소스 코드</h2><h2>생성된 RISC-V 어셈블리</h2></div>
+    {assembly && <div className="compile-comparison-tools"><label className="compile-code-search">코드 찾기<input type="search" value={query} onChange={event => { setQuery(event.target.value); setLimits({}); }} placeholder="함수, C 코드, 명령어 검색" /></label><label className="compile-explanation-toggle"><input type="checkbox" checked={showExplanations} onChange={event => setShowExplanations(event.target.checked)} />명령어 설명</label>{functionGroups.size > 1 && <label className="compile-function-filter">함수별 보기<select aria-label="대응표 함수 선택" value={functionFilter} onChange={event => { setFunctionFilter(event.target.value); setLimits({}); }}><option value="">전체 함수</option>{[...functionGroups.keys()].map(name => <option key={name} value={name}>{name === 'main' ? 'main() · 시작 함수' : `${name}()`}</option>)}</select></label>}</div>}
     {!assembly ? <div className="compile-before">{lines.map((_, i) => <div key={i}>{sourceButton(i + 1)}</div>)}</div> : <>
       {matchingGroups.map(([functionName, functionBlocks], groupIndex) => {
         const sourceLineCount = new Set(functionBlocks.flatMap(block => block.sourceLine === null ? [] : [block.sourceLine])).size;
