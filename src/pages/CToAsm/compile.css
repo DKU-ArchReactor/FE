@@ -4,7 +4,6 @@
 .compile-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .16em; color: #0284c7; margin-bottom: 8px; }
 .compile-heading h1 { font-size: clamp(22px, 2.3vw, 30px); font-weight: 750; letter-spacing: -.04em; }
 .compile-heading p:not(.compile-eyebrow) { color: #64748b; font-size: 14px; margin-top: 8px; }
-.compile-profile { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; border-radius: 20px; padding: 8px 12px; font-size: 12px; white-space: nowrap; }
 .compile-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; }
 .compile-toolbar { position: relative; z-index: 4; }
 .compile-toolbar button, .compile-toolbar select { border: 1px solid #cbd5e1; background: white; padding: 8px 14px; border-radius: 8px; font-size: 13px; }
@@ -13,8 +12,11 @@
 .compile-toolbar .compile-file-button:hover:not(:disabled) { border-style: solid; border-color: #0284c7; background: #e0f2fe; }
 .compile-file-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .compile-file-button small { padding: 2px 5px; border-radius: 4px; background: #dbeafe; color: #075985; font: 700 10px/1.3 Consolas, monospace; }
-.compile-toolbar .compile-new-code { color: #475569; }
-.compile-toolbar .compile-primary { color: white; background: #0284c7; border-color: #0284c7; margin-left: auto; font-weight: 650; }
+.compile-toolbar .compile-reset-button { display: inline-flex; align-items: center; gap: 7px; padding-inline: 11px; color: #475569; }
+.compile-reset-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.compile-toolbar .compile-reset-button:hover:not(:disabled) { border-color: #fda4af; background: #fff1f2; color: #be123c; }
+.compile-toolbar .compile-run-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.compile-toolbar .compile-primary { color: white; background: #0284c7; border-color: #0284c7; font-weight: 650; }
 .compile-toolbar .compile-primary:hover:not(:disabled) { background: #0369a1; }
 .compile-toolbar button:disabled, .compile-toolbar select:disabled { opacity: .5; cursor: not-allowed; }
 .compile-example-picker { position: relative; }
@@ -39,7 +41,6 @@
 .compile-toolbar .compile-example-apply { color: white; background: #0284c7; border-color: #0284c7; font-weight: 650; }
 .compile-example-message { display: inline-block; margin-left: 8px; color: #047857; font-size: 11px; }
 .compile-page button:focus-visible, .compile-page select:focus-visible, .compile-page summary:focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
-.compile-filename { font-size: 12px; color: #64748b; overflow-wrap: anywhere; }
 .compile-status { font-size: 12px; color: #64748b; margin: 12px 2px; }
 .compile-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
 .compile-panel { background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; min-width: 0; }
@@ -194,14 +195,12 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
   .compile-heading { gap: 12px; margin-bottom: 16px; }
   .compile-heading h1 { font-size: 22px; line-height: 1.35; }
   .compile-heading p:not(.compile-eyebrow) { font-size: 13px; line-height: 1.6; }
-  .compile-profile { padding: 6px 10px; font-size: 11px; }
   .compile-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 10px; }
   .compile-toolbar > button:first-child { justify-self: start; }
   .compile-toolbar .compile-example-picker { grid-column: 2; grid-row: 1; }
   .compile-toolbar .compile-example-picker > summary { padding-inline: 10px; }
-  .compile-toolbar .compile-filename { grid-column: 1 / -1; grid-row: 2; min-width: 0; padding: 4px 2px 0; border-top: 1px solid #f1f5f9; }
-  .compile-toolbar .compile-new-code { grid-column: 1; grid-row: 3; justify-self: start; align-self: center; }
-  .compile-toolbar .compile-primary { grid-column: 2; grid-row: 3; justify-self: end; align-self: center; margin-left: 0; padding-inline: 12px; }
+  .compile-toolbar .compile-run-actions { grid-column: 1 / -1; grid-row: 2; justify-self: end; margin-left: 0; }
+  .compile-toolbar .compile-primary { padding-inline: 12px; }
   .compile-status { line-height: 1.6; }
   .compile-ide-layout { gap: 12px; }
   .compile-editor-panel .compile-panel-heading { padding: 11px 13px; }
