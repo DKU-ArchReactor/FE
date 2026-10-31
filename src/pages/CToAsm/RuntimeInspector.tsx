@@ -25,7 +25,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
   const request = useRef<AbortController | null>(null);
   const section = useRef<HTMLElement | null>(null);
   useEffect(() => () => { request.current?.abort(); request.current = null; }, []);
-  useEffect(() => { if (trace) section.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, [trace]);
+  useEffect(() => { if (trace && !playing && scenes.length < 2) section.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, [trace, playing, scenes.length]);
   useEffect(() => {
     if (!playing || !scenes.length) return;
     const timer = setInterval(() => setStep(current => {
@@ -35,6 +35,14 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
     }), 1500);
     return () => clearInterval(timer);
   }, [playing, scenes]);
+  useEffect(() => {
+    if (!playing) return;
+    const frame = requestAnimationFrame(() => {
+      const target = section.current?.querySelector('.compile-array-board, .compile-pointer-board, .compile-memory-diagram');
+      target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [playing]);
   const scene = scenes[step];
   const sourceStructures = useMemo(() => analyzeCStructures(source), [source]);
   const cycle = scene ? trace?.history[scene.index] : undefined;
