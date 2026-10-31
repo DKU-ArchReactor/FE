@@ -17,7 +17,6 @@ export default function CToAsmPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selection, setSelection] = useState<SourceSelection | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<AbortController | null>(null);
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
@@ -48,7 +47,6 @@ export default function CToAsmPage() {
     setResult(null);
     setError('');
     setSelection(null);
-    setShowDetails(false);
   }
 
   function editSource(value?: string) {
@@ -57,7 +55,6 @@ export default function CToAsmPage() {
     setResult(null);
     setError('');
     setSelection(null);
-    setShowDetails(false);
   }
 
   async function openFile(file?: File) {
@@ -94,26 +91,26 @@ export default function CToAsmPage() {
       <div className="compile-heading">
         <div>
           <p className="compile-eyebrow">ARCHREACTOR / COMPILE</p>
-          <h1>C 코드가 명령어가 되는 순간</h1>
-          <p>직접 코드를 편집하고 컴파일 결과를 같은 화면에서 살펴보세요.</p>
+          <h1>C와 RISC-V 어셈블리 대응</h1>
+          <p>편집한 C 코드와 컴파일 결과를 줄 단위로 비교해 보세요.</p>
         </div>
         <span className="compile-profile">RV32IM · 최적화 없음 (-O0)</span>
       </div>
       <div className="compile-toolbar">
-        <button disabled={busy} onClick={() => inputRef.current?.click()}>C 파일 열기</button>
+        <button disabled={busy} onClick={() => inputRef.current?.click()}>C 파일 불러오기</button>
         <span className="compile-filename">{fileName}</span>
         <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
           void openFile(event.target.files?.[0]); event.target.value = '';
         }} />
       </div>
-      <p className="compile-status" role="status">{busy ? '현재 편집한 C 코드를 RV32IM으로 컴파일하고 있습니다.' : result ? '컴파일 완료 · 대응 명령어와 코드의 구조를 확인하세요.' : '코드를 편집하거나 .c 파일을 연 뒤 컴파일하세요.'}</p>
+      <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : result ? '컴파일 완료 · C 코드 옆에서 생성된 명령어를 확인하세요.' : `컴파일 대상: ${fileName} · 아래 편집기에 보이는 내용이 컴파일됩니다.`}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
-      <div className="compile-ide-layout">
+      <div className="compile-editor-layout">
         <section className="compile-editor-panel" aria-label="C 웹 IDE">
           <div className="compile-panel-heading"><h2>C 소스 편집</h2><span>{source.split('\n').length}줄</span></div>
           <Editor
-            height="min(58vh, 560px)"
+            height="280px"
             language="c"
             theme="vs-dark"
             path={fileName}
@@ -136,16 +133,15 @@ export default function CToAsmPage() {
             }}
           />
         </section>
-        <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />
       </div>
-      {result ? <div className="compile-learning-layout">
+      {(structure.structs.length + structure.arrays.length > 0) && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
+      {result ? <div className="compile-result-layout">
         <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} />
       </div> : <section className="compile-output-placeholder" aria-label="컴파일 대기">
         <span>컴파일 결과</span>
         <h2>{busy ? '컴파일 중입니다' : '컴파일 결과가 여기에 표시됩니다'}</h2>
         <p>현재 C 코드를 컴파일하면 실제 생성된 RISC-V 명령어와 소스 줄 연결을 보여줍니다.</p>
       </section>}
-      {result && <details className="compile-log" onToggle={event => setShowDetails(event.currentTarget.open)}><summary>상세 정보</summary>{showDetails && <><details><summary>컴파일 로그</summary><pre>{result.log || '추가 메시지가 없습니다.'}</pre></details><details><summary>원본 어셈블리</summary><pre>{result.assembly}</pre></details></>}</details>}
       <p className="compile-footnote">소스의 수정 내용이 컴파일 요청에 그대로 전달됩니다. CPU 실행 흐름은 데이터패스 페이지에서 볼 수 있습니다.</p>
     </main>
   );

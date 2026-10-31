@@ -16,6 +16,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const blocks = useMemo(() => groupAssembly(rows), [rows]);
   const mappedLines = new Set(rows.flatMap(row => row.sourceLine === null ? [] : [row.sourceLine]));
   const selectedRows = rows.filter(row => isMappedToSelection(row, selection));
+  const selectedInstructionCount = selectedRows.filter(row => row.kind === 'instruction').length;
   const ordinals = new Map(rows.filter(row => row.kind === 'instruction').map((row, i) => [row.assemblyLine, i + 1]));
 
   function select(line: number | null, extend = false) {
@@ -62,20 +63,21 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const firstFunction = Math.max(0, matchingGroups.findIndex(([name]) => name !== '전역 코드'));
 
   return <section className="compile-comparison" aria-label="C와 어셈블리 대응 블록">
-    <div className="compile-block-header"><h2>C 코드 <span>클릭하면 연결된 줄 강조</span></h2><h2>대응 어셈블리 <span>명령어별 역할</span></h2></div>
+    <div className="compile-block-header"><h2>C 소스 코드</h2><h2>생성된 RISC-V 명령어 <span>명령어를 눌러 연결된 C 줄을 확인</span></h2></div>
     {assembly && <label className="compile-code-search">함수·코드·명령어 찾기<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="예: sum, lw, node->next" /></label>}
-    <p className="compile-block-guide">{assembly ? '함수별로 접고 펼칠 수 있습니다. 같은 블록의 C와 명령어가 함께 보입니다.' : '컴파일하면 각 C 줄 옆에 해당 명령어와 역할이 함께 표시됩니다.'}</p>
+    <p className="compile-block-guide">{assembly ? '각 C 코드 줄과 그 줄에 연결된 명령어를 같은 행에서 비교합니다.' : '컴파일 후 각 C 코드 옆에 생성된 명령어가 표시됩니다.'}</p>
     {!assembly ? <div className="compile-before">{lines.map((_, i) => <div key={i}>{sourceButton(i + 1)}</div>)}</div> : <>
-      {matchingGroups.map(([functionName, functionBlocks], groupIndex) => <details key={functionName} className="compile-function" open={groupIndex === firstFunction}>
-        <summary><strong>{functionName}</strong><span>{functionBlocks.length}개 코드 블록</span></summary>
+      {matchingGroups.map(([functionName, functionBlocks], groupIndex) => {
+        const sourceLineCount = new Set(functionBlocks.flatMap(block => block.sourceLine === null ? [] : [block.sourceLine])).size;
+        return <details key={functionName} className="compile-function" open={groupIndex === firstFunction}>
+        <summary><strong>{functionName}</strong><span>{sourceLineCount ? `${sourceLineCount}개 C 줄` : '소스 줄 정보 없음'}</span></summary>
         {functionBlocks.map((block, index) => {
         const sourceLine = block.sourceLine;
         const contextLine = block.contextLine;
-        const repeated = sourceLine !== null && blocks.filter(item => item.sourceLine === sourceLine).length > 1;
         const selected = sourceLine !== null && selection !== null && sourceLine >= selection.start && sourceLine <= selection.end;
         return <article key={index} className={`compile-block ${sourceLine === null ? 'compile-block-unmapped' : ''} ${selected ? 'is-selected' : ''}`} aria-label={contextLine ? `C ${contextLine}행, 직접 연결된 명령어 없음` : sourceLine === null ? '소스 위치 없는 출력' : `C ${sourceLine}행 대응 블록`}>
           <div className="compile-block-left">
-            {sourceLine !== null ? <>{sourceButton(sourceLine)}<span className="compile-block-note">{block.rows.filter(row => row.kind === 'instruction').length}개 명령어{repeated ? ' · 같은 줄에서 나온 다른 명령어 묶음' : ''}</span></> : contextLine ? <><span className="compile-c-badge">C {contextLine}</span><code className="compile-context-source">{lines[contextLine - 1]}</code><p className="compile-block-note">이 줄에 직접 연결된 명령어가 없습니다.</p></> : <><span className="compile-c-badge">소스 위치 없음</span><p className="compile-block-note">컴파일러가 소스 위치를 제공하지 않은 출력입니다.</p></>}
+            {sourceLine !== null ? sourceButton(sourceLine) : contextLine ? <><span className="compile-c-badge">C {contextLine}</span><code className="compile-context-source">{lines[contextLine - 1]}</code><p className="compile-block-note">이 줄에 직접 연결된 명령어가 없습니다.</p></> : <><span className="compile-c-badge">소스 위치 없음</span><p className="compile-block-note">컴파일러가 소스 위치를 제공하지 않은 출력입니다.</p></>}
           </div>
           <div className="compile-block-right">
             {contextLine ? <span className="compile-no-output">이 C 줄에 직접 연결된 명령어 없음</span> : block.rows.map(row => row.kind === 'label' ? <div className="compile-block-label" key={row.assemblyLine}><code>{row.text}</code><span>이동 목적지를 나타내는 레이블</span></div> : <div className="compile-instruction" key={row.assemblyLine}>
@@ -85,11 +87,12 @@ export default function CodeComparison({ source, assembly, selection: controlled
           </div>
         </article>;
         })}
-      </details>)}
+      </details>;
+      })}
       {matchingGroups.length === 0 && <p className="compile-no-results">“{query}”에 해당하는 코드나 명령어가 없습니다.</p>}
       {mappedLines.size === 0 && <p className="compile-warning" role="status">C 줄 정보가 없어 대응 관계를 표시할 수 없습니다. 명령어 순서만 표시하며, 연결을 추측하지 않습니다.</p>}
     </>}
-    {selection && <div className="compile-selection" role="status"><h2>C {selection.start}{selection.end !== selection.start ? `–${selection.end}` : ''}행 → {selectedRows.length}개 어셈블리 명령</h2><p>같은 C 위치의 블록이 함께 강조됩니다. Shift+클릭으로 범위를 선택할 수 있습니다.</p></div>}
+    {selection && <div className="compile-selection" role="status"><h2>선택한 코드: C {selection.start}{selection.end !== selection.start ? `–${selection.end}` : ''}행</h2><p>{selectedInstructionCount ? `이 코드에서 생성된 명령어 ${selectedInstructionCount}개를 강조했습니다.` : '연결된 명령어가 없습니다.'} Shift+클릭으로 여러 줄을 함께 선택할 수 있습니다.</p></div>}
     {selectedUnmapped && <div className="compile-selection" role="status"><h2>C 위치가 없는 명령어</h2><code>{selectedUnmapped}</code><p>컴파일러가 이 명령어에 현재 C 소스의 줄 정보를 제공하지 않았습니다.</p></div>}
     <p className="compile-footnote">줄 연결은 컴파일러가 제공한 위치를 따릅니다. 명령어 번호는 표시 순서이며 PC 주소가 아닙니다. 레지스터를 C 변수로 추측하지 않으며, 의사 명령어는 조립 과정에서 확장될 수 있습니다.</p>
   </section>;

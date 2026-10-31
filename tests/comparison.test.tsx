@@ -21,7 +21,8 @@ describe('source / assembly interaction', () => {
     render(<CodeComparison source={source} assembly={assembly} />);
     fireEvent.click(screen.getByRole('button', { name: 'C 2행: int a = 1;' }));
     fireEvent.click(screen.getByRole('button', { name: 'C 3행: return a;' }), { shiftKey: true });
-    expect(screen.getByText('C 2–3행 → 3개 어셈블리 명령')).toBeTruthy();
+    expect(screen.getByText('선택한 코드: C 2–3행')).toBeTruthy();
+    expect(screen.getByText(/생성된 명령어 3개/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /ASM 10행/ }));
     expect(screen.getByText('C 위치가 없는 명령어')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'C 3행: return a;' }).getAttribute('aria-pressed')).toBe('false');

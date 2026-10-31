@@ -18,7 +18,8 @@ describe('compilation page', () => {
     fireEvent.click(screen.getByRole('button', { name: '컴파일하기 →' }));
     await screen.findByText(/컴파일 완료/);
     fireEvent.click(screen.getByRole('button', { name: 'C 4행: int sum = a + b;' }));
-    expect(screen.getByText('C 4행 → 4개 어셈블리 명령')).toBeTruthy();
+    expect(screen.getByText('선택한 코드: C 4행')).toBeTruthy();
+    expect(screen.getByText(/생성된 명령어 4개/)).toBeTruthy();
     fireEvent.change(screen.getByRole('textbox', { name: 'C 소스 편집기' }), { target: { value: 'int main(){return 1;}' } });
     expect(screen.queryByText(/컴파일 완료/)).toBeNull();
     expect(screen.queryByRole('button', { name: /ASM / })).toBeNull();
