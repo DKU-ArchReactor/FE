@@ -17,7 +17,9 @@
 .compile-example-picker > summary::-webkit-details-marker { display: none; }
 .compile-example-picker[open] { z-index: 20; }
 .compile-example-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; width: min(520px, calc(100vw - 36px)); max-height: min(72vh, 640px); overflow: auto; padding: 16px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; box-shadow: 0 16px 40px #0f172a24; }
-.compile-example-menu > strong { color: #0f172a; font-size: 14px; }
+.compile-example-menu-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.compile-example-menu-heading > strong { color: #0f172a; font-size: 14px; }
+.compile-toolbar .compile-example-menu-heading > button { padding: 5px 9px; color: #475569; font-size: 12px; }
 .compile-example-menu > p { margin: 5px 0 12px; color: #64748b; font-size: 12px; }
 .compile-toolbar .compile-example-options { display: grid; gap: 6px; }
 .compile-toolbar .compile-example-options > button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 9px 10px; text-align: left; }
@@ -247,11 +249,13 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
   .compile-editor-loading { height: 240px; }
 }
 .compile-page { max-width: 1680px; width: 100%; margin: 0 auto; }
-.compile-workspace { display: grid; grid-template-columns: minmax(320px, .78fr) minmax(0, 1.42fr); gap: 16px; align-items: start; }
+.compile-workspace { display: grid; grid-template-columns: minmax(320px, .78fr) minmax(0, 1.42fr); gap: 16px; align-items: stretch; }
 .compile-workspace-editor, .compile-output-panel { min-width: 0; }
 .compile-editor-panel { height: 404px; --compile-editor-height: 360px; }
 .compile-output-placeholder { min-height: 404px; height: 404px; margin-top: 0; align-content: center; }
-.compile-output-panel .compile-comparison { max-height: clamp(420px, 72vh, 780px); margin-top: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.compile-output-panel { display: flex; flex-direction: column; min-height: 0; }
+.compile-output-panel .compile-comparison { flex: 1 1 auto; min-height: 0; max-height: clamp(420px, 72vh, 780px); margin-top: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.compile-workspace-editor:has(.compile-structure[open]) + .compile-output-panel .compile-comparison { min-height: 404px; max-height: none; }
 .compile-workspace-editor { position: static; }
 .compile-output-panel .compile-block-guide { background: #fff; }
 @media (max-width: 1100px) {

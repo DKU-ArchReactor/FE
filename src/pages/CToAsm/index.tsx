@@ -128,7 +128,7 @@ export default function CToAsmPage() {
         <details className="compile-example-picker" ref={examplePickerRef}>
           <summary>빠른 예제</summary>
           <div className="compile-example-menu">
-            <strong>자료구조 예제</strong>
+            <div className="compile-example-menu-heading"><strong>자료구조 예제</strong><button type="button" aria-label="빠른 예제 닫기" title="닫기" onClick={() => { if (examplePickerRef.current) examplePickerRef.current.open = false; }}>닫기</button></div>
             <p>예제를 골라 코드를 확인한 뒤 에디터에 넣거나 복사하세요.</p>
             <div className="compile-example-options">{quickExamples.map(example => <button key={example.id} className={selectedExampleId === example.id ? 'is-active' : ''} aria-pressed={selectedExampleId === example.id} onClick={() => { setSelectedExampleId(example.id); setExampleMessage(''); }}><b>{example.title}</b><span>{example.description}</span></button>)}</div>
             {selectedExample && <section className="compile-example-preview" aria-label={`${selectedExample.title} 예제 코드 미리보기`}>

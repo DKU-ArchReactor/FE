@@ -59,7 +59,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
       const execution = await executeCompilation(compilation, maxCycles, controller.signal);
       if (!controller.signal.aborted) {
         const timeline = memoryTimeline(metadata, execution.history);
-        setDebug(metadata); setTrace(execution); setScenes(timeline); setStep(0);
+        setDebug(metadata); setTrace(execution); setScenes(timeline); setStep(0); setPlaying(timeline.length > 1);
       }
     } catch (failure) { if (!controller.signal.aborted) setError(compileError(failure)); }
     finally { if (request.current === controller) { request.current = null; setBusy(false); } }
@@ -77,7 +77,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
     <div className="compile-runtime-heading">
       <div><p className="compile-runtime-eyebrow">컴파일 다음 단계</p><h2>메모리 변화 시각화</h2><p>배열은 칸으로, 포인터는 화살표로 표시합니다. 값이 바뀌는 단계를 따라가 보세요.</p></div>
       <div className="compile-runtime-actions"><button className="compile-run-button" disabled={busy || !canRun} onClick={run}>{busy ? '실행하고 그림을 만드는 중…' : trace ? '다시 실행' : '코드 실행하고 변화 보기'}</button>{busy && <button onClick={() => { request.current?.abort(); request.current = null; setBusy(false); }}>취소</button>}
-        <details className="compile-runtime-options"><summary>실행 설정</summary><label>최대 사이클 <select disabled={busy} value={maxCycles} onChange={event => setMaxCycles(Number(event.target.value))}><option value={500}>500</option><option value={2000}>2000</option></select></label></details>
+        <details className="compile-runtime-options"><summary>고급 설정</summary><label>최대 실행 사이클 <select disabled={busy} value={maxCycles} onChange={event => setMaxCycles(Number(event.target.value))}><option value={500}>500</option><option value={2000}>2000</option></select></label></details>
       </div>
     </div>
     {!canRun && <p>이 빌드에 실행용 ELF 또는 실행 권한이 없습니다. 다시 컴파일해 주세요.</p>}
