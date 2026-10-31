@@ -9,9 +9,9 @@ export interface BuildCompileRequest {
 export interface BuildCompileResponse {
     build_id: string | null;
     status: string;
-    assembly_url: string;
-    binary_url: string;
-    log: string;
+    assembly_url: string | null;
+    binary_url: string | null;
+    log: string | null;
     simulation_token?: string | null;
     simulation_token_expires_in?: number | null;
 }
