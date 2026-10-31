@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { compileCode } from '@/api/build';
 
-export type Compilation = { assembly: string; log: string };
+export type Compilation = { assembly: string; log: string; binaryUrl?: string; simulationToken?: string; buildId?: string };
 
 export async function compileSource(source: string, signal: AbortSignal): Promise<Compilation> {
   const result = await compileCode({
@@ -29,7 +29,7 @@ export async function compileSource(source: string, signal: AbortSignal): Promis
   if (!response.ok) {
     throw new Error(`어셈블리 파일을 읽지 못했습니다 (HTTP ${response.status}). 다시 컴파일해 주세요.`);
   }
-  return { assembly: await response.text(), log: result.log || '' };
+  return { assembly: await response.text(), log: result.log || '', ...(result.binary_url ? { binaryUrl: result.binary_url } : {}), ...(result.simulation_token ? { simulationToken: result.simulation_token } : {}), ...(result.build_id ? { buildId: result.build_id } : {}) };
 }
 
 export function compileError(error: unknown): string {

@@ -18,7 +18,7 @@ describe('compilation transport', () => {
     const fetch = vi.fn().mockResolvedValue(new Response('.text\nmain:\nret'));
     vi.stubGlobal('fetch', fetch);
     const signal = new AbortController().signal;
-    expect(await compileSource('int main(){return 0;}', signal)).toEqual({ assembly: '.text\nmain:\nret', log: '' });
+    expect(await compileSource('int main(){return 0;}', signal)).toEqual({ assembly: '.text\nmain:\nret', log: '', simulationToken: result.simulation_token });
     expect(compileCode).toHaveBeenCalledWith({ content: 'int main(){return 0;}', lang: 'c', compile_profile: 'rv32im', compiler_opt: '-O0 -g' }, signal);
     expect(fetch).toHaveBeenCalledWith(result.assembly_url, { signal });
   });
@@ -39,7 +39,7 @@ describe('compilation transport', () => {
     vi.mocked(compileCode).mockResolvedValue(result);
     const fetch = vi.fn().mockRejectedValueOnce(new TypeError('proxy unavailable')).mockResolvedValueOnce(new Response('assembly'));
     vi.stubGlobal('fetch', fetch);
-    await expect(compileSource('C', new AbortController().signal)).resolves.toEqual({ assembly: 'assembly', log: '' });
+    await expect(compileSource('C', new AbortController().signal)).resolves.toEqual({ assembly: 'assembly', log: '', simulationToken: result.simulation_token });
     expect(fetch.mock.calls.map(call => call[0])).toEqual(['/s3-proxy/assembly.s', result.assembly_url]);
   });
   it('does not retry a cancelled artifact request', async () => {

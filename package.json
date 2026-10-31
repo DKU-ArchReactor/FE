@@ -11,6 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lezer/common": "^1.5.5",
+    "@lezer/cpp": "^1.1.6",
     "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/vite": "^4.2.4",
     "axios": "^1.16.0",

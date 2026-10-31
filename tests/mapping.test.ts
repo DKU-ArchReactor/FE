@@ -37,3 +37,17 @@ describe('compiler-authored source mapping', () => {
     expect(rows.filter(row => isMappedToSelection(row, { start: 3, end: 4 })).map(row => row.text)).toEqual(['li a0,1', 'li a0,2', 'add a0,a0,a1']);
   });
 });
+
+it('preserves compiler order and maps real calls, pointer writes and branches', async () => {
+  const {readFileSync}=await import('node:fs');
+  const source=readFileSync('samples/compile-long.c','utf8');
+  const assembly=readFileSync('tests/fixtures/long.s','utf8');
+  const rows=parseAssembly(assembly,source.split('\n').length);
+  const calls=rows.filter(row=>/^call\s+sum_list/.test(row.text));
+  expect(calls.length).toBe(2);
+  expect(calls.every(row=>row.sourceLine && source.split('\n')[row.sourceLine-1].includes('sum_list'))).toBe(true);
+  const rewire=source.split('\n').findIndex(line=>line.includes('list[0].next = &list[2]'))+1;
+  expect(rows.some(row=>row.sourceLine===rewire && /^sw\s/.test(row.text))).toBe(true);
+  expect(rows.some(row=>/^b(?:eq|ne|lt|ge)/.test(row.text) && row.sourceLine!==null)).toBe(true);
+  expect(rows.map(row=>row.assemblyLine)).toEqual(rows.map(row=>row.assemblyLine).sort((a,b)=>a-b));
+});

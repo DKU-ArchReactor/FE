@@ -42,3 +42,13 @@ describe('source / assembly interaction', () => {
     expect(screen.getByRole('button', { name: 'C 3행: return a;' }).getAttribute('aria-pressed')).toBe('false');
   });
 });
+
+it('supports function search and selected-source filtering on a real long compilation', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync('samples/compile-long.c','utf8');
+  const assembly = readFileSync('tests/fixtures/long.s','utf8');
+  render(<CodeComparison source={source} assembly={assembly} />);
+  fireEvent.change(screen.getByRole('searchbox'), {target:{value:'tree_find'}});
+  expect(screen.getByText('tree_find', {selector:'strong'})).toBeTruthy();
+  expect(screen.queryByText('sum_array', {selector:'strong'})).toBeNull();
+});

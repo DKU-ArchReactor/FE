@@ -6,6 +6,7 @@ import { compileError, compileSource } from './compile';
 import type { Compilation } from './compile';
 import CodeComparison from './CodeComparison';
 import StructureInspector from './StructureInspector';
+import RuntimeInspector from './RuntimeInspector';
 import { analyzeCStructures } from './structure';
 import type { SourceSelection } from './mapping';
 import './compile.css';
@@ -99,6 +100,7 @@ export default function CToAsmPage() {
       <div className="compile-toolbar">
         <button disabled={busy} onClick={() => inputRef.current?.click()}>C 파일 불러오기</button>
         <span className="compile-filename">{fileName}</span>
+        {result && <button onClick={() => document.getElementById('compile-runtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>실행·메모리 보기</button>}
         <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
           void openFile(event.target.files?.[0]); event.target.value = '';
@@ -106,11 +108,12 @@ export default function CToAsmPage() {
       </div>
       <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : result ? '컴파일 완료 · C 코드 옆에서 생성된 명령어를 확인하세요.' : `컴파일 대상: ${fileName} · 편집기에 보이는 내용이 컴파일됩니다.`}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
-      <p className="compile-environment-note">RV32IM용 C → 어셈블리 변환 · 현재 표준 입출력(stdio.h, printf)은 지원되지 않습니다. 이 페이지에서는 실행 결과 대신 생성된 명령어를 확인합니다.</p>
+      <p className="compile-environment-note">RV32IM용 C → 어셈블리 변환 · 표준 입출력(stdio.h, printf)은 지원되지 않습니다. 컴파일 후 아래에서 CORE 실행 기록을 확인할 수 있습니다.</p>
       <div className="compile-workspace">
         <div className="compile-workspace-editor">
           <section className="compile-editor-panel" aria-label="C 웹 IDE">
             <div className="compile-panel-heading"><h2>C 소스 편집</h2><span>{source.split('\n').length}줄</span></div>
+            {structure.functions.length > 1 && <label className="compile-function-jump">함수 이동<select aria-label="편집기 함수 이동" value="" onChange={event => { const fn = structure.functions.find(fn => fn.line === Number(event.target.value)); if (fn) setSelection({ start: fn.line, end: fn.end }); }}><option value="">함수 선택</option>{structure.functions.map(fn => <option key={`${fn.name}-${fn.line}`} value={fn.line}>{fn.name} · {fn.line}–{fn.end}행</option>)}</select></label>}
             <Editor
               height="var(--compile-editor-height, 360px)"
               language="c"
@@ -118,7 +121,7 @@ export default function CToAsmPage() {
               path={fileName}
               value={source}
               onChange={editSource}
-              onMount={editor => { editorRef.current = editor; }}
+              onMount={editor => { editorRef.current = editor; editor.onDidChangeCursorPosition(event => { if (event.source === 'mouse') setSelection({ start: event.position.lineNumber, end: event.position.lineNumber }); }); }}
               loading={<div className="compile-editor-loading">C 편집기를 불러오는 중…</div>}
               options={{
                 automaticLayout: true,
@@ -136,7 +139,7 @@ export default function CToAsmPage() {
               }}
             />
           </section>
-          {structure.structs.length + structure.arrays.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
+          {structure.structs.length + structure.arrays.length + structure.diagnostics.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
         </div>
         <section className="compile-output-panel" aria-label="C 코드 컴파일 결과">
           {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} /> : <div className="compile-output-placeholder">
@@ -146,6 +149,7 @@ export default function CToAsmPage() {
           </div>}
         </section>
       </div>
+      {result && <RuntimeInspector compilation={result} onSelectLine={line => { setSelection({ start: line, end: line }); editorRef.current?.getDomNode()?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />}
       <p className="compile-footnote">소스의 수정 내용이 컴파일 요청에 그대로 전달됩니다. CPU 실행 흐름은 데이터패스 페이지에서 볼 수 있습니다.</p>
     </main>
   );
