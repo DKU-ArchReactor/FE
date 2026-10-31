@@ -34,14 +34,17 @@ function ArrayCard({ array, onSelectLine }: { array: CArray; onSelectLine: (line
 
 export default function StructureInspector({ structure, onSelectLine }: Props) {
   const summary = [structure.structs.length ? `struct ${structure.structs.length}개` : '', structure.arrays.length ? `배열 ${structure.arrays.length}개` : ''].filter(Boolean).join(' · ');
+  const graphNodes = structure.structs.flatMap(type => type.instances.map(name => ({ id: `${type.name}:${name}`, title: name, subtitle: `struct ${type.name} · 선언 기준`, line: type.line, fields: type.fields.map(field => ({ name: field.name, value: field.type })) })));
+  const graphEdges = structure.links.flatMap(link => {
+    const type = structure.structs.find(candidate => candidate.instances.includes(link.from) && candidate.instances.includes(link.to));
+    return type ? [{ from: `${type.name}:${link.from}`, to: `${type.name}:${link.to}`, label: link.field }] : [];
+  });
+  const graphTitle = graphEdges.some(edge => edge.label === 'left' || edge.label === 'right') ? '트리 구조' : graphEdges.some(edge => edge.label === 'next') ? '연결 리스트 구조' : '구조체 인스턴스';
   return <details className="compile-structure" aria-label="현재 C 코드의 자료구조">
     <summary className="compile-structure-summary"><span>코드에서 찾은 구조</span><span>{summary}</span></summary>
     <div className="compile-structure-list">
       {structure.diagnostics.map(message => <p className="compile-warning" key={message}>{message}</p>)}
-      <StructureGraph nodes={structure.structs.flatMap(type => type.instances.map(name => ({ id: `${type.name}:${name}`, title: name, subtitle: `struct ${type.name} · 선언 기준`, line: type.line, fields: type.fields.map(field => ({ name: field.name, value: field.type })) })))} edges={structure.links.flatMap(link => {
-        const type = structure.structs.find(candidate => candidate.instances.includes(link.from) && candidate.instances.includes(link.to));
-        return type ? [{ from: `${type.name}:${link.from}`, to: `${type.name}:${link.to}`, label: link.field }] : [];
-      })} onSelectLine={onSelectLine} />
+      {graphNodes.length > 0 && <section className="compile-static-graph"><h3>{graphTitle}</h3><p>선언의 초기값에서 확인한 필드와 연결을 표시합니다.</p><StructureGraph nodes={graphNodes} edges={graphEdges} onSelectLine={onSelectLine} /></section>}
       {structure.structs.map(type => <StructCard key={type.name} type={type} onSelectLine={onSelectLine} />)}
       {structure.arrays.map((array, index) => <ArrayCard key={`${array.name}-${array.line}-${index}`} array={array} onSelectLine={onSelectLine} />)}
       {structure.links.length > 0 && <section className="compile-structure-links" aria-label="선언 초기값의 포인터 연결">

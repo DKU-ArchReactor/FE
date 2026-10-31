@@ -76,7 +76,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
           </div>
           <div className="compile-block-right">
             {contextLine ? <span className="compile-no-output">이 C 줄에 직접 연결된 명령어 없음</span> : block.rows.map(row => row.kind === 'label' ? <div className="compile-block-label" key={row.assemblyLine}><code>{row.text}</code><span>이동 목적지를 나타내는 레이블</span></div> : <div className="compile-instruction" key={row.assemblyLine}>
-              <button aria-label={`ASM ${row.assemblyLine}행: ${row.text}${sourceLine ? `, C ${sourceLine}행` : ', 매핑 없음'}`} aria-pressed={isMappedToSelection(row, selection)} onClick={() => { select(sourceLine); if (sourceLine === null) setSelectedUnmapped(row.text); }} title={`원본 어셈블리 ${row.assemblyLine}행`}><span className="compile-op-number">{ordinals.get(row.assemblyLine)}</span><code>{row.text}</code></button>
+              <button aria-label={`ASM ${row.assemblyLine}행: ${row.text}${sourceLine ? `, C ${sourceLine}행` : ', 매핑 없음'}`} aria-pressed={isMappedToSelection(row, selection)} onClick={() => { select(sourceLine); if (sourceLine === null) setSelectedUnmapped(row.text); }} title={`원본 어셈블리 ${row.assemblyLine}행`}><span className="compile-op-number">{ordinals.get(row.assemblyLine)}</span><span className="compile-assembly-code"><b>{row.text.trim().split(/\s+/, 1)[0]}</b><code>{row.text.trim().split(/\s+/).slice(1).join(' ')}</code></span></button>
               {showExplanations && <p>{operandExplanation(row.text) || instructionExplanation(row.text)}</p>}
             </div>)}
           </div>

@@ -187,6 +187,9 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-structure-summary span:first-child { color: #334155; font-size: 13px; font-weight: 650; }
 .compile-structure-summary span:nth-child(2) { color: #64748b; font-size: 12px; }
 .compile-structure-summary + .compile-structure-list { border-top: 1px solid #e2e8f0; }
+.compile-static-graph { margin: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fcfdff; }
+.compile-static-graph h3 { margin: 0 0 4px; color: #334155; font-size: 13px; }
+.compile-static-graph > p { margin: 0 0 10px; color: #64748b; font-size: 11px; }
 .compile-result-layout { margin-top: 18px; }
 .compile-result-layout > .compile-comparison { margin-top: 0; }
 .compile-block-header { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 0; padding: 15px 18px; }
@@ -196,7 +199,8 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-block-guide { color: #475569; font-size: 13px; line-height: 1.6; }
 .compile-block { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 0; }
 .compile-block-left { padding: 14px 18px; }
-.compile-block-right { padding: 10px 18px; border-left: 1px solid #e2e8f0; }
+.compile-block-right { padding: 10px 18px; border-left: 1px solid #e2e8f0; background: #fcfdff; }
+.compile-block.is-selected .compile-block-right { background: #f0f9ff; }
 .compile-block-source { align-items: flex-start; gap: 12px; }
 .compile-block-source code, .compile-context-source { font-size: 14px; line-height: 1.75; }
 .compile-c-badge { margin-top: 2px; padding: 3px 7px; font-size: 11px; }
@@ -204,6 +208,9 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-instruction:last-child { border-bottom: 0; }
 .compile-instruction > button { gap: 10px; min-height: 32px; align-items: center; font-size: 14px; }
 .compile-instruction > button code { color: #1e293b; }
+.compile-assembly-code { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 9px; min-width: 0; }
+.compile-assembly-code > b { padding: 2px 6px; border-radius: 4px; background: #eff6ff; color: #1d4ed8; font: 700 12px/1.4 Consolas, 'Courier New', monospace; }
+.compile-assembly-code > code { color: #0f172a; font: 14px/1.6 Consolas, 'Courier New', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .compile-op-number { min-width: 28px; font-size: 11px; }
 .compile-instruction p, .compile-block-label span, .compile-no-output { color: #475569; font-size: 12px; line-height: 1.6; }
 .compile-block-note { color: #475569; font-size: 12px; }
@@ -242,8 +249,12 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-output-panel .compile-block-left { padding: 8px 12px; }
 .compile-output-panel .compile-block-right { padding: 4px 12px; }
 .compile-output-panel .compile-instruction { grid-template-columns: minmax(0, 1fr); min-height: 26px; padding: 1px 0; gap: 0; border-bottom: 0; }
-.compile-output-panel .compile-instruction > button { min-height: 26px; font-size: 13px; overflow-x: auto; }
-.compile-output-panel .compile-instruction p { padding: 0 0 4px 38px; }
+.compile-output-panel .compile-instruction > button { min-height: 30px; width: 100%; align-items: center; text-align: left; font-size: 13px; overflow: visible; }
+.compile-output-panel .compile-instruction p { margin: 0 0 5px; padding: 0 0 5px 40px; color: #475569; font-size: 12px; line-height: 1.55; }
+.compile-output-panel .compile-instruction p::before { content: '↳'; margin-right: 6px; color: #94a3b8; }
+.compile-output-panel .compile-op-number { align-self: flex-start; padding-top: 6px; }
+.compile-output-panel .compile-assembly-code > b { font-size: 13px; }
+.compile-output-panel .compile-assembly-code > code { font-size: 14px; }
 @media (max-width: 600px) {
   .compile-workspace { gap: 12px; }
   .compile-editor-panel { --compile-editor-height: 280px; }
@@ -325,6 +336,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 @keyframes compile-diagram-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .compile-diagram-playing::before { animation: none; border-color: #0284c7; } }
 .compile-memory-diagram h3 { margin-bottom: 12px; font-size: 13px; font-weight: 650; color: #334155; }
+.compile-variable-board > p { margin: -7px 0 10px; color: #64748b; font-size: 11px; }
 .compile-memory-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; font-size: 11px; color: #64748b; }
 .compile-memory-legend span { display: inline-flex; gap: 5px; align-items: center; }
 .compile-memory-legend i { width: 10px; height: 10px; border: 1px solid #94a3b8; border-radius: 2px; }
