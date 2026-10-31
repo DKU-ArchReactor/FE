@@ -5,6 +5,7 @@ export type GraphEdge = { from: string; to: string; label: string };
 type Props = { nodes: GraphNode[]; edges: GraphEdge[]; onSelectLine: (line: number) => void; shape?: 'tree' | 'list' | 'graph' };
 const CARD_WIDTH = 240;
 const COLUMN_GAP = 40;
+const TOP_PADDING = 48;
 
 export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'graph' }: Props) {
   const markerId = useId().replace(/:/g, '') + '-pointer-arrow';
@@ -49,7 +50,7 @@ export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'gr
         const childCenters = childEdges.map(edge => place(edge.to, depth + 1));
         center = childCenters.reduce((sum, value) => sum + value, 0) / childCenters.length;
       }
-      positions.set(id, { x: center - cardWidth / 2, y: depth * rowHeight + 16 });
+      positions.set(id, { x: center - cardWidth / 2, y: depth * rowHeight + TOP_PADDING });
       visiting.delete(id);
       placed.add(id);
       return center;
@@ -58,10 +59,10 @@ export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'gr
     const activeRoots = roots.filter(node => childrenOf(node.id).length > 0);
     for (const node of activeRoots) place(node.id, 0);
     if (!activeRoots.length) {
-      visible.forEach((node, index) => positions.set(node.id, { x: 20 + index * (cardWidth + columnGap), y: 16 }));
+      visible.forEach((node, index) => positions.set(node.id, { x: 20 + index * (cardWidth + columnGap), y: TOP_PADDING }));
     } else {
-      const lastDepth = Math.max(...[...positions.values()].map(pos => Math.floor((pos.y - 16) / rowHeight)));
-      visible.filter(node => !positions.has(node.id)).forEach((node, index) => positions.set(node.id, { x: 20 + (index % 2) * (cardWidth + columnGap), y: (lastDepth + 1 + Math.floor(index / 2)) * rowHeight + 16 }));
+      const lastDepth = Math.max(...[...positions.values()].map(pos => Math.floor((pos.y - TOP_PADDING) / rowHeight)));
+      visible.filter(node => !positions.has(node.id)).forEach((node, index) => positions.set(node.id, { x: 20 + (index % 2) * (cardWidth + columnGap), y: (lastDepth + 1 + Math.floor(index / 2)) * rowHeight + TOP_PADDING }));
     }
   } else if (listShape) {
     const byId = new Map(visible.map(node => [node.id, node]));
@@ -72,7 +73,7 @@ export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'gr
     for (const root of [...roots, ...visible]) {
       let node: GraphNode | undefined = root;
       while (node && !placed.has(node.id)) {
-        positions.set(node.id, { x: (cardWidth + columnGap) / 2, y: row++ * rowHeight + 16 });
+        positions.set(node.id, { x: (cardWidth + columnGap) / 2, y: row++ * rowHeight + TOP_PADDING });
         placed.add(node.id);
         node = byId.get(next.get(node.id) || '');
       }
@@ -99,7 +100,7 @@ export default function StructureGraph({ nodes, edges, onSelectLine, shape = 'gr
         layer.sort((left, right) => order.get(left)! - order.get(right)!);
         for (let i = 0; i < layer.length; i += 2) {
           const batch = layer.slice(i, i + 2);
-          batch.forEach((id, index) => { positions.set(id, { x: batch.length === 1 ? (cardWidth + columnGap + 40) / 2 : index * (cardWidth + columnGap) + 20, y: row * rowHeight + 16 }); unplaced.delete(id); });
+          batch.forEach((id, index) => { positions.set(id, { x: batch.length === 1 ? (cardWidth + columnGap + 40) / 2 : index * (cardWidth + columnGap) + 20, y: row * rowHeight + TOP_PADDING }); unplaced.delete(id); });
           row++;
         }
       }

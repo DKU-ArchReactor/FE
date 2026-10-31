@@ -21,7 +21,7 @@ describe('runtime inspector', () => {
     const timeline=memoryTimeline(metadata,trace.history);
     fireEvent.change(slider,{target:{value:'2'}});
     expect(screen.getByText(new RegExp(`CPU 사이클 ${trace.history[timeline[2].index].clock}`),{selector:'.compile-step-guide'})).toBeTruthy();
-    expect(screen.getByText('주소·타입과 변수 값 자세히 보기').closest('details')?.open).toBe(false);
+    expect(screen.queryByText('주소·타입과 변수 값 자세히 보기')).toBeNull();
     expect(executeCompilation).toHaveBeenCalledWith(expect.objectContaining({simulationToken:'test-only'}),2000,expect.any(AbortSignal));
   });
   it('aborts pending work when the compiled source is discarded', () => {
