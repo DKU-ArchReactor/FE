@@ -10,6 +10,9 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const [selectedUnmapped, setSelectedUnmapped] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [showExplanations, setShowExplanations] = useState(true);
+  const [functionFilter, setFunctionFilter] = useState('');
+  const [onlySelected, setOnlySelected] = useState(false);
+  const [limits, setLimits] = useState<Record<string, number>>({});
   const selection = controlledSelection === undefined ? localSelection : controlledSelection;
   const anchor = useRef(1);
   const lines = source.split('\n');
@@ -42,25 +45,29 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const functionGroups = new Map<string, typeof displayBlocks>();
   for (const block of displayBlocks) {
     const name = block.functionName || '전역 코드';
-    functionGroups.set(name, [...(functionGroups.get(name) || []), block]);
+    const group = functionGroups.get(name);
+    if (group) group.push(block); else functionGroups.set(name, [block]);
   }
   const matchingGroups = [...functionGroups].map(([name, groupBlocks]) => [name, groupBlocks.filter(block => {
+    if (functionFilter && name !== functionFilter) return false;
+    if (onlySelected && (!selection || block.sourceLine === null || block.sourceLine < selection.start || block.sourceLine > selection.end)) return false;
     if (!query.trim()) return true;
     const needle = query.trim().toLocaleLowerCase();
     const sourceText = block.contextLine ? lines[block.contextLine - 1] : block.sourceLine ? lines[block.sourceLine - 1] : '';
-    return `${sourceText} ${block.rows.map(row => row.text).join(' ')}`.toLocaleLowerCase().includes(needle);
+    return `${name} ${sourceText} ${block.rows.map(row => row.text).join(' ')}`.toLocaleLowerCase().includes(needle);
   })] as const).filter(([, groupBlocks]) => groupBlocks.length > 0);
-  const firstFunction = Math.max(0, matchingGroups.findIndex(([name]) => name !== '전역 코드'));
+  const mainFunction = matchingGroups.findIndex(([name]) => name === 'main');
+  const firstFunction = mainFunction >= 0 ? mainFunction : Math.max(0, matchingGroups.findIndex(([name]) => name !== '전역 코드'));
 
   return <section className="compile-comparison" aria-label="C와 어셈블리 대응 블록">
     <div className="compile-block-header"><h2>C 소스 코드</h2><h2>생성된 RISC-V 명령어</h2></div>
-    {assembly && <div className="compile-comparison-tools"><label className="compile-code-search">코드 찾기<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="함수, C 코드, 명령어 검색" /></label><label className="compile-explanation-toggle"><input type="checkbox" checked={showExplanations} onChange={event => setShowExplanations(event.target.checked)} />명령어 설명</label></div>}
+    {assembly && <div className="compile-comparison-tools"><label className="compile-code-search">코드 찾기<input type="search" value={query} onChange={event => { setQuery(event.target.value); setLimits({}); }} placeholder="함수, C 코드, 명령어 검색" /></label><label className="compile-explanation-toggle"><input type="checkbox" checked={showExplanations} onChange={event => setShowExplanations(event.target.checked)} />명령어 설명</label><select aria-label="대응표 함수 선택" value={functionFilter} onChange={event => { setFunctionFilter(event.target.value); setLimits({}); }}><option value="">모든 함수</option>{[...functionGroups.keys()].map(name => <option key={name}>{name}</option>)}</select><button disabled={!selection && !onlySelected} onClick={() => { setOnlySelected(!onlySelected); setQuery(''); setFunctionFilter(''); }}>{onlySelected ? '전체 줄 보기' : '선택 줄 보기'}</button></div>}
     {!assembly ? <div className="compile-before">{lines.map((_, i) => <div key={i}>{sourceButton(i + 1)}</div>)}</div> : <>
       {matchingGroups.map(([functionName, functionBlocks], groupIndex) => {
         const sourceLineCount = new Set(functionBlocks.flatMap(block => block.sourceLine === null ? [] : [block.sourceLine])).size;
-        return <details key={functionName} className="compile-function" open={groupIndex === firstFunction}>
+        return <details key={functionName} className="compile-function" open={groupIndex === firstFunction || functionBlocks.some(block => block.sourceLine !== null && selection && block.sourceLine >= selection.start && block.sourceLine <= selection.end)}>
         <summary><strong>{functionName}</strong><span>{sourceLineCount ? `${sourceLineCount}개 C 줄` : '소스 줄 정보 없음'}</span></summary>
-        {functionBlocks.map((block, index) => {
+        {functionBlocks.slice(0, limits[functionName] || 30).map((block, index) => {
         const sourceLine = block.sourceLine;
         const contextLine = block.contextLine;
         const selected = sourceLine !== null && selection !== null && sourceLine >= selection.start && sourceLine <= selection.end;
@@ -76,6 +83,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
           </div>
         </article>;
         })}
+        {functionBlocks.length > (limits[functionName] || 30) && <button className="compile-more-blocks" onClick={() => setLimits(current => ({ ...current, [functionName]: (current[functionName] || 30) + 30 }))}>다음 30개 구간 보기 · {functionBlocks.length - (limits[functionName] || 30)}개 남음</button>}
       </details>;
       })}
       {matchingGroups.length === 0 && <p className="compile-no-results">“{query}”에 해당하는 코드나 명령어가 없습니다.</p>}

@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import MainPage from "./pages/Main";
-import CToAsmPage from "./pages/CToAsm";
+const CToAsmPage = lazy(() => import("./pages/CToAsm"));
 import ComingSoonPage from "./pages/ComingSoon";
 import LoginPage from "./pages/Auth/Login";
 import SignUpPage from "./pages/Auth/SignUp";
@@ -12,7 +13,7 @@ function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<MainPage />} />
-        <Route path="/c-to-asm" element={<CToAsmPage />} />
+        <Route path="/c-to-asm" element={<Suspense fallback={<p className="p-6 text-slate-500">컴파일 작업 공간을 불러오는 중…</p>}><CToAsmPage /></Suspense>} />
         <Route path="/coming-soon" element={<ComingSoonPage />} />
         <Route path="/total" element={<ComingSoonPage />} />
         <Route path="/login" element={<LoginPage />} />
