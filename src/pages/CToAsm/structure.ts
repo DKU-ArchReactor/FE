@@ -83,7 +83,7 @@ export function analyzeCStructures(source: string): CStructure {
     const escaped = array.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     if (new RegExp(`\\b${escaped}\\s*\\[\\s*(?:\\+\\+\\s*top|top\\s*\\+\\+|top\\s*[-+]\\s*1|top)\\s*\\]`).test(source) && /\btop\b/.test(source)) {
       array.container = { kind: 'stack', primary: 'top' };
-    } else if (new RegExp(`\\b${escaped}\\s*\\[\\s*(?:front|rear)\\s*\\]`).test(source) && /\bfront\b/.test(source) && /\brear\b/.test(source)) {
+    } else if (new RegExp(`\\b${escaped}\\s*\\[\\s*(?:\\+\\+\\s*(?:front|rear)|(?:front|rear)\\s*\\+\\+|front|rear)\\s*\\]`).test(source) && /\bfront\b/.test(source) && /\brear\b/.test(source)) {
       array.container = { kind: 'queue', primary: 'front', secondary: 'rear' };
     }
   }

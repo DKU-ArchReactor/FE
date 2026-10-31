@@ -25,15 +25,21 @@ function ArrayCard({ array, onSelectLine }: { array: CArray; onSelectLine: (line
   const indices = Number.isInteger(numericSize) && numericSize >= 0
     ? numericSize <= 8 ? Array.from({ length: numericSize }, (_, index) => String(index)) : ['0', '1', '2', '3', '…', String(numericSize - 1)]
     : ['0', '1', '…', `${size}-1`];
+  const containerSlots = array.container
+    ? Number.isInteger(numericSize) && numericSize > 0 && numericSize <= 12 ? Array.from({ length: numericSize }, (_, index) => index) : [0, 1, 2, 3]
+    : [];
   return <article className="compile-structure-card">
     <SourceRef line={array.line} onSelectLine={onSelectLine}><strong>{array.container?.kind === 'stack' ? '스택' : array.container?.kind === 'queue' ? '큐' : array.type} {array.name}</strong><span>{array.dimensions.map(dimension => `[${dimension}]`).join('')}{array.container && ` · ${array.container.kind === 'stack' ? 'top 인덱스' : 'front / rear 인덱스'}`}</span></SourceRef>
-    {unknownSize ? <p className="compile-structure-topology">선언에 길이가 생략됐습니다. 실제 크기는 컴파일 후 실행 정보에서 확인하세요.</p> : <div className="compile-array-indices" aria-label={`${array.name} 배열 원소`}>{indices.map((index, position) => <span key={`${position}-${index}`}>{index === '…' ? '…' : `${array.name}[${index}]`}</span>)}</div>}
+    {array.container ? <div className={`compile-static-container is-${array.container.kind}`} aria-label={`${array.container.kind === 'stack' ? '스택' : '큐'} 구조 예시`}><div>{containerSlots.map(index => <span key={index}><small>[{index}]</small>{array.container?.kind === 'stack' && index === containerSlots.length - 1 && <b>top 위치는 실행 중 확인</b>}</span>)}</div><p>{array.container.kind === 'stack' ? 'top 인덱스를 따라 쌓고, 마지막에 넣은 값부터 꺼냅니다.' : 'front에서 꺼내고 rear에 넣습니다. 현재 위치는 실행 그림에서 표시합니다.'}</p></div> : unknownSize ? <p className="compile-structure-topology">선언에 길이가 생략됐습니다. 실제 크기는 컴파일 후 실행 정보에서 확인하세요.</p> : <div className="compile-array-indices" aria-label={`${array.name} 배열 원소`}>{indices.map((index, position) => <span key={`${position}-${index}`}>{index === '…' ? '…' : `${array.name}[${index}]`}</span>)}</div>}
     {array.dimensions.length > 1 && <p className="compile-structure-topology">첫 번째 차원의 인덱스를 표시합니다.</p>}
   </article>;
 }
 
 export default function StructureInspector({ structure, onSelectLine }: Props) {
-  const summary = [structure.structs.length ? `struct ${structure.structs.length}개` : '', structure.arrays.length ? `배열 ${structure.arrays.length}개` : ''].filter(Boolean).join(' · ');
+  const stacks = structure.arrays.filter(array => array.container?.kind === 'stack').length;
+  const queues = structure.arrays.filter(array => array.container?.kind === 'queue').length;
+  const plainArrays = structure.arrays.length - stacks - queues;
+  const summary = [structure.structs.length ? `struct ${structure.structs.length}개` : '', stacks ? `스택 ${stacks}개` : '', queues ? `큐 ${queues}개` : '', plainArrays ? `배열 ${plainArrays}개` : ''].filter(Boolean).join(' · ');
   const graphNodes = structure.structs.flatMap(type => type.instances.map(name => ({ id: `${type.name}:${name}`, title: name, subtitle: `struct ${type.name} · 선언 기준`, line: type.line, fields: type.fields.map(field => ({ name: field.name, value: field.type })) })));
   const graphEdges = structure.links.flatMap(link => {
     const type = structure.structs.find(candidate => candidate.instances.includes(link.from) && candidate.instances.includes(link.to));

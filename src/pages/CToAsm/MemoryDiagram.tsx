@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import type { MemoryValue, MemoryView } from './runtime';
 import { hex } from './runtime';
 import type { MemoryChange } from './memoryTimeline';
@@ -7,7 +6,6 @@ import StructureGraph from './StructureGraph';
 
 type Props = { view: MemoryView; changes: MemoryChange[]; structures?: CStructure; onSelectLine: (line: number) => void; finished?: boolean; playing?: boolean };
 export default function MemoryDiagram({ view, changes, structures, onSelectLine, finished = false, playing = false }: Props) {
-  const diagramRef = useRef<HTMLDivElement>(null);
   const changed = new Set(changes.map(change => change.address));
   const targets = new Map(view.nodes.map(node => [hex(node.address!), node]));
   const incoming = new Set([...view.variables, ...view.nodes.flatMap(node => node.children)].filter(value => !value.unavailable && value.pointer).map(value => value.pointer));
@@ -26,16 +24,11 @@ export default function MemoryDiagram({ view, changes, structures, onSelectLine,
   const nodes = visibleNodes.map(value => ({ id: hex(value.address!), title: value.name, subtitle: `${value.type} · 상자는 구조체 하나`, line: value.line, changed: value.children.some(child => child.address !== undefined && changed.has(child.address)), fields: value.children.map(child => ({ name: child.name, value: display(child), changed: child.address !== undefined && changed.has(child.address) })) }));
   const edges = visibleNodes.flatMap(value => value.children.flatMap(child => child.pointer && child.targetType !== undefined && targets.get(hex(child.pointer))?.typeId === child.targetType ? [{ from: hex(value.address!), to: hex(child.pointer), label: child.name }] : []));
   const treeShape = edges.some(edge => edge.label === 'left' || edge.label === 'right') || visibleNodes.some(node => node.children.some(field => ['left', 'right'].includes(field.name) && field.type.includes('*')));
-  useEffect(() => {
-    if (!treeShape) return;
-    const frame = requestAnimationFrame(() => diagramRef.current?.querySelector('.compile-pointer-board')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }));
-    return () => cancelAnimationFrame(frame);
-  }, [treeShape]);
   const listShape = !treeShape && (edges.some(edge => edge.label === 'next') || visibleNodes.some(node => node.children.some(field => field.name === 'next' && field.type.includes('*'))));
   const cell = (value: MemoryValue, label: string, finalScalar = false) => <button key={value.name} className={`compile-memory-cell ${value.unavailable ? 'is-unknown' : ''} ${value.address !== undefined && changed.has(value.address) ? 'is-changed' : finished && finalScalar ? 'is-final' : ''}`} onClick={() => onSelectLine(value.line)} title={`${value.type}${value.address !== undefined ? ` · ${hex(value.address)}` : ''}${value.unavailable ? ` · ${value.unavailable}` : ''}`} aria-label={`${value.name}: ${display(value)}`}><span>{label}</span><strong>{value.pointer !== undefined && value.pointer !== 0 ? '→ ' : ''}{display(value)}</strong></button>;
   const nodeChanged = visibleNodes.some(node => node.children.some(field => field.address !== undefined && changed.has(field.address)));
   const arrayChanged = arrays.some(array => array.children.some(value => value.address !== undefined && changed.has(value.address)));
-  return <div ref={diagramRef} className={`compile-memory-diagram ${nodeChanged ? 'is-node-step' : arrayChanged ? 'is-array-step' : ''}`}>
+  return <div className={`compile-memory-diagram ${nodeChanged ? 'is-node-step' : arrayChanged ? 'is-array-step' : ''}`}>
     {playing && <div className="compile-diagram-playing" role="status"><strong>메모리 변화 재생 중</strong><span>1.5초마다 다음 장면으로 이동합니다</span></div>}
     <div className="compile-memory-legend"><span><i className="known" />확인된 값</span><span><i className="changed" />이번에 바뀐 값·연결</span><span><i className="unknown" />기록·위치 미확인</span>{finished && <span><i className="final" />마지막 표시 단계의 독립 변수</span>}</div>
     {scalars.length > 0 && <section className="compile-variable-board" aria-label="구조체 필드가 아닌 변수 값"><h3>독립 변수 값</h3><p>구조체 필드에 속하지 않는 C 변수는 별도 칸에 표시합니다. 마지막 표시 단계에서도 합계 같은 독립 변수 값을 확인할 수 있습니다.</p><div className="compile-variable-cells">{scalars.map(value => cell(value, value.name, true))}</div></section>}
