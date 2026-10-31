@@ -32,7 +32,7 @@ export default function MemoryDiagram({ view, changes, structures, onSelectLine,
     {playing && <div className="compile-diagram-playing" role="status"><strong>메모리 변화 재생 중</strong><span>1.5초마다 다음 장면으로 이동합니다</span></div>}
     <div className="compile-memory-legend"><span><i className="known" />확인된 값</span><span><i className="changed" />이번에 바뀐 값·연결</span><span><i className="unknown" />기록·위치 미확인</span>{finished && <span><i className="final" />마지막 표시 단계의 독립 변수</span>}</div>
     {scalars.length > 0 && <section className="compile-variable-board" aria-label="구조체 필드가 아닌 변수 값"><h3>독립 변수 값</h3><p>구조체 필드에 속하지 않는 C 변수는 별도 칸에 표시합니다. 마지막 표시 단계에서도 합계 같은 독립 변수 값을 확인할 수 있습니다.</p><div className="compile-variable-cells">{scalars.map(value => cell(value, value.name, true))}</div></section>}
-    {arrays.length > 0 && <section className="compile-array-board" aria-label="배열 메모리 그림"><h3>배열과 선형 자료구조</h3>{arrays.map(array => {
+    {(arrays.length > 0 || structures?.arrays.some(array => array.container)) && <section className="compile-array-board" aria-label="배열 메모리 그림"><h3>배열과 선형 자료구조</h3>{arrays.map(array => {
       const container = arrayContainers.get(array.name);
       const primary = container ? scalarByName.get(container.primary) : undefined;
       const secondary = container?.secondary ? scalarByName.get(container.secondary) : undefined;
@@ -46,7 +46,7 @@ export default function MemoryDiagram({ view, changes, structures, onSelectLine,
         const inactive = container?.kind === 'stack' ? primary === undefined || primary < 0 || index > primary : container?.kind === 'queue' && primary !== undefined && index < primary;
         return <div className={`compile-container-slot${marker ? ' is-active' : ''}${inactive ? ' is-inactive' : ''}`} key={`${value.name}-${index}`}><span className="compile-container-marker" aria-hidden="true">{marker}</span>{item}</div>;
       })}</div></div>;
-    })}</section>}
+    })}{!arrays.length && <p className="compile-container-state">현재 실행 위치에서는 스택·큐 배열 값을 확인할 수 없습니다. 실행이 해당 코드에 도달하면 슬롯이 여기에 표시됩니다.</p>}</section>}
     {nodes.length > 0 && <section className="compile-pointer-board" aria-label="포인터 연결 그림"><h3>{treeShape ? '트리형 포인터 연결' : listShape ? '연결 리스트형 포인터 연결' : '구조체와 포인터 연결'}</h3><p>{treeShape ? 'left·right 필드명을 기준으로 트리 형태로 배치합니다.' : listShape ? 'next 필드로 확인한 연결을 따라 배치합니다.' : '상자에는 구조체 필드를 표시합니다.'} 화살표는 실행 기록에서 확인한 실제 포인터 연결입니다. NULL은 연결 대상이 없다는 뜻입니다.</p><StructureGraph nodes={nodes} edges={edges} shape={treeShape ? 'tree' : listShape ? 'list' : 'graph'} onSelectLine={onSelectLine} /></section>}
     {!scalars.length && !arrays.length && !nodes.length && <div className="compile-memory-intro"><strong>현재 위치에는 그림으로 표시할 변수 값이 없습니다.</strong><p>{finished ? '메모리 변화 기록의 끝입니다. 이전 변화로 이동하면 실행 중 기록된 메모리를 볼 수 있습니다.' : '다음 변화로 이동하면 기록된 메모리 쓰기 시점의 변수와 배열 값을 확인할 수 있습니다.'}</p></div>}
     {(scalarValues.length > 24 || arrayValues.length > 8) && <p className="compile-footnote">그림에는 독립 변수 24개와 배열 8개까지 표시합니다.</p>}

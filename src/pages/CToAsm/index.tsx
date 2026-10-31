@@ -160,8 +160,7 @@ export default function CToAsmPage() {
       <div className="compile-workspace">
         <div className="compile-workspace-editor">
           <section className="compile-editor-panel" aria-label="C 웹 IDE">
-            <div className="compile-panel-heading"><h2>C 소스 편집</h2><div className="compile-editor-heading-actions"><span>{source.split('\n').length}줄</span></div></div>
-            {structure.functions.length > 1 && <label className="compile-function-jump">함수 이동<select aria-label="편집기 함수 이동" value="" onChange={event => { const fn = structure.functions.find(fn => fn.line === Number(event.target.value)); if (fn) setSelection({ start: fn.line, end: fn.end }); }}><option value="">함수 선택</option>{structure.functions.map(fn => <option key={`${fn.name}-${fn.line}`} value={fn.line}>{fn.name} · {fn.line}–{fn.end}행</option>)}</select></label>}
+            <div className="compile-panel-heading"><h2>C 소스 편집</h2><div className="compile-editor-heading-actions"><span>{source.split('\n').length}줄</span>{structure.functions.length > 1 && <label className="compile-function-jump"><select aria-label="편집기 함수로 이동" title="함수로 이동" value="" onChange={event => { const fn = structure.functions.find(fn => fn.line === Number(event.target.value)); if (fn) setSelection({ start: fn.line, end: fn.end }); }}><option value="">함수로 이동</option>{structure.functions.map(fn => <option key={`${fn.name}-${fn.line}`} value={fn.line}>{fn.name} · {fn.line}–{fn.end}행</option>)}</select></label>}</div></div>
             <Editor
               height="var(--compile-editor-height, 360px)"
               language="c"

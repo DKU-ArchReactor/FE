@@ -24,6 +24,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
   const [playing, setPlaying] = useState(false);
   const request = useRef<AbortController | null>(null);
   const section = useRef<HTMLElement | null>(null);
+  const sourceStructures = useMemo(() => analyzeCStructures(source), [source]);
   useEffect(() => () => { request.current?.abort(); request.current = null; }, []);
   useEffect(() => { if (trace && !playing && scenes.length < 2) section.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, [trace, playing, scenes.length]);
   useEffect(() => {
@@ -38,13 +39,15 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
   useEffect(() => {
     if (!playing) return;
     const frame = requestAnimationFrame(() => {
-      const target = section.current?.querySelector('.compile-array-board, .compile-pointer-board, .compile-memory-diagram');
+      const root = section.current;
+      const target = sourceStructures.arrays.some(array => array.container)
+        ? root?.querySelector('.compile-array-board')
+        : root?.querySelector('.compile-pointer-board, .compile-array-board, .compile-memory-diagram');
       target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
     });
     return () => cancelAnimationFrame(frame);
-  }, [playing]);
+  }, [playing, sourceStructures]);
   const scene = scenes[step];
-  const sourceStructures = useMemo(() => analyzeCStructures(source), [source]);
   const cycle = scene ? trace?.history[scene.index] : undefined;
   const snapshot = useMemo(() => cycle ? snapshotForCycle(cycle) : undefined, [cycle]);
   const view = useMemo(() => debug && snapshot ? inspectMemory(debug, snapshot) : null, [debug, snapshot]);
