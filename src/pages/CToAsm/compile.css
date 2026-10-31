@@ -46,6 +46,37 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-log summary { cursor: pointer; font-weight: 600; }
 .compile-log pre, .compile-error { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; font-size: 12px; margin-top: 12px; }
 .compile-error { background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+.compile-comparison { margin-top: 8px; overflow: hidden; background: white; border: 1px solid #dbe4ef; border-radius: 12px; }
+.compile-block-header { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 1.18fr); gap: 20px; padding: 14px 18px; border-bottom: 1px solid #dbe4ef; background: #f8fafc; }
+.compile-block-header h2 { font-size: 13px; font-weight: 700; }
+.compile-block-header h2 span { margin-left: 6px; color: #64748b; font-size: 11px; font-weight: 450; }
+.compile-block-guide { padding: 11px 18px; color: #64748b; border-bottom: 1px solid #edf2f7; font-size: 12px; }
+.compile-block { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 1.18fr); gap: 20px; border-bottom: 1px solid #e2e8f0; transition: background-color .15s; }
+.compile-block:hover { background: #f8fbff; }
+.compile-block.is-selected { background: #f0f9ff; box-shadow: inset 3px 0 #0284c7; }
+.compile-block-left { padding: 12px 18px; min-width: 0; }
+.compile-block-right { padding: 9px 18px; min-width: 0; border-left: 1px solid #edf2f7; }
+.compile-block-source { display: flex; width: 100%; gap: 12px; align-items: baseline; text-align: left; font: inherit; }
+.compile-block-source:hover code { color: #0369a1; }
+.compile-block-source[aria-pressed="true"] code { color: #075985; font-weight: 700; }
+.compile-block-source code, .compile-context-source { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.7 Consolas, 'Courier New', monospace; color: #1e293b; }
+.compile-c-badge { flex-shrink: 0; align-self: flex-start; padding: 2px 6px; border-radius: 5px; background: #e0f2fe; color: #0369a1; font-size: 10px; font-weight: 700; }
+.compile-block-note { display: block; margin: 5px 0 0 40px; color: #64748b; font-size: 11px; line-height: 1.55; }
+.compile-instruction { display: grid; grid-template-columns: minmax(220px, auto) minmax(150px, 1fr); align-items: baseline; gap: 14px; min-height: 30px; }
+.compile-instruction > button { display: flex; gap: 12px; align-items: baseline; text-align: left; font: 13px/1.7 Consolas, 'Courier New', monospace; white-space: pre; }
+.compile-instruction > button:hover code, .compile-instruction > button[aria-pressed="true"] code { color: #0369a1; font-weight: 700; }
+.compile-op-number { display: inline-block; min-width: 30px; text-align: right; color: #94a3b8; font-size: 10px; user-select: none; }
+.compile-instruction p, .compile-block-label span, .compile-no-output { color: #64748b; font-size: 11px; line-height: 1.6; }
+.compile-block-label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; padding: 4px 0 8px 42px; }
+.compile-block-label code { color: #7c3aed; font: 12px Consolas, 'Courier New', monospace; }
+.compile-block-unmapped { background: #fbfdff; }
+.compile-context-source { display: block; margin: 5px 0 0 40px; }
+.compile-no-output { display: inline-block; padding: 8px 0 8px 42px; font-style: italic; }
+.compile-before { padding: 8px 18px; }
+.compile-before > div { padding: 9px 0; border-bottom: 1px solid #f1f5f9; }
+.compile-selection { margin: 12px; }
+.compile-comparison > .compile-footnote { margin: 14px 18px; }
+@media (max-width: 760px) { .compile-block-header, .compile-block { grid-template-columns: 1fr; gap: 4px; } .compile-block-header h2:nth-child(2) { padding-left: 4px; } .compile-block-right { border-left: 0; border-top: 1px dashed #dbe4ef; padding: 9px 18px 13px; } .compile-instruction { grid-template-columns: 1fr; gap: 0; padding: 4px 0; } .compile-instruction p { padding-left: 42px; } }
 .compile-structure { margin-top: 16px; border: 1px solid #e2e8f0; background: white; border-radius: 12px; overflow: hidden; }
 .compile-structure > p { padding: 0 20px; margin: 16px 0; color: #475569; font-size: 13px; line-height: 1.8; }
 .compile-diagram-scroll { overflow-x: auto; padding: 0 16px; }
