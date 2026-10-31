@@ -26,7 +26,7 @@ function ArrayCard({ array, onSelectLine }: { array: CArray; onSelectLine: (line
     ? numericSize <= 8 ? Array.from({ length: numericSize }, (_, index) => String(index)) : ['0', '1', '2', '3', '…', String(numericSize - 1)]
     : ['0', '1', '…', `${size}-1`];
   return <article className="compile-structure-card">
-    <SourceRef line={array.line} onSelectLine={onSelectLine}><strong>{array.type} {array.name}</strong><span>{array.dimensions.map(dimension => `[${dimension}]`).join('')}</span></SourceRef>
+    <SourceRef line={array.line} onSelectLine={onSelectLine}><strong>{array.container?.kind === 'stack' ? '스택' : array.container?.kind === 'queue' ? '큐' : array.type} {array.name}</strong><span>{array.dimensions.map(dimension => `[${dimension}]`).join('')}{array.container && ` · ${array.container.kind === 'stack' ? 'top 인덱스' : 'front / rear 인덱스'}`}</span></SourceRef>
     {unknownSize ? <p className="compile-structure-topology">선언에 길이가 생략됐습니다. 실제 크기는 컴파일 후 실행 정보에서 확인하세요.</p> : <div className="compile-array-indices" aria-label={`${array.name} 배열 원소`}>{indices.map((index, position) => <span key={`${position}-${index}`}>{index === '…' ? '…' : `${array.name}[${index}]`}</span>)}</div>}
     {array.dimensions.length > 1 && <p className="compile-structure-topology">첫 번째 차원의 인덱스를 표시합니다.</p>}
   </article>;

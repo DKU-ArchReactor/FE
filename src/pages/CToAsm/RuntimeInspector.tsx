@@ -10,6 +10,7 @@ import type { MemoryStep } from './memoryTimeline';
 import MemoryDiagram from './MemoryDiagram';
 import { instructionExplanation } from './mapping';
 import { operandExplanation } from './blocks';
+import { analyzeCStructures } from './structure';
 
 const MAX_EXECUTION_CYCLES = 2000;
 type Props = { compilation: Compilation; source?: string; onSelectLine: (line: number) => void };
@@ -35,6 +36,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
     return () => clearInterval(timer);
   }, [playing, scenes]);
   const scene = scenes[step];
+  const sourceStructures = useMemo(() => analyzeCStructures(source), [source]);
   const cycle = scene ? trace?.history[scene.index] : undefined;
   const snapshot = useMemo(() => cycle ? snapshotForCycle(cycle) : undefined, [cycle]);
   const view = useMemo(() => debug && snapshot ? inspectMemory(debug, snapshot) : null, [debug, snapshot]);
@@ -91,7 +93,7 @@ export default function RuntimeInspector({ compilation, source = '', onSelectLin
         </div>
       </>}
       {view && <>{view.warnings.map(message => <p className="compile-warning" key={message}>{message}</p>)}
-        <MemoryDiagram key={scene.index} view={view} changes={scene.changes} finished={step === scenes.length - 1} playing={playing} onSelectLine={onSelectLine} />
+        <MemoryDiagram key={scene.index} view={view} changes={scene.changes} structures={sourceStructures} finished={step === scenes.length - 1} playing={playing} onSelectLine={onSelectLine} />
         <p className="compile-footnote">현재 위치에서 주소나 레지스터를 확인할 수 있는 변수만 표시합니다. 그림에는 독립 변수 최대 24개, 배열 최대 8개(각 앞 32개 원소), 포인터 그래프 최대 40개 노드를 표시합니다. 회색은 값 또는 위치를 확인하지 못했다는 뜻입니다. 초기화 완료·할당 해제 여부는 보장하지 않습니다.</p>
       </>}
       {trace.console_output && <pre className="compile-console">{trace.console_output}</pre>}
