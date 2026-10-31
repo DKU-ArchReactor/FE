@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import type { editor as MonacoEditor } from 'monaco-editor';
-import { arithmeticSource } from './examples';
+import { arithmeticSource, quickExamples } from './examples';
 import { compileError, compileSource } from './compile';
 import type { Compilation } from './compile';
 import CodeComparison from './CodeComparison';
@@ -18,11 +18,16 @@ export default function CToAsmPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selection, setSelection] = useState<SourceSelection | null>(null);
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
+  const [exampleMessage, setExampleMessage] = useState('');
+  const [announcement, setAnnouncement] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const examplePickerRef = useRef<HTMLDetailsElement>(null);
   const requestRef = useRef<AbortController | null>(null);
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const structure = useMemo(() => analyzeCStructures(source), [source]);
+  const selectedExample = quickExamples.find(example => example.id === selectedExampleId);
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
@@ -48,6 +53,7 @@ export default function CToAsmPage() {
     setResult(null);
     setError('');
     setSelection(null);
+    setAnnouncement('');
   }
 
   function editSource(value?: string) {
@@ -56,6 +62,7 @@ export default function CToAsmPage() {
     setResult(null);
     setError('');
     setSelection(null);
+    setAnnouncement('');
   }
 
   async function openFile(file?: File) {
@@ -76,6 +83,7 @@ export default function CToAsmPage() {
     setError('');
     setResult(null);
     setSelection(null);
+    setAnnouncement('');
     try {
       const compiled = await compileSource(source, controller.signal);
       if (!controller.signal.aborted) setResult(compiled);
@@ -84,6 +92,24 @@ export default function CToAsmPage() {
     } finally {
       if (!controller.signal.aborted) setBusy(false);
       if (requestRef.current === controller) requestRef.current = null;
+    }
+  }
+
+  function applyExample() {
+    if (!selectedExample) return;
+    replaceSource(selectedExample.source, selectedExample.fileName);
+    setAnnouncement(`${selectedExample.title} 예제를 편집기에 넣었습니다. 컴파일하기를 눌러 실행해 보세요.`);
+    if (examplePickerRef.current) examplePickerRef.current.open = false;
+  }
+
+  async function copyExample() {
+    if (!selectedExample) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(selectedExample.source);
+      setExampleMessage(`${selectedExample.title} 코드 복사됨`);
+    } catch {
+      setExampleMessage('클립보드에 복사하지 못했습니다. 브라우저 복사 권한을 확인해 주세요.');
     }
   }
 
@@ -99,13 +125,27 @@ export default function CToAsmPage() {
       </div>
       <div className="compile-toolbar">
         <button disabled={busy} onClick={() => inputRef.current?.click()}>C 파일 불러오기</button>
+        <details className="compile-example-picker" ref={examplePickerRef}>
+          <summary>빠른 예제</summary>
+          <div className="compile-example-menu">
+            <strong>자료구조 예제</strong>
+            <p>예제를 골라 코드를 확인한 뒤 에디터에 넣거나 복사하세요.</p>
+            <div className="compile-example-options">{quickExamples.map(example => <button key={example.id} className={selectedExampleId === example.id ? 'is-active' : ''} aria-pressed={selectedExampleId === example.id} onClick={() => { setSelectedExampleId(example.id); setExampleMessage(''); }}><b>{example.title}</b><span>{example.description}</span></button>)}</div>
+            {selectedExample && <section className="compile-example-preview" aria-label={`${selectedExample.title} 예제 코드 미리보기`}>
+              <div><strong>{selectedExample.title}</strong><button className="compile-example-copy" aria-label={`${selectedExample.title} 코드 복사`} title="코드 복사" onClick={() => void copyExample()}><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="3" width="10" height="12" rx="1.5" /><path d="M13 16v1H4V6h1" /></svg></button></div>
+              <pre>{selectedExample.source}</pre>
+              <button className="compile-example-apply" disabled={busy} onClick={applyExample}>에디터에 넣기</button>
+              <span className="compile-example-message" role="status" aria-live="polite">{exampleMessage}</span>
+            </section>}
+          </div>
+        </details>
         <span className="compile-filename">{fileName}</span>
         <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
           void openFile(event.target.files?.[0]); event.target.value = '';
         }} />
       </div>
-      <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : result ? '컴파일 완료 · C 코드 옆에서 생성된 명령어를 확인하세요.' : `컴파일 대상: ${fileName} · 편집기에 보이는 내용이 컴파일됩니다.`}</p>
+      <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : announcement || (result ? '컴파일 완료 · C 코드 옆에서 생성된 명령어를 확인하세요.' : `컴파일 대상: ${fileName} · 편집기에 보이는 내용이 컴파일됩니다.`)}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
       <p className="compile-environment-note">RV32IM용 C → 어셈블리 변환 · 표준 입출력(stdio.h, printf)은 지원되지 않습니다. 컴파일 후 아래에서 CORE 실행 기록을 확인할 수 있습니다.</p>
       <div className="compile-workspace">
@@ -138,6 +178,7 @@ export default function CToAsmPage() {
               }}
             />
           </section>
+          {structure.structs.length + structure.arrays.length + structure.diagnostics.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
         </div>
         <section className="compile-output-panel" aria-label="C 코드 컴파일 결과">
           {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} onOpenMemory={() => document.getElementById('compile-runtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} /> : <div className="compile-output-placeholder">
@@ -147,7 +188,6 @@ export default function CToAsmPage() {
           </div>}
         </section>
       </div>
-      {structure.structs.length + structure.arrays.length + structure.diagnostics.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
       {result && <RuntimeInspector compilation={result} source={source} onSelectLine={line => { setSelection({ start: line, end: line }); editorRef.current?.getDomNode()?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />}
       <p className="compile-footnote">소스의 수정 내용이 컴파일 요청에 그대로 전달됩니다. CPU 실행 흐름은 데이터패스 페이지에서 볼 수 있습니다.</p>
     </main>
