@@ -2,7 +2,7 @@ import { parser } from '@lezer/cpp';
 import type { SyntaxNode } from '@lezer/common';
 export type CField = { name: string; type: string; pointer: boolean; array: string; line: number };
 export type CStruct = { name: string; line: number; fields: CField[]; instances: string[] };
-export type CArray = { name: string; type: string; dimensions: string[]; line: number };
+export type CArray = { name: string; type: string; dimensions: string[]; line: number; container?: { kind: 'stack' | 'queue'; primary: string; secondary?: string } };
 export type CPointerLink = { from: string; field: string; to: string; line: number };
 export type CFunction = { name: string; line: number; end: number };
 export type CStructure = { structs: CStruct[]; arrays: CArray[]; links: CPointerLink[]; functions: CFunction[]; diagnostics: string[] };
@@ -77,6 +77,14 @@ export function analyzeCStructures(source: string): CStructure {
         type.instances.push(name);
         objects.push({ name, type, initializer: item.name === 'InitDeclarator' ? children(item).at(-1) : undefined, line: line(id.from), scope });
       }
+    }
+  }
+  for (const array of arrays) {
+    const escaped = array.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`\\b${escaped}\\s*\\[\\s*(?:\\+\\+\\s*top|top\\s*\\+\\+|top\\s*[-+]\\s*1|top)\\s*\\]`).test(source) && /\btop\b/.test(source)) {
+      array.container = { kind: 'stack', primary: 'top' };
+    } else if (new RegExp(`\\b${escaped}\\s*\\[\\s*(?:front|rear)\\s*\\]`).test(source) && /\bfront\b/.test(source) && /\brear\b/.test(source)) {
+      array.container = { kind: 'queue', primary: 'front', secondary: 'rear' };
     }
   }
   const links: CPointerLink[] = [];
