@@ -160,3 +160,19 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-monaco-line-highlight { background: rgba(14, 165, 233, .18); }
 .compile-monaco-line-glyph { background: #0ea5e9; width: 4px !important; margin-left: 4px; }
 @media (max-width: 900px) { .compile-ide-layout { grid-template-columns: minmax(0, 1fr); } .compile-ide-layout > .compile-structure { margin-top: 0; } }
+@media (max-width: 600px) {
+  .compile-page { padding: 18px 14px 28px; }
+  .compile-heading { gap: 12px; margin-bottom: 16px; }
+  .compile-heading h1 { font-size: 22px; line-height: 1.35; }
+  .compile-heading p:not(.compile-eyebrow) { font-size: 13px; line-height: 1.6; }
+  .compile-profile { padding: 6px 10px; font-size: 11px; }
+  .compile-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 10px; }
+  .compile-toolbar > button:first-child { justify-self: start; }
+  .compile-toolbar .compile-filename { grid-column: 1 / -1; grid-row: 2; min-width: 0; padding: 4px 2px 0; border-top: 1px solid #f1f5f9; }
+  .compile-toolbar .compile-primary { grid-column: 2; grid-row: 1; align-self: center; margin-left: 0; padding-inline: 12px; }
+  .compile-status { line-height: 1.6; }
+  .compile-ide-layout { gap: 12px; }
+  .compile-editor-panel .compile-panel-heading { padding: 11px 13px; }
+  .compile-structure { border-radius: 10px; }
+  .compile-output-placeholder { min-height: 140px; padding: 20px 14px; }
+}
