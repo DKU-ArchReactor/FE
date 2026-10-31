@@ -9,6 +9,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const [localSelection, setSelection] = useState<SourceSelection | null>(null);
   const [selectedUnmapped, setSelectedUnmapped] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [showExplanations, setShowExplanations] = useState(false);
   const selection = controlledSelection === undefined ? localSelection : controlledSelection;
   const anchor = useRef(1);
   const lines = source.split('\n');
@@ -63,9 +64,8 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const firstFunction = Math.max(0, matchingGroups.findIndex(([name]) => name !== '전역 코드'));
 
   return <section className="compile-comparison" aria-label="C와 어셈블리 대응 블록">
-    <div className="compile-block-header"><h2>C 소스 코드</h2><h2>생성된 RISC-V 명령어 <span>명령어를 눌러 연결된 C 줄을 확인</span></h2></div>
-    {assembly && <label className="compile-code-search">함수·코드·명령어 찾기<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="예: sum, lw, node->next" /></label>}
-    <p className="compile-block-guide">{assembly ? '각 C 코드 줄과 그 줄에 연결된 명령어를 같은 행에서 비교합니다.' : '컴파일 후 각 C 코드 옆에 생성된 명령어가 표시됩니다.'}</p>
+    <div className="compile-block-header"><h2>C 소스 코드</h2><h2>생성된 RISC-V 명령어</h2></div>
+    {assembly && <div className="compile-comparison-tools"><label className="compile-code-search">코드 찾기<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="함수, C 코드, 명령어 검색" /></label><label className="compile-explanation-toggle"><input type="checkbox" checked={showExplanations} onChange={event => setShowExplanations(event.target.checked)} />명령어 설명</label></div>}
     {!assembly ? <div className="compile-before">{lines.map((_, i) => <div key={i}>{sourceButton(i + 1)}</div>)}</div> : <>
       {matchingGroups.map(([functionName, functionBlocks], groupIndex) => {
         const sourceLineCount = new Set(functionBlocks.flatMap(block => block.sourceLine === null ? [] : [block.sourceLine])).size;
@@ -82,7 +82,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
           <div className="compile-block-right">
             {contextLine ? <span className="compile-no-output">이 C 줄에 직접 연결된 명령어 없음</span> : block.rows.map(row => row.kind === 'label' ? <div className="compile-block-label" key={row.assemblyLine}><code>{row.text}</code><span>이동 목적지를 나타내는 레이블</span></div> : <div className="compile-instruction" key={row.assemblyLine}>
               <button aria-label={`ASM ${row.assemblyLine}행: ${row.text}${sourceLine ? `, C ${sourceLine}행` : ', 매핑 없음'}`} aria-pressed={isMappedToSelection(row, selection)} onClick={() => { select(sourceLine); if (sourceLine === null) setSelectedUnmapped(row.text); }} title={`원본 어셈블리 ${row.assemblyLine}행`}><span className="compile-op-number">{ordinals.get(row.assemblyLine)}</span><code>{row.text}</code></button>
-              <p>{operandExplanation(row.text) || instructionExplanation(row.text)}</p>
+              {showExplanations && <p>{operandExplanation(row.text) || instructionExplanation(row.text)}</p>}
             </div>)}
           </div>
         </article>;
