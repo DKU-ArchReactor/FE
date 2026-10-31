@@ -89,5 +89,8 @@ export function instructionExplanation(text: string): string {
   if (/^(add|addi|sub|mul|mulh|mulhu|mulhsu|div|divu|rem|remu)$/.test(op)) return '산술 연산: 정수 계산에 사용됩니다. add/addi는 주소·스택 위치 계산에도 사용됩니다.';
   if (/^(sll|slli|srl|srli|sra|srai)$/.test(op)) return '비트 이동: 비트를 좌우로 옮깁니다. 원소 크기에 따른 인덱스 계산에도 쓰일 수 있습니다.';
   if (/^(and|andi|or|ori|xor|xori|slt|slti|sltu|sltiu)$/.test(op)) return '논리·비교 연산: 비트를 조합하거나 비교 결과를 레지스터에 저장합니다.';
-  return '이 명령어가 속한 C 위치는 컴파일러의 줄 정보를 기준으로 표시합니다.';
+  if (/^(lui|auipc)$/.test(op)) return '상위 즉시값으로 값이나 주소를 구성합니다.';
+  if (op === 'nop') return '상태를 바꾸지 않고 다음 명령어로 진행합니다.';
+  if (op === 'ecall') return '실행 환경에 시스템 호출을 요청합니다.';
+  return `${op}: 이 명령어의 개별 해설은 아직 지원하지 않습니다.`;
 }

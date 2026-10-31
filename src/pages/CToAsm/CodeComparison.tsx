@@ -9,7 +9,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
   const [localSelection, setSelection] = useState<SourceSelection | null>(null);
   const [selectedUnmapped, setSelectedUnmapped] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [showExplanations, setShowExplanations] = useState(false);
+  const [showExplanations, setShowExplanations] = useState(true);
   const selection = controlledSelection === undefined ? localSelection : controlledSelection;
   const anchor = useRef(1);
   const lines = source.split('\n');
@@ -35,20 +35,9 @@ export default function CodeComparison({ source, assembly, selection: controlled
   }
 
   const displayBlocks: (typeof blocks[number] & { contextLine?: number })[] = [];
-  let lastContextLine = 0;
-  let currentFunction: string | null = null;
+  const contextLines = lines.flatMap((text, index) => text.trim() && !mappedLines.has(index + 1) ? [{ line: index + 1, text }] : []);
   for (const block of blocks) {
-    if (block.sourceLine !== null) {
-      for (let line = lastContextLine + 1; line < block.sourceLine; line += 1) {
-        if (lines[line - 1]?.trim() && !mappedLines.has(line)) displayBlocks.push({ sourceLine: null, functionName: currentFunction, contextLine: line, rows: [] });
-      }
-      lastContextLine = Math.max(lastContextLine, block.sourceLine);
-    }
-    currentFunction = block.functionName || currentFunction;
     displayBlocks.push(block);
-  }
-  for (let line = lastContextLine + 1; line <= lines.length; line += 1) {
-    if (lines[line - 1]?.trim() && !mappedLines.has(line)) displayBlocks.push({ sourceLine: null, functionName: currentFunction, contextLine: line, rows: [] });
   }
   const functionGroups = new Map<string, typeof displayBlocks>();
   for (const block of displayBlocks) {
@@ -77,7 +66,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
         const selected = sourceLine !== null && selection !== null && sourceLine >= selection.start && sourceLine <= selection.end;
         return <article key={index} className={`compile-block ${sourceLine === null ? 'compile-block-unmapped' : ''} ${selected ? 'is-selected' : ''}`} aria-label={contextLine ? `C ${contextLine}행, 직접 연결된 명령어 없음` : sourceLine === null ? '소스 위치 없는 출력' : `C ${sourceLine}행 대응 블록`}>
           <div className="compile-block-left">
-            {sourceLine !== null ? sourceButton(sourceLine) : contextLine ? <><span className="compile-c-badge">C {contextLine}</span><code className="compile-context-source">{lines[contextLine - 1]}</code><p className="compile-block-note">이 줄에 직접 연결된 명령어가 없습니다.</p></> : <><span className="compile-c-badge">소스 위치 없음</span><p className="compile-block-note">컴파일러가 소스 위치를 제공하지 않은 출력입니다.</p></>}
+            {sourceLine !== null ? sourceButton(sourceLine) : <><span className="compile-c-badge">{block.rows.every(row => row.kind === 'label') ? '이동 목적지' : '소스 줄 정보 없음'}</span><p className="compile-block-note">{block.rows.every(row => row.kind === 'label') ? '함수 시작이나 분기 대상을 표시합니다.' : '컴파일러가 C 줄 정보를 제공하지 않은 명령어입니다.'}</p></>}
           </div>
           <div className="compile-block-right">
             {contextLine ? <span className="compile-no-output">이 C 줄에 직접 연결된 명령어 없음</span> : block.rows.map(row => row.kind === 'label' ? <div className="compile-block-label" key={row.assemblyLine}><code>{row.text}</code><span>이동 목적지를 나타내는 레이블</span></div> : <div className="compile-instruction" key={row.assemblyLine}>
@@ -92,6 +81,7 @@ export default function CodeComparison({ source, assembly, selection: controlled
       {matchingGroups.length === 0 && <p className="compile-no-results">“{query}”에 해당하는 코드나 명령어가 없습니다.</p>}
       {mappedLines.size === 0 && <p className="compile-warning" role="status">C 줄 정보가 없어 대응 관계를 표시할 수 없습니다. 명령어 순서만 표시하며, 연결을 추측하지 않습니다.</p>}
     </>}
+    {assembly && contextLines.length > 0 && <details className="compile-unmapped-source"><summary>직접 연결된 명령어가 없는 소스 · {contextLines.length}줄</summary><p>타입·구조체 정의와 주석 등은 실행 명령어를 직접 만들지 않습니다. 나머지 줄도 컴파일러가 위치 정보를 주지 않으면 연결하지 않습니다.</p><pre>{contextLines.map(item => `${item.line}  ${item.text}`).join('\n')}</pre></details>}
     {selection && <div className="compile-selection" role="status"><h2>선택한 코드: C {selection.start}{selection.end !== selection.start ? `–${selection.end}` : ''}행</h2><p>{selectedInstructionCount ? `이 코드에서 생성된 명령어 ${selectedInstructionCount}개를 강조했습니다.` : '연결된 명령어가 없습니다.'} Shift+클릭으로 여러 줄을 함께 선택할 수 있습니다.</p></div>}
     {selectedUnmapped && <div className="compile-selection" role="status"><h2>C 위치가 없는 명령어</h2><code>{selectedUnmapped}</code><p>컴파일러가 이 명령어에 현재 C 소스의 줄 정보를 제공하지 않았습니다.</p></div>}
     <p className="compile-footnote">줄 연결은 컴파일러가 제공한 위치를 따릅니다. 명령어 번호는 표시 순서이며 PC 주소가 아닙니다. 레지스터를 C 변수로 추측하지 않으며, 의사 명령어는 조립 과정에서 확장될 수 있습니다.</p>
