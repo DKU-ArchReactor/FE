@@ -34,9 +34,9 @@ const Header = () => {
   };
 
   const navItems = [
-    { label: "C → 어셈블리 변환", path: "/c-to-asm" },
-    { label: "파이프라인 시각화", path: "/" },
-    { label: "구현 예정", path: "/coming-soon" },
+    { label: "컴파일", path: "/c-to-asm" },
+    { label: "데이터패스", path: "/" },
+    { label: "토탈", path: "/total" },
   ];
 
   return (

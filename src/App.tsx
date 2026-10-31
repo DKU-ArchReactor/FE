@@ -14,6 +14,7 @@ function App() {
         <Route path="/" element={<MainPage />} />
         <Route path="/c-to-asm" element={<CToAsmPage />} />
         <Route path="/coming-soon" element={<ComingSoonPage />} />
+        <Route path="/total" element={<ComingSoonPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/my" element={<MyPage />} />

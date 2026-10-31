@@ -6,10 +6,10 @@ export default function ComingSoonPage() {
           COMING SOON
         </span>
         <h1 className="text-2xl font-bold text-slate-800 mb-3">
-          구현 예정 페이지
+          코드를 전체 흐름으로 이해하기
         </h1>
         <p className="text-slate-600 text-sm leading-relaxed">
-          추가적인 컴퓨터 구조 시각화 및 실습 기능이 이곳에 업데이트될 예정입니다.
+          C 코드의 변환과 CPU 실행을 연결해 컴퓨터 구조 개념을 정리하는 토탈 페이지입니다. 요약·설명 기능은 준비 중입니다.
         </p>
       </div>
     </div>
