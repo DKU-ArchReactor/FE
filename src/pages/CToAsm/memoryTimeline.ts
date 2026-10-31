@@ -34,6 +34,5 @@ export function memoryTimeline(info: DebugInfo, history: CycleHistoryItem[]): Me
     }
     if (byAddress.size) result.push({ index, changes: [...byAddress.values()] });
   }
-  if (result.at(-1)!.index !== history.length - 1) result.push({ index: history.length - 1, changes: [] });
   return result;
 }
