@@ -30,13 +30,10 @@ function ArrayCard({ array, onSelectLine }: { array: CArray; onSelectLine: (line
 }
 
 export default function StructureInspector({ structure, onSelectLine }: Props) {
-  const count = structure.structs.length + structure.arrays.length;
-  return <aside className="compile-structure" aria-label="현재 C 코드의 자료구조">
-    <div className="compile-structure-heading"><span>현재 코드에서 찾음</span><span>자료구조 {count}개</span></div>
-    {count === 0 ? <div className="compile-structure-empty">
-      <p>현재 C 파일에 배열 선언이나 struct 정의가 없습니다.</p>
-      <p>C 소스에 실제로 선언된 구조만 표시합니다.</p>
-    </div> : <div className="compile-structure-list">
+  const summary = [structure.structs.length ? `struct ${structure.structs.length}개` : '', structure.arrays.length ? `배열 ${structure.arrays.length}개` : ''].filter(Boolean).join(' · ');
+  return <details className="compile-structure" aria-label="현재 C 코드의 자료구조">
+    <summary className="compile-structure-summary"><span>코드에서 찾은 구조</span><span>{summary}</span></summary>
+    <div className="compile-structure-list">
       {structure.structs.map(type => <StructCard key={type.name} type={type} onSelectLine={onSelectLine} />)}
       {structure.arrays.map((array, index) => <ArrayCard key={`${array.name}-${array.line}-${index}`} array={array} onSelectLine={onSelectLine} />)}
       {structure.links.length > 0 && <section className="compile-structure-links" aria-label="선언 초기값의 포인터 연결">
@@ -44,7 +41,7 @@ export default function StructureInspector({ structure, onSelectLine }: Props) {
         {structure.links.map((link, index) => <SourceRef key={`${link.from}-${link.field}-${link.to}-${index}`} line={link.line} onSelectLine={onSelectLine}><code>{link.from}.{link.field}</code><span className="compile-link-arrow">→</span><code>{link.to}</code></SourceRef>)}
         <p>소스의 초기화 표현을 읽은 결과입니다. 이후 대입이나 반복 실행에 따른 연결 상태는 보여주지 않습니다.</p>
       </section>}
-    </div>}
-    {count > 0 && <p className="compile-structure-note">필드 순서와 배열 원소 수는 선언을 표시합니다. 실제 주소·패딩·실행 중 값은 추측하지 않습니다.</p>}
-  </aside>;
+    </div>
+    <p className="compile-structure-note">선언에 적힌 구조만 표시합니다. 실제 주소와 실행 중 값은 추측하지 않습니다.</p>
+  </details>;
 }
