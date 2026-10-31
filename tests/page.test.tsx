@@ -16,7 +16,7 @@ describe('compilation page', () => {
     expect(screen.getByRole('heading', { name: '명령어가 여기에 표시됩니다' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: /대응 어셈블리/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '컴파일하기 →' }));
-    await screen.findByText(/컴파일 완료/);
+    await screen.findByText('컴파일 결과');
     fireEvent.click(screen.getByRole('button', { name: 'C 4행: int sum = a + b;' }));
     expect(screen.getByText('선택한 코드: C 4행')).toBeTruthy();
     expect(screen.getByText(/생성된 명령어 4개/)).toBeTruthy();
@@ -24,7 +24,7 @@ describe('compilation page', () => {
     expect(screen.queryByText(/컴파일 완료/)).toBeNull();
     expect(screen.queryByRole('button', { name: /ASM / })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '컴파일하기 →' }));
-    await screen.findByText(/컴파일 완료/);
+    await screen.findByText('컴파일 결과');
     expect(compileSource).toHaveBeenLastCalledWith('int main(){return 1;}', expect.any(AbortSignal));
   });
 
@@ -34,7 +34,7 @@ describe('compilation page', () => {
     const file = new File([fileSource], 'custom.c', { type: 'text/plain' });
     Object.defineProperty(file, 'text', { value: async () => fileSource });
     fireEvent.change(screen.getByLabelText('C 파일 열기', { selector: 'input' }), { target: { files: [file] } });
-    await screen.findByText('custom.c');
+    await waitFor(() => expect((screen.getByRole('textbox', { name: 'C 소스 편집기' }) as HTMLTextAreaElement).value).toBe(fileSource));
     expect(screen.getByText('struct Link')).toBeTruthy();
     expect(screen.getByText('int scores')).toBeTruthy();
     expect(screen.getByText(/실행 중 대상 미확정/)).toBeTruthy();
@@ -57,6 +57,6 @@ describe('compilation page', () => {
     fireEvent.click(screen.getByRole('button', { name: '컴파일 중…' }));
     expect(compileSource).toHaveBeenCalledTimes(1);
     finish({ assembly: '.text\nret', log: '' });
-    await screen.findByText(/컴파일 완료/);
+    await screen.findByText('컴파일 결과');
   });
 });

@@ -11,7 +11,7 @@ describe('source / assembly interaction', () => {
   it('keeps declarations without instructions out of the executable mapping rows', () => {
     render(<CodeComparison source={'struct Item { int value; };\nint main() { return 0; }'} assembly={'.file 1 "source.c"\n.text\n.loc 1 2 0\nli a0,0'} />);
     expect(screen.queryByRole('article', { name: 'C 1행, 직접 연결된 명령어 없음' })).toBeNull();
-    expect(screen.getByRole('article', { name: 'C 2행 대응 블록' })).toBeTruthy();
+    expect(screen.getByRole('article', { name: 'C 2행에서 생성된 명령어' })).toBeTruthy();
     expect(screen.getByText('직접 연결된 명령어가 없는 소스 · 1줄')).toBeTruthy();
   });
   it('shows descriptions by default and keeps instructions when descriptions are hidden', () => {
