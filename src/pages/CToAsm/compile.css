@@ -9,6 +9,8 @@
 .compile-toolbar { position: relative; z-index: 4; }
 .compile-toolbar button, .compile-toolbar select { border: 1px solid #cbd5e1; background: white; padding: 8px 14px; border-radius: 8px; font-size: 13px; }
 .compile-toolbar button:hover:not(:disabled) { background: #f0f9ff; }
+.compile-toolbar .compile-file-button { display: inline-flex; align-items: center; gap: 8px; }
+.compile-file-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .compile-toolbar .compile-primary { color: white; background: #0284c7; border-color: #0284c7; margin-left: auto; font-weight: 650; }
 .compile-toolbar .compile-primary:hover:not(:disabled) { background: #0369a1; }
 .compile-toolbar button:disabled, .compile-toolbar select:disabled { opacity: .5; cursor: not-allowed; }
@@ -154,6 +156,10 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-editor-panel { min-width: 0; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 12px; background: #1e1e1e; }
 .compile-editor-panel .compile-panel-heading { color: #e2e8f0; border-color: #334155; background: #252526; }
 .compile-editor-panel .compile-panel-heading > span { color: #94a3b8; }
+.compile-editor-heading-actions { display: flex; align-items: center; gap: 12px; }
+.compile-editor-heading-actions > span { color: #94a3b8; font-size: 11px; }
+.compile-editor-heading-actions > button { padding: 4px 8px; border: 1px solid #475569; border-radius: 6px; background: #303033; color: #cbd5e1; font-size: 11px; }
+.compile-editor-heading-actions > button:hover:not(:disabled) { background: #3b3b40; color: white; }
 .compile-editor-loading { display: grid; height: min(58vh, 560px); place-items: center; color: #94a3b8; font-size: 13px; }
 .compile-ide-layout > .compile-structure { margin-top: 0; }
 .compile-structure-list { display: grid; gap: 10px; max-height: min(64vh, 640px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 12px; }
