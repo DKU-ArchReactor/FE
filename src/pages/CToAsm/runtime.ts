@@ -1,7 +1,7 @@
 import { Reader, nameOf, num, rangeOf } from './debug';
 import type { DebugInfo, Die } from './debug';
 import type { CycleHistoryItem, GlobalResult } from '@/type/simulation';
-export type MemoryValue = { name: string; type: string; typeId?: number; address?: number; value: string; line: number; children: MemoryValue[]; pointer?: number; targetType?: number; unavailable?: string };
+export type MemoryValue = { name: string; type: string; typeId?: number; byteSize?: number; address?: number; value: string; line: number; children: MemoryValue[]; pointer?: number; targetType?: number; unavailable?: string };
 export type MemoryView = { variables: MemoryValue[]; nodes: MemoryValue[]; line?: number; warnings: string[] };
 export const hex = (value: number) => `0x${(value >>> 0).toString(16).padStart(8, '0')}`;
 export function snapshotForCycle(cycle: CycleHistoryItem): GlobalResult {
@@ -56,7 +56,7 @@ export function inspectMemory(info: DebugInfo, snapshot: GlobalResult): MemoryVi
   };
   const read = (name: string, typeId: number, address: number | undefined, line: number, depth = 0, reg?: number): MemoryValue => {
     const original = info.dies.get(typeId), type = concrete(info, original);
-    const result: MemoryValue = { name, type: typeName(info, original), typeId: type?.offset, address, value: '확인할 수 없음', line, children: [] };
+    const result: MemoryValue = { name, type: typeName(info, original), typeId: type?.offset, byteSize: byteSize(info, type), address, value: '확인할 수 없음', line, children: [] };
     if (!type) { result.unavailable = '타입 정보 없음'; return result; }
     if (address === undefined && reg === undefined) { result.unavailable = '현재 위치의 변수 주소를 해석할 수 없음'; return result; }
     if (type.tag === 0x13 && address !== undefined && depth < 5) {
