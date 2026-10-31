@@ -66,14 +66,10 @@ export default function CToAsmPage() {
   }
 
   function resetEditor() {
-    setSource('');
-    setFileName('main.c');
-    setResult(null);
-    setError('');
-    setSelection(null);
+    replaceSource(arithmeticSource, 'main.c');
     setSelectedExampleId(null);
     setExampleMessage('');
-    setAnnouncement('편집기를 비웠습니다. 새 코드를 작성하거나 C 파일을 불러오세요.');
+    setAnnouncement('기본 덧셈 코드를 불러왔습니다. 수정한 뒤 바로 컴파일할 수 있습니다.');
     if (examplePickerRef.current) examplePickerRef.current.open = false;
   }
 
@@ -151,7 +147,7 @@ export default function CToAsmPage() {
           </div>
         </details>
         <div className="compile-run-actions">
-          <button className="compile-reset-button" title="편집기와 컴파일 결과를 비웁니다" disabled={busy} onClick={resetEditor}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 8a6 6 0 1 1-.1 4" /><path d="M4 3.8v4.5h4.5" /></svg>초기화</button>
+          <button className="compile-reset-button" title="기본 덧셈 코드로 되돌립니다" disabled={busy} onClick={resetEditor}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 8a6 6 0 1 1-.1 4" /><path d="M4 3.8v4.5h4.5" /></svg>기본 코드</button>
           <button className="compile-primary" disabled={busy || !source.trim()} onClick={compile}>{busy ? '컴파일 중…' : '컴파일하기 →'}</button>
         </div>
         <input ref={inputRef} type="file" accept=".c" aria-label="C 파일 열기" hidden onChange={event => {
