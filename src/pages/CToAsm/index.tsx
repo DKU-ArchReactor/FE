@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { arithmeticSource } from './examples';
 import { compileError, compileSource } from './compile';
 import type { Compilation } from './compile';
+import CodeComparison from './CodeComparison';
 import './compile.css';
 
 export default function CToAsmPage() {
@@ -71,16 +72,7 @@ export default function CToAsmPage() {
       </div>
       <p className="compile-status" role="status">{busy ? '파일과 컴파일 결과를 준비하고 있습니다.' : result ? '컴파일 완료 · 아래에서 결과를 확인하세요.' : '예제를 컴파일하거나 UTF-8 C 파일을 열어 시작하세요.'}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
-      <div className="compile-columns">
-        <section className="compile-panel" aria-label="C 소스 코드">
-          <div className="compile-panel-heading"><h2><span>01</span> C 소스</h2><span>{source.split('\n').length} lines</span></div>
-          <div className="compile-code">{source.split('\n').map((line, i) => <div className="compile-code-line" key={i}><span className="compile-line-number">{i + 1}</span><code>{line || ' '}</code></div>)}</div>
-        </section>
-        <section className="compile-panel" aria-label="RISC-V 어셈블리">
-          <div className="compile-panel-heading"><h2><span>02</span> RISC-V 어셈블리</h2><span>컴파일 결과</span></div>
-          {result ? <pre className="compile-code compile-raw">{result.assembly}</pre> : <div className="compile-empty"><strong>C → Assembly</strong><p>컴파일하면 이곳에 생성된 어셈블리가 표시됩니다.</p><p>표준 라이브러리 없이 실행 가능한 작은 C 프로그램으로 시작하세요.</p></div>}
-        </section>
-      </div>
+      <CodeComparison key={source + Boolean(result)} source={source} assembly={result?.assembly} />
       <p className="compile-footnote">이 페이지는 컴파일 결과를 비교합니다. CPU 내부 실행은 데이터패스 페이지에서 확인할 수 있습니다.</p>
       {result && <details className="compile-log"><summary>컴파일 로그</summary><pre>{result.log || '추가 메시지가 없습니다.'}</pre></details>}
     </main>
