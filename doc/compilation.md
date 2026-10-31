@@ -29,3 +29,9 @@ References: [GNU as .loc](https://sourceware.org/binutils/docs/as/Loc.html), [GC
 - `feat/structure-visualization`: builds on source-mapping; bounded educational structure diagrams.
 
 Branches are stacked in that order. Merge prerequisites first, or review each branch against its predecessor. No feature branch has been merged into main automatically. Monaco editing is deferred.
+
+## Structure diagrams
+
+The selector includes arithmetic, array, static linked-list and static binary-tree examples. For the three structure examples, diagrams encode the declared initial layout and explanatory access relationships. Selecting a node selects its associated C line and thus the compiler-mapped assembly; selecting a C range highlights related nodes. Keyboard Enter/Space activates nodes.
+
+These are curated explanations, **not runtime snapshots** or automatic analysis of arbitrary C. Uploading a file clears the example diagram and previous assembly. No malloc, fake PC addresses or simulated pointer movement is introduced. Runtime structure discovery requires type/layout metadata plus actual memory snapshots and remains separate work.

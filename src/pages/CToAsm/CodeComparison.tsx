@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { instructionExplanation, isMappedToSelection, parseAssembly } from './mapping';
 import type { SourceSelection } from './mapping';
 
-type Props = { source: string; assembly?: string; onSelectionChange?: (selection: SourceSelection | null) => void };
+type Props = { source: string; assembly?: string; selection?: SourceSelection | null; onSelectionChange?: (selection: SourceSelection | null) => void };
 
-export default function CodeComparison({ source, assembly, onSelectionChange }: Props) {
-  const [selection, setSelection] = useState<SourceSelection | null>(null);
+export default function CodeComparison({ source, assembly, selection: controlledSelection, onSelectionChange }: Props) {
+  const [localSelection, setSelection] = useState<SourceSelection | null>(null);
+  const selection = controlledSelection === undefined ? localSelection : controlledSelection;
   const [selectedAssembly, setSelectedAssembly] = useState<number | null>(null);
   const [rawVisible, setRawVisible] = useState(false);
   const anchor = useRef(1);
@@ -47,7 +48,7 @@ export default function CodeComparison({ source, assembly, onSelectionChange }: 
         <div className="compile-panel-heading"><h2><span>02</span> RISC-V 어셈블리</h2><span>{assembly ? `${mappedCount}개 C 줄 연결` : '컴파일 결과'}</span></div>
         {assembly ? <div className="compile-code" ref={assemblyRef}>
           {rows.map(row => row.kind === 'label' ? <div key={row.assemblyLine} className="compile-code-line compile-label"><span className="compile-line-number">{row.assemblyLine}</span><code>{row.text}</code></div> :
-            <button key={row.assemblyLine} className={`compile-code-line ${selectedAssembly === row.assemblyLine ? 'compile-selected-instruction' : ''}`} aria-label={`ASM ${row.assemblyLine}행: ${row.text}${row.sourceLine ? `, C ${row.sourceLine}행` : ', 매핑 없음'}`} aria-pressed={isMappedToSelection(row, selection) || selectedAssembly === row.assemblyLine} onClick={() => {
+            <button key={row.assemblyLine} className={`compile-code-line ${selectedAssembly === row.assemblyLine && (!selection || isMappedToSelection(row, selection)) ? 'compile-selected-instruction' : ''}`} aria-label={`ASM ${row.assemblyLine}행: ${row.text}${row.sourceLine ? `, C ${row.sourceLine}행` : ', 매핑 없음'}`} aria-pressed={isMappedToSelection(row, selection) || (!selection && selectedAssembly === row.assemblyLine)} onClick={() => {
               const range = row.sourceLine === null ? null : { start: row.sourceLine, end: row.sourceLine };
               scrollTarget.current = 'source';
               setSelection(range);
