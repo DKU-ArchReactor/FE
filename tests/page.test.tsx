@@ -13,7 +13,7 @@ describe('compilation page', () => {
   it('hides assembly headings before compilation and connects the compiled source', async () => {
     vi.mocked(compileSource).mockResolvedValue({ assembly: readFileSync('tests/fixtures/arithmetic.s', 'utf8'), log: 'ok' });
     render(<CToAsmPage />);
-    expect(screen.getByRole('heading', { name: '컴파일 결과가 여기에 표시됩니다' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '명령어가 여기에 표시됩니다' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: /대응 어셈블리/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '컴파일하기 →' }));
     await screen.findByText(/컴파일 완료/);

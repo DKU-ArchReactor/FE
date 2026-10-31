@@ -104,44 +104,46 @@ export default function CToAsmPage() {
           void openFile(event.target.files?.[0]); event.target.value = '';
         }} />
       </div>
-      <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : result ? '컴파일 완료 · C 코드 옆에서 생성된 명령어를 확인하세요.' : `컴파일 대상: ${fileName} · 아래 편집기에 보이는 내용이 컴파일됩니다.`}</p>
+      <p className="compile-status" role="status">{busy ? '편집기 내용을 RV32IM으로 컴파일하고 있습니다.' : result ? '컴파일 완료 · C 코드 옆에서 생성된 명령어를 확인하세요.' : `컴파일 대상: ${fileName} · 편집기에 보이는 내용이 컴파일됩니다.`}</p>
       {error && <pre className="compile-error" role="alert">{error}</pre>}
-      <div className="compile-editor-layout">
-        <section className="compile-editor-panel" aria-label="C 웹 IDE">
-          <div className="compile-panel-heading"><h2>C 소스 편집</h2><span>{source.split('\n').length}줄</span></div>
-          <Editor
-            height="280px"
-            language="c"
-            theme="vs-dark"
-            path={fileName}
-            value={source}
-            onChange={editSource}
-            onMount={editor => { editorRef.current = editor; }}
-            loading={<div className="compile-editor-loading">C 편집기를 불러오는 중…</div>}
-            options={{
-              automaticLayout: true,
-              fontSize: 14,
-              fontFamily: "'D2Coding', Consolas, monospace",
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              wordWrap: 'off',
-              tabSize: 4,
-              insertSpaces: true,
-              lineNumbers: 'on',
-              padding: { top: 12, bottom: 12 },
-              readOnly: busy,
-            }}
-          />
+      <div className="compile-workspace">
+        <div className="compile-workspace-editor">
+          <section className="compile-editor-panel" aria-label="C 웹 IDE">
+            <div className="compile-panel-heading"><h2>C 소스 편집</h2><span>{source.split('\n').length}줄</span></div>
+            <Editor
+              height="var(--compile-editor-height, 360px)"
+              language="c"
+              theme="vs-dark"
+              path={fileName}
+              value={source}
+              onChange={editSource}
+              onMount={editor => { editorRef.current = editor; }}
+              loading={<div className="compile-editor-loading">C 편집기를 불러오는 중…</div>}
+              options={{
+                automaticLayout: true,
+                fontSize: 14,
+                fontFamily: "'D2Coding', Consolas, monospace",
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                wordWrap: 'off',
+                tabSize: 4,
+                insertSpaces: true,
+                lineNumbers: 'on',
+                padding: { top: 12, bottom: 12 },
+                readOnly: busy,
+              }}
+            />
+          </section>
+          {structure.structs.length + structure.arrays.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
+        </div>
+        <section className="compile-output-panel" aria-label="C 코드 컴파일 결과">
+          {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} /> : <div className="compile-output-placeholder">
+            <span>컴파일 결과</span>
+            <h2>{busy ? '컴파일 중입니다' : '명령어가 여기에 표시됩니다'}</h2>
+            <p>편집기의 C 코드를 컴파일하면 이곳에서 대응 관계를 보여줍니다.</p>
+          </div>}
         </section>
       </div>
-      {(structure.structs.length + structure.arrays.length > 0) && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
-      {result ? <div className="compile-result-layout">
-        <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} />
-      </div> : <section className="compile-output-placeholder" aria-label="컴파일 대기">
-        <span>컴파일 결과</span>
-        <h2>{busy ? '컴파일 중입니다' : '컴파일 결과가 여기에 표시됩니다'}</h2>
-        <p>현재 C 코드를 컴파일하면 실제 생성된 RISC-V 명령어와 소스 줄 연결을 보여줍니다.</p>
-      </section>}
       <p className="compile-footnote">소스의 수정 내용이 컴파일 요청에 그대로 전달됩니다. CPU 실행 흐름은 데이터패스 페이지에서 볼 수 있습니다.</p>
     </main>
   );
