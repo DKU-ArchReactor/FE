@@ -11,7 +11,8 @@ describe('memory change navigation',()=>{
     const timeline=memoryTimeline(debug,trace.history);
     expect(timeline.length).toBeLessThan(trace.history.length);
     expect(timeline[0].index).toBe(0);
-    expect(timeline.at(-1)!.index).toBe(trace.history.length-1);
+    expect(timeline.at(-1)!.index).toBeLessThan(trace.history.length-1);
+    expect(timeline.at(-1)!.changes.length).toBeGreaterThan(0);
     expect(timeline.some(step=>step.changes.some(change=>change.name==='values[0]' && change.after==='1'))).toBe(true);
     const pointerChanges=timeline.flatMap(step=>step.changes).filter(change=>change.name==='list[0].next' && change.pointer);
     expect(new Set(pointerChanges.map(change=>change.after)).size).toBeGreaterThanOrEqual(2);

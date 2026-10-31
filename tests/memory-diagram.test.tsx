@@ -24,3 +24,16 @@ it('draws real array values, resolves pointer names, and highlights the rewired 
   expect(screen.queryByText(/next: 0x/)).toBeNull();
   expect(result.container.querySelector('path[stroke="#d97706"]')).toBeTruthy();
 });
+it('keeps the final recorded memory scene and distinguishes retained scalar values',()=>{
+  const bytes=readFileSync('tests/fixtures/long.elf');
+  const debug=parseDebugInfo(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+  const trace=JSON.parse(readFileSync('tests/fixtures/long-trace.json','utf8')) as SimulationResult;
+  const finalScene=memoryTimeline(debug,trace.history).at(-1)!;
+  expect(finalScene.index).toBeLessThan(trace.history.length-1);
+  expect(finalScene.changes.length).toBeGreaterThan(0);
+  const view=inspectMemory(debug,snapshotForCycle(trace.history[finalScene.index]));
+  const {container}=render(<MemoryDiagram view={view} changes={finalScene.changes} finished onSelectLine={vi.fn()} />);
+  expect(screen.getByText('마지막 기록의 독립 변수')).toBeTruthy();
+  expect(container.querySelector('.compile-memory-cell.is-final')).toBeTruthy();
+  expect(screen.getByRole('region',{name:'포인터 연결 그림'})).toBeTruthy();
+});

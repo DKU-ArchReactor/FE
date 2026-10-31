@@ -138,7 +138,6 @@ export default function CToAsmPage() {
               }}
             />
           </section>
-          {structure.structs.length + structure.arrays.length + structure.diagnostics.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
         </div>
         <section className="compile-output-panel" aria-label="C 코드 컴파일 결과">
           {result ? <CodeComparison key={`${fileName}-${source}`} source={source} assembly={result.assembly} selection={selection} onSelectionChange={setSelection} onOpenMemory={() => document.getElementById('compile-runtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} /> : <div className="compile-output-placeholder">
@@ -148,6 +147,7 @@ export default function CToAsmPage() {
           </div>}
         </section>
       </div>
+      {structure.structs.length + structure.arrays.length + structure.diagnostics.length > 0 && <StructureInspector structure={structure} onSelectLine={line => setSelection({ start: line, end: line })} />}
       {result && <RuntimeInspector compilation={result} source={source} onSelectLine={line => { setSelection({ start: line, end: line }); editorRef.current?.getDomNode()?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />}
       <p className="compile-footnote">소스의 수정 내용이 컴파일 요청에 그대로 전달됩니다. CPU 실행 흐름은 데이터패스 페이지에서 볼 수 있습니다.</p>
     </main>

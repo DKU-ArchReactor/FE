@@ -232,7 +232,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-output-panel .compile-comparison { margin-top: 0; overflow: hidden; }
 .compile-workspace-editor { position: sticky; top: 12px; }
 .compile-output-panel .compile-block-guide { background: #fff; }
-.compile-workspace .compile-structure { margin-top: 12px; }
+.compile-workspace + .compile-structure { margin-top: 12px; }
 @media (max-width: 1100px) {
   .compile-workspace { grid-template-columns: minmax(0, 1fr); }
   .compile-workspace-editor { position: static; }
@@ -343,6 +343,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-memory-legend .known { background: #e0f2fe; border-color: #7dd3fc; }
 .compile-memory-legend .changed { background: #fef3c7; border-color: #f59e0b; }
 .compile-memory-legend .unknown { background: #e2e8f0; }
+.compile-memory-legend .final { background: #d1fae5; border-color: #34d399; }
 .compile-variable-board, .compile-array-board { margin-bottom: 22px; }
 .compile-variable-cells { display: flex; flex-wrap: wrap; gap: 10px; }
 .compile-runtime .compile-memory-cell { display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 100px; max-width: 220px; min-height: 82px; padding: 10px 14px; text-align: center; color: #0c4a6e; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; }
@@ -351,6 +352,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-memory-cell small { font-size: 10px; color: #64748b; }
 .compile-runtime .compile-memory-cell.is-unknown { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
 .compile-runtime .compile-memory-cell.is-changed { background: #fef3c7; border-color: #f59e0b; color: #92400e; box-shadow: 0 0 0 2px #fffbeb; }
+.compile-runtime .compile-memory-cell.is-final { background: #ecfdf5; border-color: #34d399; color: #065f46; box-shadow: 0 0 0 2px #d1fae5; }
 .compile-array-caption { display: flex; gap: 12px; align-items: baseline; margin: 8px 0; font-size: 12px; }
 .compile-array-caption span { color: #64748b; }
 .compile-array-cells { display: flex; overflow-x: auto; padding: 4px 2px 10px; }
