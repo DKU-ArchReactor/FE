@@ -269,7 +269,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-editor-panel { height: 404px; --compile-editor-height: 360px; }
 .compile-output-placeholder { min-height: 404px; height: 404px; margin-top: 0; align-content: center; }
 .compile-output-panel { display: flex; flex-direction: column; min-height: 0; }
-.compile-output-panel .compile-comparison { flex: 1 1 auto; min-height: 0; max-height: clamp(420px, 72vh, 780px); margin-top: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.compile-output-panel .compile-comparison { flex: 1 1 auto; min-height: 0; max-height: clamp(630px, 90vh, 1170px); margin-top: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .compile-workspace-editor:has(.compile-structure[open]) + .compile-output-panel .compile-comparison { min-height: 404px; }
 .compile-workspace-editor { position: static; }
 .compile-output-panel .compile-block-guide { background: #fff; }
@@ -278,7 +278,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
   .compile-workspace-editor { position: static; }
   .compile-editor-panel { height: auto; }
   .compile-output-placeholder { min-height: 190px; height: auto; }
-  .compile-output-panel .compile-comparison { height: auto; max-height: clamp(380px, 68vh, 680px); overflow-x: hidden; overflow-y: auto; }
+  .compile-output-panel .compile-comparison { height: auto; max-height: clamp(570px, 90vh, 1020px); overflow-x: hidden; overflow-y: auto; }
   .compile-output-panel .compile-block-header, .compile-output-panel .compile-code-search { position: static; }
 }
 .compile-comparison-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
@@ -312,9 +312,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
   .compile-output-panel .compile-instruction { grid-template-columns: 1fr; gap: 0; }
   .compile-output-panel .compile-instruction p { padding-left: 38px; }
 }
-.compile-function-jump { display: flex; align-items: center; gap: 8px; padding: 7px 12px; color: #cbd5e1; background: #252526; font-size: 12px; }
-.compile-function-jump select { width: 100%; min-width: 0; color: #334155; background: white; border-radius: 5px; padding: 3px 6px; }
-.compile-editor-panel:has(.compile-function-jump) { height: auto; }
+.compile-function-jump select { max-width: 150px; min-width: 112px; padding: 4px 20px 4px 7px; border: 1px solid #475569; border-radius: 5px; color: #cbd5e1; background: #30343b; font-size: 11px; }
 .compile-object-graph { overflow: visible; padding: 12px; background: white; }
 .compile-object-graph svg { display: block; width: 100%; max-width: 840px; margin: auto; }
 .compile-object-graph g[role=button] { cursor: pointer; }
@@ -419,7 +417,7 @@ button.compile-selected-instruction { box-shadow: inset 0 0 0 1px #0284c7; }
 .compile-memory-diagram { display: flex; flex-direction: column; }
 .compile-memory-legend { order: 0; }
 .compile-variable-board { order: 20; }
-.compile-array-board { order: 30; }
+.compile-array-board { order: 10; min-height: 190px; }
 .compile-pointer-board { order: 40; }
 .compile-memory-diagram.is-node-step .compile-pointer-board { order: 10; }
 .compile-memory-diagram > .compile-footnote { order: 50; }
