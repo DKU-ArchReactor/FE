@@ -21,6 +21,9 @@ import TranslationEditor from "./components/TranslationEditor";
 import TranslationMapping from "./components/TranslationMapping";
 import { compileTranslation } from "./components/translationCompile";
 
+const DEFAULT_TRANSLATION_SOURCE = "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
+const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
+
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -82,7 +85,7 @@ const MainPage: React.FC = () => {
   // ========================================================
   const [fileId, setFileId] = useState<string | null>(initialFileId);
   const [cFileName, setCFileName] = useState<string>("");
-  const [cContent, setCContent] = useState<string>("");
+  const [cContent, setCContent] = useState<string>(() => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || "");
   const [asmFileName, setAsmFileName] = useState<string>("");
   const [asmContent, setAsmContent] = useState<string>("");
   const [savedFiles, setSavedFiles] = useState<FileSummary[]>([]);
@@ -91,20 +94,46 @@ const MainPage: React.FC = () => {
   );
   const [externalLoadFileId, setExternalLoadFileId] = useState<string | null>(null);
   const [translationSource, setTranslationSource] = useState(
-    "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n"
+    () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE
   );
   const [translationAssembly, setTranslationAssembly] = useState("");
   const [translationError, setTranslationError] = useState("");
   const [translationBusy, setTranslationBusy] = useState(false);
   const isTranslationPage = location.pathname === "/c-to-asm";
 
+  const updateTranslationSource = (source: string, fileName = "main.c") => {
+    setTranslationSource(source);
+    setCContent(source);
+    setCFileName(fileName);
+    setFileId(null);
+    sessionStorage.setItem(TRANSLATION_SOURCE_KEY, source);
+    setAsmContent("");
+    setTranslationAssembly("");
+    setTranslationError("");
+  };
+
+  useEffect(() => {
+    if (!isTranslationPage) return;
+    if (cContent && cContent !== translationSource) {
+      setTranslationSource(cContent);
+      sessionStorage.setItem(TRANSLATION_SOURCE_KEY, cContent);
+      return;
+    }
+    setCContent(translationSource);
+    setCFileName((current) => current || "main.c");
+    setFileId(null);
+  }, [cContent, isTranslationPage, translationSource]);
+
   const handleTranslationCompile = async () => {
     if (!translationSource.trim() || translationBusy) return;
     setTranslationBusy(true);
     setTranslationError("");
-    setTranslationAssembly("");
+    setAsmContent("");
     try {
-      setTranslationAssembly(await compileTranslation(translationSource));
+      const assembly = await compileTranslation(translationSource);
+      setTranslationAssembly(assembly);
+      setAsmContent(assembly);
+      setAsmFileName("assembly.s");
     } catch (error) {
       setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
     } finally {
@@ -122,9 +151,7 @@ const MainPage: React.FC = () => {
       return;
     }
     try {
-      setTranslationSource((await file.text()).replace(/^\uFEFF/, ""));
-      setTranslationAssembly("");
-      setTranslationError("");
+      updateTranslationSource((await file.text()).replace(/^\uFEFF/, ""), file.name);
     } catch {
       setTranslationError("파일을 읽지 못했습니다.");
     }
@@ -398,7 +425,7 @@ const MainPage: React.FC = () => {
     switch (panelKey) {
       case "cSource":
         if (isTranslationPage) {
-          return <TranslationEditor source={translationSource} onChange={(value) => { setTranslationSource(value); setTranslationAssembly(""); }} onCompile={handleTranslationCompile} onFile={handleTranslationFile} onReset={() => { setTranslationSource("int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n"); setTranslationAssembly(""); setTranslationError(""); }} busy={translationBusy} error={translationError} />;
+          return <TranslationEditor source={translationSource} onChange={(value) => updateTranslationSource(value)} onCompile={handleTranslationCompile} onFile={handleTranslationFile} onReset={() => updateTranslationSource(DEFAULT_TRANSLATION_SOURCE)} busy={translationBusy} error={translationError} />;
         }
         return (
           <SourceArea
