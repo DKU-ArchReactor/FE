@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import SourceArea from "./components/Source";
+import type { SharedSourceState } from "./components/Source";
 import TutorArea from "./components/TutorArea";
 import AIAgentArea from "./components/AIAgentArea";
 import PipelineVisualizer from "./components/PipelineVisualizer";
@@ -8,13 +9,13 @@ import StateVisualizer from "./components/StateVisualizer";
 import RegisterVisualizer from "./components/RegisterVisualizer";
 import MemoryVisualizer from "./components/MemoryVisualizer";
 import ControlPanel from "./components/ControlPanel";
-import LayoutModal from "./components/LayoutModal";
 import FlyoutPanel from "./components/FlyoutPanel";
 
 import type { SimulationResult } from "@/type/simulation";
+import type { FileSummary } from "@/type/file";
 import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
-import { PANEL_METAS, ALL_PANEL_KEYS, getDefaultSections } from "./types";
+import { PANEL_METAS, getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 
 const MainPage: React.FC = () => {
@@ -25,13 +26,94 @@ const MainPage: React.FC = () => {
     (location.state as { fileId?: string } | null)?.fileId ||
     null;
 
+  // ========================================================
+  // 0. 현재 라우트에 따른 슬라이드 시작 섹션 인덱스 & 화면 비율 3단계 감지
+  // - 일반 비율 (< 21:9, 3개 섹션씩 노출):
+  //   · Translation (/c-to-asm) -> 0 (1, 2, 3 섹션 노출)
+  //   · Execution   (/)         -> 1 (2, 3, 4 섹션 노출)
+  //   · Management  (/coming-soon) -> 2 (3, 4, 5 섹션 노출)
+  // - 21:9 이상 화면 비율 (4개 섹션씩 노출):
+  //   · Translation & Execution (/c-to-asm, /) -> 0 (1, 2, 3, 4 섹션 노출)
+  //   · Execution & Management  (/coming-soon) -> 1 (2, 3, 4, 5 섹션 노출)
+  // - 32:9 이상 화면 비율 (5개 섹션 전체 노출):
+  //   · 항상 0 (1, 2, 3, 4, 5 섹션 한눈에 노출)
+  // ========================================================
+  const [aspectTier, setAspectTier] = useState<"normal" | "ultrawide" | "superwide">(() => {
+    if (typeof window === "undefined") return "normal";
+    const ratio = window.innerWidth / Math.max(1, window.innerHeight);
+    if (ratio >= 32 / 9) return "superwide";
+    if (ratio >= 21 / 9) return "ultrawide";
+    return "normal";
+  });
+
+  useEffect(() => {
+    const checkAspectRatio = () => {
+      const ratio = window.innerWidth / Math.max(1, window.innerHeight);
+      if (ratio >= 32 / 9) setAspectTier("superwide");
+      else if (ratio >= 21 / 9) setAspectTier("ultrawide");
+      else setAspectTier("normal");
+    };
+    checkAspectRatio();
+    window.addEventListener("resize", checkAspectRatio);
+    return () => window.removeEventListener("resize", checkAspectRatio);
+  }, []);
+
+  const visibleCount =
+    aspectTier === "superwide" ? 5 : aspectTier === "ultrawide" ? 4 : 3;
+
+  const slideStartIndex = useMemo(() => {
+    if (aspectTier === "superwide") return 0;
+    if (aspectTier === "ultrawide") {
+      return location.pathname === "/coming-soon" ? 1 : 0;
+    }
+    if (location.pathname === "/c-to-asm") return 0;
+    if (location.pathname === "/coming-soon") return 2;
+    return 1;
+  }, [location.pathname, aspectTier]);
+
+  // 1섹션(C 코드 + File List)이 화면에 함께 보이는 상태인지 여부 (시작 인덱스가 0일 때)
+  const isSection1Visible = slideStartIndex === 0;
+
+  // ========================================================
+  // 1. 1섹션(C 전용) & 2섹션(ASM / C·ASM 전환) 간 공유 소스 상태
+  // ========================================================
+  const [fileId, setFileId] = useState<string | null>(initialFileId);
+  const [cFileName, setCFileName] = useState<string>("");
+  const [cContent, setCContent] = useState<string>("");
+  const [asmFileName, setAsmFileName] = useState<string>("");
+  const [asmContent, setAsmContent] = useState<string>("");
+  const [savedFiles, setSavedFiles] = useState<FileSummary[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(
+    () => !!localStorage.getItem("access_token")
+  );
+  const [externalLoadFileId, setExternalLoadFileId] = useState<string | null>(null);
+
+  const sharedSourceState: SharedSourceState = {
+    fileId,
+    setFileId,
+    cFileName,
+    setCFileName,
+    cContent,
+    setCContent,
+    asmFileName,
+    setAsmFileName,
+    asmContent,
+    setAsmContent,
+    savedFiles,
+    setSavedFiles,
+    isLoggedIn,
+    setIsLoggedIn,
+    externalLoadFileId,
+    onExternalLoadHandled: () => setExternalLoadFileId(null),
+  };
+
+  // ========================================================
+  // 2. 시뮬레이션 제어 상태 관리
+  // ========================================================
   const [simulationData, setSimulationData] = useState<SimulationResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const totalCycles = simulationData?.history?.length ?? 0;
 
-  // ========================================================
-  // 1. 시뮬레이션 제어 상태 관리
-  // ========================================================
   const [currentCycle, setCurrentCycle] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(800);
@@ -110,12 +192,9 @@ const MainPage: React.FC = () => {
   };
 
   // ========================================================
-  // 2. 동적 레이아웃 상태 및 리사이징 훅 연동
+  // 3. 5섹션 슬라이드 레이아웃 상태 및 리사이징 훅 연동
   // ========================================================
   const [sections, setSections] = useState<SectionConfig[]>(getDefaultSections);
-  const resetToDefaultLayout = () => {
-    setSections(getDefaultSections());
-  };
 
   const {
     containerRef,
@@ -127,61 +206,162 @@ const MainPage: React.FC = () => {
     handlePairResizeStart,
   } = useResizableLayout(sections, setSections);
 
-  // 레이아웃 모달 & 우측 책갈피 말풍선 상태
-  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState<boolean>(false);
-  const layoutModalRef = useRef<HTMLDivElement>(null);
+  // 슬라이드 뷰 전환 또는 21:9(4섹션) / 일반(3섹션) 전환 시 현재 보이는 섹션들의 너비 합이 100%가 되도록 자동 보정
+  useEffect(() => {
+    setSections((prev) => {
+      const visibleSlice = prev.slice(slideStartIndex, slideStartIndex + visibleCount);
+      const visibleSum = visibleSlice.reduce((acc, s) => acc + s.widthPercent, 0);
+      if (Math.abs(visibleSum - 100) < 0.2 || visibleSum <= 0) return prev;
 
+      const scale = 100 / visibleSum;
+      return prev.map((sec) => ({
+        ...sec,
+        widthPercent: Math.round(sec.widthPercent * scale * 100) / 100,
+      }));
+    });
+  }, [slideStartIndex, visibleCount]);
+
+  // 현재 시작 인덱스 이전 섹션들의 너비 합만큼 왼쪽으로 슬라이드 이동 (%)
+  const slideOffsetPercent = useMemo(() => {
+    return sections
+      .slice(0, slideStartIndex)
+      .reduce((acc, s) => acc + s.widthPercent, 0);
+  }, [sections, slideStartIndex]);
+
+  // 우측 책갈피 말풍선 상태 (AI 에이전트 전용)
   const [activeFlyout, setActiveFlyout] = useState<PanelKey | null>(null);
   const flyoutRef = useRef<HTMLDivElement>(null);
 
-  // 외부 클릭 시 말풍선 및 레이아웃 모달 닫기
+  // 외부 클릭 시 말풍선 닫기
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (layoutModalRef.current && !layoutModalRef.current.contains(e.target as Node)) {
-        setIsLayoutModalOpen(false);
-      }
       if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
         const target = e.target as HTMLElement;
-        if (!target.closest('[data-bookmark-tab]')) {
+        if (!target.closest("[data-bookmark-tab]")) {
           setActiveFlyout(null);
         }
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
-  // 화면에 배치된 패널 및 미배치(우측 책갈피) 패널 계산
-  const placedPanelsSet = new Set<PanelKey>();
-  sections.forEach((sec) => {
-    sec.slots.forEach((slot) => {
-      if (slot.type === 'single') {
-        placedPanelsSet.add(slot.panel);
-      } else if (slot.type === 'pair') {
-        placedPanelsSet.add(slot.left);
-        placedPanelsSet.add(slot.right);
-      }
-    });
-  });
-
-  const unplacedPanels: PanelKey[] = ALL_PANEL_KEYS.filter((key) => !placedPanelsSet.has(key));
-
   const currentData = simulationData?.history?.[currentCycle] ?? null;
-  const prevData = currentCycle > 0 ? simulationData?.history?.[currentCycle - 1] ?? null : null;
+  const prevData =
+    currentCycle > 0 ? simulationData?.history?.[currentCycle - 1] ?? null : null;
 
   // ========================================================
-  // 3. 컴포넌트 공통 렌더러 (슬롯 및 말풍선에서 공용 렌더링)
+  // 4. 사각형 텍스트 플레이스홀더 카드 및 1섹션 하단 File List 패널
+  // ========================================================
+  const renderPlaceholderBox = (title: string) => (
+    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center p-4 min-h-0 overflow-hidden select-none">
+      <span className="text-base font-bold text-slate-700 tracking-wide">
+        {title}
+      </span>
+    </div>
+  );
+
+  const renderFileListPanel = () => (
+    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-0 overflow-hidden">
+      <div className="px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">📁</span>
+          <h3 className="text-xs font-bold text-slate-800">File List</h3>
+        </div>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-mono">
+          {isLoggedIn ? `${savedFiles.length}개` : "비로그인"}
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 min-h-0">
+        {!isLoggedIn ? (
+          <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
+            <span className="text-xs font-semibold text-slate-500">
+              로그인이 필요합니다
+            </span>
+            <span className="text-[11px]">
+              로그인하면 저장한 C/ASM 파일 목록을 여기서 바로 불러올 수 있습니다.
+            </span>
+          </div>
+        ) : savedFiles.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
+            <span className="text-xs font-semibold text-slate-500">
+              저장된 파일이 없습니다
+            </span>
+            <span className="text-[11px]">
+              상단 C 코드 영역의 ☰ 메뉴에서 파일을 저장해 보세요.
+            </span>
+          </div>
+        ) : (
+          savedFiles.map((f) => {
+            const isSelected = fileId === f.file_id;
+            const dateStr = f.updated_at
+              ? new Date(f.updated_at).toLocaleDateString("ko-KR", {
+                  month: "2-digit",
+                  day: "2-digit",
+                })
+              : "";
+
+            return (
+              <button
+                key={f.file_id}
+                type="button"
+                onClick={() => setExternalLoadFileId(f.file_id)}
+                className={`w-full px-3 py-2 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                  isSelected
+                    ? "bg-blue-50/90 border-blue-400 text-blue-900 shadow-2xs"
+                    : "bg-slate-50/50 hover:bg-slate-100/80 border-slate-200/70 text-slate-700"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                      f.lang === "asm"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-sky-100 text-sky-700"
+                    }`}
+                  >
+                    {f.lang || "c"}
+                  </span>
+                  <span className="text-xs font-semibold truncate">
+                    {f.title}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {dateStr && (
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {dateStr}
+                    </span>
+                  )}
+                  {isSelected && (
+                    <span className="text-[10px] font-bold text-blue-600">
+                      선택됨
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  // ========================================================
+  // 5. 컴포넌트 공통 렌더러 (슬롯 및 말풍선에서 공용 렌더링)
   // ========================================================
   const renderPanelComponent = (panelKey: PanelKey) => {
     switch (panelKey) {
-      case 'pipeline':
-        return <PipelineVisualizer currentData={currentData} loadingMessage={loadingMessage} />;
-      case 'source':
+      case "cSource":
         return (
-          <SourceArea 
+          <SourceArea
+            mode="c-only"
+            showFileSelector={false}
+            sharedState={sharedSourceState}
             fileId={initialFileId}
+            loadingMessage={loadingMessage}
             onStartSimulation={handleStartSimulation}
             onSimulationComplete={handleSimulationComplete}
             onLoadingChange={setLoadingMessage}
@@ -190,9 +370,27 @@ const MainPage: React.FC = () => {
             onSelectLine={setSelectedCodeLine}
           />
         );
-      case 'tutor':
+      case "fileList":
+        return renderFileListPanel();
+      case "source":
         return (
-          <TutorArea 
+          <SourceArea
+            mode={isSection1Visible ? "asm-only" : "both"}
+            showFileSelector={!isSection1Visible}
+            sharedState={sharedSourceState}
+            fileId={initialFileId}
+            loadingMessage={loadingMessage}
+            onStartSimulation={handleStartSimulation}
+            onSimulationComplete={handleSimulationComplete}
+            onLoadingChange={setLoadingMessage}
+            stageBuffers={currentData?.buffers}
+            selectedLine={selectedCodeLine}
+            onSelectLine={setSelectedCodeLine}
+          />
+        );
+      case "tutor":
+        return (
+          <TutorArea
             simulationData={simulationData}
             currentCycleData={currentData}
             loadingMessage={loadingMessage}
@@ -200,56 +398,55 @@ const MainPage: React.FC = () => {
             onClearSelectedCodeLine={() => setSelectedCodeLine(null)}
           />
         );
-      case 'state':
+      case "pipeline":
+        return (
+          <PipelineVisualizer
+            currentData={currentData}
+            loadingMessage={loadingMessage}
+          />
+        );
+      case "state":
         return (
           <StateVisualizer
             currentData={currentData}
             prevData={prevData}
             simulationData={simulationData}
+            defaultLayout="vertical"
           />
         );
-      case 'registers':
+      case "registers":
         return (
-          <RegisterVisualizer 
+          <RegisterVisualizer
             registers={currentData?.global_result.registers || {}}
             prevRegisters={prevData?.global_result.registers}
           />
         );
-      case 'memory':
+      case "memory":
         return (
-          <MemoryVisualizer 
+          <MemoryVisualizer
             memorySnapshot={currentData?.global_result.memory_snapshot || {}}
             prevMemorySnapshot={prevData?.global_result.memory_snapshot}
           />
         );
-      case 'aiPanel':
+      case "queues":
+        return renderPlaceholderBox("Queues");
+      case "ioDevice":
+        return renderPlaceholderBox("IO Device");
+      case "aiPanel":
         return <AIAgentArea />;
       default:
         return null;
     }
   };
 
-  const handlePinToLayout = (panel: PanelKey) => {
-    setSections((prev) =>
-      prev.map((sec, idx) => {
-        if (idx !== 0 || sec.slots.length >= 3) return sec;
-        return {
-          ...sec,
-          slots: [...sec.slots, { type: 'single', panel, flexRatio: 1 }],
-        };
-      })
-    );
-    setActiveFlyout(null);
-  };
-
   return (
     <main className="flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative">
       {/* ============================================================ */}
-      {/* [최상단 제어 바]: 재생 컨트롤러 + 우측 [⊞ 레이아웃] 조절 버튼 */}
+      {/* [최상단 제어 바]: 재생 컨트롤러                               */}
       {/* ============================================================ */}
       <div className="h-[48px] shrink-0 flex items-center gap-2 mb-2 min-h-0 w-full">
         <div className="flex-1 h-full min-w-0">
-          <ControlPanel 
+          <ControlPanel
             currentCycle={currentCycle}
             totalCycles={totalCycles}
             isPlaying={isPlaying}
@@ -262,182 +459,206 @@ const MainPage: React.FC = () => {
             onChangeSpeed={handleChangeSpeed}
           />
         </div>
-
-        {/* 레이아웃 커스터마이징 트리거 버튼 */}
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsLayoutModalOpen((prev) => !prev)}
-            title="화면 구역 분할 및 컴포넌트 자유 배치"
-            className={`h-[48px] px-3.5 bg-white border rounded-2xl shadow-xs flex items-center gap-2 text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              isLayoutModalOpen 
-                ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50 shadow-sm' 
-                : 'border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300'
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-            <span>레이아웃 배치</span>
-          </button>
-        </div>
       </div>
 
       {/* ============================================================ */}
-      {/* [동적 구역 스플릿 컨테이너]: 1~4구역 렌더링 + 가로 리사이저 */}
+      {/* [동적 5섹션 가로 슬라이드 컨테이너]: 3섹션씩 노출 + 리사이저 */}
       {/* ============================================================ */}
-      <div 
-        ref={containerRef}
-        className={`flex-1 flex w-full min-h-0 overflow-hidden ${resizingSplitterIndex !== null ? 'select-none' : ''}`}
-      >
-        {sections.map((section, secIdx) => (
-          <div key={section.id} className="flex h-full min-h-0 overflow-hidden" style={{ width: `${section.widthPercent}%` }}>
-            {/* 구역 내부 세로 슬롯 렌더링 (최대 3개 층) */}
-            <div className="flex-1 flex flex-col gap-1.5 min-w-0 h-full overflow-hidden">
-              {section.slots.map((slot, slotIdx) => {
-                const defaultRatio = (section.slots.length === 2 && slot.type === 'single' && slot.panel === 'pipeline') ? 1.9 : 1;
-                const flexVal = slot.flexRatio ?? defaultRatio;
+      <div className="flex-1 flex w-full min-h-0 overflow-hidden">
+        {/* 슬라이드 뷰포트 영역 */}
+        <div
+          ref={containerRef}
+          className={`flex-1 h-full min-w-0 overflow-hidden relative ${
+            resizingSplitterIndex !== null ? "select-none" : ""
+          }`}
+        >
+          {/* 5개 섹션을 가로로 나열하는 슬라이딩 트랙 */}
+          <div
+            className={`flex h-full w-full ${
+              resizingSplitterIndex !== null
+                ? ""
+                : "transition-transform duration-500 ease-in-out"
+            }`}
+            style={{
+              transform: `translate3d(-${slideOffsetPercent}%, 0, 0)`,
+            }}
+          >
+            {sections.map((section, secIdx) => {
+              const isLastVisibleInWindow =
+                secIdx === slideStartIndex + visibleCount - 1;
+              const showColSplitter =
+                secIdx < sections.length - 1 && !isLastVisibleInWindow;
 
-                return (
-                  <React.Fragment key={slotIdx}>
-                    <div 
-                      className="min-h-0 overflow-hidden flex"
-                      style={{ flex: `${flexVal} 1 0%` }}
-                    >
-                      {slot.type === 'single' ? (
-                        /* 1) 단일 컴포넌트 렌더링 */
-                        <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
-                          {renderPanelComponent(slot.panel)}
-                        </div>
-                      ) : (
-                        /* 2) 가로 2개 묶음 렌더링 + 내부 좌우 가로 스플리터 바 */
-                        <div className="w-full h-full flex min-h-0 overflow-hidden relative">
-                          <div 
-                            className="flex flex-col min-h-0 overflow-hidden"
-                            style={{ width: `${slot.pairRatio ?? 50}%` }}
-                          >
-                            {renderPanelComponent(slot.left)}
-                          </div>
-
-                          {/* 2개 묶음 내부 좌우 분할 조절 스플리터 바 */}
-                          <div
-                            onMouseDown={(e) => handlePairResizeStart(secIdx, slotIdx, slot.pairRatio ?? 50, e)}
-                            title="좌우로 드래그하여 가로 분할 비율 조절"
-                            className="w-2.5 -mx-1 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
-                          >
-                            <div className={`w-[3px] rounded-full transition-all duration-200 ${
-                              resizingPair?.secIdx === secIdx && resizingPair?.slotIdx === slotIdx
-                                ? 'h-16 bg-indigo-600 shadow-sm'
-                                : 'h-8 bg-slate-300 group-hover:h-14 group-hover:bg-indigo-500'
-                            }`} />
-                          </div>
-
-                          <div 
-                            className="flex flex-col min-h-0 overflow-hidden"
-                            style={{ width: `${100 - (slot.pairRatio ?? 50)}%` }}
-                          >
-                            {renderPanelComponent(slot.right)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
-                    {slotIdx < section.slots.length - 1 && (
-                      <div
-                        onMouseDown={(e) => {
-                          const topSlot = section.slots[slotIdx];
-                          const btmSlot = section.slots[slotIdx + 1];
-                          const topDefault = topSlot.type === 'single' && topSlot.panel === 'pipeline' ? 1.9 : 1;
-                          const btmDefault = btmSlot.type === 'single' && btmSlot.panel === 'pipeline' ? 1.9 : 1;
-                          const topRatio = topSlot.flexRatio ?? topDefault;
-                          const btmRatio = btmSlot.flexRatio ?? btmDefault;
-                          handleSlotResizeStart(secIdx, slotIdx, topRatio, btmRatio, e);
-                        }}
-                        title="위아래로 드래그하여 슬롯 높이 비율 조절"
-                        className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
-                      >
-                        <div className={`h-[3px] rounded-full transition-all duration-200 ${
-                          resizingRowSlot?.secIdx === secIdx && resizingRowSlot?.slotIdx === slotIdx
-                            ? 'w-24 bg-indigo-600 shadow-sm'
-                            : 'w-10 bg-slate-300 group-hover:w-20 group-hover:bg-indigo-500'
-                        }`} />
-                      </div>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-
-            {/* 구역 간 가로 조절 스플리터 바 */}
-            {secIdx < sections.length - 1 && (
-              <div
-                onMouseDown={() => handleColResizeStart(secIdx)}
-                title="드래그하여 구역 간 너비 조절"
-                className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-blue-50/50 rounded-sm transition-colors"
-              >
-                <div className={`w-[3px] rounded-full transition-all duration-200 ${
-                  resizingSplitterIndex === secIdx 
-                    ? 'h-24 bg-blue-600 shadow-sm' 
-                    : 'h-10 bg-slate-300 group-hover:h-20 group-hover:bg-blue-500'
-                }`} />
-              </div>
-            )}
-          </div>
-        ))}
-
-        {/* ============================================================ */}
-        {/* [우측 벽면 책갈피 인덱스 탭]: 화면에 배치되지 않은 컴포넌트들 */}
-        {/* ============================================================ */}
-        {unplacedPanels.length > 0 && (
-          <aside className="flex flex-col gap-2 shrink-0 ml-1.5 pt-1 z-30">
-            {unplacedPanels.map((pKey) => {
-              const meta = PANEL_METAS[pKey];
-              const isActive = activeFlyout === pKey;
               return (
-                <button
-                  key={pKey}
-                  type="button"
-                  data-bookmark-tab="true"
-                  onClick={() => setActiveFlyout((prev) => (prev === pKey ? null : pKey))}
-                  title={`${meta.fullName} (말풍선으로 열기)`}
-                  className={`w-8 py-3 rounded-l-xl border shadow-xs flex flex-col items-center gap-1.5 transition-all duration-200 group cursor-pointer ${
-                    isActive 
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md translate-x-[-2px]' 
-                      : 'bg-white hover:bg-indigo-50/80 text-slate-500 hover:text-indigo-600 border-slate-200 hover:border-indigo-300'
-                  }`}
+                <div
+                  key={section.id}
+                  className="flex h-full min-h-0 shrink-0 overflow-hidden pr-1"
+                  style={{ width: `${section.widthPercent}%` }}
                 >
-                  <span className="text-xs">{meta.icon}</span>
-                  <span className="text-[10px] font-bold tracking-widest [writing-mode:vertical-rl] select-none py-0.5">
-                    {meta.label}
-                  </span>
-                </button>
+                  {/* 구역 내부 세로 슬롯 렌더링 */}
+                  <div className="flex-1 flex flex-col gap-1.5 min-w-0 h-full overflow-hidden">
+                    {section.slots.map((slot, slotIdx) => {
+                      const defaultRatio =
+                        section.slots.length === 2 &&
+                        slot.type === "single" &&
+                        slot.panel === "pipeline"
+                          ? 1.9
+                          : 1;
+                      const flexVal = slot.flexRatio ?? defaultRatio;
+
+                      return (
+                        <React.Fragment key={slotIdx}>
+                          <div
+                            className="min-h-0 overflow-hidden flex"
+                            style={{ flex: `${flexVal} 1 0%` }}
+                          >
+                            {slot.type === "single" ? (
+                              /* 1) 단일 컴포넌트 렌더링 */
+                              <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
+                                {renderPanelComponent(slot.panel)}
+                              </div>
+                            ) : (
+                              /* 2) 가로 2개 묶음 렌더링 + 내부 좌우 가로 스플리터 바 */
+                              <div className="w-full h-full flex min-h-0 overflow-hidden relative">
+                                <div
+                                  className="flex flex-col min-h-0 overflow-hidden"
+                                  style={{ width: `${slot.pairRatio ?? 50}%` }}
+                                >
+                                  {renderPanelComponent(slot.left)}
+                                </div>
+
+                                {/* 2개 묶음 내부 좌우 분할 조절 스플리터 바 */}
+                                <div
+                                  onMouseDown={(e) =>
+                                    handlePairResizeStart(
+                                      secIdx,
+                                      slotIdx,
+                                      slot.pairRatio ?? 50,
+                                      e
+                                    )
+                                  }
+                                  title="좌우로 드래그하여 가로 분할 비율 조절"
+                                  className="w-2.5 -mx-1 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
+                                >
+                                  <div
+                                    className={`w-[3px] rounded-full transition-all duration-200 ${
+                                      resizingPair?.secIdx === secIdx &&
+                                      resizingPair?.slotIdx === slotIdx
+                                        ? "h-16 bg-indigo-600 shadow-sm"
+                                        : "h-8 bg-slate-300 group-hover:h-14 group-hover:bg-indigo-500"
+                                    }`}
+                                  />
+                                </div>
+
+                                <div
+                                  className="flex flex-col min-h-0 overflow-hidden"
+                                  style={{
+                                    width: `${100 - (slot.pairRatio ?? 50)}%`,
+                                  }}
+                                >
+                                  {renderPanelComponent(slot.right)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
+                          {slotIdx < section.slots.length - 1 && (
+                            <div
+                              onMouseDown={(e) => {
+                                const topSlot = section.slots[slotIdx];
+                                const btmSlot = section.slots[slotIdx + 1];
+                                const topDefault =
+                                  topSlot.type === "single" &&
+                                  topSlot.panel === "pipeline"
+                                    ? 1.9
+                                    : 1;
+                                const btmDefault =
+                                  btmSlot.type === "single" &&
+                                  btmSlot.panel === "pipeline"
+                                    ? 1.9
+                                    : 1;
+                                const topRatio = topSlot.flexRatio ?? topDefault;
+                                const btmRatio = btmSlot.flexRatio ?? btmDefault;
+                                handleSlotResizeStart(
+                                  secIdx,
+                                  slotIdx,
+                                  topRatio,
+                                  btmRatio,
+                                  e
+                                );
+                              }}
+                              title="위아래로 드래그하여 슬롯 높이 비율 조절"
+                              className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
+                            >
+                              <div
+                                className={`h-[3px] rounded-full transition-all duration-200 ${
+                                  resizingRowSlot?.secIdx === secIdx &&
+                                  resizingRowSlot?.slotIdx === slotIdx
+                                    ? "w-24 bg-indigo-600 shadow-sm"
+                                    : "w-10 bg-slate-300 group-hover:w-20 group-hover:bg-indigo-500"
+                                }`}
+                              />
+                            </div>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  {/* 구역 간 가로 조절 스플리터 바 */}
+                  {showColSplitter && (
+                    <div
+                      onMouseDown={(e) => handleColResizeStart(secIdx, e)}
+                      title="드래그하여 구역 간 너비 조절"
+                      className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-blue-50/50 rounded-sm transition-colors"
+                    >
+                      <div
+                        className={`w-[3px] rounded-full transition-all duration-200 ${
+                          resizingSplitterIndex === secIdx
+                            ? "h-24 bg-blue-600 shadow-sm"
+                            : "h-10 bg-slate-300 group-hover:h-20 group-hover:bg-blue-500"
+                        }`}
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
-          </aside>
-        )}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* [우측 벽면 책갈피 인덱스 탭]: AI 에이전트 전용 플로팅 버튼    */}
+        {/* ============================================================ */}
+        <aside className="flex flex-col gap-2 shrink-0 ml-1.5 pt-1 z-30">
+          <button
+            type="button"
+            data-bookmark-tab="true"
+            onClick={() =>
+              setActiveFlyout((prev) => (prev === "aiPanel" ? null : "aiPanel"))
+            }
+            title={`${PANEL_METAS.aiPanel.fullName} (말풍선으로 열기)`}
+            className={`w-8 py-3 rounded-l-xl border shadow-xs flex flex-col items-center gap-1.5 transition-all duration-200 group cursor-pointer ${
+              activeFlyout === "aiPanel"
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-md translate-x-[-2px]"
+                : "bg-white hover:bg-indigo-50/80 text-slate-500 hover:text-indigo-600 border-slate-200 hover:border-indigo-300"
+            }`}
+          >
+            <span className="text-xs">{PANEL_METAS.aiPanel.icon}</span>
+            <span className="text-[10px] font-bold tracking-widest [writing-mode:vertical-rl] select-none py-0.5">
+              {PANEL_METAS.aiPanel.label}
+            </span>
+          </button>
+        </aside>
       </div>
 
       {/* ============================================================ */}
-      {/* [레이아웃 모달]: 구역 및 슬롯 실시간 에디터 */}
+      {/* [말풍선 / 플로팅 플라이아웃 창]: AI 에이전트 호출             */}
       {/* ============================================================ */}
-      <LayoutModal 
-        isOpen={isLayoutModalOpen}
-        onClose={() => setIsLayoutModalOpen(false)}
-        modalRef={layoutModalRef}
-        sections={sections}
-        setSections={setSections}
-        onResetToDefault={resetToDefaultLayout}
-      />
-
-      {/* ============================================================ */}
-      {/* [말풍선 / 플로팅 플라이아웃 창]: 미배치 컴포넌트 호출 */}
-      {/* ============================================================ */}
-      <FlyoutPanel 
+      <FlyoutPanel
         activeFlyout={activeFlyout}
         flyoutRef={flyoutRef}
-        isPlacedInLayout={activeFlyout ? placedPanelsSet.has(activeFlyout) : false}
-        onPinToLayout={handlePinToLayout}
         onClose={() => setActiveFlyout(null)}
       >
         {activeFlyout && renderPanelComponent(activeFlyout)}

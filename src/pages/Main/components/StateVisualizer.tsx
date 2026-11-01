@@ -5,6 +5,7 @@ interface StateVisualizerProps {
   currentData: CycleHistoryItem | null;
   prevData: CycleHistoryItem | null;
   simulationData: SimulationResult | null;
+  defaultLayout?: 'auto' | 'horizontal' | 'vertical';
 }
 
 interface RegisterMeta {
@@ -177,10 +178,11 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
   currentData,
   prevData,
   simulationData,
+  defaultLayout = 'auto',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoHorizontal, setAutoHorizontal] = useState<boolean>(true);
-  const [manualLayout, setManualLayout] = useState<'auto' | 'horizontal' | 'vertical'>('auto');
+  const [manualLayout, setManualLayout] = useState<'auto' | 'horizontal' | 'vertical'>(defaultLayout);
   const [onlyNonZero, setOnlyNonZero] = useState<boolean>(false);
   const [hoveredSegment, setHoveredSegment] = useState<MemorySegmentKey | null>(null);
   const [pinnedSegment, setPinnedSegment] = useState<MemorySegmentKey | null>(null);

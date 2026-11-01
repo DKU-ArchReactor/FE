@@ -7,6 +7,25 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<UserMeResponse | null>(null);
+  const [aspectTier, setAspectTier] = useState<"normal" | "ultrawide" | "superwide">(() => {
+    if (typeof window === "undefined") return "normal";
+    const ratio = window.innerWidth / Math.max(1, window.innerHeight);
+    if (ratio >= 32 / 9) return "superwide";
+    if (ratio >= 21 / 9) return "ultrawide";
+    return "normal";
+  });
+
+  useEffect(() => {
+    const checkAspectRatio = () => {
+      const ratio = window.innerWidth / Math.max(1, window.innerHeight);
+      if (ratio >= 32 / 9) setAspectTier("superwide");
+      else if (ratio >= 21 / 9) setAspectTier("ultrawide");
+      else setAspectTier("normal");
+    };
+    checkAspectRatio();
+    window.addEventListener("resize", checkAspectRatio);
+    return () => window.removeEventListener("resize", checkAspectRatio);
+  }, []);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -33,11 +52,39 @@ const Header = () => {
     navigate("/login");
   };
 
-  const navItems = [
-    { label: "C → 어셈블리 변환", path: "/c-to-asm" },
-    { label: "파이프라인 시각화", path: "/" },
-    { label: "구현 예정", path: "/coming-soon" },
-  ];
+  const navItems =
+    aspectTier === "superwide"
+      ? []
+      : aspectTier === "ultrawide"
+      ? [
+          {
+            label: "Translation & Execution",
+            path: "/c-to-asm",
+            active: location.pathname === "/c-to-asm" || location.pathname === "/",
+          },
+          {
+            label: "Execution & Management",
+            path: "/coming-soon",
+            active: location.pathname === "/coming-soon",
+          },
+        ]
+      : [
+          {
+            label: "Translation",
+            path: "/c-to-asm",
+            active: isActive("/c-to-asm"),
+          },
+          {
+            label: "Execution",
+            path: "/",
+            active: isActive("/"),
+          },
+          {
+            label: "Management",
+            path: "/coming-soon",
+            active: isActive("/coming-soon"),
+          },
+        ];
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-sky-100 shadow-sm">
@@ -55,7 +102,7 @@ const Header = () => {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                  isActive(item.path)
+                  item.active
                     ? "bg-sky-50 text-sky-600 font-semibold"
                     : "text-slate-600 hover:text-sky-600 hover:bg-slate-50"
                 }`}

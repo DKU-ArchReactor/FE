@@ -10,8 +10,31 @@ import type { StageBuffer, SimulationResult } from '@/type/simulation';
 import type { FileSummary } from '@/type/file';
 import type { CodeLineSelectInfo } from './SourceViewer';
 
+export interface SharedSourceState {
+  fileId: string | null;
+  setFileId: React.Dispatch<React.SetStateAction<string | null>>;
+  cFileName: string;
+  setCFileName: React.Dispatch<React.SetStateAction<string>>;
+  cContent: string;
+  setCContent: React.Dispatch<React.SetStateAction<string>>;
+  asmFileName: string;
+  setAsmFileName: React.Dispatch<React.SetStateAction<string>>;
+  asmContent: string;
+  setAsmContent: React.Dispatch<React.SetStateAction<string>>;
+  savedFiles: FileSummary[];
+  setSavedFiles: React.Dispatch<React.SetStateAction<FileSummary[]>>;
+  isLoggedIn: boolean;
+  setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>;
+  externalLoadFileId?: string | null;
+  onExternalLoadHandled?: () => void;
+}
+
 interface SourceAreaProps {
+  mode?: 'both' | 'c-only' | 'asm-only';
+  showFileSelector?: boolean;
+  sharedState?: SharedSourceState;
   fileId?: string | null;
+  loadingMessage?: string | null;
   onStartSimulation?: () => void;
   onSimulationComplete?: (data: SimulationResult) => void;
   onLoadingChange?: (loadingMessage: string | null) => void;
@@ -27,26 +50,55 @@ interface SourceAreaProps {
 }
 
 const SourceArea: React.FC<SourceAreaProps> = ({ 
+  mode = 'both',
+  showFileSelector,
+  sharedState,
   fileId: externalFileId = null,
+  loadingMessage: externalLoadingMessage = null,
   onSimulationComplete,
   onLoadingChange,
   stageBuffers,
   selectedLine,
   onSelectLine,
 }) => {
-  const [activeTab, setActiveTab] = useState<'c' | 'asm'>('c');
-  const [fileId, setFileId] = useState<string | null>(externalFileId);
-  const [cFileName, setCFileName] = useState<string>('');
-  const [cContent, setCContent] = useState<string>('');
-  const [asmFileName, setAsmFileName] = useState<string>('');
-  const [asmContent, setAsmContent] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'c' | 'asm'>(mode === 'asm-only' ? 'asm' : 'c');
+
+  // 로컬 폴백 상태 (sharedState가 없을 때만 사용)
+  const [localFileId, setLocalFileId] = useState<string | null>(externalFileId);
+  const [localCFileName, setLocalCFileName] = useState<string>('');
+  const [localCContent, setLocalCContent] = useState<string>('');
+  const [localAsmFileName, setLocalAsmFileName] = useState<string>('');
+  const [localAsmContent, setLocalAsmContent] = useState<string>('');
+  const [localIsLoggedIn, setLocalIsLoggedIn] = useState<boolean>(() => !!localStorage.getItem('access_token'));
+  const [localSavedFiles, setLocalSavedFiles] = useState<FileSummary[]>([]);
+
+  const fileId = sharedState ? sharedState.fileId : localFileId;
+  const setFileId = sharedState ? sharedState.setFileId : setLocalFileId;
+  const cFileName = sharedState ? sharedState.cFileName : localCFileName;
+  const setCFileName = sharedState ? sharedState.setCFileName : setLocalCFileName;
+  const cContent = sharedState ? sharedState.cContent : localCContent;
+  const setCContent = sharedState ? sharedState.setCContent : setLocalCContent;
+  const asmFileName = sharedState ? sharedState.asmFileName : localAsmFileName;
+  const setAsmFileName = sharedState ? sharedState.setAsmFileName : setLocalAsmFileName;
+  const asmContent = sharedState ? sharedState.asmContent : localAsmContent;
+  const setAsmContent = sharedState ? sharedState.setAsmContent : setLocalAsmContent;
+  const isLoggedIn = sharedState ? sharedState.isLoggedIn : localIsLoggedIn;
+  const setIsLoggedIn = sharedState ? sharedState.setIsLoggedIn : setLocalIsLoggedIn;
+  const savedFiles = sharedState ? sharedState.savedFiles : localSavedFiles;
+  const setSavedFiles = sharedState ? sharedState.setSavedFiles : setLocalSavedFiles;
+
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const loadedFileIdRef = useRef<string | null>(null);
 
-  // 로그인 상태 및 저장된 파일 목록
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => !!localStorage.getItem('access_token'));
-  const [savedFiles, setSavedFiles] = useState<FileSummary[]>([]);
+  // mode 변화에 따라 activeTab 동기화
+  useEffect(() => {
+    if (mode === 'c-only') {
+      setActiveTab('c');
+    } else if (mode === 'asm-only') {
+      setActiveTab('asm');
+    }
+  }, [mode]);
 
   // 파일 저장 모달 상태
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
@@ -92,7 +144,6 @@ const SourceArea: React.FC<SourceAreaProps> = ({
     updateLoading('1/2 C 코드를 어셈블리로 컴파일하는 중...');
 
     try {
-      // file_id가 있는 경우와 없는 경우(직접 입력 모드)로 분기하여 컴파일 요청
       const compilePayload = targetFileId
         ? {
             file_id: targetFileId,
@@ -124,13 +175,13 @@ const SourceArea: React.FC<SourceAreaProps> = ({
 
           setAsmContent(asmText);
           setAsmFileName(targetFileName ? targetFileName.replace(/\.c$/i, '.s') : 'assembly.s');
-          setActiveTab('asm');
+          if (mode !== 'c-only') {
+            setActiveTab('asm');
+          }
         } catch (asmErr) {
           console.error("Assembly Fetch Error:", asmErr);
         }
 
-        // file_id 기반으로 컴파일하여 build_id가 있는 경우 build_id 사용,
-        // file_id 없이 직접 입력으로 컴파일하여 simulation_token이 있는 경우 simulation_token 사용
         if (result.build_id) {
           updateLoading('2/2 파이프라인 시뮬레이션 실행 중...');
           const simResult = await runSimulation({
@@ -178,7 +229,9 @@ const SourceArea: React.FC<SourceAreaProps> = ({
       const detail = await getFileById(targetId);
       setCFileName(detail.title);
       setCContent(detail.content);
-      setActiveTab(detail.lang === 'asm' ? 'asm' : 'c');
+      if (mode === 'both') {
+        setActiveTab(detail.lang === 'asm' ? 'asm' : 'c');
+      }
       await executeCompileAndSimulate(detail.file_id, detail.content, detail.title);
     } catch (err) {
       console.error("File Load Error:", err);
@@ -189,9 +242,19 @@ const SourceArea: React.FC<SourceAreaProps> = ({
 
   // 마이페이지 등에서 fileId를 선택해 진입한 경우 파일 상세 조회 후 자동 컴파일 & 시뮬레이션 실행
   useEffect(() => {
+    if (mode !== 'c-only') return;
     if (!externalFileId || loadedFileIdRef.current === externalFileId) return;
     loadSavedFileAndSimulate(externalFileId);
-  }, [externalFileId]);
+  }, [externalFileId, mode]);
+
+  // 1섹션 하단 File List 패널에서 파일을 클릭해 선택한 경우 로드 및 시뮬레이션 실행
+  useEffect(() => {
+    if (mode !== 'c-only') return;
+    const targetId = sharedState?.externalLoadFileId;
+    if (!targetId) return;
+    sharedState?.onExternalLoadHandled?.();
+    loadSavedFileAndSimulate(targetId);
+  }, [sharedState?.externalLoadFileId, mode]);
 
   const handleFileAdded = (file: File) => {
     setErrorMsg(null);
@@ -202,7 +265,9 @@ const SourceArea: React.FC<SourceAreaProps> = ({
     reader.onload = (e) => {
       const result = e.target?.result as string;
       setCContent(result);
-      setActiveTab('c');
+      if (mode !== 'asm-only') {
+        setActiveTab('c');
+      }
     };
     reader.readAsText(file);
   };
@@ -219,8 +284,9 @@ const SourceArea: React.FC<SourceAreaProps> = ({
       return;
     }
 
-    const currentContent = activeTab === 'c' ? cContent : asmContent;
-    const currentName = activeTab === 'c' ? cFileName : asmFileName;
+    const effectiveTab = mode === 'c-only' ? 'c' : mode === 'asm-only' ? 'asm' : activeTab;
+    const currentContent = effectiveTab === 'c' ? cContent : asmContent;
+    const currentName = effectiveTab === 'c' ? cFileName : asmFileName;
 
     if (!currentContent && !cContent) {
       setErrorMsg('저장할 코드 내용이 없습니다. 먼저 파일을 추가해 주세요.');
@@ -228,7 +294,7 @@ const SourceArea: React.FC<SourceAreaProps> = ({
     }
 
     setSaveTitle(currentName || cFileName || 'untitled.c');
-    setSaveLang(activeTab === 'asm' && !cContent ? 'asm' : 'c');
+    setSaveLang(effectiveTab === 'asm' && !cContent ? 'asm' : 'c');
     setSaveContent(cContent || currentContent);
     setIsSaveModalOpen(true);
   };
@@ -266,7 +332,8 @@ const SourceArea: React.FC<SourceAreaProps> = ({
       return;
     }
 
-    const targetName = (activeTab === 'c' ? cFileName : asmFileName) || cFileName || '현재 파일';
+    const effectiveTab = mode === 'c-only' ? 'c' : mode === 'asm-only' ? 'asm' : activeTab;
+    const targetName = (effectiveTab === 'c' ? cFileName : asmFileName) || cFileName || '현재 파일';
     if (!window.confirm(`'${targetName}'을(를) 삭제하시겠습니까?`)) return;
 
     setErrorMsg(null);
@@ -281,7 +348,9 @@ const SourceArea: React.FC<SourceAreaProps> = ({
       setCContent('');
       setAsmFileName('');
       setAsmContent('');
-      setActiveTab('c');
+      if (mode !== 'asm-only') {
+        setActiveTab('c');
+      }
     } catch (err) {
       console.error('File delete error:', err);
       setErrorMsg('파일 삭제 중 오류가 발생했습니다.');
@@ -317,6 +386,10 @@ const SourceArea: React.FC<SourceAreaProps> = ({
     setIsDownloadModalOpen(false);
   };
 
+  const effectiveTab: 'c' | 'asm' =
+    mode === 'c-only' ? 'c' : mode === 'asm-only' ? 'asm' : activeTab;
+  const activeLoadingMessage = externalLoadingMessage || loadingMessage;
+
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden min-h-0 relative">
       {errorMsg && (
@@ -333,10 +406,12 @@ const SourceArea: React.FC<SourceAreaProps> = ({
       )}
 
       <SourceViewer 
-        activeTab={activeTab} 
-        fileName={activeTab === 'c' ? cFileName : asmFileName}
-        content={activeTab === 'c' ? cContent : asmContent}
+        activeTab={effectiveTab} 
+        fileName={effectiveTab === 'c' ? cFileName : asmFileName}
+        content={effectiveTab === 'c' ? cContent : asmContent}
         isLoggedIn={isLoggedIn}
+        showFileSelector={showFileSelector ?? (mode === 'both')}
+        showStageLegendBar={mode !== 'asm-only'}
         savedFiles={savedFiles}
         selectedFileId={fileId}
         onSelectSavedFile={loadSavedFileAndSimulate}
@@ -345,20 +420,21 @@ const SourceArea: React.FC<SourceAreaProps> = ({
         onSelectLine={onSelectLine}
       />
 
-      {loadingMessage && (
+      {activeLoadingMessage && (
         <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center gap-3 p-4 text-center">
           <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <div className="text-xs font-semibold text-blue-700">{loadingMessage}</div>
+          <div className="text-xs font-semibold text-blue-700">{activeLoadingMessage}</div>
           <div className="text-[11px] text-slate-500">잠시만 기다려 주세요...</div>
         </div>
       )}
 
       <SourceHeader 
-        activeTab={activeTab} 
+        activeTab={effectiveTab} 
         setActiveTab={setActiveTab}
+        mode={mode}
         onFileAdded={handleFileAdded}
         onCompile={handleCompile}
-        isCompiling={!!loadingMessage}
+        isCompiling={!!activeLoadingMessage}
         onOpenSaveModal={handleOpenSaveModal}
         onDeleteCurrentFile={handleDeleteCurrentFile}
         onOpenDownloadModal={handleOpenDownloadModal}

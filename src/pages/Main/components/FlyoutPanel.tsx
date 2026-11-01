@@ -5,8 +5,6 @@ import { PANEL_METAS } from '../types';
 interface FlyoutPanelProps {
   activeFlyout: PanelKey | null;
   flyoutRef: React.RefObject<HTMLDivElement | null>;
-  isPlacedInLayout: boolean;
-  onPinToLayout: (panel: PanelKey) => void;
   onClose: () => void;
   children: React.ReactNode;
 }
@@ -14,8 +12,6 @@ interface FlyoutPanelProps {
 const FlyoutPanel: React.FC<FlyoutPanelProps> = ({
   activeFlyout,
   flyoutRef,
-  isPlacedInLayout,
-  onPinToLayout,
   onClose,
   children,
 }) => {
@@ -39,18 +35,6 @@ const FlyoutPanel: React.FC<FlyoutPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {/* 화면 메인 1구역에 추가 배치하는 옵션 (레이아웃에 등록된 경우에만 노출) */}
-          {isPlacedInLayout && (
-            <button
-              type="button"
-              onClick={() => onPinToLayout(activeFlyout)}
-              title="이 컴포넌트를 메인 1구역에 고정 배치하기"
-              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-            >
-              화면에 고정 ⊞
-            </button>
-          )}
-
           {/* 말풍선 닫기 */}
           <button
             type="button"

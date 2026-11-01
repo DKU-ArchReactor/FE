@@ -15,6 +15,8 @@ interface SourceViewerProps {
   fileName?: string;
   content?: string;
   isLoggedIn?: boolean;
+  showFileSelector?: boolean;
+  showStageLegendBar?: boolean;
   savedFiles?: FileSummary[];
   selectedFileId?: string | null;
   onSelectSavedFile?: (fileId: string) => void;
@@ -127,6 +129,8 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
   fileName, 
   content, 
   isLoggedIn = false,
+  showFileSelector = true,
+  showStageLegendBar = true,
   savedFiles = [],
   selectedFileId = null,
   onSelectSavedFile,
@@ -224,9 +228,9 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 text-left min-h-0">
-      {(isLoggedIn || (hasContent && fileName)) && (
+      {((isLoggedIn && showFileSelector) || (hasContent && fileName)) && (
         <div className="px-3 py-2 border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 flex items-center justify-between gap-2 shrink-0">
-          {isLoggedIn ? (
+          {isLoggedIn && showFileSelector ? (
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <select
                 value={selectedFileId || ''}
@@ -350,8 +354,8 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
         )}
       </div>
 
-      {/* 하단 파이프라인 단계 색상 범례 (어셈블리 모드에서만 노출) */}
-      {hasContent && activeTab === 'asm' && (
+      {/* 하단 파이프라인 단계 색상 범례 (어셈블리 모드에서만 노출, asm-only일 때는 헤더 바에 통합) */}
+      {hasContent && activeTab === 'asm' && showStageLegendBar && (
         <div className="px-3 py-1.5 bg-white border-t border-slate-200 flex items-center justify-between text-[11px] shrink-0">
           <span className="font-semibold text-slate-500 text-[10px]">단계 색상:</span>
           <div className="flex items-center gap-1 text-[9px] font-bold">
