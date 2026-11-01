@@ -23,6 +23,8 @@ export function mapAssembly(assembly: string, sourceLineCount: number): MappedAs
   const sourceFiles = new Map<number, string>();
   let sourceLine: number | null = null;
   let executable = false;
+  let previousExecutable = false;
+  const sectionStack: boolean[] = [];
   const mapped: MappedAssemblyRow[] = [];
 
   for (const raw of assembly.split(/\r?\n/)) {
@@ -34,14 +36,27 @@ export function mapAssembly(assembly: string, sourceLineCount: number): MappedAs
       if (name) sourceFiles.set(Number(file[1]), name.replace(/\\\\/g, "/").split("/").at(-1) || name);
       continue;
     }
-    const section = line.match(/^\.(?:section\s+)?([^\s,]+)/);
-    if (section && (section[1] === ".text" || section[1].startsWith(".text."))) {
-      executable = true;
+    const section = line.match(/^\.(section|pushsection)\s+([^,\s]+)(?:\s*,\s*"([^"]*)")?/);
+    if (section) {
+      if (section[1] === "pushsection") sectionStack.push(executable);
+      previousExecutable = executable;
+      executable = section[3]?.includes("x") ?? /^\.text(?:\.|$)/.test(section[2]);
       sourceLine = null;
       continue;
     }
-    if (/^\.(?:data|bss|rodata)\b/.test(line)) {
-      executable = false;
+    if (/^\.(?:text|data|bss|rodata)(?:\s|$)/.test(line)) {
+      executable = /^\.text(?:\s|$)/.test(line);
+      sourceLine = null;
+      continue;
+    }
+    if (line === ".popsection" || line === ".previous") {
+      const next = line === ".popsection" ? sectionStack.pop() ?? false : previousExecutable;
+      previousExecutable = executable;
+      executable = next;
+      sourceLine = null;
+      continue;
+    }
+    if (/^\.(?:cfi_endproc|size)\b/.test(line)) {
       sourceLine = null;
       continue;
     }
