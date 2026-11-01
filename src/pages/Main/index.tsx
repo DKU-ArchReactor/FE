@@ -17,6 +17,9 @@ import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
 import { PANEL_METAS, getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
+import TranslationEditor from "./components/TranslationEditor";
+import TranslationMapping from "./components/TranslationMapping";
+import { compileTranslation } from "./components/translationCompile";
 
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -87,6 +90,45 @@ const MainPage: React.FC = () => {
     () => !!localStorage.getItem("access_token")
   );
   const [externalLoadFileId, setExternalLoadFileId] = useState<string | null>(null);
+  const [translationSource, setTranslationSource] = useState(
+    "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n"
+  );
+  const [translationAssembly, setTranslationAssembly] = useState("");
+  const [translationError, setTranslationError] = useState("");
+  const [translationBusy, setTranslationBusy] = useState(false);
+  const isTranslationPage = location.pathname === "/c-to-asm";
+
+  const handleTranslationCompile = async () => {
+    if (!translationSource.trim() || translationBusy) return;
+    setTranslationBusy(true);
+    setTranslationError("");
+    setTranslationAssembly("");
+    try {
+      setTranslationAssembly(await compileTranslation(translationSource));
+    } catch (error) {
+      setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
+    } finally {
+      setTranslationBusy(false);
+    }
+  };
+
+  const handleTranslationFile = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".c")) {
+      setTranslationError(".c 파일을 선택해 주세요.");
+      return;
+    }
+    if (file.size > 64 * 1024) {
+      setTranslationError("C 파일은 64 KiB 이하로 열어 주세요.");
+      return;
+    }
+    try {
+      setTranslationSource((await file.text()).replace(/^\uFEFF/, ""));
+      setTranslationAssembly("");
+      setTranslationError("");
+    } catch {
+      setTranslationError("파일을 읽지 못했습니다.");
+    }
+  };
 
   const sharedSourceState: SharedSourceState = {
     fileId,
@@ -355,6 +397,9 @@ const MainPage: React.FC = () => {
   const renderPanelComponent = (panelKey: PanelKey) => {
     switch (panelKey) {
       case "cSource":
+        if (isTranslationPage) {
+          return <TranslationEditor source={translationSource} onChange={(value) => { setTranslationSource(value); setTranslationAssembly(""); }} onCompile={handleTranslationCompile} onFile={handleTranslationFile} onReset={() => { setTranslationSource("int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n"); setTranslationAssembly(""); setTranslationError(""); }} busy={translationBusy} error={translationError} />;
+        }
         return (
           <SourceArea
             mode="c-only"
@@ -373,6 +418,9 @@ const MainPage: React.FC = () => {
       case "fileList":
         return renderFileListPanel();
       case "source":
+        if (isTranslationPage) {
+          return <TranslationMapping source={translationSource} assembly={translationAssembly} busy={translationBusy} error={translationError} />;
+        }
         return (
           <SourceArea
             mode={isSection1Visible ? "asm-only" : "both"}
