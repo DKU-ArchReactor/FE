@@ -542,7 +542,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                 <div
                   key={regKey}
                   title={meta.desc || regKey}
-                  className={`flex items-center justify-between px-3 py-1.5 rounded-xl border transition-all ${
+                  className={`flex items-center justify-between px-2.5 py-1 rounded-lg border transition-all ${
                     isChanged
                       ? 'bg-amber-100/90 border-amber-400 text-amber-950 font-bold shadow-xs animate-pulse ring-1 ring-amber-300'
                       : hasVal
@@ -551,23 +551,23 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                   }`}
                 >
                   {/* 좌측: 번호, ABI 이름, 설명 태그, 사전 배정 뱃지 */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`w-8 font-bold ${isChanged ? 'text-amber-900' : hasVal ? 'text-blue-700' : 'text-slate-500'}`}>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`w-7 font-bold ${isChanged ? 'text-amber-900' : hasVal ? 'text-blue-700' : 'text-slate-500'}`}>
                       {regKey}
                     </span>
 
-                    <span className="text-[11px] text-slate-500 font-medium w-10 truncate">
+                    <span className="text-[11px] text-slate-500 font-medium w-8 truncate">
                       ({meta.abi})
                     </span>
 
                     {meta.presetTag && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-sans font-bold bg-purple-100 text-purple-700 shrink-0">
+                      <span className="text-[8px] px-1 py-0.2 rounded font-sans font-bold bg-purple-100 text-purple-700 shrink-0">
                         {meta.presetTag}
                       </span>
                     )}
 
                     {hasVal && !meta.presetTag && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-sans font-semibold bg-blue-100 text-blue-700 shrink-0">
+                      <span className="text-[8px] px-1 py-0.2 rounded font-sans font-semibold bg-blue-100 text-blue-700 shrink-0">
                         Active
                       </span>
                     )}
@@ -575,7 +575,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
 
                   {/* 우측: 16진수 값 전체 표시 (잘림 없음) */}
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className={`font-mono text-xs tracking-wider ${isChanged ? 'text-amber-950 font-extrabold' : hasVal ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                    <span className={`font-mono text-[11px] tracking-wider ${isChanged ? 'text-amber-950 font-extrabold' : hasVal ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
                       {val}
                     </span>
                   </div>

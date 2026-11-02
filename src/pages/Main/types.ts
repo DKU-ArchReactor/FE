@@ -55,8 +55,8 @@ export interface SectionConfig {
 // 5개 섹션 기본 레이아웃:
 // 1섹션: 상단 C언어 / 하단 File List
 // 2섹션: 상단 ASM(Execution에선 C/ASM 전환) / 하단 튜터
-// 3섹션: 파이프라인 시각화
-// 4섹션: 상단 레지스터 / 가운데 브릿지 / 하단 메모리 (StateVisualizer 상하 배치)
+// 3섹션: 상단 레지스터 / 가운데 브릿지 / 하단 메모리 (StateVisualizer 아키텍처 상태)
+// 4섹션: 파이프라인 시각화 (회로도 및 5단계 스테이지)
 // 5섹션: 상단 Queues / 하단 IO Device
 export const getDefaultSections = (): SectionConfig[] => [
   {
@@ -77,16 +77,16 @@ export const getDefaultSections = (): SectionConfig[] => [
   },
   {
     id: 'sec-3',
-    widthPercent: 44,
+    widthPercent: 38,
     slots: [
-      { type: 'single', panel: 'pipeline', flexRatio: 1 },
+      { type: 'single', panel: 'state', flexRatio: 1 },
     ],
   },
   {
     id: 'sec-4',
-    widthPercent: 28,
+    widthPercent: 34,
     slots: [
-      { type: 'single', panel: 'state', flexRatio: 1 },
+      { type: 'single', panel: 'pipeline', flexRatio: 1 },
     ],
   },
   {

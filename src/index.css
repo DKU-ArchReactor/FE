@@ -5,3 +5,25 @@ body {
   font-family: 'Inter', sans-serif;
   background-color: #f8fafc;
 }
+
+/* Monaco Editor 선택 라인 하이라이트 스타일 */
+/* 1. 코드 영역 배경색 */
+.monaco-selected-c-line {
+  background-color: #eff6ff !important; /* bg-blue-50 */
+}
+
+/* 2. 라인 넘버 뒤의 거터 전체 행을 파란색으로 채우고, 맨 왼쪽에 4px 파란 액센트 바 배치 */
+.monaco-editor .margin-view-overlays > div:has(.monaco-selected-c-linenumber) {
+  background-color: #eff6ff !important;
+  box-shadow: inset 4px 0 0 0 #2563eb !important; /* 맨 왼쪽 4px 파란 바 */
+}
+
+/* 3. 라인 넘버 숫자 텍스트 선명하게 강조 */
+.monaco-editor .line-numbers.monaco-selected-c-linenumber {
+  color: #1d4ed8 !important; /* blue-700 진한 파란색 */
+  font-weight: 700 !important;
+}
+
+.monaco-editor .margin {
+  background-color: #ffffff !important;
+}
