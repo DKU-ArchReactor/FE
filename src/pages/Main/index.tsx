@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import SourceArea from "./components/Source";
 import type { SharedSourceState } from "./components/Source";
 import TutorArea from "./components/TutorArea";
@@ -15,7 +15,7 @@ import type { SimulationResult } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
 import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
-import { PANEL_METAS, getDefaultSections } from "./types";
+import { getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 import TranslationEditor from "./components/TranslationEditor";
 import TranslationMapping from "./components/TranslationMapping";
@@ -27,6 +27,7 @@ const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const initialFileId =
     searchParams.get("fileId") ||
     (location.state as { fileId?: string } | null)?.fileId ||
@@ -78,7 +79,7 @@ const MainPage: React.FC = () => {
   }, [location.pathname, aspectTier]);
 
   // 1섹션(C 코드 + File List)이 화면에 함께 보이는 상태인지 여부 (시작 인덱스가 0일 때)
-  const isSection1Visible = slideStartIndex === 0;
+  void slideStartIndex;
 
   // ========================================================
   // 1. 1섹션(C 전용) & 2섹션(ASM / C·ASM 전환) 간 공유 소스 상태
@@ -99,9 +100,10 @@ const MainPage: React.FC = () => {
   const [translationAssembly, setTranslationAssembly] = useState("");
   const [translationError, setTranslationError] = useState("");
   const [translationBusy, setTranslationBusy] = useState(false);
+  const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
   const isTranslationPage = location.pathname === "/c-to-asm";
 
-  const updateTranslationSource = (source: string, fileName = "main.c") => {
+  const updateTranslationSource = (source: string, fileName = "main.c", resetSimulation = false) => {
     setTranslationSource(source);
     setCContent(source);
     setCFileName(fileName);
@@ -110,6 +112,14 @@ const MainPage: React.FC = () => {
     setAsmContent("");
     setTranslationAssembly("");
     setTranslationError("");
+    setTranslationSelectedLine(null);
+
+    // 초기화 버튼 클릭 등으로 시뮬레이션 상태도 함께 리셋해야 할 때
+    if (resetSimulation) {
+      setSimulationData(null);
+      setCurrentCycle(0);
+      setIsPlaying(false);
+    }
   };
 
   useEffect(() => {
@@ -130,10 +140,15 @@ const MainPage: React.FC = () => {
     setTranslationError("");
     setAsmContent("");
     try {
-      const assembly = await compileTranslation(translationSource);
+      const { assembly, simulationResult } = await compileTranslation(translationSource);
       setTranslationAssembly(assembly);
       setAsmContent(assembly);
       setAsmFileName("assembly.s");
+
+      // 5개 컴포넌트 전체가 공유하는 시뮬레이션 상태 갱신
+      if (simulationResult) {
+        handleSimulationComplete(simulationResult);
+      }
     } catch (error) {
       setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
     } finally {
@@ -297,6 +312,28 @@ const MainPage: React.FC = () => {
       .reduce((acc, s) => acc + s.widthPercent, 0);
   }, [sections, slideStartIndex]);
 
+  // 좌/우 뷰포트 네비게이션 액션
+  const canGoPrevViewport = slideStartIndex > 0;
+  const canGoNextViewport = slideStartIndex + visibleCount < sections.length;
+
+  const handleGoPrevViewport = () => {
+    if (aspectTier === "ultrawide") {
+      navigate("/c-to-asm");
+    } else {
+      if (slideStartIndex === 2) navigate("/");
+      else if (slideStartIndex === 1) navigate("/c-to-asm");
+    }
+  };
+
+  const handleGoNextViewport = () => {
+    if (aspectTier === "ultrawide") {
+      navigate("/coming-soon");
+    } else {
+      if (slideStartIndex === 0) navigate("/");
+      else if (slideStartIndex === 1) navigate("/coming-soon");
+    }
+  };
+
   // 우측 책갈피 말풍선 상태 (AI 에이전트 전용)
   const [activeFlyout, setActiveFlyout] = useState<PanelKey | null>(null);
   const flyoutRef = useRef<HTMLDivElement>(null);
@@ -425,7 +462,19 @@ const MainPage: React.FC = () => {
     switch (panelKey) {
       case "cSource":
         if (isTranslationPage) {
-          return <TranslationEditor source={translationSource} onChange={(value) => updateTranslationSource(value)} onCompile={handleTranslationCompile} onFile={handleTranslationFile} onReset={() => updateTranslationSource(DEFAULT_TRANSLATION_SOURCE)} busy={translationBusy} error={translationError} />;
+          return (
+            <TranslationEditor
+              source={translationSource}
+              onChange={(value) => updateTranslationSource(value)}
+              onCompile={handleTranslationCompile}
+              onFile={handleTranslationFile}
+              onReset={() => updateTranslationSource(DEFAULT_TRANSLATION_SOURCE, "main.c", true)}
+              busy={translationBusy}
+              error={translationError}
+              selectedLine={translationSelectedLine}
+              onSelectLine={setTranslationSelectedLine}
+            />
+          );
         }
         return (
           <SourceArea
@@ -445,22 +494,15 @@ const MainPage: React.FC = () => {
       case "fileList":
         return renderFileListPanel();
       case "source":
-        if (isTranslationPage) {
-          return <TranslationMapping source={translationSource} assembly={translationAssembly} busy={translationBusy} error={translationError} />;
-        }
         return (
-          <SourceArea
-            mode={isSection1Visible ? "asm-only" : "both"}
-            showFileSelector={!isSection1Visible}
-            sharedState={sharedSourceState}
-            fileId={initialFileId}
-            loadingMessage={loadingMessage}
-            onStartSimulation={handleStartSimulation}
-            onSimulationComplete={handleSimulationComplete}
-            onLoadingChange={setLoadingMessage}
+          <TranslationMapping
+            source={translationSource || cContent}
+            assembly={translationAssembly || asmContent}
+            busy={translationBusy}
+            error={translationError}
+            selectedLine={translationSelectedLine}
+            onSelectLine={setTranslationSelectedLine}
             stageBuffers={currentData?.buffers}
-            selectedLine={selectedCodeLine}
-            onSelectLine={setSelectedCodeLine}
           />
         );
       case "tutor":
@@ -532,14 +574,32 @@ const MainPage: React.FC = () => {
             onReset={handleReset}
             onJumpToCycle={handleJumpToCycle}
             onChangeSpeed={handleChangeSpeed}
+            isReady={totalCycles > 0}
           />
         </div>
       </div>
 
       {/* ============================================================ */}
-      {/* [동적 5섹션 가로 슬라이드 컨테이너]: 3섹션씩 노출 + 리사이저 */}
+      {/* [동적 5섹션 가로 슬라이드 컨테이너]: 필요할 때만 여백 버튼 노출 */}
       {/* ============================================================ */}
-      <div className="flex-1 flex w-full min-h-0 overflow-hidden">
+      <div className="flex-1 flex w-full min-h-0 overflow-hidden items-stretch gap-1.5">
+        {/* 좌측 네비게이션 레일 (Translation 등 맨 왼쪽 끝일 때는 여백 없이 꽉 채움) */}
+        {canGoPrevViewport && (
+          <div className="w-8 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
+            <button
+              type="button"
+              onClick={handleGoPrevViewport}
+              title="이전 뷰포트(왼쪽 영역)로 이동"
+              className="w-full h-28 rounded-xl bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
+            >
+              <span className="text-lg font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:-translate-x-0.5">‹</span>
+              <span className="text-[9px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
+                PREV
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* 슬라이드 뷰포트 영역 */}
         <div
           ref={containerRef}
@@ -703,29 +763,22 @@ const MainPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* [우측 벽면 책갈피 인덱스 탭]: AI 에이전트 전용 플로팅 버튼    */}
-        {/* ============================================================ */}
-        <aside className="flex flex-col gap-2 shrink-0 ml-1.5 pt-1 z-30">
-          <button
-            type="button"
-            data-bookmark-tab="true"
-            onClick={() =>
-              setActiveFlyout((prev) => (prev === "aiPanel" ? null : "aiPanel"))
-            }
-            title={`${PANEL_METAS.aiPanel.fullName} (말풍선으로 열기)`}
-            className={`w-8 py-3 rounded-l-xl border shadow-xs flex flex-col items-center gap-1.5 transition-all duration-200 group cursor-pointer ${
-              activeFlyout === "aiPanel"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-md translate-x-[-2px]"
-                : "bg-white hover:bg-indigo-50/80 text-slate-500 hover:text-indigo-600 border-slate-200 hover:border-indigo-300"
-            }`}
-          >
-            <span className="text-xs">{PANEL_METAS.aiPanel.icon}</span>
-            <span className="text-[10px] font-bold tracking-widest [writing-mode:vertical-rl] select-none py-0.5">
-              {PANEL_METAS.aiPanel.label}
-            </span>
-          </button>
-        </aside>
+        {/* 우측 네비게이션 레일 (Management 등 맨 오른쪽 끝일 때는 여백 없이 꽉 채움) */}
+        {canGoNextViewport && (
+          <div className="w-8 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
+            <button
+              type="button"
+              onClick={handleGoNextViewport}
+              title="다음 뷰포트(오른쪽 영역)로 이동"
+              className="w-full h-28 rounded-xl bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
+            >
+              <span className="text-lg font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:translate-x-0.5">›</span>
+              <span className="text-[9px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
+                NEXT
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ============================================================ */}
