@@ -89,6 +89,12 @@ const formatSignedDecimal = (hexStr: string): string => {
   return signed.toLocaleString();
 };
 
+const formatAddressDecimal = (hexStr: string): string => {
+  const num = parseInt(hexStr, 16);
+  if (isNaN(num)) return hexStr;
+  return num.toLocaleString();
+};
+
 const extractPrintableAscii = (hexStr: string): string | undefined => {
   const clean = hexStr.replace(/^0x/i, '').padStart(8, '0');
   if (clean === '00000000') return undefined;
@@ -412,7 +418,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex flex-col min-h-0 overflow-hidden relative"
+      className="@container flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex flex-col min-h-0 overflow-hidden relative"
     >
       {/* 애니메이션 키프레임 */}
       <style>{`
@@ -443,37 +449,39 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
       `}</style>
 
       {/* 상단 통합 헤더 바 */}
-      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-100 shrink-0 flex-wrap">
-        <div className="flex items-center gap-2">
-          <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-1.5 pb-2 mb-2 border-b border-slate-100 shrink-0 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap truncate">
             <span>🗄️</span>
-            <span>레지스터 & 메모리 아키텍처 뷰</span>
+            <span className="hidden @[320px]:inline">레지스터 & 메모리 뷰</span>
+            <span className="@[320px]:hidden">State</span>
           </h3>
           {transferActivity && (
             <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse ${
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse whitespace-nowrap truncate ${
                 transferActivity.type === 'store'
                   ? 'bg-amber-100 text-amber-800 border border-amber-300'
                   : 'bg-cyan-100 text-cyan-800 border border-cyan-300'
               }`}
             >
               <span>{transferActivity.type === 'store' ? '📤 STORE' : '📥 LOAD'}</span>
-              <span className="font-mono">{transferActivity.instruction}</span>
+              <span className="font-mono hidden @[380px]:inline">{transferActivity.instruction}</span>
             </span>
           )}
         </div>
 
-        {/* 가로/세로 배치 모드 스위치 (기본값: 비율 자동 감지) */}
-        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px] font-semibold text-slate-600">
+        {/* 가로/세로 배치 모드 스위치 */}
+        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-[10px] font-semibold text-slate-600 shrink-0 whitespace-nowrap">
           <button
             type="button"
             onClick={() => setManualLayout('auto')}
-            className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-md transition-colors cursor-pointer ${
               manualLayout === 'auto' ? 'bg-white text-indigo-600 shadow-2xs' : 'hover:text-slate-900'
             }`}
             title="컨테이너 가로/세로 비율에 맞춰 자동으로 좌우 또는 상하 배치"
           >
-            자동({isHorizontal ? '좌우' : '상하'})
+            <span>자동</span>
+            <span className="hidden @[300px]:inline">({isHorizontal ? '좌우' : '상하'})</span>
           </button>
           <button
             type="button"
@@ -573,10 +581,13 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                     )}
                   </div>
 
-                  {/* 우측: 16진수 값 전체 표시 (잘림 없음) */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`font-mono text-[11px] tracking-wider ${isChanged ? 'text-amber-950 font-extrabold' : hasVal ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
-                      {val}
+                  {/* 우측: 10진수 메인 표시 & 호버 시 16진수 원본 툴팁 */}
+                  <div
+                    title={`Hex: ${val} (Unsigned: ${parseInt(val, 16) || 0})`}
+                    className="flex items-center gap-2 shrink-0 cursor-help"
+                  >
+                    <span className={`font-mono text-[11px] tracking-wide ${isChanged ? 'text-amber-950 font-extrabold' : hasVal ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                      {formatSignedDecimal(val)}
                     </span>
                   </div>
                 </div>
@@ -647,8 +658,11 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                 )}
               </div>
 
-              <div className="text-[10px] font-mono text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
-                {transferActivity.valueHex}
+              <div
+                title={`Hex: ${transferActivity.valueHex}`}
+                className="text-[10px] font-mono text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0 cursor-help"
+              >
+                {formatSignedDecimal(transferActivity.valueHex)}
               </div>
             </div>
           ) : (
@@ -722,10 +736,13 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                         </span>
                       )}
                       {isTargetSeg && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white animate-bounce">
+                        <span
+                          title={`Hex: ${transferActivity?.targetAddress}`}
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white animate-bounce cursor-help"
+                        >
                           {transferActivity?.type === 'store'
-                            ? `📥 Store (${transferActivity.targetAddress})`
-                            : `📤 Load (${transferActivity.targetAddress})`}
+                            ? `📥 Store (${formatAddressDecimal(transferActivity.targetAddress)})`
+                            : `📤 Load (${formatAddressDecimal(transferActivity.targetAddress)})`}
                         </span>
                       )}
                       {changedCount > 0 && !isTargetSeg && (
@@ -748,8 +765,11 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                   <div className="flex items-center justify-between gap-2 mt-1 text-[11px]">
                     <span className="text-slate-500 truncate">{meta.subtitle}</span>
                     {items.length > 0 ? (
-                      <span className="font-mono text-[10px] text-slate-700 bg-white/70 px-1.5 py-0.2 rounded border border-slate-200/70 shrink-0">
-                        최근: {items[0].address} → {items[0].hexValue}
+                      <span
+                        title={`Hex: ${items[0].address} → ${items[0].hexValue}`}
+                        className="font-mono text-[10px] text-slate-700 bg-white/70 px-1.5 py-0.2 rounded border border-slate-200/70 shrink-0 cursor-help"
+                      >
+                        최근: {formatAddressDecimal(items[0].address)} → {formatSignedDecimal(items[0].hexValue)}
                       </span>
                     ) : (
                       <span className="text-[10px] text-slate-400 shrink-0">비어 있음</span>
@@ -812,7 +832,12 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                       }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-sky-400 font-bold">{entry.address}</span>
+                        <span
+                          title={`Hex: ${entry.address}`}
+                          className="text-sky-400 font-bold cursor-help"
+                        >
+                          {formatAddressDecimal(entry.address)}
+                        </span>
                         {entry.label && (
                           <span className="text-[9px] px-1 py-0.2 rounded bg-violet-500/30 text-violet-200 border border-violet-400/40 shrink-0">
                             {entry.label}
@@ -821,10 +846,32 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-white font-bold">{entry.hexValue}</span>
-                        <span className="text-[10px] text-slate-400">
-                          ({activeSegmentKey === 'code' ? entry.decText : `=${entry.decText}`})
-                        </span>
+                        {activeSegmentKey === 'code' ? (
+                          <>
+                            <span className="text-white font-bold">{entry.decText}</span>
+                            <span
+                              title={`Hex: ${entry.hexValue}`}
+                              className="text-[10px] text-slate-400 cursor-help"
+                            >
+                              ({entry.hexValue})
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span
+                              title={`Hex: ${entry.hexValue} (Unsigned: ${parseInt(entry.hexValue, 16) || 0})`}
+                              className="text-white font-bold cursor-help"
+                            >
+                              {entry.decText}
+                            </span>
+                            <span
+                              title={`Hex: ${entry.hexValue}`}
+                              className="text-[10px] text-slate-400 cursor-help"
+                            >
+                              ({entry.hexValue})
+                            </span>
+                          </>
+                        )}
                         {entry.asciiHint && (
                           <span className="text-[9px] text-emerald-300 bg-emerald-950/80 px-1 py-0.2 rounded">
                             {entry.asciiHint}

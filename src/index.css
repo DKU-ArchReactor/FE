@@ -24,6 +24,64 @@ body {
   font-weight: 700 !important;
 }
 
+/* Monaco Editor 실행 중인 라인 하이라이트 스타일 (초록색 테마) */
+.monaco-executing-c-line {
+  background-color: #ecfdf5 !important; /* bg-emerald-50 */
+}
+
+.monaco-editor .margin-view-overlays > div:has(.monaco-executing-c-linenumber) {
+  background-color: #ecfdf5 !important;
+  box-shadow: inset 4px 0 0 0 #059669 !important; /* 맨 왼쪽 4px 에메랄드 바 */
+}
+
+.monaco-editor .line-numbers.monaco-executing-c-linenumber {
+  color: #047857 !important; /* emerald-700 */
+  font-weight: 700 !important;
+}
+
+/* 실행 중인 라인이면서 사용자가 선택한 라인일 때 (합쳐졌을 때) */
+.monaco-executing-selected-c-line {
+  background-color: #ecfeff !important; /* cyan-50 */
+}
+
+.monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-c-linenumber) {
+  background-color: #ecfeff !important;
+  box-shadow: inset 4px 0 0 0 #0891b2 !important; /* cyan-600 */
+}
+
+.monaco-editor .line-numbers.monaco-executing-selected-c-linenumber {
+  color: #0e7490 !important; /* cyan-700 */
+  font-weight: 700 !important;
+}
+
 .monaco-editor .margin {
   background-color: #ffffff !important;
+}
+
+/* Play/Pause 화면 중앙 팝업 & 블러 페이드아웃 애니메이션 */
+@keyframes playbackIndicatorAnim {
+  0% {
+    opacity: 0;
+    transform: scale(0.65);
+    filter: blur(8px);
+  }
+  20% {
+    opacity: 0.95;
+    transform: scale(1.05);
+    filter: blur(0px);
+  }
+  35% {
+    opacity: 0.9;
+    transform: scale(1);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+    filter: blur(12px);
+  }
+}
+
+.playback-indicator-overlay {
+  animation: playbackIndicatorAnim 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

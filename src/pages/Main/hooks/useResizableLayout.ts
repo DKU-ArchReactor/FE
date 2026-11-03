@@ -4,8 +4,7 @@ import type { SectionConfig } from '../types';
 interface ResizingCol {
   idx: number;
   startX: number;
-  initialLeftWidth: number;
-  initialRightWidth: number;
+  initialWidths: number[];
   viewportWidth: number;
 }
 
@@ -46,22 +45,56 @@ export function useResizableLayout(
     if (resizingCol === null && resizingRowSlot === null && resizingPair === null) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      // (1) 구역 간 가로 너비 리사이징
+      // (1) 구역 간 가로 너비 리사이징 (연쇄 캐스케이딩 밀기)
       if (resizingCol !== null) {
-        const { idx, startX, initialLeftWidth, initialRightWidth, viewportWidth } = resizingCol;
+        const { idx, startX, initialWidths, viewportWidth } = resizingCol;
         if (viewportWidth <= 0) return;
 
         const deltaX = e.clientX - startX;
         const deltaPercent = (deltaX / viewportWidth) * 100;
-        const combinedTwoWidths = initialLeftWidth + initialRightWidth;
+        const minPercent = 30;
 
-        const newLeftWidth = Math.max(10, Math.min(initialLeftWidth + deltaPercent, combinedTwoWidths - 10));
-        const newRightWidth = combinedTwoWidths - newLeftWidth;
+        const newWidths = [...initialWidths];
+
+        if (deltaPercent > 0) {
+          // 오른쪽으로 드래그: idx 컴포넌트를 늘리고, 오른쪽 컴포넌트들을 순차적으로 줄임
+          let needed = deltaPercent;
+          // 오른쪽 컴포넌트들(idx+1, idx+2, ...)에서 여유분을 깎아냄
+          for (let r = idx + 1; r < newWidths.length; r++) {
+            const available = newWidths[r] - minPercent;
+            if (available > 0) {
+              const reduce = Math.min(needed, available);
+              newWidths[r] -= reduce;
+              needed -= reduce;
+              if (needed <= 0.001) break;
+            }
+          }
+          // 실제로 오른쪽 컴포넌트들에서 확보된 폭만큼만 idx 컴포넌트를 늘림
+          const actualGained = deltaPercent - needed;
+          newWidths[idx] = initialWidths[idx] + actualGained;
+        } else if (deltaPercent < 0) {
+          // 왼쪽으로 드래그: idx+1 컴포넌트를 늘리고, 왼쪽 컴포넌트들을 순차적으로 줄임
+          let needed = -deltaPercent;
+          // 왼쪽 컴포넌트들(idx, idx-1, ...)에서 여유분을 깎아냄
+          for (let l = idx; l >= 0; l--) {
+            const available = newWidths[l] - minPercent;
+            if (available > 0) {
+              const reduce = Math.min(needed, available);
+              newWidths[l] -= reduce;
+              needed -= reduce;
+              if (needed <= 0.001) break;
+            }
+          }
+          // 실제로 왼쪽 컴포넌트들에서 확보된 폭만큼만 idx+1 컴포넌트를 늘림
+          const actualGained = (-deltaPercent) - needed;
+          newWidths[idx + 1] = initialWidths[idx + 1] + actualGained;
+        }
 
         setSections((prev) =>
           prev.map((s, i) => {
-            if (i === idx) return { ...s, widthPercent: Math.round(newLeftWidth * 10) / 10 };
-            if (i === idx + 1) return { ...s, widthPercent: Math.round(newRightWidth * 10) / 10 };
+            if (newWidths[i] !== undefined) {
+              return { ...s, widthPercent: Math.round(newWidths[i] * 10) / 10 };
+            }
             return s;
           })
         );
@@ -150,8 +183,7 @@ export function useResizableLayout(
     setResizingCol({
       idx: colIdx,
       startX: e ? e.clientX : 0,
-      initialLeftWidth: sections[colIdx].widthPercent,
-      initialRightWidth: sections[colIdx + 1].widthPercent,
+      initialWidths: sections.map((s) => s.widthPercent),
       viewportWidth,
     });
   };
