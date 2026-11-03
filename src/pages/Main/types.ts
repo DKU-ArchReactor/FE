@@ -55,13 +55,13 @@ export interface SectionConfig {
 // 5개 섹션 기본 레이아웃:
 // 1섹션: 상단 C언어 / 하단 File List
 // 2섹션: 상단 ASM(Execution에선 C/ASM 전환) / 하단 튜터
-// 3섹션: 상단 레지스터 / 가운데 브릿지 / 하단 메모리 (StateVisualizer 아키텍처 상태)
+// 3섹션: 좌측 Registers / 우측 Memory (Pair 좌우 분할 구조)
 // 4섹션: 파이프라인 시각화 (회로도 및 5단계 스테이지)
 // 5섹션: 상단 Queues / 하단 IO Device
 export const getDefaultSections = (): SectionConfig[] => [
   {
     id: 'sec-1',
-    widthPercent: 28,
+    widthPercent: 26,
     slots: [
       { type: 'single', panel: 'cSource', flexRatio: 1.2 },
       { type: 'single', panel: 'fileList', flexRatio: 0.8 },
@@ -69,7 +69,7 @@ export const getDefaultSections = (): SectionConfig[] => [
   },
   {
     id: 'sec-2',
-    widthPercent: 28,
+    widthPercent: 26,
     slots: [
       { type: 'single', panel: 'source', flexRatio: 1.1 },
       { type: 'single', panel: 'tutor', flexRatio: 0.9 },
@@ -79,7 +79,7 @@ export const getDefaultSections = (): SectionConfig[] => [
     id: 'sec-3',
     widthPercent: 38,
     slots: [
-      { type: 'single', panel: 'state', flexRatio: 1 },
+      { type: 'pair', left: 'registers', right: 'memory', flexRatio: 1, pairRatio: 50 },
     ],
   },
   {
@@ -91,7 +91,7 @@ export const getDefaultSections = (): SectionConfig[] => [
   },
   {
     id: 'sec-5',
-    widthPercent: 28,
+    widthPercent: 26,
     slots: [
       { type: 'single', panel: 'queues', flexRatio: 1 },
       { type: 'single', panel: 'ioDevice', flexRatio: 1 },

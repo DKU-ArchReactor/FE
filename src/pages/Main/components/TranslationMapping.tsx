@@ -8,7 +8,9 @@ type Props = {
   busy: boolean;
   error: string;
   selectedLine?: number | null;
-  onSelectLine?: (line: number | null) => void;
+  selectedAsmIndex?: number | null;
+  executionLine?: number | null;
+  onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
     ID?: StageBuffer | null;
@@ -16,6 +18,8 @@ type Props = {
     MEM?: StageBuffer | null;
     WB?: StageBuffer | null;
   };
+  mode?: "single" | "pipeline"; // 싱글 사이클 모드 vs 5단계 파이프라인 모드
+  currentActiveStep?: number | null; // Single 모드에서 현재 실행 중인 어셈블리 행 인덱스 (0~17)
 };
 
 const STAGES_CONFIG: {
@@ -52,8 +56,12 @@ export default function TranslationMapping({
   busy,
   error,
   selectedLine,
+  selectedAsmIndex,
+  executionLine,
   onSelectLine,
   stageBuffers,
+  mode = "pipeline",
+  currentActiveStep,
 }: Props) {
   const sourceLines = source.split(/\r?\n/);
   const rows: MappedAssemblyRow[] = useMemo(
@@ -62,12 +70,12 @@ export default function TranslationMapping({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeRowRef = useRef<HTMLDivElement>(null);
+  const rowElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
   // 파이프라인 스테이지별 활성 명령어 매핑 (현재 클록 사이클 기준)
   const activeStagesByInst = useMemo(() => {
     const map: Record<string, string[]> = {};
-    if (!stageBuffers) return map;
+    if (!stageBuffers || mode === "single") return map;
 
     STAGES_CONFIG.forEach(({ key, name }) => {
       const buf = stageBuffers[key];
@@ -80,9 +88,66 @@ export default function TranslationMapping({
       }
     });
     return map;
-  }, [stageBuffers]);
+  }, [stageBuffers, mode]);
 
-  // 선택된 C 라인에 매핑된 어셈블리 행들 찾기
+  // 헬퍼: 타겟 요소(그룹 마지막 행)가 컨테이너 뷰포트 하단에 완전히 드러나도록 스크롤
+  const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const cRect = container.getBoundingClientRect();
+    const lastRect = lastEl.getBoundingClientRect();
+
+    // 그룹 마지막 행의 바닥이 컨테이너 바닥보다 아래에 있다면 -> 끝까지 확실하게 아래로 스크롤 (여백 28px)
+    if (lastRect.bottom > cRect.bottom - 28) {
+      const scrollDiff = lastRect.bottom - (cRect.bottom - 28);
+      container.scrollTo({
+        top: container.scrollTop + scrollDiff,
+        behavior: "smooth",
+      });
+      return;
+    }
+
+    // 그룹 첫 번째 행이 컨테이너 천장보다 위에 있다면 -> 위로 스크롤
+    if (firstEl) {
+      const firstRect = firstEl.getBoundingClientRect();
+      if (firstRect.top < cRect.top + 12) {
+        const scrollDiff = (cRect.top + 12) - firstRect.top;
+        container.scrollTo({
+          top: Math.max(0, container.scrollTop - scrollDiff),
+          behavior: "smooth",
+        });
+      }
+    }
+  };
+
+  // Single 모드에서 실행 라인이 바뀔 때: 해당 C 구문에 속한 연관 라인 그룹 전체(맨 마지막 행까지)를 한눈에 볼 수 있도록 자동 스크롤
+  useEffect(() => {
+    if (mode !== "single" || currentActiveStep === null || currentActiveStep === undefined) return;
+    if (!containerRef.current) return;
+
+    const activeRow = rows[currentActiveStep];
+    if (!activeRow) return;
+
+    // 현재 실행 라인과 동일한 C 라인 번호를 갖는 마지막 어셈블리 행 인덱스 찾기
+    let lastSiblingIndex = currentActiveStep;
+    for (let i = currentActiveStep; i < rows.length; i++) {
+      if (rows[i].sourceLine === activeRow.sourceLine) {
+        lastSiblingIndex = i;
+      } else {
+        break;
+      }
+    }
+
+    // 그룹의 마지막 행 및 현재 실행 행 요소
+    const lastEl = rowElementsRef.current.get(lastSiblingIndex);
+    const activeEl = rowElementsRef.current.get(currentActiveStep);
+
+    if (lastEl) {
+      scrollGroupIntoView(lastEl, activeEl);
+    }
+  }, [mode, currentActiveStep, rows]);
+
   const matchingIndices = useMemo(() => {
     if (!selectedLine) return new Set<number>();
     const indices = new Set<number>();
@@ -94,28 +159,42 @@ export default function TranslationMapping({
     return indices;
   }, [rows, selectedLine]);
 
-  // 선택된 라인이 바뀔 때 해당 어셈블리 영역으로 스크롤 이동
+  // 선택된 라인이 바뀔 때: 해당 그룹의 마지막 행까지 한눈에 보이도록 스크롤 이동
   useEffect(() => {
-    if (activeRowRef.current && containerRef.current) {
-      activeRowRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
+    if (!selectedLine || !containerRef.current) return;
+
+    // 선택된 C 라인에 매핑된 어셈블리 행들 중 마지막 행과 첫 행 찾기
+    let firstIdx = -1;
+    let lastIdx = -1;
+    rows.forEach((row, idx) => {
+      if (row.sourceLine === selectedLine) {
+        if (firstIdx === -1) firstIdx = idx;
+        lastIdx = idx;
+      }
+    });
+
+    if (lastIdx !== -1) {
+      const lastEl = rowElementsRef.current.get(lastIdx);
+      const firstEl = rowElementsRef.current.get(firstIdx);
+
+      if (lastEl) {
+        scrollGroupIntoView(lastEl, firstEl);
+      }
     }
-  }, [selectedLine]);
+  }, [selectedLine, rows]);
 
   return (
     <section
-      className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-label="RISC-V 어셈블리 결과"
     >
       {/* 헤더 */}
-      <header className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <strong className="text-xs text-slate-700">RISC-V 어셈블리</strong>
+      <header className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-2.5 py-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <strong className="text-xs text-slate-700 whitespace-nowrap truncate">RISC-V 어셈블리</strong>
           {assembly && (
-            <span className="text-[10px] text-slate-400 font-mono">
+            <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap hidden @[220px]:inline">
               ({rows.length} lines)
             </span>
           )}
@@ -155,54 +234,99 @@ export default function TranslationMapping({
 
             const normRowText = row.text.replace(/\s+/g, " ").trim().toLowerCase();
             const activeStages = activeStagesByInst[normRowText] || [];
+            const isCurrentSingleActive =
+              mode === "single" && currentActiveStep === index;
+            // 같은 C 실행 라인에 속해 있는 형제 어셈블리 라인인지 확인
+            const isExecutionSibling =
+              executionLine !== null &&
+              executionLine !== undefined &&
+              row.sourceLine === executionLine &&
+              !isCurrentSingleActive;
+
+            // 선택 라인(파란색) 그룹:
+            // 사용자가 특정 어셈블리 행(selectedAsmIndex)을 클릭했으면 해당 행이 primary,
+            // C 에디터에서 클릭했거나 어셈블리 미지정이면 첫 번째 매핑 행이 primary
+            const isSelectedPrimary =
+              selectedAsmIndex !== null && selectedAsmIndex !== undefined
+                ? selectedAsmIndex === index
+                : isFirstOfMatch;
+            const isSelectedSibling = isMatched && !isSelectedPrimary;
+
+            // 실행 중인 라인이면서 동시에 사용자가 선택한 라인인 경우
+            const isExecutingAndSelected = isCurrentSingleActive && isSelectedPrimary;
 
             return (
               <div
                 key={`${row.sourceLine}-${index}`}
-                ref={isFirstOfMatch ? activeRowRef : undefined}
+                ref={(el) => {
+                  if (el) rowElementsRef.current.set(index, el);
+                  else rowElementsRef.current.delete(index);
+                }}
                 onClick={() => {
-                  if (selectedLine === row.sourceLine) {
-                    onSelectLine?.(null);
+                  // 동일한 특정 어셈블리 행을 다시 클릭했을 때만 해제
+                  if (selectedLine === row.sourceLine && selectedAsmIndex === index) {
+                    onSelectLine?.(null, null);
                   } else {
-                    onSelectLine?.(row.sourceLine);
+                    onSelectLine?.(row.sourceLine, index);
                   }
                 }}
                 className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${
-                  isMatched
-                    ? "bg-blue-50 border-blue-600 text-blue-950 font-medium"
+                  isCurrentSingleActive && !isSelectedPrimary
+                    ? "bg-emerald-100/90 border-emerald-500 text-emerald-950 font-bold shadow-2xs"
+                    : isSelectedPrimary
+                    ? "bg-blue-100/90 border-blue-600 text-blue-950 font-bold shadow-2xs"
+                    : isSelectedSibling
+                    ? "bg-blue-50/50 border-blue-300/60 text-blue-900/80 font-normal"
+                    : isExecutionSibling
+                    ? "bg-emerald-50/50 border-emerald-300/60 text-emerald-900/80 font-normal"
                     : activeStages.length > 0
                     ? "bg-amber-50/70 border-transparent"
                     : "border-transparent hover:bg-slate-50 text-slate-700"
                 }`}
               >
-                {/* 1. 화살표 / 인디케이터 (C 에디터와 동일하게 군더더기 없는 정갈한 인디케이터) */}
-                <div className="w-5 shrink-0 flex items-center justify-center select-none pl-1">
-                  {isFirstOfMatch ? (
-                    <span className="text-blue-600 text-xs font-bold leading-none">➔</span>
-                  ) : isMatched ? (
-                    <span className="text-blue-400 text-[10px] leading-none opacity-60">·</span>
-                  ) : (
-                    <span className="opacity-0 group-hover:opacity-40 text-slate-400 text-[10px] leading-none">
-                      ›
-                    </span>
-                  )}
+                {/* 1. 화살표 / 인디케이터 (현재 실행 라인에는 ▶, 사용자가 선택한 메인 라인에는 ●, 둘 다인 경우 둘 다 표시) */}
+                <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
+                  {isExecutingAndSelected ? (
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-emerald-600 text-xs font-bold leading-none animate-pulse">▶</span>
+                      <span className="text-blue-600 text-[9px] leading-none">●</span>
+                    </div>
+                  ) : isCurrentSingleActive ? (
+                    <span className="text-emerald-600 text-xs font-bold leading-none animate-pulse">▶</span>
+                  ) : isSelectedPrimary ? (
+                    <span className="text-blue-600 text-[10px] leading-none">●</span>
+                  ) : null}
                 </div>
 
-                {/* 2. 라인 번호 (C Monaco 라인 넘버와 동일하게 text-[13px], 우측 패딩을 줘서 명령어와 간격 넉넉히 확보) */}
+                {/* 2. 라인 번호 */}
                 <div
                   className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${
-                    isMatched ? "text-blue-600 font-semibold" : "text-slate-400"
+                    isSelectedPrimary
+                      ? "text-blue-700 font-bold"
+                      : isSelectedSibling
+                      ? "text-blue-500 font-medium"
+                      : isCurrentSingleActive
+                      ? "text-emerald-700 font-bold"
+                      : isExecutionSibling
+                      ? "text-emerald-600"
+                      : "text-slate-400"
                   }`}
                 >
                   {index + 1}
                 </div>
 
-                {/* 3. Opcode (간격 최적화: 72px -> 52px로 축소하여 오퍼랜드와 적절한 간격 유지) */}
+                {/* 3. Opcode */}
                 <div className="w-[52px] shrink-0 font-bold select-text">
                   <span
                     className={
-                      isMatched
-                        ? "text-blue-700 font-bold"
+                      isSelectedPrimary
+                        ? "text-blue-800 font-bold"
+                        : isSelectedSibling
+                        ? "text-blue-600 font-semibold"
+                        : isCurrentSingleActive
+                        ? "text-emerald-800 font-bold"
+                        : isExecutionSibling
+                        ? "text-emerald-700 font-semibold"
                         : "text-indigo-600 group-hover:text-indigo-700 font-semibold"
                     }
                   >
@@ -214,8 +338,14 @@ export default function TranslationMapping({
                 <div className="flex-1 pr-2 whitespace-pre-wrap break-words select-text flex items-center gap-2">
                   <span
                     className={
-                      isMatched
-                        ? "text-slate-900 font-medium"
+                      isSelectedPrimary
+                        ? "text-slate-950 font-bold"
+                        : isSelectedSibling
+                        ? "text-slate-800 font-normal"
+                        : isCurrentSingleActive
+                        ? "text-slate-950 font-bold"
+                        : isExecutionSibling
+                        ? "text-slate-800 font-normal"
                         : "text-slate-700 group-hover:text-slate-900"
                     }
                   >
@@ -242,16 +372,22 @@ export default function TranslationMapping({
                   )}
                 </div>
 
-                {/* 5. 우측 C 매핑 라인 태그 (스크롤바에 가리지 않도록 pr-4.5로 왼쪽으로 당김) */}
+                {/* 5. 우측 C 매핑 라인 태그 (실행 및 선택 모두 대표 행은 진한색, 연관 행은 연한색) */}
                 <div className="shrink-0 pr-4 flex items-center select-none">
                   <span
-                    className={`text-[9px] px-1.5 py-0.5 rounded font-sans transition-colors ${
-                      isMatched
-                        ? "bg-blue-600 text-white font-bold"
-                        : "bg-slate-100 text-slate-400 group-hover:text-slate-600"
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${
+                      isSelectedPrimary
+                        ? "bg-blue-600 text-white font-bold shadow-2xs"
+                        : isCurrentSingleActive
+                        ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                        : isSelectedSibling
+                        ? "bg-blue-100 text-blue-800 font-semibold"
+                        : isExecutionSibling
+                        ? "bg-emerald-100 text-emerald-800 font-semibold"
+                        : "bg-slate-100 text-slate-500 group-hover:text-slate-700"
                     }`}
                   >
-                    L{row.sourceLine}
+                    C: L{row.sourceLine}
                   </span>
                 </div>
               </div>

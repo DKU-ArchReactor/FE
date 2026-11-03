@@ -7,7 +7,7 @@ import AIAgentArea from "./components/AIAgentArea";
 import PipelineVisualizer from "./components/PipelineVisualizer";
 import StateVisualizer from "./components/StateVisualizer";
 import RegisterVisualizer from "./components/RegisterVisualizer";
-import MemoryVisualizer from "./components/MemoryVisualizer";
+import MemorySegmentVisualizer from "./components/MemorySegmentVisualizer";
 import ControlPanel from "./components/ControlPanel";
 import FlyoutPanel from "./components/FlyoutPanel";
 
@@ -19,7 +19,7 @@ import { getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 import TranslationEditor from "./components/TranslationEditor";
 import TranslationMapping from "./components/TranslationMapping";
-import { compileTranslation } from "./components/translationCompile";
+import { compileTranslation, mapAssembly } from "./components/translationCompile";
 
 const DEFAULT_TRANSLATION_SOURCE = "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
 const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
@@ -101,6 +101,22 @@ const MainPage: React.FC = () => {
   const [translationError, setTranslationError] = useState("");
   const [translationBusy, setTranslationBusy] = useState(false);
   const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
+  // 사용자가 수동 클릭한 특정 어셈블리 행 인덱스 (0부터 시작)
+  const [translationSelectedAsmIndex, setTranslationSelectedAsmIndex] = useState<number | null>(null);
+
+  const handleSelectTranslationLine = (line: number | null, asmIndex: number | null = null) => {
+    // 사용자가 특정 라인을 클릭해 탐색할 때, 자동 재생 중이면 즉시 일시정지(Pause)
+    if (line !== null) {
+      setIsPlaying((prev) => {
+        if (prev) {
+          triggerPlaybackFeedback("pause");
+        }
+        return false;
+      });
+    }
+    setTranslationSelectedLine(line);
+    setTranslationSelectedAsmIndex(asmIndex);
+  };
   const isTranslationPage = location.pathname === "/c-to-asm";
 
   const updateTranslationSource = (source: string, fileName = "main.c", resetSimulation = false) => {
@@ -113,6 +129,7 @@ const MainPage: React.FC = () => {
     setTranslationAssembly("");
     setTranslationError("");
     setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
 
     // 초기화 버튼 클릭 등으로 시뮬레이션 상태도 함께 리셋해야 할 때
     if (resetSimulation) {
@@ -192,37 +209,197 @@ const MainPage: React.FC = () => {
   };
 
   // ========================================================
-  // 2. 시뮬레이션 제어 상태 관리
+  // 2. 시뮬레이션 제어 상태 관리 (Single-Cycle vs 5-Stage Pipeline 모드)
   // ========================================================
   const [simulationData, setSimulationData] = useState<SimulationResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
-  const totalCycles = simulationData?.history?.length ?? 0;
 
+  // 현재 뷰포트가 Compile ➔ Execution(1번 뷰)인지 5-Stage Pipeline(2번 뷰)인지 판별
+  const isSingleCycleViewport = location.pathname === "/c-to-asm";
+  const simulationMode: "single" | "pipeline" = isSingleCycleViewport ? "single" : "pipeline";
+  // 1) 어셈블리 뷰어의 실제 실행 가능한 명령어 행들 (매핑된 rows)
+  const mappedAssemblyRows = useMemo(() => {
+    if (!translationAssembly) return [];
+    return mapAssembly(translationAssembly, 1000);
+  }, [translationAssembly]);
+
+  // 2) 5-Stage 파이프라인 전체 히스토리
+  const pipelineHistory = simulationData?.history ?? [];
+  const totalPipelineCycles = pipelineHistory.length;
+
+  const isSimulationReady = isSingleCycleViewport
+    ? Boolean(simulationData && mappedAssemblyRows.length > 0)
+    : totalPipelineCycles > 0;
+
+  // 3) Single-Cycle 모드: 어셈블리 줄 수(예: 18줄)와 1:1로 정확하게 일치하는 Step 인덱스 생성
+  const singleCycleHistoryIndices = useMemo(() => {
+    if (!mappedAssemblyRows.length) {
+      return [0];
+    }
+
+    // 각 어셈블리 라인마다 파이프라인 히스토리 중 해당 명령어가 실행 완료된(WB/MEM) 사이클 시점 매핑:
+    // Single-Cycle 관점에서는 명령어가 완전히 실행되어 레지스터에 결과가 쓰여진 시점(WB)이 보여야
+    // 레지스터와 메모리 변경 사항이 직관적으로 반영됩니다.
+    let lastFoundIdx = 0;
+    return mappedAssemblyRows.map((row, rowIdx) => {
+      const cleanRow = row.text.replace(/\s+/g, " ").trim().toLowerCase();
+
+      // 1순위: WB(Write Back) 단계에서 해당 명령어가 실행 완료된 사이클 탐색 (이전 명령어 이후 시점부터)
+      let foundIdx = pipelineHistory.findIndex(
+        (item, idx) =>
+          idx >= lastFoundIdx &&
+          item.buffers?.WB?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow
+      );
+
+      // 2순위: Store 계열(sw, sh, sb)은 WB에 레지스터를 쓰지 않고 MEM 단계에서 메모리에 쓰므로 MEM 단계 탐색
+      if (foundIdx === -1) {
+        foundIdx = pipelineHistory.findIndex(
+          (item, idx) =>
+            idx >= lastFoundIdx &&
+            item.buffers?.MEM?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow
+        );
+      }
+
+      // 3순위: EX 단계 탐색
+      if (foundIdx === -1) {
+        foundIdx = pipelineHistory.findIndex(
+          (item, idx) =>
+            idx >= lastFoundIdx &&
+            item.buffers?.EX?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow
+        );
+      }
+
+      // 4순위: 파이프라인 어느 단계든 매칭
+      if (foundIdx === -1) {
+        foundIdx = pipelineHistory.findIndex(
+          (item, idx) =>
+            idx >= lastFoundIdx &&
+            (item.buffers?.WB?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
+              item.buffers?.MEM?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
+              item.buffers?.EX?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
+              item.buffers?.ID?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
+              item.buffers?.IF?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow)
+        );
+      }
+
+      if (foundIdx !== -1) {
+        lastFoundIdx = foundIdx;
+        return foundIdx;
+      }
+
+      // 못 찾으면 이전 인덱스 + 1 또는 비례 분배
+      const fallback = Math.min(
+        pipelineHistory.length - 1,
+        Math.max(
+          lastFoundIdx + 1,
+          Math.floor((rowIdx / Math.max(1, mappedAssemblyRows.length - 1)) * (pipelineHistory.length - 1))
+        )
+      );
+      lastFoundIdx = fallback;
+      return fallback;
+    });
+  }, [mappedAssemblyRows, pipelineHistory]);
+
+  // Step 0(대기 상태)을 포함하여 총 스텝 수는 어셈블리 행 수와 동일 (0 ~ totalSingleSteps)
+  // 예: 18줄의 경우 Step 0(준비/연관코드만 표시) ~ Step 18(마지막 명령어 실행)
+  const totalSingleSteps = mappedAssemblyRows.length > 0 ? mappedAssemblyRows.length : 0;
+
+  // 모드별 총 스텝/사이클 수 (Single 모드는 0부터 18까지 탐색 가능하도록 totalSingleSteps)
+  const totalCycles = isSingleCycleViewport ? totalSingleSteps : totalPipelineCycles;
+
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [currentCycle, setCurrentCycle] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [playSpeed, setPlaySpeed] = useState<number>(800);
+  const [playSpeed, setPlaySpeed] = useState<number>(1000); // 기본값: 1.0 (초당 1스텝 = 1000ms)
   const [selectedCodeLine, setSelectedCodeLine] = useState<CodeLineSelectInfo | null>(null);
+
+  // Play / Pause 토글 시 화면 중앙에 잠깐 떴다가 사라지는 오버레이 인디케이터 상태
+  const [playbackFeedback, setPlaybackFeedback] = useState<{
+    type: "play" | "pause";
+    id: number;
+  } | null>(null);
+
+  // Single 모드와 Pipeline 모드 간 인덱스 동기화:
+  // Step 0일 때는 아직 1번째 명령어가 실행되기 전(대기 상태)이므로 0번 인덱스 히스토리를 가리키되,
+  // Step 1부터 1번째 명령어(mappedAssemblyRows[0])의 실행 히스토리를 가리킴
+  const activeCycleIndex = isSingleCycleViewport
+    ? currentStepIndex === 0
+      ? 0
+      : singleCycleHistoryIndices[currentStepIndex - 1] ?? 0
+    : currentCycle;
+
+  const prevCycleIndex = isSingleCycleViewport
+    ? currentStepIndex <= 1
+      ? 0
+      : singleCycleHistoryIndices[currentStepIndex - 2] ?? 0
+    : activeCycleIndex > 0
+    ? activeCycleIndex - 1
+    : null;
+
+  const currentData = pipelineHistory[activeCycleIndex] ?? null;
+  const prevData = prevCycleIndex !== null && prevCycleIndex !== activeCycleIndex
+    ? pipelineHistory[prevCycleIndex] ?? null
+    : null;
+
+  // Single 모드에서 현재 활성 실행 중인 어셈블리 행:
+  // Step 0일 때는 아직 실행 전이므로 activeRow 없음 (연관 라인만 표시하거나 대기)
+  // Step 1일 때 0번째 줄(1번째 줄)이 실행됨
+  const currentActiveRow = isSingleCycleViewport
+    ? currentStepIndex === 0
+      ? null
+      : mappedAssemblyRows[currentStepIndex - 1] ?? null
+    : null;
+
+  // 현재 실행 중인 어셈블리 줄의 C 소스 라인 번호
+  // Step 0일 때도 1번째 C 라인의 연관 코드 관계를 알 수 있도록 첫 번째 행의 sourceLine을 기본 연관으로 제공
+  const activeExecutionCLine = currentActiveRow
+    ? currentActiveRow.sourceLine
+    : isSingleCycleViewport && currentStepIndex === 0 && mappedAssemblyRows.length > 0
+    ? mappedAssemblyRows[0].sourceLine
+    : null;
+
+  // 실제 "진행 중/실행 중"인 상태인지 (Step 0이 아닐 때만 실제 실행 중)
+  const isActuallyExecuting = isSingleCycleViewport ? currentStepIndex > 0 : true;
+
+  // 현재 활성화된 선택 라인: 사용자가 명시적으로 클릭하지 않았으면 activeExecutionCLine을 자동 선택
+  const effectiveSelectedLine = translationSelectedLine ?? activeExecutionCLine;
 
   const timerRef = useRef<number | null>(null);
 
   const handleSimulationComplete = (data: SimulationResult) => {
     setIsPlaying(false);
+    setCurrentStepIndex(0);
     setCurrentCycle(0);
+    setPlaySpeed(1000); // 컴파일 완료 즉시 1.0에 포커스
     setSelectedCodeLine(null);
     setSimulationData(data);
   };
 
-  // 자동 재생 타이머
+  // 자동 재생 타이머: 재생 중에는 튜터 및 에디터가 현재 실행 라인을 실시간으로 따라가도록 수동 선택 자동 해제
   useEffect(() => {
     if (isPlaying) {
+      // 재생 시작 시 즉시 수동 선택을 해제하여 실행 라인 추적 모드로 전환
+      setTranslationSelectedLine(null);
+      setTranslationSelectedAsmIndex(null);
+
       timerRef.current = window.setInterval(() => {
-        setCurrentCycle((prev) => {
-          if (prev >= totalCycles - 1) {
-            setIsPlaying(false);
-            return prev;
-          }
-          return prev + 1;
-        });
+        if (isSingleCycleViewport) {
+          setCurrentStepIndex((prev) => {
+            if (prev >= totalSingleSteps) {
+              setIsPlaying(false);
+              return prev;
+            }
+            return prev + 1;
+          });
+        } else {
+          setCurrentCycle((prev) => {
+            if (prev >= totalPipelineCycles - 1) {
+              setIsPlaying(false);
+              return prev;
+            }
+            return prev + 1;
+          });
+        }
       }, playSpeed);
     } else {
       if (timerRef.current !== null) {
@@ -235,35 +412,83 @@ const MainPage: React.FC = () => {
         clearInterval(timerRef.current);
       }
     };
-  }, [isPlaying, playSpeed, totalCycles]);
+  }, [isPlaying, playSpeed, isSingleCycleViewport, totalSingleSteps, totalPipelineCycles]);
 
   const handleStepBack = () => {
     setIsPlaying(false);
-    setCurrentCycle((prev) => Math.max(0, prev - 1));
+    triggerPlaybackFeedback("pause");
+    // 스텝 조작 시 수동 선택을 해제하고 현재 실행 라인으로 자동 포커스
+    setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
+    if (isSingleCycleViewport) {
+      setCurrentStepIndex((prev) => Math.max(0, prev - 1));
+    } else {
+      setCurrentCycle((prev) => Math.max(0, prev - 1));
+    }
   };
 
   const handleStepForward = () => {
     setIsPlaying(false);
-    setCurrentCycle((prev) => Math.min(totalCycles - 1, prev + 1));
+    triggerPlaybackFeedback("pause");
+    // 스텝 조작 시 수동 선택을 해제하고 현재 실행 라인으로 자동 포커스
+    setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
+    if (isSingleCycleViewport) {
+      setCurrentStepIndex((prev) => Math.min(totalSingleSteps, prev + 1));
+    } else {
+      setCurrentCycle((prev) => Math.min(totalPipelineCycles - 1, prev + 1));
+    }
+  };
+
+  const triggerPlaybackFeedback = (type: "play" | "pause") => {
+    setPlaybackFeedback({ type, id: Date.now() });
   };
 
   const handleTogglePlay = () => {
-    if (currentCycle >= totalCycles - 1) {
-      setCurrentCycle(0);
+    const currentPos = isSingleCycleViewport ? currentStepIndex : currentCycle;
+    const maxPos = isSingleCycleViewport ? totalSingleSteps : totalPipelineCycles - 1;
+
+    // 재생 토글 시 수동 선택을 해제하여 실시간 실행 라인 추적 모드로 전환
+    setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
+
+    if (currentPos >= maxPos) {
+      if (isSingleCycleViewport) setCurrentStepIndex(0);
+      else setCurrentCycle(0);
       setIsPlaying(true);
+      triggerPlaybackFeedback("play");
     } else {
-      setIsPlaying((prev) => !prev);
+      setIsPlaying((prev) => {
+        const nextState = !prev;
+        triggerPlaybackFeedback(nextState ? "play" : "pause");
+        return nextState;
+      });
     }
   };
 
   const handleReset = () => {
     setIsPlaying(false);
+    setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
+    setCurrentStepIndex(0);
     setCurrentCycle(0);
   };
 
-  const handleJumpToCycle = (cycle: number) => {
-    setIsPlaying(false);
-    setCurrentCycle(cycle);
+  const handleJumpToCycle = (val: number) => {
+    setIsPlaying((prev) => {
+      if (prev) {
+        triggerPlaybackFeedback("pause");
+      }
+      return false;
+    });
+    // 슬라이더 조작 시에도 해당 실행 시점 라인으로 자동 포커스
+    setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
+    if (isSingleCycleViewport) {
+      setCurrentStepIndex(val);
+    } else {
+      setCurrentCycle(val);
+    }
   };
 
   const handleChangeSpeed = (speed: number) => {
@@ -353,10 +578,6 @@ const MainPage: React.FC = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  const currentData = simulationData?.history?.[currentCycle] ?? null;
-  const prevData =
-    currentCycle > 0 ? simulationData?.history?.[currentCycle - 1] ?? null : null;
 
   // ========================================================
   // 4. 사각형 텍스트 플레이스홀더 카드 및 1섹션 하단 File List 패널
@@ -472,7 +693,8 @@ const MainPage: React.FC = () => {
               busy={translationBusy}
               error={translationError}
               selectedLine={translationSelectedLine}
-              onSelectLine={setTranslationSelectedLine}
+              executionLine={isActuallyExecuting ? activeExecutionCLine : null}
+              onSelectLine={handleSelectTranslationLine}
             />
           );
         }
@@ -501,8 +723,18 @@ const MainPage: React.FC = () => {
             busy={translationBusy}
             error={translationError}
             selectedLine={translationSelectedLine}
-            onSelectLine={setTranslationSelectedLine}
+            selectedAsmIndex={translationSelectedAsmIndex}
+            executionLine={activeExecutionCLine}
+            onSelectLine={handleSelectTranslationLine}
             stageBuffers={currentData?.buffers}
+            mode={simulationMode}
+            currentActiveStep={
+              isSingleCycleViewport
+                ? currentStepIndex > 0
+                  ? currentStepIndex - 1
+                  : null
+                : null
+            }
           />
         );
       case "tutor":
@@ -513,6 +745,20 @@ const MainPage: React.FC = () => {
             loadingMessage={loadingMessage}
             selectedCodeLine={selectedCodeLine}
             onClearSelectedCodeLine={() => setSelectedCodeLine(null)}
+            translationSource={translationSource || cContent}
+            translationAssembly={translationAssembly || asmContent}
+            selectedTranslationLine={effectiveSelectedLine}
+            selectedAsmIndex={translationSelectedAsmIndex}
+            currentActiveAsmIndex={
+              isSingleCycleViewport
+                ? currentStepIndex > 0
+                  ? currentStepIndex - 1
+                  : null
+                : null
+            }
+            executionLine={isActuallyExecuting ? activeExecutionCLine : null}
+            isUserSelected={translationSelectedLine !== null}
+            onSelectTranslationLine={handleSelectTranslationLine}
           />
         );
       case "pipeline":
@@ -536,13 +782,19 @@ const MainPage: React.FC = () => {
           <RegisterVisualizer
             registers={currentData?.global_result.registers || {}}
             prevRegisters={prevData?.global_result.registers}
+            playSpeed={playSpeed}
+            cycle={activeCycleIndex}
           />
         );
       case "memory":
         return (
-          <MemoryVisualizer
-            memorySnapshot={currentData?.global_result.memory_snapshot || {}}
-            prevMemorySnapshot={prevData?.global_result.memory_snapshot}
+          <MemorySegmentVisualizer
+            currentData={currentData}
+            prevData={prevData}
+            simulationData={simulationData}
+            translationAssembly={translationAssembly || asmContent}
+            playSpeed={playSpeed}
+            cycle={activeCycleIndex}
           />
         );
       case "queues":
@@ -564,7 +816,7 @@ const MainPage: React.FC = () => {
       <div className="h-[48px] shrink-0 flex items-center gap-2 mb-2 min-h-0 w-full">
         <div className="flex-1 h-full min-w-0">
           <ControlPanel
-            currentCycle={currentCycle}
+            currentCycle={isSingleCycleViewport ? currentStepIndex : currentCycle}
             totalCycles={totalCycles}
             isPlaying={isPlaying}
             playSpeed={playSpeed}
@@ -574,7 +826,8 @@ const MainPage: React.FC = () => {
             onReset={handleReset}
             onJumpToCycle={handleJumpToCycle}
             onChangeSpeed={handleChangeSpeed}
-            isReady={totalCycles > 0}
+            isReady={isSimulationReady}
+            mode={simulationMode}
           />
         </div>
       </div>
@@ -791,6 +1044,35 @@ const MainPage: React.FC = () => {
       >
         {activeFlyout && renderPanelComponent(activeFlyout)}
       </FlyoutPanel>
+
+      {/* ============================================================ */}
+      {/* [Play / Pause 화면 중앙 블러 페이드 피드백 애니메이션]       */}
+      {/* ============================================================ */}
+      {playbackFeedback && (
+        <div
+          key={playbackFeedback.id}
+          className="playback-indicator-overlay fixed inset-0 m-auto w-24 h-24 rounded-3xl bg-slate-900/80 backdrop-blur-md shadow-2xl flex items-center justify-center pointer-events-none z-50 text-white border border-white/20"
+        >
+          {playbackFeedback.type === "play" ? (
+            // 삼각형 Play 아이콘
+            <svg
+              className="w-12 h-12 fill-white translate-x-1 drop-shadow-md"
+              viewBox="0 0 24 24"
+            >
+              <path d="M6 4.5l14 7.5-14 7.5v-15z" />
+            </svg>
+          ) : (
+            // 두 개의 세로선 Pause 아이콘
+            <svg
+              className="w-12 h-12 fill-white drop-shadow-md"
+              viewBox="0 0 24 24"
+            >
+              <rect x="5.5" y="4.5" width="4" height="15" rx="1.5" />
+              <rect x="14.5" y="4.5" width="4" height="15" rx="1.5" />
+            </svg>
+          )}
+        </div>
+      )}
     </main>
   );
 };

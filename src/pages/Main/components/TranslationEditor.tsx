@@ -11,6 +11,7 @@ type Props = {
   busy: boolean;
   error: string;
   selectedLine?: number | null;
+  executionLine?: number | null;
   onSelectLine?: (line: number | null) => void;
 };
 
@@ -23,6 +24,7 @@ export default function TranslationEditor({
   busy,
   error,
   selectedLine,
+  executionLine,
   onSelectLine,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
@@ -52,52 +54,67 @@ export default function TranslationEditor({
     });
   };
 
-  // 선택된 라인이 변경되었을 때 Monaco Editor 라인 하이라이트(Decoration) 갱신
+  // 선택된 라인 및 실행 중인 라인이 변경되었을 때 Monaco Editor 라인 하이라이트(Decoration) 갱신
   useEffect(() => {
     if (!editorRef.current || !monacoRef.current) return;
 
-    if (selectedLine && selectedLine > 0) {
-      const newDecorations: editor.IModelDeltaDecoration[] = [
-        {
-          range: new monacoRef.current.Range(selectedLine, 1, selectedLine, 1),
-          options: {
-            isWholeLine: true,
-            className: "monaco-selected-c-line",
-            lineNumberClassName: "monaco-selected-c-linenumber",
-          },
-        },
-      ];
+    const newDecorations: editor.IModelDeltaDecoration[] = [];
 
-      decorationsRef.current = editorRef.current.deltaDecorations(
-        decorationsRef.current,
-        newDecorations
-      );
-    } else {
-      decorationsRef.current = editorRef.current.deltaDecorations(
-        decorationsRef.current,
-        []
-      );
+    // 1. 실행 중인 라인 (초록색 에메랄드 테마)
+    if (executionLine && executionLine > 0) {
+      const isAlsoSelected = selectedLine === executionLine;
+      newDecorations.push({
+        range: new monacoRef.current.Range(executionLine, 1, executionLine, 1),
+        options: {
+          isWholeLine: true,
+          className: isAlsoSelected
+            ? "monaco-executing-selected-c-line"
+            : "monaco-executing-c-line",
+          lineNumberClassName: isAlsoSelected
+            ? "monaco-executing-selected-c-linenumber"
+            : "monaco-executing-c-linenumber",
+        },
+      });
     }
-  }, [selectedLine]);
+
+    // 2. 사용자가 수동 선택한 라인 (실행 라인과 다를 때 파란색 테마)
+    if (selectedLine && selectedLine > 0 && selectedLine !== executionLine) {
+      newDecorations.push({
+        range: new monacoRef.current.Range(selectedLine, 1, selectedLine, 1),
+        options: {
+          isWholeLine: true,
+          className: "monaco-selected-c-line",
+          lineNumberClassName: "monaco-selected-c-linenumber",
+        },
+      });
+    }
+
+    decorationsRef.current = editorRef.current.deltaDecorations(
+      decorationsRef.current,
+      newDecorations
+    );
+  }, [selectedLine, executionLine]);
 
   return (
     <section
-      className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       aria-label="Translation C 편집기"
     >
-      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-          <strong className="text-xs text-slate-700">C 소스 코드</strong>
+      <header className="shrink-0 flex items-center justify-between gap-1.5 border-b border-slate-200 bg-slate-50/80 px-2.5 py-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 shrink">
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+          <strong className="text-xs text-slate-700 truncate whitespace-nowrap">C 소스 코드</strong>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           <button
             type="button"
-            className="rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
             onClick={() => input.current?.click()}
             disabled={busy}
+            title="파일 열기"
           >
-            파일 열기
+            <span>📁</span>
+            <span className="hidden @[380px]:inline">파일 열기</span>
           </button>
           <input
             ref={input}
@@ -112,17 +129,20 @@ export default function TranslationEditor({
           />
           <button
             type="button"
-            className="rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
             onClick={onReset}
             disabled={busy}
+            title="초기화"
           >
-            초기화
+            <span>🔄</span>
+            <span className="hidden @[300px]:inline">초기화</span>
           </button>
           <button
             type="button"
-            className="w-[78px] justify-center rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+            className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
             onClick={onCompile}
             disabled={busy || !source.trim()}
+            title="컴파일"
           >
             <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
               {busy ? (
@@ -131,7 +151,7 @@ export default function TranslationEditor({
                 <span className="text-[12px] leading-none">⚡</span>
               )}
             </span>
-            <span>컴파일</span>
+            <span className="hidden @[230px]:inline">컴파일</span>
           </button>
         </div>
       </header>

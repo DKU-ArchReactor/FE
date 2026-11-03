@@ -66,30 +66,34 @@ const Header = () => {
     navigate("/login");
   };
 
+  // 3단계 뷰포트 내비게이션 아이템:
+  // 1번: Compile -> Execution (/c-to-asm)
+  // 2번: 5-Stage Pipeline (/)
+  // 3번: Management (/coming-soon)
   const navItems =
     aspectTier === "superwide"
       ? []
       : aspectTier === "ultrawide"
       ? [
           {
-            label: "Translation & Execution",
+            label: "Compile ➔ Pipeline",
             path: "/c-to-asm",
             active: location.pathname === "/c-to-asm" || location.pathname === "/",
           },
           {
-            label: "Execution & Management",
+            label: "Pipeline ➔ Management",
             path: "/coming-soon",
             active: location.pathname === "/coming-soon",
           },
         ]
       : [
           {
-            label: "Translation",
+            label: "Compile ➔ Execution",
             path: "/c-to-asm",
             active: isActive("/c-to-asm"),
           },
           {
-            label: "Execution",
+            label: "5-Stage Pipeline",
             path: "/",
             active: isActive("/"),
           },
