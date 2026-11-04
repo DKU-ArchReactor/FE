@@ -140,6 +140,8 @@ const BOUNDARY_DIVIDERS = [
   '0x00000000', // [5] Code와 NULL 사이 (NULL 기준점: 0)
 ];
 
+const EMPTY_MEMORY_SNAPSHOT: Record<string, string> = {};
+
 const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   currentData,
   prevData,
@@ -148,13 +150,13 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   playSpeed = 1000,
   cycle = 0,
 }) => {
-  const memorySnapshot = currentData?.global_result.memory_snapshot || {};
+  const memorySnapshot = currentData?.global_result.memory_snapshot ?? EMPTY_MEMORY_SNAPSHOT;
   const prevMemorySnapshot = prevData?.global_result.memory_snapshot;
   const currentPc = currentData?.global_result.current_pc?.toLowerCase();
   const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(false);
 
   // 새로 값이 쓰인 메모리 주소들에 대해 절반 주기(50%) 동안 점등 상태 유지
-  const [pulsingAddresses, setPulsingAddresses] = React.useState<Set<string>>(new Set());
+  const [pulsingAddresses, setPulsingAddresses] = React.useState<Set<string>>(() => new Set());
   const prevMemRef = React.useRef<Record<string, string> | undefined>(undefined);
 
   React.useEffect(() => {
@@ -162,7 +164,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     prevMemRef.current = memorySnapshot;
 
     if (!referencePrev) {
-      setPulsingAddresses(new Set());
+      setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
       return;
     }
 
@@ -181,12 +183,12 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
       setPulsingAddresses(changed);
       const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
       const timer = window.setTimeout(() => {
-        setPulsingAddresses(new Set());
+        setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
       }, halfDuration);
 
       return () => clearTimeout(timer);
     } else {
-      setPulsingAddresses(new Set());
+      setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
     }
   }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
 

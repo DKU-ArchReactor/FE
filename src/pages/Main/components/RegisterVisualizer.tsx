@@ -106,6 +106,8 @@ const REGISTER_METAS: Record<string, RegisterMeta> = {
   x31: { abi: 't6', group: 'temp', desc: 'Temporary' },
 };
 
+const REG_KEYS = Array.from({ length: 32 }, (_, i) => `x${i}`);
+
 const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   registers,
   prevRegisters,
@@ -113,10 +115,10 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   cycle = 0,
 }) => {
   // x0부터 x31까지 고정 순서 (32개)
-  const regKeys = Array.from({ length: 32 }, (_, i) => `x${i}`);
+  const regKeys = REG_KEYS;
 
   // 새로 값이 쓰인 레지스터에 대해 절반 주기 동안 점등(Flash/Pulse) 상태 유지
-  const [pulsingKeys, setPulsingKeys] = useState<Set<string>>(new Set());
+  const [pulsingKeys, setPulsingKeys] = useState<Set<string>>(() => new Set());
 
   const prevRegsRef = React.useRef<Record<string, string> | undefined>(undefined);
 
@@ -126,7 +128,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
     prevRegsRef.current = registers;
 
     if (!referencePrev) {
-      setPulsingKeys(new Set());
+      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
       return;
     }
 
@@ -145,14 +147,14 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
       // 속도의 절반(50%) 동안 점등 상태 유지 후 원래 파스텔 색상으로 복귀
       const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
       const timer = window.setTimeout(() => {
-        setPulsingKeys(new Set());
+        setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
       }, halfDuration);
 
       return () => clearTimeout(timer);
     } else {
-      setPulsingKeys(new Set());
+      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
     }
-  }, [cycle, registers, prevRegisters, playSpeed]);
+  }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3.5 flex flex-col min-h-0 overflow-hidden select-none">
