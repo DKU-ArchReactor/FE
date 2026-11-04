@@ -13,6 +13,7 @@ import FlyoutPanel from "./components/FlyoutPanel";
 
 import type { SimulationResult } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
+import { getFiles, getFileById } from "@/api/file";
 import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
 import { getDefaultSections } from "./types";
@@ -23,6 +24,7 @@ import { compileTranslation, mapAssembly } from "./components/translationCompile
 
 const DEFAULT_TRANSLATION_SOURCE = "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
 const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
+const EMPTY_REGISTERS: Record<string, string> = {};
 
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -36,12 +38,12 @@ const MainPage: React.FC = () => {
   // ========================================================
   // 0. 현재 라우트에 따른 슬라이드 시작 섹션 인덱스 & 화면 비율 3단계 감지
   // - 일반 비율 (< 21:9, 3개 섹션씩 노출):
-  //   · Translation (/c-to-asm) -> 0 (1, 2, 3 섹션 노출)
-  //   · Execution   (/)         -> 1 (2, 3, 4 섹션 노출)
-  //   · Management  (/coming-soon) -> 2 (3, 4, 5 섹션 노출)
+  //   · Compile ➔ Execution (/)        -> 0 (1, 2, 3 섹션 노출)
+  //   · 5-Stage Pipeline    (/pipeline)-> 1 (2, 3, 4 섹션 노출)
+  //   · Management          (/management)-> 2 (3, 4, 5 섹션 노출)
   // - 21:9 이상 화면 비율 (4개 섹션씩 노출):
-  //   · Translation & Execution (/c-to-asm, /) -> 0 (1, 2, 3, 4 섹션 노출)
-  //   · Execution & Management  (/coming-soon) -> 1 (2, 3, 4, 5 섹션 노출)
+  //   · Compile ➔ Pipeline    (/, /pipeline) -> 0 (1, 2, 3, 4 섹션 노출)
+  //   · Pipeline ➔ Management (/management)  -> 1 (2, 3, 4, 5 섹션 노출)
   // - 32:9 이상 화면 비율 (5개 섹션 전체 노출):
   //   · 항상 0 (1, 2, 3, 4, 5 섹션 한눈에 노출)
   // ========================================================
@@ -68,15 +70,19 @@ const MainPage: React.FC = () => {
   const visibleCount =
     aspectTier === "superwide" ? 5 : aspectTier === "ultrawide" ? 4 : 3;
 
+  const isManagementPath =
+    location.pathname === "/management" || location.pathname === "/coming-soon";
+  const isPipelinePath = location.pathname === "/pipeline";
+
   const slideStartIndex = useMemo(() => {
     if (aspectTier === "superwide") return 0;
     if (aspectTier === "ultrawide") {
-      return location.pathname === "/coming-soon" ? 1 : 0;
+      return isManagementPath ? 1 : 0;
     }
-    if (location.pathname === "/c-to-asm") return 0;
-    if (location.pathname === "/coming-soon") return 2;
-    return 1;
-  }, [location.pathname, aspectTier]);
+    if (isManagementPath) return 2;
+    if (isPipelinePath) return 1;
+    return 0;
+  }, [isManagementPath, isPipelinePath, aspectTier]);
 
   // 1섹션(C 코드 + File List)이 화면에 함께 보이는 상태인지 여부 (시작 인덱스가 0일 때)
   void slideStartIndex;
@@ -94,6 +100,10 @@ const MainPage: React.FC = () => {
     () => !!localStorage.getItem("access_token")
   );
   const [externalLoadFileId, setExternalLoadFileId] = useState<string | null>(null);
+  const [fileContentCache, setFileContentCache] = useState<Record<string, string>>({});
+  const [hoveredFileId, setHoveredFileId] = useState<string | null>(null);
+  const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
+  const loadedInitialFileIdRef = useRef<string | null>(null);
   const [translationSource, setTranslationSource] = useState(
     () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE
   );
@@ -117,13 +127,18 @@ const MainPage: React.FC = () => {
     setTranslationSelectedLine(line);
     setTranslationSelectedAsmIndex(asmIndex);
   };
-  const isTranslationPage = location.pathname === "/c-to-asm";
+  const isTranslationPage = slideStartIndex === 0;
 
-  const updateTranslationSource = (source: string, fileName = "main.c", resetSimulation = false) => {
+  const updateTranslationSource = (
+    source: string,
+    fileName = "main.c",
+    resetSimulation = false,
+    keepFileId: string | null = null
+  ) => {
     setTranslationSource(source);
     setCContent(source);
     setCFileName(fileName);
-    setFileId(null);
+    setFileId(keepFileId);
     sessionStorage.setItem(TRANSLATION_SOURCE_KEY, source);
     setAsmContent("");
     setTranslationAssembly("");
@@ -138,6 +153,59 @@ const MainPage: React.FC = () => {
       setIsPlaying(false);
     }
   };
+
+  // 로그인 상태 확인 및 저장된 파일 목록 조회 (Translation 페이지에서도 항상 로드)
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    setIsLoggedIn(!!token);
+    if (!token) {
+      setSavedFiles([]);
+      return;
+    }
+    getFiles()
+      .then((list) => setSavedFiles(list))
+      .catch((err) => console.error("Saved file list fetch error:", err));
+  }, [location.pathname]);
+
+  // 파일 ID로 상세 내용을 가져와 캐시에 저장하는 헬퍼
+  const ensureFileContent = async (targetId: string): Promise<{ title: string; content: string } | null> => {
+    const summary = savedFiles.find((f) => f.file_id === targetId);
+    if (fileContentCache[targetId] !== undefined) {
+      return {
+        title: summary?.title || "main.c",
+        content: fileContentCache[targetId],
+      };
+    }
+    try {
+      setLoadingPreviewId(targetId);
+      const detail = await getFileById(targetId);
+      setFileContentCache((prev) => ({ ...prev, [targetId]: detail.content }));
+      return { title: detail.title, content: detail.content };
+    } catch (err) {
+      console.error("File detail fetch error:", err);
+      return null;
+    } finally {
+      setLoadingPreviewId((prev) => (prev === targetId ? null : prev));
+    }
+  };
+
+  // File List에서 더블클릭(또는 마이페이지에서 진입) 시 상단 C 소스 코드 에디터에 코드 로드
+  const handleOpenSavedFileInEditor = async (targetId: string) => {
+    const detail = await ensureFileContent(targetId);
+    if (!detail) {
+      setTranslationError("선택한 소스 코드 파일을 불러오지 못했습니다.");
+      return;
+    }
+    setHoveredFileId(null);
+    updateTranslationSource(detail.content, detail.title, true, targetId);
+  };
+
+  // 마이페이지 등에서 fileId 쿼리/state를 들고 진입한 경우 자동으로 에디터에 로드
+  useEffect(() => {
+    if (!initialFileId || loadedInitialFileIdRef.current === initialFileId) return;
+    loadedInitialFileIdRef.current = initialFileId;
+    void handleOpenSavedFileInEditor(initialFileId);
+  }, [initialFileId]);
 
   useEffect(() => {
     if (!isTranslationPage) return;
@@ -215,7 +283,7 @@ const MainPage: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
 
   // 현재 뷰포트가 Compile ➔ Execution(1번 뷰)인지 5-Stage Pipeline(2번 뷰)인지 판별
-  const isSingleCycleViewport = location.pathname === "/c-to-asm";
+  const isSingleCycleViewport = location.pathname === "/" || location.pathname === "/c-to-asm";
   const simulationMode: "single" | "pipeline" = isSingleCycleViewport ? "single" : "pipeline";
   // 1) 어셈블리 뷰어의 실제 실행 가능한 명령어 행들 (매핑된 rows)
   const mappedAssemblyRows = useMemo(() => {
@@ -543,19 +611,19 @@ const MainPage: React.FC = () => {
 
   const handleGoPrevViewport = () => {
     if (aspectTier === "ultrawide") {
-      navigate("/c-to-asm");
+      navigate("/");
     } else {
-      if (slideStartIndex === 2) navigate("/");
-      else if (slideStartIndex === 1) navigate("/c-to-asm");
+      if (slideStartIndex === 2) navigate("/pipeline");
+      else if (slideStartIndex === 1) navigate("/");
     }
   };
 
   const handleGoNextViewport = () => {
     if (aspectTier === "ultrawide") {
-      navigate("/coming-soon");
+      navigate("/management");
     } else {
-      if (slideStartIndex === 0) navigate("/");
-      else if (slideStartIndex === 1) navigate("/coming-soon");
+      if (slideStartIndex === 0) navigate("/pipeline");
+      else if (slideStartIndex === 1) navigate("/management");
     }
   };
 
@@ -590,91 +658,137 @@ const MainPage: React.FC = () => {
     </div>
   );
 
-  const renderFileListPanel = () => (
-    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-0 overflow-hidden">
-      <div className="px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">📁</span>
-          <h3 className="text-xs font-bold text-slate-800">File List</h3>
+  const renderFileListPanel = () => {
+    const hoveredFile = savedFiles.find((f) => f.file_id === hoveredFileId) || null;
+    const hoveredCode = hoveredFileId ? fileContentCache[hoveredFileId] : undefined;
+
+    return (
+      <div
+        className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-0 overflow-hidden relative"
+        onMouseLeave={() => setHoveredFileId(null)}
+      >
+        <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs">📁</span>
+            <h3 className="text-xs font-bold text-slate-800">File List</h3>
+            <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">
+              (호버: 미리보기 · 더블클릭: 열기)
+            </span>
+          </div>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-mono">
+            {isLoggedIn ? `${savedFiles.length}개` : "비로그인"}
+          </span>
         </div>
-        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-mono">
-          {isLoggedIn ? `${savedFiles.length}개` : "비로그인"}
-        </span>
-      </div>
 
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 min-h-0">
-        {!isLoggedIn ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
-            <span className="text-xs font-semibold text-slate-500">
-              로그인이 필요합니다
-            </span>
-            <span className="text-[11px]">
-              로그인하면 저장한 C/ASM 파일 목록을 여기서 바로 불러올 수 있습니다.
-            </span>
-          </div>
-        ) : savedFiles.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
-            <span className="text-xs font-semibold text-slate-500">
-              저장된 파일이 없습니다
-            </span>
-            <span className="text-[11px]">
-              상단 C 코드 영역의 ☰ 메뉴에서 파일을 저장해 보세요.
-            </span>
-          </div>
-        ) : (
-          savedFiles.map((f) => {
-            const isSelected = fileId === f.file_id;
-            const dateStr = f.updated_at
-              ? new Date(f.updated_at).toLocaleDateString("ko-KR", {
-                  month: "2-digit",
-                  day: "2-digit",
-                })
-              : "";
+        <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 min-h-0 relative">
+          {!isLoggedIn ? (
+            <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
+              <span className="text-xs font-semibold text-slate-500">
+                로그인이 필요합니다
+              </span>
+              <span className="text-[11px]">
+                로그인하면 저장한 C/ASM 파일 목록을 여기서 바로 불러올 수 있습니다.
+              </span>
+            </div>
+          ) : savedFiles.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
+              <span className="text-xs font-semibold text-slate-500">
+                저장된 파일이 없습니다
+              </span>
+              <span className="text-[11px]">
+                마이페이지 또는 코드 메뉴에서 파일을 저장해 보세요.
+              </span>
+            </div>
+          ) : (
+            savedFiles.map((f) => {
+              const isSelected = fileId === f.file_id;
+              const isHovered = hoveredFileId === f.file_id;
+              const dateStr = f.updated_at
+                ? new Date(f.updated_at).toLocaleDateString("ko-KR", {
+                    month: "2-digit",
+                    day: "2-digit",
+                  })
+                : "";
 
-            return (
-              <button
-                key={f.file_id}
-                type="button"
-                onClick={() => setExternalLoadFileId(f.file_id)}
-                className={`w-full px-3 py-2 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer ${
-                  isSelected
-                    ? "bg-blue-50/90 border-blue-400 text-blue-900 shadow-2xs"
-                    : "bg-slate-50/50 hover:bg-slate-100/80 border-slate-200/70 text-slate-700"
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
-                      f.lang === "asm"
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-sky-100 text-sky-700"
-                    }`}
-                  >
-                    {f.lang || "c"}
-                  </span>
-                  <span className="text-xs font-semibold truncate">
-                    {f.title}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {dateStr && (
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {dateStr}
+              return (
+                <button
+                  key={f.file_id}
+                  type="button"
+                  onMouseEnter={() => {
+                    setHoveredFileId(f.file_id);
+                    void ensureFileContent(f.file_id);
+                  }}
+                  onDoubleClick={() => void handleOpenSavedFileInEditor(f.file_id)}
+                  title="마우스를 올리면 코드 미리보기, 더블클릭하면 C 소스 코드에 열기"
+                  className={`w-full px-3 py-2 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer select-none ${
+                    isSelected
+                      ? "bg-blue-50/90 border-blue-400 text-blue-900 shadow-2xs"
+                      : isHovered
+                      ? "bg-slate-100 border-slate-300 text-slate-900"
+                      : "bg-slate-50/50 hover:bg-slate-100/80 border-slate-200/70 text-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                        f.lang === "asm"
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-sky-100 text-sky-700"
+                      }`}
+                    >
+                      {f.lang || "c"}
                     </span>
-                  )}
-                  {isSelected && (
-                    <span className="text-[10px] font-bold text-blue-600">
-                      선택됨
+                    <span className="text-xs font-semibold truncate">
+                      {f.title}
                     </span>
-                  )}
-                </div>
-              </button>
-            );
-          })
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {dateStr && (
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {dateStr}
+                      </span>
+                    )}
+                    {isSelected && (
+                      <span className="text-[10px] font-bold text-blue-600">
+                        열림
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* 호버 시 우측에 뜨는 코드 미리보기 오버레이 (뒤의 파일 리스트를 가리지 않도록 우측 68% 배치 & pointer-events-none) */}
+        {hoveredFile && (
+          <div className="absolute top-10 bottom-2 right-2 w-[72%] z-30 bg-slate-900/95 backdrop-blur-xs text-slate-100 rounded-xl p-3 shadow-xl border border-slate-700 flex flex-col overflow-hidden pointer-events-none animate-in fade-in duration-150">
+            <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-slate-700 shrink-0">
+              <span className="text-[11px] font-bold text-sky-300 truncate">
+                📄 {hoveredFile.title}
+              </span>
+              <span className="text-[10px] text-slate-400 shrink-0">
+                더블클릭하여 열기
+              </span>
+            </div>
+            <div className="flex-1 overflow-hidden font-mono text-[11px] leading-relaxed text-slate-200 whitespace-pre-wrap">
+              {loadingPreviewId === hoveredFile.file_id && hoveredCode === undefined ? (
+                <span className="text-slate-400 font-sans text-xs">
+                  코드를 불러오는 중...
+                </span>
+              ) : hoveredCode ? (
+                hoveredCode
+              ) : (
+                <span className="text-slate-400 font-sans text-xs">
+                  코드 내용이 비어 있습니다.
+                </span>
+              )}
+            </div>
+          </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // ========================================================
   // 5. 컴포넌트 공통 렌더러 (슬롯 및 말풍선에서 공용 렌더링)
@@ -780,7 +894,7 @@ const MainPage: React.FC = () => {
       case "registers":
         return (
           <RegisterVisualizer
-            registers={currentData?.global_result.registers || {}}
+            registers={currentData?.global_result.registers ?? EMPTY_REGISTERS}
             prevRegisters={prevData?.global_result.registers}
             playSpeed={playSpeed}
             cycle={activeCycleIndex}
