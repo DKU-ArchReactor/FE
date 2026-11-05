@@ -48,6 +48,42 @@ export async function compileTranslation(source: string): Promise<TranslationCom
   };
 }
 
+export async function compileAssemblyDirectly(assemblySource: string): Promise<TranslationCompileResult> {
+  const result = await compileCode({
+    content: assemblySource,
+    lang: "asm",
+    compile_profile: "rv32im",
+    compiler_opt: "",
+  });
+  if (result.status !== "success") {
+    throw new Error(result.log || "어셈블리 빌드에 실패했습니다.");
+  }
+
+  let simulationResult: SimulationResult | null = null;
+  const targetToken = result.build_id
+    ? { build_id: result.build_id }
+    : result.simulation_token
+    ? { simulation_token: result.simulation_token }
+    : null;
+
+  if (targetToken) {
+    try {
+      simulationResult = await runSimulation({
+        ...targetToken,
+        mode: "pipeline",
+        max_cycles: 2000,
+      });
+    } catch (simError) {
+      console.warn("어셈블리 시뮬레이션 연동 실패:", simError);
+    }
+  }
+
+  return {
+    assembly: assemblySource,
+    simulationResult,
+  };
+}
+
 export function mapAssembly(assembly: string, sourceLineCount: number): MappedAssemblyRow[] {
   const sourceFiles = new Map<number, string>();
   let sourceLine: number | null = null;

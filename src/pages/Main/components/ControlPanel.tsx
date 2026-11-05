@@ -34,32 +34,32 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const maxCycle = isSingle ? totalCycles : Math.max(0, totalCycles - 1);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 px-4 py-2 flex items-center justify-between gap-4 transition-all">
+    <div className="flex-1 h-full bg-white dark:bg-[#252526] rounded-md shadow-xs dark:shadow-md border border-[#E5E5E5] dark:border-[#333333] px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
       {/* 1. 모드 뱃지 & 사이클/스텝 정보 및 슬라이더 */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {/* 모드 뱃지 */}
-        <div className="shrink-0 select-none">
+        <div className="shrink-0">
           {isSingle ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>⚡ Single-Cycle</span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 dark:bg-[#1E1E1E] border border-emerald-200 dark:border-[#3E3E42] text-emerald-800 dark:text-[#4EC9B0] text-[10px] font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#4EC9B0] animate-pulse" />
+              <span>SINGLE</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-[11px] font-bold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-              <span>🔄 5-Stage Pipeline</span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-50 dark:bg-[#1E1E1E] border border-sky-200 dark:border-[#3E3E42] text-sky-800 dark:text-[#9CDCFE] text-[10px] font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#005FB8] dark:bg-[#007ACC] animate-pulse" />
+              <span>PIPELINE</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-baseline gap-1.5 shrink-0 select-none">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            {isSingle ? "Step" : "Cycle"}
+        <div className="flex items-baseline gap-1 shrink-0 text-[#24292F] dark:text-[#CCCCCC]">
+          <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
+            {isSingle ? "Step" : "Cycle"}:
           </span>
-          <span className={`text-lg font-bold font-mono transition-colors ${isReady ? (isSingle ? "text-emerald-600" : "text-blue-600") : "text-slate-400"}`}>
+          <span className="text-base font-bold text-[#005FB8] dark:text-[#DCDCAA]">
             {currentCycle}
           </span>
-          <span className="text-[11px] text-slate-400 font-mono">/ {maxCycle}</span>
+          <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">/{maxCycle}</span>
         </div>
         
         <div className="flex-1 min-w-0 flex items-center gap-2 relative">
@@ -70,29 +70,27 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             disabled={!isReady || totalCycles <= 1}
             value={currentCycle}
             onChange={(e) => onJumpToCycle(Number(e.target.value))}
-            className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
-              isSingle ? "bg-emerald-100 accent-emerald-600" : "bg-slate-200 accent-blue-600"
-            }`}
+            className="w-full h-1 bg-[#E1E4E8] dark:bg-[#333333] rounded appearance-none cursor-pointer focus:outline-none accent-[#005FB8] dark:accent-[#007ACC] disabled:opacity-30"
           />
 
           {!isReady && (
-            <div className="hidden sm:flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-medium select-none">
+            <div className="hidden sm:flex items-center gap-1 shrink-0 px-2 py-0.5 rounded bg-[#F6F8FA] dark:bg-[#1E1E1E] border border-[#D0D7DE] dark:border-[#3E3E42] text-[#57606A] dark:text-[#858585] text-[10px]">
               <span>💡</span>
-              <span>C 코드 작성 후 <strong>[⚡ 컴파일]</strong>을 누르면 시뮬레이션이 활성화됩니다</span>
+              <span>C 코드 작성 후 <strong>[컴파일]</strong>을 누르면 시뮬레이터가 동작합니다</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* 2. 조작 버튼 그룹 */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* 2. VS Code 디버그 액션 툴바 (Control Buttons) */}
+      <div className="flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] dark:bg-[#333333] p-0.5 rounded border border-[#D0D7DE] dark:border-[#3E3E42]">
         <button
           onClick={onReset}
           disabled={!isReady || currentCycle === 0}
-          title="처음으로 리셋"
-          className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          title="재시작 (Restart / Reset)"
+          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </button>
@@ -100,10 +98,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <button
           onClick={onStepBack}
           disabled={!isReady || currentCycle <= 0}
-          title="이전 사이클 (Step Back)"
-          className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          title="이전 단계 (Step Back)"
+          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -111,69 +109,65 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <button
           onClick={onTogglePlay}
           disabled={!isReady || totalCycles <= 1}
-          title={isPlaying ? "일시정지" : "재생 (Play)"}
-          className={`w-[84px] justify-center px-2.5 py-1.5 rounded-xl font-semibold text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer border border-transparent outline-none focus:outline-none focus:ring-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+          title={isPlaying ? "일시정지 (Pause)" : "계속 실행 (Continue / Play)"}
+          className={`px-2.5 py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-30 ${
             isPlaying 
-              ? 'bg-amber-500 hover:bg-amber-600' 
-              : 'bg-blue-600 hover:bg-blue-700'
+              ? 'bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold' 
+              : 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
           }`}
         >
-          <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+          <span className="w-2.5 h-2.5 flex items-center justify-center shrink-0">
             {isPlaying ? (
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
+              <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                <rect x="5" y="4" width="4" height="16" rx="1" />
+                <rect x="15" y="4" width="4" height="16" rx="1" />
               </svg>
             ) : (
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+              <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                 <path d="M5 3.868v16.264a1 1 0 001.555.832l13.012-8.132a1 1 0 000-1.664L6.555 3.036A1 1 0 005 3.868z" />
               </svg>
             )}
           </span>
-          <span className="text-xs font-semibold">{isPlaying ? "Pause" : "Play"}</span>
+          <span>{isPlaying ? "PAUSE" : "RUN"}</span>
         </button>
 
         <button
           onClick={onStepForward}
           disabled={!isReady || currentCycle >= maxCycle}
-          title="다음 사이클 (Step Forward)"
-          className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          title="한 단계 실행 (Step Over / Forward)"
+          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
 
-      {/* 3. 속도 조절: 속도(0.5, 1.0, 1.5, 2.0) 버튼 그룹 */}
-      <div className="flex items-center gap-1 shrink-0 border-l border-slate-200 pl-2.5">
-        <span className="text-[10.5px] font-medium text-slate-400 select-none">속도:</span>
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-          {[
-            { label: "0.5", speed: 2000 },
-            { label: "1.0", speed: 1000 },
-            { label: "1.5", speed: 666 },
-            { label: "2.0", speed: 500 },
-          ].map(({ label, speed }) => {
-            const isSelected = Math.abs(playSpeed - speed) < 50;
-            return (
-              <button
-                key={label}
-                type="button"
-                disabled={!isReady}
-                onClick={() => onChangeSpeed(speed)}
-                className={`px-1.5 py-0.5 text-[10px] font-bold font-mono rounded-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                  isSelected
-                    ? "bg-white text-blue-700 shadow-2xs font-extrabold"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                }`}
-                title={`초당 ${label}스텝 실행`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+      {/* 3. 속도 조절 */}
+      <div className="flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] dark:border-[#3E3E42] pl-2 text-[10px]">
+        {[
+          { label: "0.5x", speed: 2000 },
+          { label: "1.0x", speed: 1000 },
+          { label: "1.5x", speed: 667 },
+          { label: "2.0x", speed: 500 },
+        ].map(({ label, speed }) => {
+          const isSelected = Math.abs(playSpeed - speed) < 50;
+          return (
+            <button
+              key={label}
+              type="button"
+              disabled={!isReady}
+              onClick={() => onChangeSpeed(speed)}
+              className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 ${
+                isSelected
+                  ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold"
+                  : "text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC] hover:bg-[#EAEAEA] dark:hover:bg-[#333333]"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

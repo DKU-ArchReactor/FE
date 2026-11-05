@@ -15,52 +15,7 @@ const formatSignedDec = (hexStr: string): string => {
   return signed.toLocaleString();
 };
 
-// 레지스터 역할별 그룹 스타일 정의: 기본은 깨끗한 흰색(bg-white), 값이 들어있는 곳만 구역별 연한 파스텔 배경
 type RegisterGroup = 'zero' | 'special' | 'args' | 'saved' | 'temp';
-
-interface RegisterGroupStyle {
-  label: string;
-  textColor: string;
-  activeBg: string; // 기본 상태에서 값이 들어있을 때의 구역별 연한 파스텔톤 배경
-  pulseBg: string;  // 값이 새로 쓰이는 전반부(50% 주기) 동안 반짝 점등되는 하이라이트 배경
-}
-
-const REGISTER_GROUP_STYLES: Record<RegisterGroup, RegisterGroupStyle> = {
-  zero: {
-    label: 'Zero',
-    textColor: 'text-slate-600 font-bold',
-    activeBg: 'bg-slate-100 hover:bg-slate-200/80',
-    pulseBg: 'bg-slate-200 text-slate-900 font-bold',
-  },
-  special: {
-    // ra, sp, gp, tp: 세련된 파스텔 로즈
-    label: 'Special',
-    textColor: 'text-rose-600 font-bold',
-    activeBg: 'bg-rose-50/80 hover:bg-rose-100/70',
-    pulseBg: 'bg-rose-200/90 text-rose-950 font-bold',
-  },
-  args: {
-    // a0 ~ a7 (함수 인자): 맑고 청량한 파스텔 블루
-    label: 'Args',
-    textColor: 'text-blue-600 font-bold',
-    activeBg: 'bg-blue-50/80 hover:bg-blue-100/70',
-    pulseBg: 'bg-blue-200/90 text-blue-950 font-bold',
-  },
-  saved: {
-    // s0 ~ s11 (보존 레지스터): 편안한 파스텔 틸/민트
-    label: 'Saved',
-    textColor: 'text-teal-700 font-bold',
-    activeBg: 'bg-teal-50/80 hover:bg-teal-100/70',
-    pulseBg: 'bg-teal-200/90 text-teal-950 font-bold',
-  },
-  temp: {
-    // t0 ~ t6 (임시 레지스터): 부드러운 파스텔 앰버/피치
-    label: 'Temp',
-    textColor: 'text-amber-700 font-bold',
-    activeBg: 'bg-amber-50/80 hover:bg-amber-100/70',
-    pulseBg: 'bg-amber-200/90 text-amber-950 font-bold',
-  },
-};
 
 // 레지스터 메타데이터: ABI 이름, 특수 목적 및 사전 배정 여부
 interface RegisterMeta {
@@ -157,26 +112,29 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
-      {/* 통일된 상단 헤더 바 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs">📋</span>
-          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">Registers</h3>
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[#24292F] dark:text-[#CCCCCC] shadow-2xs transition-colors duration-150">
+      {/* VS Code VARIABLES / WATCH 스타일 헤더 */}
+      <div className="shrink-0 flex items-center justify-between px-3 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-[#8C959F] dark:text-[#858585]">▼</span>
+          <h3 className="text-[11px] font-semibold text-[#1F2328] dark:text-[#CCCCCC] uppercase tracking-wider whitespace-nowrap">
+            REGISTERS (x0 ~ x31)
+          </h3>
         </div>
-        <span className="text-[10px] font-mono text-slate-400 font-semibold">x0 ~ x31</span>
+        <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">
+          CLK:{cycle ?? 0}
+        </span>
       </div>
 
-      {/* 32개 레지스터: 전체 가용 높이를 1/32로 균등 분할(flex-1 min-h-0)하여 스크롤 없이 100% 핏 */}
-      <div className="flex-1 flex flex-col font-mono min-h-0 overflow-hidden px-1.5 py-1">
+      {/* 32개 레지스터 그리드: VS Code 디버거 변수 인스펙터 룩앤필 */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1.5 py-0.5 divide-y divide-[#F0F0F0] dark:divide-[#2A2D2E]">
         {regKeys.map((regKey, idx) => {
           const val = registers[regKey] || '0x00000000';
           const isPulsing = pulsingKeys.has(regKey);
           const hasVal = val !== '0x00000000';
           const meta = REGISTER_METAS[regKey] || { abi: regKey, group: 'temp' as RegisterGroup };
-          const groupStyle = REGISTER_GROUP_STYLES[meta.group];
 
-          // 그룹이 바뀌는 경계선(Chunk Divider): 상단 1px 구분선 (일반 행은 1px 경계선)
+          // 그룹 경계선
           const prevMeta = idx > 0 ? REGISTER_METAS[regKeys[idx - 1]] : undefined;
           const isGroupStart = prevMeta && prevMeta.group !== meta.group;
 
@@ -184,53 +142,55 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
             <div
               key={regKey}
               title={`${meta.desc || regKey} (Hex: ${val})`}
-              className={`flex-1 min-h-0 flex items-center justify-between px-2.5 transition-colors duration-200 border-b border-slate-100 ${
-                isGroupStart ? 'border-t border-t-slate-300' : ''
+              className={`flex-1 min-h-0 flex items-center justify-between px-2 text-[11px] transition-colors duration-100 ${
+                isGroupStart ? 'border-t border-t-[#D0D7DE] dark:border-t-[#3E3E42]' : ''
               } ${
                 isPulsing
-                  ? groupStyle.pulseBg
+                  ? 'bg-[#FFF8C5] dark:bg-[#37373D] text-[#9A6700] dark:text-[#E5B567] font-bold'
                   : hasVal
-                  ? `${groupStyle.activeBg} text-slate-900 font-medium`
-                  : 'bg-white hover:bg-slate-50/70 text-slate-400'
+                  ? 'bg-white dark:bg-[#252526]/50 hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#1F2328] dark:text-[#D4D4D4]'
+                  : 'hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E]/50 text-[#656D76] dark:text-[#6E7681]'
               }`}
             >
-              {/* 좌측: [ABI 이름 크게] + [레지스터 번호] + [태그] */}
+              {/* 좌측: [ABI 이름] : [레지스터 번호] */}
               <div className="flex items-center gap-1.5 min-w-0">
-                {/* 1. ABI 이름 (a0, s0, t0, sp 등) - 동그라미 제거 & 폰트 크기 12.5px로 시원하게 확대 */}
-                <span className={`w-8 text-[12.5px] font-mono tracking-tight ${
-                  isPulsing ? 'font-black' : groupStyle.textColor
+                <span className={`w-7 font-bold ${
+                  isPulsing 
+                    ? 'text-[#9A6700] dark:text-[#E5B567]' 
+                    : hasVal 
+                    ? 'text-[#005FB8] dark:text-[#4EC9B0]' 
+                    : 'text-[#656D76] dark:text-[#858585]'
                 }`}>
                   {meta.abi}
                 </span>
 
-                {/* 2. 하드웨어 레지스터 번호 (x0 ~ x31) - 서브 라벨 */}
-                <span className={`w-6 text-[10px] font-mono ${
-                  isPulsing ? 'font-bold' : hasVal ? 'text-slate-500 font-semibold' : 'text-slate-400'
-                }`}>
-                  {regKey}
+                <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+                  ({regKey})
                 </span>
 
-                {/* 3. 사전 설정 태그 (Init SP, Fixed 0 등) */}
                 {meta.presetTag && (
-                  <span className="text-[7.5px] px-1 py-0.2 rounded font-sans font-bold bg-white/80 text-purple-700 shadow-2xs border border-purple-200 shrink-0 leading-none">
+                  <span className="text-[8px] px-1 py-0.1 rounded font-sans bg-[#EAEAEA] dark:bg-[#333333] text-[#005FB8] dark:text-[#9CDCFE] border border-[#D0D7DE] dark:border-[#454545] shrink-0 leading-none">
                     {meta.presetTag}
                   </span>
                 )}
               </div>
 
-              {/* 우측: 10진수 값 (폰트 크기 12px) */}
+              {/* 우측: 16진수 & 10진수 값 매핑 */}
               <div
-                title={`Hex: ${val} (Unsigned: ${parseInt(val, 16) || 0})`}
-                className="flex items-center gap-2 shrink-0 cursor-help"
+                title={`Hex: ${val}`}
+                className="flex items-center gap-2 shrink-0"
               >
-                <span className={`font-mono text-[12px] tracking-wide ${
+                <span className={`text-[10.5px] ${
                   isPulsing
-                    ? 'font-black'
+                    ? 'text-[#CF222E] dark:text-[#F44747] font-bold'
                     : hasVal
-                    ? 'text-slate-950 font-bold'
-                    : 'text-slate-400'
+                    ? 'text-[#953800] dark:text-[#CE9178]'
+                    : 'text-[#8C959F] dark:text-[#5A5A5A]'
                 }`}>
-                  {formatSignedDec(val)}
+                  {val}
+                </span>
+                <span className="text-[9.5px] text-[#656D76] dark:text-[#6E7681]">
+                  ({formatSignedDec(val)})
                 </span>
               </div>
             </div>

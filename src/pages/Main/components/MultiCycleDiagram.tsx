@@ -359,12 +359,12 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   }, [currentCycle, traceRows]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 & 범례 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2 bg-slate-50/80 border-b border-slate-200/80 min-w-0 gap-2">
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs">📈</span>
-          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">
+          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">
             Pipeline Timing Diagram
           </h3>
         </div>
@@ -377,39 +377,39 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
             <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white">MEM</span>
             <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white">WB</span>
             <span
-              className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-300 border-dashed"
+              className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 border-dashed"
               title="데이터 해저드로 인한 파이프라인 대기 (Stall)"
             >
               STL(지연)
             </span>
             <span
-              className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-300 border-dashed"
+              className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 border-dashed"
               title="분기/점프 플러시로 인해 버블(Bubble)로 변환됨"
             >
               BBL(버블)
             </span>
           </div>
-          <span className="text-[10px] font-mono text-slate-500 font-semibold px-2 py-0.5 rounded-full bg-slate-200/60">
+          <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585] font-semibold px-2 py-0.5 rounded bg-[#EAEAEA] dark:bg-[#333333]">
             {totalCycles > 0 ? `${totalCycles} Cycles` : 'Ready'}
           </span>
         </div>
       </div>
 
-      {/* 2. 계단식 타이밍 매트릭스 테이블 (가로·세로 통합 스크롤) */}
+      {/* 2. 계단식 타이밍 매트릭스 테이블 */}
       {!simulationData || traceRows.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-slate-400 gap-1.5">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-[#57606A] dark:text-[#858585] gap-1.5 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
           <span className="text-xl">📊</span>
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
             시뮬레이션을 실행하면 계단식 파이프라인 타이밍 다이어그램이 생성됩니다
           </span>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-[#57606A] dark:text-[#858585]">
             사이클별 각 명령어의 진행 단계(IF·ID·EX·MEM·WB)와 버블(BBL)/스톨(STL) 발생 위치를 한눈에 추적합니다.
           </span>
         </div>
       ) : (
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-auto min-h-0 relative select-none scrollbar-thin"
+          className="flex-1 overflow-auto min-h-0 relative select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
         >
           <div
             className="relative min-w-max"
@@ -418,14 +418,14 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
             }}
           >
             {/* 상단 고정 헤더 행 (Sticky Top) */}
-            <div className="h-7 flex items-stretch border-b border-slate-200 sticky top-0 bg-slate-50 z-20 shadow-2xs">
+            <div className="h-7 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-20 shadow-2xs">
               {/* 좌상단 고정 코너 셀 (Sticky Top & Left) */}
               <div
-                className="shrink-0 px-2.5 flex items-center justify-between border-r border-slate-200 bg-slate-100/95 sticky left-0 z-30 text-[10px] font-bold text-slate-600"
+                className="shrink-0 px-2.5 flex items-center justify-between border-r border-[#E5E5E5] dark:border-[#333333] bg-[#EAEAEA] dark:bg-[#2D2D2D] sticky left-0 z-30 text-[10px] font-bold text-[#57606A] dark:text-[#858585]"
                 style={{ width: `${LEFT_COL_WIDTH}px` }}
               >
                 <span>Instruction</span>
-                <span className="text-[9px] text-slate-400 font-mono">Now</span>
+                <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] font-mono">Now</span>
               </div>
 
               {/* 각 사이클 번호 헤더 (클릭 시 해당 사이클로 이동) */}
@@ -439,14 +439,14 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     key={cIdx}
                     type="button"
                     onClick={() => onJumpToCycle?.(cIdx)}
-                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-slate-200/70 cursor-pointer transition-colors relative ${
+                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${
                       isCurrent
-                        ? 'bg-blue-600 text-white shadow-inner font-extrabold'
+                        ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
                         : hasStall
-                        ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                        ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
                         : hasFlush
-                        ? 'bg-purple-50 text-purple-600 hover:bg-purple-100'
-                        : 'text-slate-500 hover:bg-sky-50 hover:text-sky-600'
+                        ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                        : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
                     }`}
                     style={{ width: `${COL_WIDTH}px` }}
                     title={`Clock ${item.clock ?? cIdx}${
@@ -470,7 +470,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
             <div className="relative">
               {/* 현재 선택된 사이클 수직 하이라이트 기둥 */}
               <div
-                className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-blue-500/80 bg-blue-500/10 transition-all duration-150"
+                className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
                 style={{
                   left: `${LEFT_COL_WIDTH + currentCycle * COL_WIDTH}px`,
                   width: `${COL_WIDTH}px`,
@@ -485,24 +485,28 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                 return (
                   <div
                     key={row.id}
-                    className={`flex items-stretch border-b border-slate-100/90 relative transition-colors ${
-                      isRowActiveNow ? 'bg-sky-50/60' : rIdx % 2 === 1 ? 'bg-slate-50/25' : ''
+                    className={`flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${
+                      isRowActiveNow 
+                        ? 'bg-blue-50/50 dark:bg-[#04395E]/30' 
+                        : rIdx % 2 === 1 
+                        ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30' 
+                        : ''
                     }`}
                     style={{ height: `${ROW_HEIGHT}px` }}
                   >
                     {/* 좌측 고정 명령어 열 (Sticky Left) */}
                     <div
                       onClick={() => onJumpToCycle?.(row.firstCycle)}
-                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-slate-200 sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${
+                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-[#E5E5E5] dark:border-[#333333] sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${
                         isRowActiveNow
-                          ? 'bg-sky-50 border-l-3 border-l-blue-600 font-bold text-slate-900 shadow-2xs'
-                          : 'bg-white hover:bg-slate-50 text-slate-600'
+                          ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
+                          : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
                       }`}
                       style={{ width: `${LEFT_COL_WIDTH}px` }}
                       title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
                     >
                       <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <span className="text-[9px] text-slate-400 shrink-0 w-4 text-right">
+                        <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
                           {rIdx + 1}.
                         </span>
                         <span className="truncate">{row.assembly}</span>
@@ -516,7 +520,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                           {activeCellNow.label}
                         </span>
                       ) : row.pc ? (
-                        <span className="text-[8.5px] text-slate-400 shrink-0">
+                        <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
                           {row.pc.slice(-4)}
                         </span>
                       ) : null}

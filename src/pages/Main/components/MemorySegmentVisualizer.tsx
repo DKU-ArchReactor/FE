@@ -323,29 +323,29 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 미니멀 헤더 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs">💾</span>
-          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">Memory</h3>
+          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">Virtual Memory</h3>
         </div>
-        <span className="text-[10px] font-mono text-slate-400 font-semibold">High ➔ Low</span>
+        <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585] font-semibold">High ➔ Low</span>
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-3 py-2">
         {/* 2. 최상단 시작 주소 헤더 바 */}
         <div className="shrink-0 flex flex-col mb-1">
-          <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pb-1 px-0.5">
+          <div className="flex items-center justify-between text-[10px] text-[#57606A] dark:text-[#858585] font-mono pb-1 px-0.5">
             <span
               title="Hex: 0x7FFFEFFC"
-              className="font-semibold text-slate-600 cursor-help"
+              className="font-semibold text-[#24292F] dark:text-[#CCCCCC] cursor-help"
             >
             {formatAddressDecimal('0x7FFFEFFC')}
           </span>
-          <span className="text-slate-400">High Address (Top)</span>
+          <span className="text-[#8C959F] dark:text-[#6E7681]">High Address (Top)</span>
         </div>
-        <div className="w-full border-t border-slate-300" />
+        <div className="w-full border-t border-[#E5E5E5] dark:border-[#333333]" />
       </div>
 
       {/* 3. 전체 6대 가상 메모리 영역과 세그먼트 사이 독립 경계선 5개 */}
@@ -495,12 +495,12 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                       return (
                         <div
                           key={item.address}
-                          className={`flex items-center justify-between px-2 py-1 rounded transition-colors duration-200 shrink-0 ${
+                          className={`flex items-center justify-between px-2 py-1 rounded transition-colors duration-150 shrink-0 ${
                             isPulsing
                               ? isStack
-                                ? 'bg-violet-200 text-violet-950 font-bold'
-                                : 'bg-amber-200/95 text-amber-950 font-bold'
-                              : 'bg-white hover:bg-slate-50/80 text-slate-700'
+                                ? 'bg-violet-200 dark:bg-violet-950/70 text-violet-950 dark:text-violet-200 font-bold'
+                                : 'bg-amber-200/95 dark:bg-amber-950/70 text-amber-950 dark:text-amber-200 font-bold'
+                              : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
                           }`}
                         >
                           {/* 좌측 주소 (10진수 고정 + 호버 시 16진수) */}
@@ -510,15 +510,15 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                               className={`text-[11px] font-mono font-medium cursor-help ${
                                 isPulsing
                                   ? isStack
-                                    ? 'text-violet-950 font-bold'
-                                    : 'text-amber-950 font-bold'
-                                  : 'text-slate-600'
+                                    ? 'text-violet-950 dark:text-violet-200 font-bold'
+                                    : 'text-amber-950 dark:text-amber-200 font-bold'
+                                  : 'text-[#57606A] dark:text-[#858585]'
                               }`}
                             >
                               {formatAddressDecimal(item.address)}
                             </span>
                             {item.label && (
-                              <span className="text-[8px] px-1 py-0.2 rounded font-sans font-bold bg-violet-100 text-violet-700 shrink-0">
+                              <span className="text-[8px] px-1 py-0.2 rounded font-sans font-bold bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 shrink-0">
                                 {item.label}
                               </span>
                             )}
@@ -530,11 +530,11 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                               className={`font-mono text-[11.5px] tracking-wide ${
                                 isPulsing
                                   ? isStack
-                                    ? 'text-violet-950 font-black'
-                                    : 'text-amber-950 font-black'
+                                    ? 'text-violet-950 dark:text-violet-200 font-black'
+                                    : 'text-amber-950 dark:text-amber-200 font-black'
                                   : isCode
-                                  ? 'text-indigo-950 font-semibold'
-                                  : 'text-slate-900 font-medium'
+                                  ? 'text-indigo-950 dark:text-[#9CDCFE] font-semibold'
+                                  : 'text-[#1F2328] dark:text-[#CCCCCC] font-medium'
                               }`}
                             >
                               {item.decText}
@@ -547,16 +547,16 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                 </div>
               </div>
 
-              {/* 세그먼트 사이 독립 경계선 (세그먼트 내부에 종속되지 않고 사이사이에 위치) */}
+              {/* 세그먼트 사이 독립 경계선 */}
               {dividerHex && index < SEGMENT_DEFS.length - 1 && (
                 <div className="relative flex items-center justify-center my-1 shrink-0">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-dashed border-slate-300" />
+                    <div className="w-full border-t border-dashed border-[#D0D7DE] dark:border-[#3E3E42]" />
                   </div>
-                  <div className="relative flex items-center bg-white px-2 text-[10px] text-slate-500 font-mono z-10">
+                  <div className="relative flex items-center bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono z-10">
                     <span
                       title={`Hex: ${normalizeHex(dividerHex)}`}
-                      className="font-semibold text-slate-600 cursor-help"
+                      className="font-semibold text-[#57606A] dark:text-[#858585] cursor-help"
                     >
                       {formatAddressDecimal(dividerHex)}
                     </span>
@@ -570,15 +570,15 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
 
       {/* 4. 최하단 메모리 끝 경계선 */}
       <div className="shrink-0 flex flex-col pt-1 mt-1">
-        <div className="w-full border-t border-slate-300 mb-1" />
-        <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono px-0.5">
+        <div className="w-full border-t border-[#E5E5E5] dark:border-[#333333] mb-1" />
+        <div className="flex items-center justify-between text-[10px] text-[#57606A] dark:text-[#858585] font-mono px-0.5">
           <span
             title="Hex: 0x00000000"
-            className="font-semibold text-slate-600 cursor-help"
+            className="font-semibold text-[#24292F] dark:text-[#CCCCCC] cursor-help"
           >
             0
           </span>
-          <span className="text-slate-400">Low Address (Origin)</span>
+          <span className="text-[#8C959F] dark:text-[#6E7681]">Low Address (Origin)</span>
         </div>
       </div>
       </div>

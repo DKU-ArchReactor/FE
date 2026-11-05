@@ -14,17 +14,17 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
 
   if (loadingMessage) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center gap-3 text-center">
-        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-semibold text-blue-700">{loadingMessage}</p>
-        <p className="text-xs text-slate-400">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
+      <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150">
+        <div className="w-9 h-9 border-3 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-[#005FB8] dark:text-[#007ACC]">{loadingMessage}</p>
+        <p className="text-xs text-[#57606A] dark:text-[#858585]">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
       </div>
     );
   }
 
   if (!currentData) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center text-slate-400 text-sm">
+      <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] p-6 flex items-center justify-center text-[#57606A] dark:text-[#858585] text-sm transition-colors duration-150">
         C 소스 코드를 작성하고 [⚡ 컴파일]을 누르면 파이프라인 데이터패스가 활성화됩니다.
       </div>
     );
@@ -55,7 +55,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
   const handleZoomReset = () => setZoomLevel(1.0);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0">
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
       {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일 */}
       <style>{`
         @keyframes streamDown {
@@ -84,11 +84,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
       `}</style>
 
       {/* 1. 상단 헤더 & 컨트롤러 */}
-      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-100 shrink-0">
+      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-[#E5E5E5] dark:border-[#333333] shrink-0">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-          <h3 className="text-xs font-bold text-slate-800">Vertical 5-Stage Datapath</h3>
-          <span className="text-[10px] text-slate-400 font-mono">(Clock {clock ?? 0})</span>
+          <span className="w-2 h-2 rounded-full bg-[#005FB8] dark:bg-[#007ACC] animate-pulse" />
+          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">Vertical 5-Stage Datapath</h3>
+          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">(Clock {clock ?? 0})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
@@ -108,24 +108,24 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
               🔄 Flush
             </span>
           )}
-          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-1 py-0.5 text-slate-600 text-[10px]">
+          <div className="flex items-center bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] rounded px-1 py-0.5 text-[#57606A] dark:text-[#CCCCCC] text-[10px]">
             <button
               onClick={handleZoomOut}
-              className="px-1 hover:text-blue-600 font-bold cursor-pointer"
+              className="px-1 hover:text-[#005FB8] dark:hover:text-[#007ACC] font-bold cursor-pointer"
               title="축소"
             >
               −
             </button>
             <button
               onClick={handleZoomReset}
-              className="px-1 font-mono font-semibold hover:text-blue-600 cursor-pointer"
+              className="px-1 font-mono font-semibold hover:text-[#005FB8] dark:hover:text-[#007ACC] cursor-pointer"
               title="100% (세로 맞춤)"
             >
               {Math.round(zoomLevel * 100)}%
             </button>
             <button
               onClick={handleZoomIn}
-              className="px-1 hover:text-blue-600 font-bold cursor-pointer"
+              className="px-1 hover:text-[#005FB8] dark:hover:text-[#007ACC] font-bold cursor-pointer"
               title="확대"
             >
               +

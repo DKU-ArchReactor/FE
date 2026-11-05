@@ -16,14 +16,15 @@ import FlyoutPanel from "./components/FlyoutPanel";
 
 import type { SimulationResult } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
-import { getFiles, getFileById } from "@/api/file";
+import { getFiles, getFileById, saveFile } from "@/api/file";
 import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
 import { getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 import TranslationEditor from "./components/TranslationEditor";
 import TranslationMapping from "./components/TranslationMapping";
-import { compileTranslation, mapAssembly } from "./components/translationCompile";
+import { compileTranslation, compileAssemblyDirectly, mapAssembly } from "./components/translationCompile";
+import AiAssistantPopup from "@/components/AiAssistantPopup";
 
 const DEFAULT_TRANSLATION_SOURCE = "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
 const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
@@ -98,6 +99,8 @@ const MainPage: React.FC = () => {
     () => !!localStorage.getItem("access_token")
   );
   const [externalLoadFileId, setExternalLoadFileId] = useState<string | null>(null);
+  const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
+  const aiButtonRef = useRef<HTMLButtonElement>(null);
   const [fileContentCache, setFileContentCache] = useState<Record<string, string>>({});
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null);
   const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
@@ -111,6 +114,49 @@ const MainPage: React.FC = () => {
   const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
   // 사용자가 수동 클릭한 특정 어셈블리 행 인덱스 (0부터 시작)
   const [translationSelectedAsmIndex, setTranslationSelectedAsmIndex] = useState<number | null>(null);
+
+  // 작성 대상 활성화 상태 ("c" vs "asm")
+  const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
+
+  // 어셈블리 직접 작성 모드 전용 소스 코드
+  const [customAssembly, setCustomAssembly] = useState<string>(() => {
+    return [
+      "# RISC-V 32IM 어셈블리 직접 작성",
+      ".globl main",
+      "main:",
+      "    addi x1, x0, 5",
+      "    addi x2, x0, 10",
+      "    add  x3, x1, x2",
+      "    slli x4, x3, 2",
+      "    ret",
+      "",
+    ].join("\n");
+  });
+
+  // 어셈블리 직접 시뮬레이션 핸들러
+  const handleAssemblySimulation = async () => {
+    const codeToSimulate = customAssembly;
+    if (!codeToSimulate.trim() || translationBusy) return;
+
+    setTranslationBusy(true);
+    setTranslationError("");
+    setAsmContent(codeToSimulate);
+    setTranslationAssembly(codeToSimulate);
+
+    try {
+      const { assembly, simulationResult } = await compileAssemblyDirectly(codeToSimulate);
+      setTranslationAssembly(assembly);
+      setAsmContent(assembly);
+      if (simulationResult) {
+        handleSimulationComplete(simulationResult);
+      }
+    } catch (err: any) {
+      console.error("Assembly simulation error:", err);
+      setTranslationError(err?.message || "어셈블리 시뮬레이션 요청에 실패했습니다.");
+    } finally {
+      setTranslationBusy(false);
+    }
+  };
 
   const handleSelectTranslationLine = (line: number | null, asmIndex: number | null = null) => {
     // 사용자가 특정 라인을 클릭해 탐색할 때, 자동 재생 중이면 즉시 일시정지(Pause)
@@ -195,6 +241,35 @@ const MainPage: React.FC = () => {
     }
     setHoveredFileId(null);
     updateTranslationSource(detail.content, detail.title, true, targetId);
+  };
+
+  // 소스 코드 에디터에서 서버로 저장하는 핸들러
+  const handleSaveTranslationFile = async (nameToSave?: string): Promise<boolean> => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      alert("파일 저장은 로그인 후 이용할 수 있습니다.");
+      return false;
+    }
+
+    const title = (nameToSave || cFileName || "main.c").trim();
+    if (!title) return false;
+
+    try {
+      const saved = await saveFile({
+        title,
+        content: translationSource,
+        lang: "c",
+      });
+      setFileId(saved.file_id);
+      setCFileName(saved.title);
+      const updatedList = await getFiles();
+      setSavedFiles(updatedList);
+      return true;
+    } catch (err) {
+      console.error("Save file error:", err);
+      alert("파일 저장 중 오류가 발생했습니다.");
+      return false;
+    }
   };
 
   // 마이페이지 등에서 fileId 쿼리/state를 들고 진입한 경우 자동으로 에디터에 로드
@@ -426,8 +501,8 @@ const MainPage: React.FC = () => {
   // 실제 "진행 중/실행 중"인 상태인지 (Step 0이 아닐 때만 실제 실행 중)
   const isActuallyExecuting = isSingleCycleViewport ? currentStepIndex > 0 : true;
 
-  // 현재 활성화된 선택 라인: 사용자가 명시적으로 클릭하지 않았으면 activeExecutionCLine을 자동 선택
-  const effectiveSelectedLine = translationSelectedLine ?? activeExecutionCLine;
+  // 현재 활성화된 선택 라인: 어셈블리 작성 모드일 때는 비활성화(null), C 모드일 때는 사용자가 선택한 라인 또는 실행 라인
+  const effectiveSelectedLine = editorTarget === "asm" ? null : (translationSelectedLine ?? activeExecutionCLine);
 
   const timerRef = useRef<number | null>(null);
 
@@ -613,12 +688,86 @@ const MainPage: React.FC = () => {
     };
   }, [resizingLeftPane]);
 
+  // 좌측 고정 패널 내부 레이아웃 상태:
+  // 1) 상단 (C 소스 + ASM) vs 하단 (Tutor) 높이 비율 (기본 56% : 44%)
+  const [leftTopHeightPercent, setLeftTopHeightPercent] = useState<number>(56);
+  const [resizingLeftVertical, setResizingLeftVertical] = useState<boolean>(false);
+  const leftPaneContainerRef = useRef<HTMLDivElement>(null);
+
+  // 2) 상단 내부 C 소스 vs ASM 매핑 가로 너비 비율 (기본 50% : 50%)
+  const [leftCodeColRatio, setLeftCodeColRatio] = useState<number>(50);
+  const [resizingLeftCodeCol, setResizingLeftCodeCol] = useState<boolean>(false);
+  const leftTopContainerRef = useRef<HTMLDivElement>(null);
+
+  // 좌측 상단(코드/ASM) <-> 하단(튜터) 세로 분할선 드래그 핸들러
+  useEffect(() => {
+    if (!resizingLeftVertical) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!leftPaneContainerRef.current) return;
+      const rect = leftPaneContainerRef.current.getBoundingClientRect();
+      const currentY = e.clientY - rect.top;
+      const percent = (currentY / rect.height) * 100;
+      // 상단 최소 25%, 최대 80% 제한
+      setLeftTopHeightPercent(Math.max(25, Math.min(80, Math.round(percent * 10) / 10)));
+    };
+
+    const handleMouseUp = () => {
+      setResizingLeftVertical(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [resizingLeftVertical]);
+
+  // 좌측 C 소스 <-> ASM 매핑 가로 분할선 드래그 핸들러
+  useEffect(() => {
+    if (!resizingLeftCodeCol) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!leftTopContainerRef.current) return;
+      const rect = leftTopContainerRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const percent = (currentX / rect.width) * 100;
+      // C 코드 최소 20%, 최대 80% 제한
+      setLeftCodeColRatio(Math.max(20, Math.min(80, Math.round(percent * 10) / 10)));
+    };
+
+    const handleMouseUp = () => {
+      setResizingLeftCodeCol(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [resizingLeftCodeCol]);
+
   const {
     containerRef,
     resizingSplitterIndex,
     resizingRowSlot,
     resizingPair,
-    handleColResizeStart,
     handleSlotResizeStart,
     handlePairResizeStart,
   } = useResizableLayout(sections, setSections);
@@ -661,8 +810,8 @@ const MainPage: React.FC = () => {
   // 4. 사각형 텍스트 플레이스홀더 카드 및 1섹션 하단 File List 패널
   // ========================================================
   const renderPlaceholderBox = (title: string) => (
-    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center p-4 min-h-0 overflow-hidden select-none">
-      <span className="text-base font-bold text-slate-700 tracking-wide">
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center p-4 min-h-0 overflow-hidden select-none transition-colors duration-150">
+      <span className="text-base font-bold text-[#24292F] dark:text-[#CCCCCC] tracking-wide">
         {title}
       </span>
     </div>
@@ -674,26 +823,26 @@ const MainPage: React.FC = () => {
 
     return (
       <div
-        className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-0 overflow-hidden relative"
+        className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden relative transition-colors duration-150"
         onMouseLeave={() => setHoveredFileId(null)}
       >
-        <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+        <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#333333] bg-[#F3F3F3] dark:bg-[#252526] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="text-xs">📁</span>
-            <h3 className="text-xs font-bold text-slate-800">File List</h3>
-            <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">
+            <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">File List</h3>
+            <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-normal hidden sm:inline">
               (호버: 미리보기 · 더블클릭: 열기)
             </span>
           </div>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-mono">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#EAEAEA] dark:bg-[#333333] text-[#005FB8] dark:text-[#79C0FF] font-mono">
             {isLoggedIn ? `${savedFiles.length}개` : "비로그인"}
           </span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 min-h-0 relative">
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0 relative">
           {!isLoggedIn ? (
-            <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
-              <span className="text-xs font-semibold text-slate-500">
+            <div className="h-full flex flex-col items-center justify-center text-center text-[#57606A] dark:text-[#858585] px-3 gap-1">
+              <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
                 로그인이 필요합니다
               </span>
               <span className="text-[11px]">
@@ -701,8 +850,8 @@ const MainPage: React.FC = () => {
               </span>
             </div>
           ) : savedFiles.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 px-3 gap-1">
-              <span className="text-xs font-semibold text-slate-500">
+            <div className="h-full flex flex-col items-center justify-center text-center text-[#57606A] dark:text-[#858585] px-3 gap-1">
+              <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
                 저장된 파일이 없습니다
               </span>
               <span className="text-[11px]">
@@ -730,36 +879,36 @@ const MainPage: React.FC = () => {
                   }}
                   onDoubleClick={() => void handleOpenSavedFileInEditor(f.file_id)}
                   title="마우스를 올리면 코드 미리보기, 더블클릭하면 C 소스 코드에 열기"
-                  className={`w-full px-3 py-2 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer select-none ${
+                  className={`w-full px-2.5 py-1.5 rounded-md border text-left transition-all flex items-center justify-between gap-2 cursor-pointer select-none ${
                     isSelected
-                      ? "bg-blue-50/90 border-blue-400 text-blue-900 shadow-2xs"
+                      ? "bg-blue-50 dark:bg-[#04395E] border-blue-400 dark:border-[#007ACC] text-blue-900 dark:text-[#9CDCFE] shadow-2xs"
                       : isHovered
-                      ? "bg-slate-100 border-slate-300 text-slate-900"
-                      : "bg-slate-50/50 hover:bg-slate-100/80 border-slate-200/70 text-slate-700"
+                      ? "bg-[#F3F4F6] dark:bg-[#2A2D2E] border-[#D0D7DE] dark:border-[#3E3E42] text-[#1F2328] dark:text-[#CCCCCC]"
+                      : "bg-[#F8F8F8] dark:bg-[#252526]/40 hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E] border-[#E5E5E5] dark:border-[#333333] text-[#24292F] dark:text-[#CCCCCC]"
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                      className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
                         f.lang === "asm"
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-sky-100 text-sky-700"
+                          ? "bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300"
+                          : "bg-sky-100 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300"
                       }`}
                     >
                       {f.lang || "c"}
                     </span>
-                    <span className="text-xs font-semibold truncate">
+                    <span className="text-xs font-medium truncate">
                       {f.title}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {dateStr && (
-                      <span className="text-[10px] text-slate-400 font-mono">
+                      <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">
                         {dateStr}
                       </span>
                     )}
                     {isSelected && (
-                      <span className="text-[10px] font-bold text-blue-600">
+                      <span className="text-[10px] font-bold text-[#005FB8] dark:text-[#79C0FF]">
                         열림
                       </span>
                     )}
@@ -770,45 +919,30 @@ const MainPage: React.FC = () => {
           )}
         </div>
 
-        {/* 호버 시 우측에 뜨는 코드 미리보기 오버레이 (뒤의 파일 리스트를 가리지 않도록 우측 68% 배치 & pointer-events-none) */}
+        {/* 호버 시 우측에 뜨는 코드 미리보기 오버레이 */}
         {hoveredFile && (
-          <div className="absolute top-10 bottom-2 right-2 w-[72%] z-30 bg-slate-900/95 backdrop-blur-xs text-slate-100 rounded-xl p-3 shadow-xl border border-slate-700 flex flex-col overflow-hidden pointer-events-none animate-in fade-in duration-150">
-            <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-slate-700 shrink-0">
-              <span className="text-[11px] font-bold text-sky-300 truncate">
+          <div className="absolute top-10 bottom-2 right-2 w-[72%] z-30 bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-xs text-[#24292F] dark:text-[#CCCCCC] rounded-lg p-3 shadow-xl border border-[#E5E5E5] dark:border-[#333333] flex flex-col overflow-hidden pointer-events-none animate-in fade-in duration-150">
+            <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-[#E5E5E5] dark:border-[#333333] shrink-0">
+              <span className="text-[11px] font-bold text-[#005FB8] dark:text-[#79C0FF] truncate">
                 📄 {hoveredFile.title}
               </span>
-              <span className="text-[10px] text-slate-400 shrink-0">
+              <span className="text-[10px] text-[#57606A] dark:text-[#858585] shrink-0">
                 더블클릭하여 열기
               </span>
             </div>
-            <div className="flex-1 overflow-hidden font-mono text-[11px] leading-relaxed text-slate-200 whitespace-pre-wrap">
+            <div className="flex-1 overflow-hidden font-mono text-[11px] leading-relaxed text-[#24292F] dark:text-[#CCCCCC] whitespace-pre-wrap">
               {loadingPreviewId === hoveredFile.file_id && hoveredCode === undefined ? (
-                <span className="text-slate-400 font-sans text-xs">
+                <span className="text-[#57606A] dark:text-[#858585] font-sans text-xs">
                   코드를 불러오는 중...
                 </span>
               ) : hoveredCode ? (
                 hoveredCode
               ) : (
-                <span className="text-slate-400 font-sans text-xs">
+                <span className="text-[#57606A] dark:text-[#858585] font-sans text-xs">
                   코드 내용이 비어 있습니다.
                 </span>
               )}
             </div>
-
-            {/* 구역 간 가로 조절 스플리터 바 */}
-            {secIdx < sections.length - 1 && (
-              <div
-                onMouseDown={() => handleColResizeStart(secIdx)}
-                title="드래그하여 구역 간 너비 조절"
-                className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-blue-50/50 rounded-sm transition-colors"
-              >
-                <div className={`w-[3px] rounded-full transition-all duration-200 ${
-                  resizingSplitterIndex === secIdx 
-                    ? 'h-24 bg-blue-600 shadow-sm' 
-                    : 'h-10 bg-slate-300 group-hover:h-20 group-hover:bg-blue-500'
-                }`} />
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -825,6 +959,7 @@ const MainPage: React.FC = () => {
           return (
             <TranslationEditor
               source={translationSource}
+              fileName={cFileName || "main.c"}
               onChange={(value) => updateTranslationSource(value)}
               onCompile={handleTranslationCompile}
               onFile={handleTranslationFile}
@@ -834,6 +969,12 @@ const MainPage: React.FC = () => {
               selectedLine={translationSelectedLine}
               executionLine={isActuallyExecuting ? activeExecutionCLine : null}
               onSelectLine={handleSelectTranslationLine}
+              savedFiles={savedFiles}
+              isLoggedIn={isLoggedIn}
+              currentFileId={fileId}
+              onOpenSavedFile={(id) => void handleOpenSavedFileInEditor(id)}
+              onSave={handleSaveTranslationFile}
+              activeTarget={editorTarget}
             />
           );
         }
@@ -858,7 +999,7 @@ const MainPage: React.FC = () => {
         return (
           <TranslationMapping
             source={translationSource || cContent}
-            assembly={translationAssembly || asmContent}
+            assembly={editorTarget === "asm" ? customAssembly : (translationAssembly || asmContent)}
             busy={translationBusy}
             error={translationError}
             selectedLine={translationSelectedLine}
@@ -874,6 +1015,23 @@ const MainPage: React.FC = () => {
                   : null
                 : null
             }
+            activeTarget={editorTarget}
+            onAssemblyChange={setCustomAssembly}
+            onSimulateAssembly={handleAssemblySimulation}
+            onResetAssembly={() => {
+              const defaultAsm = [
+                "# RISC-V 32IM 어셈블리 직접 작성",
+                ".globl main",
+                "main:",
+                "    addi x1, x0, 5",
+                "    addi x2, x0, 10",
+                "    add  x3, x1, x2",
+                "    slli x4, x3, 2",
+                "    ret",
+                "",
+              ].join("\n");
+              setCustomAssembly(defaultAsm);
+            }}
           />
         );
       case "tutor":
@@ -895,9 +1053,10 @@ const MainPage: React.FC = () => {
                   : null
                 : null
             }
-            executionLine={isActuallyExecuting ? activeExecutionCLine : null}
-            isUserSelected={translationSelectedLine !== null}
+            executionLine={isActuallyExecuting && editorTarget === "c" ? activeExecutionCLine : null}
+            isUserSelected={editorTarget === "c" && translationSelectedLine !== null}
             onSelectTranslationLine={handleSelectTranslationLine}
+            activeTarget={editorTarget}
           />
         );
       case "pipeline":
@@ -976,10 +1135,11 @@ const MainPage: React.FC = () => {
   return (
     <main className="flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative">
       {/* ============================================================ */}
-      {/* [최상단 제어 바]: 재생 컨트롤러                               */}
+      {/* [최상단 제어 바]: 재생 컨트롤러 + AI 로고 어시스턴트 버튼     */}
       {/* ============================================================ */}
-      <div className="h-[48px] shrink-0 flex items-center gap-2 mb-2 min-h-0 w-full">
-        <div className="flex-1 h-full min-w-0">
+      <div className="h-[42px] shrink-0 flex items-stretch gap-2 mb-2 min-h-0 w-full">
+        {/* 시뮬레이션 제어 바 */}
+        <div className="flex-1 h-full min-w-0 flex">
           <ControlPanel
             currentCycle={isSingleCycleViewport ? currentStepIndex : currentCycle}
             totalCycles={totalCycles}
@@ -995,7 +1155,46 @@ const MainPage: React.FC = () => {
             mode={simulationMode}
           />
         </div>
+
+        {/* 오른쪽 여백: 정사각형(라운드) AI 로고 전용 버튼 */}
+        <button
+          ref={aiButtonRef}
+          type="button"
+          onClick={() => setIsAiPopupOpen((prev) => !prev)}
+          title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
+          className={`h-full aspect-square rounded-md border flex items-center justify-center cursor-pointer transition-all duration-150 shrink-0 select-none shadow-xs dark:shadow-md group ${
+            isAiPopupOpen
+              ? "bg-[#005FB8] dark:bg-[#007ACC] text-white border-[#005FB8] dark:border-[#007ACC] ring-2 ring-[#005FB8]/25 dark:ring-[#007ACC]/30"
+              : "border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#252526] text-[#005FB8] dark:text-[#007ACC] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:bg-[#F3F4F6] dark:hover:bg-[#2D2D2D]"
+          }`}
+        >
+          {/* AI 로고 (Sparkle) */}
+          <div className="relative flex items-center justify-center">
+            <svg
+              className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${
+                isAiPopupOpen ? "text-amber-300" : "text-[#005FB8] dark:text-[#007ACC]"
+              }`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+              />
+            </svg>
+          </div>
+        </button>
       </div>
+
+      {/* 버튼 바로 아래에서 애니메이션과 함께 드롭다운되는 이동 가능한 AI 어시스턴트 팝업 창 */}
+      <AiAssistantPopup
+        isOpen={isAiPopupOpen}
+        onClose={() => setIsAiPopupOpen(false)}
+        anchorRef={aiButtonRef}
+      />
 
       {/* ============================================================ */}
       {/* [분할 레이아웃]: 좌측 고정 (C & ASM) + 우측 슬라이딩 뷰포트   */}
@@ -1003,93 +1202,172 @@ const MainPage: React.FC = () => {
       <div
         ref={mainWorkspaceRef}
         className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch gap-1.5 ${
-          resizingLeftPane || resizingSplitterIndex !== null ? "select-none" : ""
+          resizingLeftPane ||
+          resizingSplitterIndex !== null ||
+          resizingLeftVertical ||
+          resizingLeftCodeCol
+            ? "select-none"
+            : ""
         }`}
       >
         {/* ======================================================== */}
-        {/* [좌측 고정 영역]: 1섹션 (C 소스/파일) + 2섹션 (ASM/튜터)   */}
+        {/* [좌측 고정 영역]: 상단 (C 소스 + ASM) + 하단 단일 튜터   */}
         {/* ======================================================== */}
         <div
-          className="flex h-full min-h-0 overflow-hidden"
+          ref={leftPaneContainerRef}
+          className="flex flex-col h-full min-h-0 overflow-hidden pr-1"
           style={{ width: `${leftPaneWidth}%` }}
         >
-          {sections.slice(0, 2).map((section, secIdx) => {
-            return (
-              <div
-                key={section.id}
-                className="flex h-full min-h-0 shrink-0 overflow-hidden pr-1"
-                style={{ width: `${section.widthPercent}%` }}
-              >
-                {/* 섹션 내부 세로 슬롯 렌더링 */}
-                <div className="flex-1 flex flex-col gap-1.5 min-w-0 h-full overflow-hidden">
-                  {section.slots.map((slot, slotIdx) => {
-                    const defaultRatio = 1;
-                    const flexVal = slot.flexRatio ?? defaultRatio;
-
-                    return (
-                      <React.Fragment key={slotIdx}>
-                        <div
-                          className="min-h-0 overflow-hidden flex"
-                          style={{ flex: `${flexVal} 1 0%` }}
-                        >
-                          <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
-                            {renderPanelComponent(slot.type === "single" ? slot.panel : slot.left)}
-                          </div>
-                        </div>
-
-                        {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
-                        {slotIdx < section.slots.length - 1 && (
-                          <div
-                            onMouseDown={(e) => {
-                              const topSlot = section.slots[slotIdx];
-                              const btmSlot = section.slots[slotIdx + 1];
-                              const topRatio = topSlot.flexRatio ?? 1;
-                              const btmRatio = btmSlot.flexRatio ?? 1;
-                              handleSlotResizeStart(
-                                secIdx,
-                                slotIdx,
-                                topRatio,
-                                btmRatio,
-                                e
-                              );
-                            }}
-                            title="위아래로 드래그하여 슬롯 높이 비율 조절"
-                            className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
-                          >
-                            <div
-                              className={`h-[3px] rounded-full transition-all duration-200 ${
-                                resizingRowSlot?.secIdx === secIdx &&
-                                resizingRowSlot?.slotIdx === slotIdx
-                                  ? "w-24 bg-indigo-600 shadow-sm"
-                                  : "w-10 bg-slate-300 group-hover:w-20 group-hover:bg-indigo-500"
-                              }`}
-                            />
-                          </div>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </div>
-
-                {/* 1섹션과 2섹션 사이 가로 분할 조절 스플리터 바 */}
-                {secIdx === 0 && (
-                  <div
-                    onMouseDown={(e) => handleColResizeStart(secIdx, e)}
-                    title="드래그하여 C 코드와 ASM 영역 너비 조절"
-                    className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-blue-50/50 rounded-sm transition-colors"
+          {/* 상단: C 소스 + ASM 영역 (통합 마스터 탭 바 + 가로 분할 에디터) */}
+          <div
+            className="flex flex-col w-full min-h-0 overflow-hidden"
+            style={{ height: `${leftTopHeightPercent}%` }}
+          >
+            {/* [통합 마스터 탭 바]: C 소스 코드 vs 어셈블리 직접 작성 모드 단일 스위치 */}
+            <div className="shrink-0 flex items-center justify-between px-3 py-1.5 mb-1.5 rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-[#F8F9FA] dark:bg-[#252526] shadow-2xs select-none">
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] font-semibold text-[#57606A] dark:text-[#858585] hidden min-[400px]:inline">
+                  작성 모드
+                </span>
+                {/* 단일 알약형 세그먼트 스위치 */}
+                <div className="inline-flex p-0.5 rounded-full bg-[#E5E7EB] dark:bg-[#1E1E1E] border border-[#D0D7DE] dark:border-[#3E3E42]">
+                  <button
+                    type="button"
+                    onClick={() => setEditorTarget("c")}
+                    className={`flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                      editorTarget === "c"
+                        ? "bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-xs"
+                        : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#1F2328] dark:hover:text-white"
+                    }`}
                   >
-                    <div
-                      className={`w-[3px] rounded-full transition-all duration-200 ${
-                        resizingSplitterIndex === secIdx
-                          ? "h-24 bg-blue-600 shadow-sm"
-                          : "h-10 bg-slate-300 group-hover:h-20 group-hover:bg-blue-500"
-                      }`}
-                    />
-                  </div>
+                    <span>💻</span>
+                    <span>C 소스 코드</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditorTarget("asm");
+                      setTranslationSelectedLine(null);
+                      setTranslationSelectedAsmIndex(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                      editorTarget === "asm"
+                        ? "bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-xs"
+                        : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#1F2328] dark:hover:text-white"
+                    }`}
+                  >
+                    <span>⚙️</span>
+                    <span>RISC-V 어셈블리</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 우측 안내 힌트 */}
+              <div className="text-[11px] text-[#57606A] dark:text-[#858585] flex items-center gap-1.5">
+                {editorTarget === "c" ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#005FB8] dark:bg-[#79C0FF] animate-pulse" />
+                    <span className="hidden min-[480px]:inline">C 코드 작성 후</span>
+                    <span className="font-semibold text-[#005FB8] dark:text-[#79C0FF]">[컴파일]</span>
+                    <span className="hidden min-[480px]:inline">실행</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="hidden min-[480px]:inline">어셈블리 작성 후</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">[시뮬레이션]</span>
+                    <span className="hidden min-[480px]:inline">실행</span>
+                  </>
                 )}
               </div>
-            );
-          })}
+            </div>
+
+            {/* C 소스와 ASM 가로 분할 영역 */}
+            <div
+              ref={leftTopContainerRef}
+              className="flex-1 flex w-full min-h-0 overflow-hidden"
+            >
+              {/* 좌측: C 소스 코드 */}
+              <div
+                className="flex flex-col h-full min-h-0 overflow-hidden"
+                style={{ width: `${leftCodeColRatio}%` }}
+              >
+                {renderPanelComponent("cSource")}
+              </div>
+
+              {/* C 소스와 ASM 사이 세로 분할 조절 스플리터 바 */}
+              <div
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.detail === 2) {
+                    setLeftCodeColRatio(50);
+                    return;
+                  }
+                  setResizingLeftCodeCol(true);
+                }}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setLeftCodeColRatio(50);
+                }}
+                title="드래그하여 C 코드와 ASM 영역 너비 조절 (더블클릭: 50:50 리셋)"
+                className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+              >
+                <div
+                  className={`w-[3px] rounded-full transition-all duration-200 ${
+                    resizingLeftCodeCol
+                      ? "h-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
+                      : "h-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                  }`}
+                />
+              </div>
+
+              {/* 우측: ASM 매핑 */}
+              <div
+                className="flex flex-col h-full min-h-0 overflow-hidden"
+                style={{ width: `${100 - leftCodeColRatio}%` }}
+              >
+                {renderPanelComponent("source")}
+              </div>
+            </div>
+          </div>
+
+          {/* 상단(코드/ASM)과 하단(튜터) 사이 가로 분할 조절 스플리터 바 */}
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.detail === 2) {
+                setLeftTopHeightPercent(50);
+                return;
+              }
+              setResizingLeftVertical(true);
+            }}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setLeftTopHeightPercent(50);
+            }}
+            title="위아래로 드래그하여 코드 영역과 튜터 높이 비율 조절 (더블클릭: 50:50 리셋)"
+            className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+          >
+            <div
+              className={`h-[3px] rounded-full transition-all duration-200 ${
+                resizingLeftVertical
+                  ? "w-28 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
+                  : "w-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-24 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+              }`}
+            />
+          </div>
+
+          {/* 하단: 단일 통합 와이드 ArchReactor Tutor 영역 */}
+          <div
+            className="w-full min-h-0 overflow-hidden flex flex-col"
+            style={{ height: `${100 - leftTopHeightPercent}%` }}
+          >
+            {renderPanelComponent("tutor")}
+          </div>
         </div>
 
         {/* ======================================================== */}
@@ -1098,13 +1376,13 @@ const MainPage: React.FC = () => {
         <div
           onMouseDown={handleMainDividerResizeStart}
           title="드래그하여 좌측 고정 영역과 우측 뷰포트 분할 비율 조절"
-          className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-sky-100/60 rounded-md transition-colors"
+          className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-md transition-colors"
         >
           <div
             className={`w-[4px] rounded-full transition-all duration-200 ${
               resizingLeftPane
-                ? "h-36 bg-sky-600 shadow-md ring-2 ring-sky-300"
-                : "h-16 bg-slate-300 group-hover:h-28 group-hover:bg-sky-500"
+                ? "h-36 bg-[#005FB8] dark:bg-[#007ACC] shadow-md ring-2 ring-[#005FB8]/30 dark:ring-[#007ACC]/30"
+                : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
             }`}
           />
         </div>
@@ -1115,15 +1393,15 @@ const MainPage: React.FC = () => {
         <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch gap-1">
           {/* 이전 뷰포트 이동 버튼 (PREV 레일) */}
           {canGoPrevViewport && (
-            <div className="w-7 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
+            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200">
               <button
                 type="button"
                 onClick={handleGoPrevViewport}
                 title="이전 뷰포트(왼쪽 영역)로 이동"
-                className="w-full h-24 rounded-lg bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
+                className="w-full h-full rounded-md border border-transparent bg-transparent text-[#8C959F] dark:text-[#858585] hover:bg-[#E5E7EB] hover:border-[#E5E7EB] hover:text-[#1F2328] dark:hover:bg-[#383838] dark:hover:border-[#383838] dark:hover:text-[#F0F6FC] flex flex-col items-center justify-center gap-2.5 transition-colors duration-150 cursor-pointer group active:scale-[0.99]"
               >
-                <span className="text-base font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:-translate-x-0.5">‹</span>
-                <span className="text-[8px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
+                <span className="text-base font-bold leading-none transition-transform group-hover:-translate-x-0.5">‹</span>
+                <span className="text-[9px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
                   PREV
                 </span>
               </button>
@@ -1192,14 +1470,14 @@ const MainPage: React.FC = () => {
                                       )
                                     }
                                     title="좌우로 드래그하여 가로 분할 비율 조절"
-                                    className="w-2.5 -mx-1 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
+                                    className="w-2.5 -mx-1 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
                                   >
                                     <div
                                       className={`w-[3px] rounded-full transition-all duration-200 ${
                                         resizingPair?.secIdx === secIdx &&
                                         resizingPair?.slotIdx === slotIdx
-                                          ? "h-16 bg-indigo-600 shadow-sm"
-                                          : "h-8 bg-slate-300 group-hover:h-14 group-hover:bg-indigo-500"
+                                          ? "h-16 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
+                                          : "h-8 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-14 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
                                       }`}
                                     />
                                   </div>
@@ -1233,14 +1511,14 @@ const MainPage: React.FC = () => {
                                   );
                                 }}
                                 title="위아래로 드래그하여 슬롯 높이 비율 조절"
-                                className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
+                                className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
                               >
                                 <div
                                   className={`h-[3px] rounded-full transition-all duration-200 ${
                                     resizingRowSlot?.secIdx === secIdx &&
                                     resizingRowSlot?.slotIdx === slotIdx
-                                      ? "w-24 bg-indigo-600 shadow-sm"
-                                      : "w-10 bg-slate-300 group-hover:w-20 group-hover:bg-indigo-500"
+                                      ? "w-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
+                                      : "w-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
                                   }`}
                                 />
                               </div>
@@ -1257,15 +1535,15 @@ const MainPage: React.FC = () => {
 
           {/* 다음 뷰포트 이동 버튼 (NEXT 레일) */}
           {canGoNextViewport && (
-            <div className="w-7 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
+            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200">
               <button
                 type="button"
                 onClick={handleGoNextViewport}
                 title="다음 뷰포트(오른쪽 영역)로 이동"
-                className="w-full h-24 rounded-lg bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
+                className="w-full h-full rounded-md border border-transparent bg-transparent text-[#8C959F] dark:text-[#858585] hover:bg-[#E5E7EB] hover:border-[#E5E7EB] hover:text-[#1F2328] dark:hover:bg-[#383838] dark:hover:border-[#383838] dark:hover:text-[#F0F6FC] flex flex-col items-center justify-center gap-2.5 transition-colors duration-150 cursor-pointer group active:scale-[0.99]"
               >
-                <span className="text-base font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:translate-x-0.5">›</span>
-                <span className="text-[8px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
+                <span className="text-base font-bold leading-none transition-transform group-hover:translate-x-0.5">›</span>
+                <span className="text-[9px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
                   NEXT
                 </span>
               </button>
