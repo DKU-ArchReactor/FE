@@ -1,11 +1,4 @@
 export interface StageBuffer {
-  memory_operation?: "load" | "store" | "none";
-  target_address?: string | null;
-  read_data?: string | null;
-  write_data?: string | null;
-  will_write_reg?: boolean;
-  destination_register?: string;
-  final_write_data?: string | null;
   pc?: string;
   raw_instruction?: string;
   assembly: string;
@@ -106,8 +99,6 @@ export interface SimulationRunRequest {
 }
 
 export interface SimulationResult {
-  initial_state?: GlobalResult;
-  console_output?: string;
   schema_version: string;
   simulator: {
     mode: string;
@@ -115,10 +106,6 @@ export interface SimulationResult {
     pipeline_model: string;
   };
   program: {
-    fingerprint?: string;
-    instructions?: { pc: string; raw_instruction: string; assembly: string }[];
-    memory_regions?: { name: string; start: string; end_exclusive: string; kind: "code" | "data" | "bss" }[];
-    initial_stack_pointer?: string;
     entry_point: string;
     instruction_words: number;
     data_words: number;

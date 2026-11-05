@@ -229,7 +229,7 @@ export function analyzeAsmInstruction(text: string): AsmInstructionExplanation {
         opcode,
         operands,
         action: `메모리 로드: ${mem} ➔ ${rd}`,
-        explanation: `유효 메모리 주소(${mem})에 저장된 32비트 워드(변수) 값을 레지스터 ${rd}로 읽어옵니다.`,
+        explanation: `스택 메모리 주소(${mem})에 저장된 32비트 워드(변수) 값을 레지스터 ${rd}로 읽어옵니다.`,
         hardwareDetail: "MEM 단계에서 데이터 메모리를 읽어 WB 단계에서 레지스터 파일에 기록합니다.",
       };
     }
@@ -241,7 +241,7 @@ export function analyzeAsmInstruction(text: string): AsmInstructionExplanation {
         opcode,
         operands,
         action: `메모리 저장: ${rs2} ➔ ${mem}`,
-        explanation: `레지스터 ${rs2}에 계산된 결과값을 유효 메모리 위치(${mem})의 변수 저장 공간에 기록합니다.`,
+        explanation: `레지스터 ${rs2}에 계산된 결과값을 스택 메모리 위치(${mem})의 변수 저장 공간에 기록합니다.`,
         hardwareDetail: "EX 단계에서 계산된 유효 주소에 맞춰 MEM 단계에서 데이터 메모리에 값을 씁니다.",
       };
     }
@@ -374,7 +374,7 @@ export function analyzeAsmInstruction(text: string): AsmInstructionExplanation {
         operands,
         action: `조건 분기: ${rs1}과 ${rs2}가 ${opNames[opcode] || "비교조건"} ➔ ${label} 점프`,
         explanation: `${rs1}과 ${rs2}를 비교하여 조건이 참이면 '${label}' 레이블 위치로 프로그램 카운터(PC)를 변경합니다.`,
-        hardwareDetail: "조건이 참이면 목적지 PC로 이동합니다. 파이프라인 모드에서는 IF/ID의 더 어린 명령을 폐기합니다.",
+        hardwareDetail: "조건이 만족되면 파이프라인의 다음 명령어들을 플러시하고 분기 목적지 주소로 인출(IF)을 시작합니다.",
       };
     }
     case "j":

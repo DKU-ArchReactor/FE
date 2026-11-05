@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import type { CycleHistoryItem } from '@/type/simulation';
 
 interface PipelineVisualizerProps {
-  mode?: "single" | "pipeline";
   currentData: CycleHistoryItem | null;
   loadingMessage?: string | null;
 }
 
-const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, loadingMessage, mode = "pipeline" }) => {
+const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, loadingMessage }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
 
   if (loadingMessage) {
@@ -28,25 +27,24 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
     );
   }
 
-  const { cycle_events, clock } = currentData;
-  const activity = currentData.stage_activity;
+  const { buffers, cycle_events, clock } = currentData;
   const isStall = cycle_events.stall?.has_stall;
   const isForward = cycle_events.forwarding?.has_forwarded;
   const isBranchFlush = cycle_events.control_hazard?.has_flush;
 
   // 5단계별 명령어
-  const ifInst = activity?.IF?.assembly || 'bubble';
-  const idInst = activity?.ID?.assembly || 'bubble';
-  const exInst = activity?.EX?.assembly || 'bubble';
-  const memInst = activity?.MEM?.assembly || 'bubble';
-  const wbInst = activity?.WB?.assembly || 'bubble';
+  const ifInst = buffers.IF?.assembly || 'bubble';
+  const idInst = buffers.ID?.assembly || 'bubble';
+  const exInst = buffers.EX?.assembly || 'bubble';
+  const memInst = buffers.MEM?.assembly || 'bubble';
+  const wbInst = buffers.WB?.assembly || 'bubble';
 
   // 활성 여부
   const isIfActive = ifInst !== 'bubble' && ifInst !== 'empty';
   const isIdActive = idInst !== 'bubble' && idInst !== 'empty';
   const isExActive = exInst !== 'bubble' && exInst !== 'empty';
-  const isMemActive = activity?.MEM.status !== 'error' && ['load', 'store'].includes(activity?.MEM.memory_operation ?? 'none');
-  const isWbActive = activity?.WB.will_write_reg === true;
+  const isMemActive = memInst !== 'bubble' && memInst !== 'empty';
+  const isWbActive = wbInst !== 'bubble' && wbInst !== 'empty';
 
   // 줌 조절
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(2.0, +(prev + 0.15).toFixed(2)));
@@ -86,8 +84,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
       <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-          <h3 className="text-xs font-bold text-slate-800">{mode === 'single' ? 'Single-Cycle Datapath' : '5-Stage Pipeline Datapath'}</h3>
-          <span className="text-[10px] text-slate-400 font-mono">(완료 클록 {clock + 1})</span>
+          <h3 className="text-xs font-bold text-slate-800">Vertical 5-Stage Datapath</h3>
+          <span className="text-[10px] text-slate-400 font-mono">(Clock {clock ?? 0})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
@@ -240,7 +238,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
                   PC
                 </text>
                 <text x="45" y="24" fill="#B91C1C" fontSize="7.5" fontFamily="monospace" textAnchor="middle">
-                  {activity?.IF?.pc ? activity.IF.pc.slice(-6) : "0x0000"}
+                  {buffers.IF?.pc ? buffers.IF.pc.slice(-6) : "0x0000"}
                 </text>
               </g>
 
@@ -314,7 +312,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
             <g transform="translate(50, 165)">
               <rect x="0" y="0" width="480" height="14" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
               <text x="240" y="10.5" fill="#334155" fontSize="8.5" fontWeight="bold" textAnchor="middle" letterSpacing="1.5">
-                {mode === 'single' ? 'IF / ID 조합 경로' : 'IF / ID BUFFER ⬇'}
+                IF / ID BUFFER ⬇
               </text>
             </g>
 
@@ -478,7 +476,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
             <g transform="translate(50, 355)">
               <rect x="0" y="0" width="480" height="14" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
               <text x="240" y="10.5" fill="#334155" fontSize="8.5" fontWeight="bold" textAnchor="middle" letterSpacing="1.5">
-                {mode === 'single' ? 'ID / EX 조합 경로' : 'ID / EX BUFFER ⬇'}
+                ID / EX BUFFER ⬇
               </text>
             </g>
 
@@ -659,7 +657,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
             <g transform="translate(50, 595)">
               <rect x="0" y="0" width="480" height="14" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
               <text x="240" y="10.5" fill="#334155" fontSize="8.5" fontWeight="bold" textAnchor="middle" letterSpacing="1.5">
-                {mode === 'single' ? 'EX / MEM 조합 경로' : 'EX / MEM BUFFER ⬇'}
+                EX / MEM BUFFER ⬇
               </text>
             </g>
 
@@ -764,7 +762,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
             <g transform="translate(50, 785)">
               <rect x="0" y="0" width="480" height="14" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
               <text x="240" y="10.5" fill="#334155" fontSize="8.5" fontWeight="bold" textAnchor="middle" letterSpacing="1.5">
-                {mode === 'single' ? 'MEM / WB 조합 경로' : 'MEM / WB BUFFER ⬇'}
+                MEM / WB BUFFER ⬇
               </text>
             </g>
 
