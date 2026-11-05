@@ -30,8 +30,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   mode = "pipeline",
 }) => {
   const isSingle = mode === "single";
-  // Single 모드에서는 Step 0(대기) ~ Step totalCycles까지 슬라이더가 0~totalCycles 이동
-  const maxCycle = isSingle ? totalCycles : Math.max(0, totalCycles - 1);
+  // Both modes include the initial state at 0 and every recorded clock.
+  const maxCycle = totalCycles;
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 px-4 py-2 flex items-center justify-between gap-4 transition-all">
@@ -67,7 +67,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             type="range"
             min={0}
             max={maxCycle}
-            disabled={!isReady || totalCycles <= 1}
+            disabled={!isReady || totalCycles === 0}
             value={currentCycle}
             onChange={(e) => onJumpToCycle(Number(e.target.value))}
             className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${

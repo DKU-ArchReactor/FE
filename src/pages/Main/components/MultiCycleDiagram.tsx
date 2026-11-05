@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import type { SimulationResult, CycleHistoryItem, StageBuffer } from '@/type/simulation';
+import { getActivity } from '../simulationView';
 
 interface MultiCycleDiagramProps {
   simulationData: SimulationResult | null;
@@ -114,7 +115,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const history = simulationData?.history ?? [];
+  const history = useMemo(() => simulationData?.history.map((item, index) => ({ ...item, clock: index + 1, buffers: getActivity(item) })) ?? [], [simulationData]);
   const totalCycles = history.length;
 
   // 파이프라인 히스토리를 시간순으로 추적하여 계단식(Stair-step) 다이어그램 행 생성
@@ -122,6 +123,16 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     if (!history.length) return [];
 
     const rows: TraceRow[] = [];
+    if (simulationData?.simulator.mode === 'single') {
+      return history.flatMap((item, index) => {
+        const instruction = item.buffers.IF;
+        if (!instruction?.pc) return [];
+        return [{
+          id: index, pc: instruction.pc, assembly: instruction.assembly, firstCycle: index,
+          cells: { [index]: { type: 'WB' as const, stage: 'WB' as const, label: item.cycle_events.runtime_error.has_error ? 'ERR' : '1CLK' } },
+        }];
+      });
+    }
     let prevStageRow: Partial<Record<'IF' | 'ID' | 'EX' | 'MEM' | 'WB', number>> = {};
 
     const createRow = (buf: StageBuffer, cIdx: number): number => {
@@ -319,7 +330,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     });
 
     return rows;
-  }, [history]);
+  }, [history, simulationData]);
 
   // 현재 사이클이 바뀔 때 해당 사이클 열과 현재 실행 중인 명령어 행이 화면 중앙에 오도록 가로·세로 자동 스크롤
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { getActivity } from '../simulationView';
 import React from 'react';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 
@@ -33,10 +34,15 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
     );
   }
 
-  const { cycle_events, buffers } = currentCycleData;
+  const { cycle_events } = currentCycleData;
+  const buffers = getActivity(currentCycleData);
   const isStall = cycle_events.stall?.has_stall;
   const isForward = cycle_events.forwarding?.has_forwarded;
   const isBranchFlush = cycle_events.control_hazard?.has_flush;
+  const errorMessage = cycle_events.runtime_error?.has_error
+    ? cycle_events.runtime_error.message
+    : simulationData.status === 'error' && currentCycle === simulationData.summary.total_cycles
+    ? simulationData.console_output : null;
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
@@ -74,7 +80,7 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
           )}
           {!isStall && !isForward && !isBranchFlush && (
             <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-              🟢 Normal Execution (스톨 없음)
+              {errorMessage ? '실행 오류 또는 사이클 제한' : currentCycle === 0 ? '실행 전 초기 상태' : '🟢 Normal Execution (스톨 없음)'}
             </span>
           )}
         </div>
@@ -119,7 +125,7 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
 
           {!isStall && !isForward && !isBranchFlush && (
             <p className="text-[11px] text-slate-500">
-              현재 사이클에서는 해저드나 분기 지연 없이 모든 파이프라인 스테이지가 원활하게 진행되고 있습니다.
+              {errorMessage || (currentCycle === 0 ? '아직 명령어를 실행하지 않았습니다.' : '현재 클록에 스톨·포워딩·분기 플러시 이벤트가 없습니다.')}
             </p>
           )}
         </div>

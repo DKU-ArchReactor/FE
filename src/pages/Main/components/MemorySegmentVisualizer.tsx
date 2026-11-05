@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
-import { mapAssembly } from './translationCompile';
+import { getCodeMap } from '../simulationView';
 
 interface MemorySegmentVisualizerProps {
   currentData: CycleHistoryItem | null;
@@ -34,15 +34,13 @@ const normalizeHex = (hexStr: string): string => {
 };
 
 // 주소 분류: 6대 세그먼트 (Stack, Heap, BSS, Data, Code, Reserved/NULL)
-const classifyAddress = (addrHex: string, valHex: string, maxCodePcNum: number): MemorySegmentKey => {
+const classifyAddress = (addrHex: string, _valHex: string, maxCodePcNum: number): MemorySegmentKey => {
   const num = parseInt(addrHex, 16) >>> 0;
   if (num >= 0x70000000) return 'stack';
   if (num >= 0x10008000) return 'heap';
   if (num >= 0x00010000 && num <= maxCodePcNum) return 'code';
   if (num < 0x00010000) return 'reserved';
   // 0x10000000 ~ 0x10007FFF 영역:
-  const valNum = parseInt(valHex, 16) || 0;
-  if (valNum === 0) return 'bss';
   return 'data';
 };
 
@@ -130,23 +128,12 @@ const SEGMENT_DEFS: SegmentDefinition[] = [
   },
 ];
 
-// 6대 세그먼트 사이의 5대 독립 경계선 주소 (High ➔ Low)
-// Stack ➔ [1] ➔ Heap ➔ [2] ➔ BSS ➔ [3] ➔ Data ➔ [4] ➔ Code ➔ [5] ➔ NULL
-const BOUNDARY_DIVIDERS = [
-  '0x10008000', // [1] Stack과 Heap 사이 (Heap 시작점: 268,468,224)
-  '0x10004000', // [2] Heap과 BSS 사이 (BSS 시작점: 268,451,840)
-  '0x10000000', // [3] BSS와 Data 사이 (Data 시작점: 268,435,456)
-  '0x00010000', // [4] Data와 Code 사이 (Code 시작점: 65,536)
-  '0x00000000', // [5] Code와 NULL 사이 (NULL 기준점: 0)
-];
-
 const EMPTY_MEMORY_SNAPSHOT: Record<string, string> = {};
 
 const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   currentData,
   prevData,
   simulationData,
-  translationAssembly,
   playSpeed = 1000,
   cycle = 0,
 }) => {
@@ -192,70 +179,13 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     }
   }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
 
-  // 어셈블리 컴포넌트(Section 2)에 들어가는 코드 라인들을 추출하여 Code 메모리 세그먼트에 매핑
   const { codeMap, maxCodePcNum, codeCount, minCodePc, maxCodePc } = useMemo(() => {
-    const map: Record<string, { raw: string; asm: string }> = {};
-    let minPc = 0x00010018; // 65,560
-    let maxPc = 0x00010018;
-
-    // 1. translationAssembly가 있으면 Section 2와 100% 동일한 어셈블리 명령어 추출
-    if (translationAssembly) {
-      const mappedRows = mapAssembly(translationAssembly, 1000);
-      const basePc = 0x00010018; // 65,560 (main 시작 지점)
-      minPc = basePc;
-      mappedRows.forEach((row, idx) => {
-        const pcNum = basePc + idx * 4;
-        const pcHex = `0x${pcNum.toString(16).padStart(8, '0')}`;
-        map[pcHex.toLowerCase()] = {
-          raw: '0x00000000',
-          asm: row.text,
-        };
-      });
-      maxPc = basePc + Math.max(0, mappedRows.length - 1) * 4;
-      return {
-        codeMap: map,
-        maxCodePcNum: maxPc,
-        codeCount: mappedRows.length,
-        minCodePc: minPc,
-        maxCodePc: maxPc,
-      };
-    }
-
-    // 2. translationAssembly가 없을 때는 기존 파이프라인 버퍼 히스토리 폴백
-    let calcMax = 0x0001017f;
-    if (simulationData?.history) {
-      simulationData.history.forEach((cycle) => {
-        const stages = [
-          cycle.buffers?.IF,
-          cycle.buffers?.ID,
-          cycle.buffers?.EX,
-          cycle.buffers?.MEM,
-          cycle.buffers?.WB,
-        ];
-        stages.forEach((buf) => {
-          if (buf?.pc && buf.assembly && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
-            const pcLower = buf.pc.toLowerCase();
-            map[pcLower] = {
-              raw: buf.raw_instruction || '0x00000000',
-              asm: buf.assembly,
-            };
-            const num = parseInt(pcLower, 16) >>> 0;
-            if (!isNaN(num) && num < 0x00010180 && num > calcMax) {
-              calcMax = num;
-            }
-          }
-        });
-      });
-    }
-    const keys = Object.keys(map);
-    return {
-      codeMap: map,
-      maxCodePcNum: calcMax,
-      codeCount: keys.length,
-      minCodePc: 0x00010018,
-      maxCodePc: calcMax,
-    };
-  }, [translationAssembly, simulationData]);
+    const map = getCodeMap(simulationData);
+    const addresses = Object.keys(map).map((pc) => Number(pc));
+    const min = addresses.length ? Math.min(...addresses) : 0;
+    const max = addresses.length ? Math.max(...addresses) : 0;
+    return { codeMap: map, maxCodePcNum: max, codeCount: addresses.length, minCodePc: min, maxCodePc: max };
+  }, [simulationData]);
 
   // 메모리 6대 세그먼트별 분류 및 정렬 (모든 섹션 High ➔ Low 일치)
   const segmentedMemory = useMemo(() => {
@@ -278,7 +208,9 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     };
 
     Object.entries(memorySnapshot).forEach(([addrHex, valHex]) => {
-      const segKey = classifyAddress(addrHex, valHex, maxCodePcNum);
+      const address = Number(addrHex);
+      const region = simulationData?.program.memory_regions.find((item) => address >= Number(item.start) && address < Number(item.end_exclusive));
+      const segKey = region?.kind ?? classifyAddress(addrHex, valHex, maxCodePcNum);
       const prevVal = prevMemorySnapshot ? prevMemorySnapshot[addrHex] : undefined;
       const isChanged = prevVal !== undefined && prevVal !== valHex;
 
@@ -320,7 +252,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     result.data.sort((a, b) => (parseInt(b.address, 16) >>> 0) - (parseInt(a.address, 16) >>> 0));
 
     return result;
-  }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc]);
+  }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc, simulationData]);
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
@@ -354,7 +286,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
           const items = segmentedMemory[seg.key];
           const isCode = seg.key === 'code';
           const isReserved = seg.key === 'reserved';
-          const dividerHex = index < BOUNDARY_DIVIDERS.length ? BOUNDARY_DIVIDERS[index] : null;
+          const dividerHex = items.length ? `0x${Math.min(...items.map((item) => Number(item.address))).toString(16)}` : null;
 
           return (
             <React.Fragment key={seg.key}>
@@ -396,7 +328,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                 <div className={`flex-1 flex flex-col divide-y divide-slate-100 min-w-0 pl-1.5 py-1 overflow-y-auto custom-scrollbar ${
                   items.length === 0 && !isCode && !isReserved ? 'justify-center' : 'justify-start'
                 }`}>
-                  {isReserved ? (
+                  {isReserved && items.length === 0 ? (
                     <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 text-slate-500">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-slate-500 font-semibold text-[10.5px]">
@@ -405,7 +337,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         <span className="text-[9px] font-mono text-slate-400">64KB</span>
                       </div>
                       <span className="font-sans text-[9.5px] text-slate-400 leading-tight">
-                        NULL Pointer Guard (접근 금지 보호 구역)
+                        ELF 영역 외 낮은 주소 범위
                       </span>
                     </div>
                   ) : isCode ? (
@@ -428,7 +360,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         {/* 2층: 영역 라벨 & 명령어 토글 버튼 */}
                         <div className="flex items-center justify-between gap-1 text-[10px]">
                           <span className="font-semibold text-amber-900 font-sans">
-                            User Program (main)
+                            Loaded ELF Code
                           </span>
                           <button
                             type="button"
@@ -471,15 +403,15 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                       <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80">
                         <div className="flex items-center justify-between">
                           <span
-                            title="Hex: 0x00010000 ~ 0x00010017 (24 Bytes)"
+                            title={simulationData?.program.entry_point ?? "—"}
                             className="font-mono text-slate-600 font-semibold text-[10.5px] cursor-help"
                           >
-                            65,536 ~ 65,559
+                            {simulationData ? formatAddressDecimal(simulationData.program.entry_point) : "—"}
                           </span>
-                          <span className="text-[9px] font-mono text-slate-400">24B</span>
+                          <span className="text-[9px] font-mono text-slate-400">Entry</span>
                         </div>
                         <span className="font-sans text-[9.5px] text-slate-400 leading-tight">
-                          System Runtime Startup (_start)
+                          ELF Entry Point
                         </span>
                       </div>
                     </div>
@@ -548,17 +480,17 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
               </div>
 
               {/* 세그먼트 사이 독립 경계선 (세그먼트 내부에 종속되지 않고 사이사이에 위치) */}
-              {dividerHex && index < SEGMENT_DEFS.length - 1 && (
+              {index < SEGMENT_DEFS.length - 1 && (
                 <div className="relative flex items-center justify-center my-1 shrink-0">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-dashed border-slate-300" />
                   </div>
                   <div className="relative flex items-center bg-white px-2 text-[10px] text-slate-500 font-mono z-10">
                     <span
-                      title={`Hex: ${normalizeHex(dividerHex)}`}
+                      title={dividerHex ? `표시된 ${seg.name} 주소의 최솟값: ${normalizeHex(dividerHex)}` : '표시할 주소가 없습니다.'}
                       className="font-semibold text-slate-600 cursor-help"
                     >
-                      {formatAddressDecimal(dividerHex)}
+                      {dividerHex ? formatAddressDecimal(dividerHex) : '—'}
                     </span>
                   </div>
                 </div>

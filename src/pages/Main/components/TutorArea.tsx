@@ -3,6 +3,7 @@ import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import type { CodeLineSelectInfo } from './Source/SourceViewer';
 import { mapAssembly, type MappedAssemblyRow } from './translationCompile';
 import { analyzeCLine, analyzeAsmInstruction } from './tutorAnalysis';
+import { getActivity } from '../simulationView';
 
 export interface TutorAreaProps {
   simulationData: SimulationResult | null;
@@ -26,16 +27,12 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   simulationData,
   currentCycleData,
   loadingMessage,
-  selectedCodeLine: _selectedCodeLine,
-  onClearSelectedCodeLine: _onClearSelectedCodeLine,
   translationSource,
   translationAssembly,
   selectedTranslationLine,
   selectedAsmIndex,
   currentActiveAsmIndex,
-  executionLine: _executionLine,
   isUserSelected = false,
-  onSelectTranslationLine: _onSelectTranslationLine,
 }) => {
   // 1. C 소스 코드 라인별 배열
   const cLines = useMemo(() => {
@@ -321,7 +318,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
                 {/* 현재 파이프라인 인출(IF) 명령어 */}
                 {(() => {
-                  const ifBuf = currentCycleData.buffers?.IF || currentCycleData.if_stage;
+                  const ifBuf = getActivity(currentCycleData).IF;
                   const ifInst = ifBuf?.assembly || "bubble";
                   const ifAnalysis = analyzeAsmInstruction(ifInst);
                   return (
@@ -349,6 +346,10 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   const isStall = cycle_events.stall?.has_stall;
                   const isForward = cycle_events.forwarding?.has_forwarded;
                   const isFlush = cycle_events.control_hazard?.has_flush;
+                  const errorMessage = cycle_events.runtime_error?.has_error
+                    ? cycle_events.runtime_error.message
+                    : simulationData?.status === 'error' && currentCycleData.clock === simulationData.summary.total_cycles
+                    ? simulationData.console_output : null;
 
                   return (
                     <div
@@ -363,22 +364,22 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                       }`}
                     >
                       <strong className="font-bold block mb-0.5">
-                        {isStall
+                        {errorMessage ? '⚠️ 실행 오류 또는 사이클 제한' : currentCycleData.clock === 0 ? '실행 전 초기 상태' : isStall
                           ? "⚠️ 데이터 해저드 (Data Stall)"
                           : isFlush
                           ? "🔄 제어 해저드 (Branch Flush)"
                           : isForward
                           ? "⚡ 데이터 포워딩 (Forwarding 활성화)"
-                          : "✅ 정상 파이프라인 전진"}
+                          : simulationData?.simulator.mode === 'single' ? "✅ 싱글 사이클 실행" : "✅ 정상 파이프라인 전진"}
                       </strong>
                       <span className="opacity-90">
-                        {isStall
+                        {errorMessage || (currentCycleData.clock === 0 ? '아직 명령어를 실행하지 않았습니다.' : isStall
                           ? cycle_events.stall?.stall_desc || "필요한 피연산자가 준비되지 않아 파이프라인이 1사이클 정지되었습니다."
                           : isFlush
                           ? cycle_events.control_hazard?.flush_reason || "분기 예측 실패로 인해 파이프라인 버블이 플러시되었습니다."
                           : isForward
                           ? cycle_events.forwarding?.forwarding_desc || "ALU 결과를 후속 명령어에 직접 포워딩하여 지연 없이 실행합니다."
-                          : "현재 사이클에 해저드 없이 5개 스테이지가 순차적으로 실행되고 있습니다."}
+                          : simulationData?.simulator.mode === 'single' ? "하나의 클록에서 한 명령어의 처리를 수행합니다." : "현재 클록의 각 스테이지 처리 기록입니다.")}
                       </span>
                     </div>
                   );

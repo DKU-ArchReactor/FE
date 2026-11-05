@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React from 'react';
+import { getPerformanceStats } from '../simulationView';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 
 interface PerformanceMetricsProps {
@@ -11,62 +12,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
   simulationData,
   currentCycle,
 }) => {
-  const history = simulationData?.history ?? [];
-
-  // 메트릭스 계산 (전체 시뮬레이션 기준 & 현재 사이클까지의 기준)
-  const stats = useMemo(() => {
-    if (!history.length) {
-      return {
-        completedInstructions: 0,
-        totalCycles: 0,
-        cpi: '1.00',
-        ipc: '1.00',
-        stalls: 0,
-        forwards: 0,
-        bubbleRatio: 0,
-      };
-    }
-
-    // 현재 사이클까지 WB를 완료한 고유 명령어 개수 추적
-    const wbInstructions = new Set<string>();
-    let totalStalls = 0;
-    let totalForwards = 0;
-    let totalBubbles = 0;
-
-    for (let i = 0; i <= Math.min(currentCycle, history.length - 1); i++) {
-      const item = history[i];
-      if (item.buffers.WB?.assembly && item.buffers.WB?.status !== 'bubble') {
-        const key = `${item.buffers.WB.pc}_${item.buffers.WB.assembly}`;
-        wbInstructions.add(key);
-      }
-      if (item.cycle_events.stall?.has_stall) totalStalls++;
-      if (item.cycle_events.forwarding?.has_forwarded) totalForwards++;
-
-      // 5개 스테이지 중 버블 개수
-      Object.values(item.buffers).forEach((b) => {
-        if (!b || b.status === 'bubble' || b.assembly === 'bubble') {
-          totalBubbles++;
-        }
-      });
-    }
-
-    const completed = Math.max(1, wbInstructions.size);
-    const activeCycles = Math.max(1, currentCycle + 1);
-    const cpiVal = (activeCycles / completed).toFixed(2);
-    const ipcVal = (completed / activeCycles).toFixed(2);
-    const totalSlotCount = activeCycles * 5;
-    const bubbleRatio = Math.round((totalBubbles / totalSlotCount) * 100);
-
-    return {
-      completedInstructions: wbInstructions.size,
-      totalCycles: activeCycles,
-      cpi: cpiVal,
-      ipc: ipcVal,
-      stalls: totalStalls,
-      forwards: totalForwards,
-      bubbleRatio: Math.min(100, bubbleRatio),
-    };
-  }, [history, currentCycle]);
+  const stats = getPerformanceStats(simulationData, currentCycle);
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
@@ -102,9 +48,9 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
               <span className="text-[10px] text-slate-400 font-mono">cycles</span>
             </div>
             <span className="text-[9px] text-slate-500 mt-0.5">
-              {Number(stats.cpi) <= 1.2
+              {stats.cpi === '—' ? '완료된 명령어가 없습니다.' : Number(stats.cpi) <= 1.2
                 ? '최적의 파이프라인 처리량'
-                : '스톨 발생으로 지연 증가'}
+                : '파이프라인 채움·비움 또는 실행 지연 포함'}
             </span>
           </div>
 
