@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useEffectEvent, useRef } from 'react';
 import axios from 'axios';
 import SourceHeader from './SourceHeader';
 import SourceViewer from './SourceViewer';
@@ -6,7 +6,7 @@ import { compileCode } from '@/api/build';
 import { runSimulation } from '@/api/simulation';
 import { getFiles, getFileById, saveFile, deleteFile } from '@/api/file';
 
-import type { StageBuffer, SimulationResult } from '@/type/simulation';
+import type { StageBuffer, SimulationResult, SimulationMode, SimulationArtifact } from '@/type/simulation';
 import type { FileSummary } from '@/type/file';
 import type { CodeLineSelectInfo } from './SourceViewer';
 
@@ -30,6 +30,8 @@ export interface SharedSourceState {
 }
 
 interface SourceAreaProps {
+  simulationMode?: SimulationMode;
+  onArtifactReady?: (artifact: SimulationArtifact) => void;
   mode?: 'both' | 'c-only' | 'asm-only';
   showFileSelector?: boolean;
   sharedState?: SharedSourceState;
@@ -50,6 +52,8 @@ interface SourceAreaProps {
 }
 
 const SourceArea: React.FC<SourceAreaProps> = ({ 
+  simulationMode = 'pipeline',
+  onArtifactReady,
   mode = 'both',
   showFileSelector,
   sharedState,
@@ -130,8 +134,9 @@ const SourceArea: React.FC<SourceAreaProps> = ({
     }
   };
 
+  const fetchSavedFilesForEffect = useEffectEvent(fetchSavedFileList);
   useEffect(() => {
-    fetchSavedFileList();
+    void fetchSavedFilesForEffect();
   }, []);
 
   const executeCompileAndSimulate = async (targetFileId: string | null, targetContent: string, targetFileName: string) => {
@@ -182,11 +187,13 @@ const SourceArea: React.FC<SourceAreaProps> = ({
           console.error("Assembly Fetch Error:", asmErr);
         }
 
-        if (result.build_id) {
+        if (onArtifactReady && (result.build_id || result.simulation_token)) {
+          onArtifactReady(result.build_id ? { build_id: result.build_id } : { simulation_token: result.simulation_token! });
+        } else if (result.build_id) {
           updateLoading('2/2 파이프라인 시뮬레이션 실행 중...');
           const simResult = await runSimulation({
             build_id: result.build_id,
-            mode: 'pipeline',
+            mode: simulationMode,
             max_cycles: 2000,
           });
           console.log("Simulation Result:", simResult);
@@ -195,7 +202,7 @@ const SourceArea: React.FC<SourceAreaProps> = ({
           updateLoading('2/2 파이프라인 시뮬레이션 실행 중...');
           const simResult = await runSimulation({
             simulation_token: result.simulation_token,
-            mode: 'pipeline',
+            mode: simulationMode,
             max_cycles: 2000,
           });
           console.log("Simulation Result:", simResult);
@@ -240,11 +247,16 @@ const SourceArea: React.FC<SourceAreaProps> = ({
     }
   };
 
+  const loadFileForEffect = useEffectEvent(loadSavedFileAndSimulate);
+  const loadExternalFileForEffect = useEffectEvent((targetId: string) => {
+    sharedState?.onExternalLoadHandled?.();
+    void loadSavedFileAndSimulate(targetId);
+  });
   // 마이페이지 등에서 fileId를 선택해 진입한 경우 파일 상세 조회 후 자동 컴파일 & 시뮬레이션 실행
   useEffect(() => {
     if (mode !== 'c-only') return;
     if (!externalFileId || loadedFileIdRef.current === externalFileId) return;
-    loadSavedFileAndSimulate(externalFileId);
+    void loadFileForEffect(externalFileId);
   }, [externalFileId, mode]);
 
   // 1섹션 하단 File List 패널에서 파일을 클릭해 선택한 경우 로드 및 시뮬레이션 실행
@@ -252,8 +264,7 @@ const SourceArea: React.FC<SourceAreaProps> = ({
     if (mode !== 'c-only') return;
     const targetId = sharedState?.externalLoadFileId;
     if (!targetId) return;
-    sharedState?.onExternalLoadHandled?.();
-    loadSavedFileAndSimulate(targetId);
+    loadExternalFileForEffect(targetId);
   }, [sharedState?.externalLoadFileId, mode]);
 
   const handleFileAdded = (file: File) => {

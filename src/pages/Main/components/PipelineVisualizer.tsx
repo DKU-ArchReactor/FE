@@ -1,3 +1,4 @@
+import { getActivity } from '../simulationView';
 import React, { useState } from 'react';
 import type { CycleHistoryItem } from '@/type/simulation';
 
@@ -30,7 +31,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
     );
   }
 
-  const { buffers, cycle_events, clock } = currentData;
+  const { cycle_events, clock } = currentData;
+  const buffers = getActivity(currentData);
   const isStall = cycle_events.stall?.has_stall;
   const isForward = cycle_events.forwarding?.has_forwarded;
   const isBranchFlush = cycle_events.control_hazard?.has_flush;

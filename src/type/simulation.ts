@@ -4,6 +4,10 @@ export interface StageBuffer {
   assembly: string;
   status: string; // "normal" | "empty" | "bubble" | "stall" | "flush"
   stage?: string;
+  memory_operation?: 'load' | 'store' | 'none';
+  target_address?: string | null;
+  read_data?: string | null;
+  write_data?: string | null;
   flush_info?: {
     is_flushed: boolean;
     reason: string | null;
@@ -94,18 +98,25 @@ export interface CycleHistoryItem {
 export interface SimulationRunRequest {
   build_id?: string;
   simulation_token?: string;
-  mode?: string;
+  mode?: SimulationMode;
   max_cycles?: number;
 }
 
+export type SimulationMode = 'single' | 'pipeline';
+export type SimulationArtifact = { build_id: string; simulation_token?: never } | { simulation_token: string; build_id?: never };
+
 export interface SimulationResult {
+  initial_state: GlobalResult;
+  console_output: string;
   schema_version: string;
   simulator: {
-    mode: string;
+    mode: SimulationMode;
     max_cycles: number;
     pipeline_model: string;
   };
   program: {
+    instructions: { pc: string; raw_instruction: string; assembly: string }[];
+    memory_regions: { name: string; start: string; end_exclusive: string; kind: 'code' | 'bss' | 'data' }[];
     entry_point: string;
     instruction_words: number;
     data_words: number;

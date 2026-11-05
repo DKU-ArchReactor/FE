@@ -1,7 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import MainPage from "./pages/Main";
-import CToAsmPage from "./pages/CToAsm";
-import ComingSoonPage from "./pages/ComingSoon";
 import LoginPage from "./pages/Auth/Login";
 import SignUpPage from "./pages/Auth/SignUp";
 import MyPage from "./pages/My";

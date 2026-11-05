@@ -1,12 +1,11 @@
 import { compileCode } from "@/api/build";
-import { runSimulation } from "@/api/simulation";
-import type { SimulationResult } from "@/type/simulation";
+import type { SimulationArtifact } from "@/type/simulation";
 
 export type MappedAssemblyRow = { sourceLine: number; text: string };
 
 export interface TranslationCompileResult {
   assembly: string;
-  simulationResult: SimulationResult | null;
+  artifact: SimulationArtifact;
 }
 
 export async function compileTranslation(source: string): Promise<TranslationCompileResult> {
@@ -26,25 +25,12 @@ export async function compileTranslation(source: string): Promise<TranslationCom
   if (!response.ok) throw new Error(`어셈블리 파일을 불러오지 못했습니다. (HTTP ${response.status})`);
   const assembly = await response.text();
 
-  // 2. 전체 페이지(3번 레지스터/메모리, 4번 파이프라인 등) 시뮬레이션 즉시 실행 연동
-  let simulationResult: SimulationResult | null = null;
   const targetToken = result.build_id ? { build_id: result.build_id } : result.simulation_token ? { simulation_token: result.simulation_token } : null;
-
-  if (targetToken) {
-    try {
-      simulationResult = await runSimulation({
-        ...targetToken,
-        mode: "pipeline",
-        max_cycles: 2000,
-      });
-    } catch (simError) {
-      console.warn("시뮬레이션 자동 연동 실패 (어셈블리는 로드됨):", simError);
-    }
-  }
+  if (!targetToken) throw new Error('시뮬레이션 실행에 필요한 빌드 정보가 없습니다.');
 
   return {
     assembly,
-    simulationResult,
+    artifact: targetToken,
   };
 }
 

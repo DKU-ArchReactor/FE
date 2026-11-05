@@ -1,8 +1,10 @@
 import { useMemo, useEffect, useRef } from "react";
 import { mapAssembly, type MappedAssemblyRow } from "./translationCompile";
-import type { StageBuffer } from "@/type/simulation";
+import type { StageBuffer, SimulationResult } from "@/type/simulation";
+import { findAssemblyRow } from '../simulationView';
 
 type Props = {
+  instructions?: SimulationResult['program']['instructions'];
   source: string;
   assembly: string;
   busy: boolean;
@@ -51,6 +53,7 @@ function splitInstruction(text: string): { opcode: string; operands: string } {
 }
 
 export default function TranslationMapping({
+  instructions,
   source,
   assembly,
   busy,
@@ -79,7 +82,7 @@ export default function TranslationMapping({
 
     STAGES_CONFIG.forEach(({ key, name }) => {
       const buf = stageBuffers[key];
-      if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
+      if (buf && findAssemblyRow(rows, buf, instructions) !== null) {
         const norm = buf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
         if (norm) {
           if (!map[norm]) map[norm] = [];
@@ -88,7 +91,7 @@ export default function TranslationMapping({
       }
     });
     return map;
-  }, [stageBuffers, mode]);
+  }, [stageBuffers, mode, rows, instructions]);
 
   // 헬퍼: 타겟 요소(그룹 마지막 행)가 컨테이너 뷰포트 하단에 완전히 드러나도록 스크롤
   const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
