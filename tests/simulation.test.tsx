@@ -32,7 +32,7 @@ function result(mode: SimulationMode = 'single'): SimulationResult {
       { name: '.data', kind: 'data', start: '0x00030000', end_exclusive: '0x00030004' },
     ] },
     summary: { total_cycles: 2, instructions_executed: 2, data_hazards: 0, control_hazards: 0, stalls: 0, forwards: 0, executed_cycles: 2 },
-    history: [1, 2].map((clock) => ({ clock, buffers: empty, stage_activity: { IF: instruction, ID: instruction, EX: instruction, MEM: instruction, WB: instruction },
+    history: [1, 2].map((clock) => ({ clock: clock - 1, buffers: empty, stage_activity: { IF: instruction, ID: instruction, EX: instruction, MEM: instruction, WB: instruction },
       cycle_events: events, global_result: { ...initial, registers: { ...initial.registers, x10: `0x0000000${clock}` },
         metrics: { ...initial.metrics, accumulated_instructions: clock } } })),
   };
@@ -43,6 +43,9 @@ describe('execution values', () => {
     const data = result();
     expect(getCycleData(data, 0)?.global_result).toEqual(initial);
     expect(getCycleData(data, 0)?.buffers).toEqual(empty);
+    expect(getCycleData(data, 1)?.clock).toBe(1);
+    expect(getCycleData(data, 2)?.clock).toBe(2);
+    expect(data.history.map((item) => item.clock)).toEqual([0, 1]);
     expect(getCycleData(data, 1)?.global_result.registers.x10).toBe('0x00000001');
     expect(getCycleData(data, 2)?.global_result.registers.x10).toBe('0x00000002');
     expect(getPerformanceStats(data, 2)).toMatchObject({ completedInstructions: 2, totalCycles: 2, cpi: '1.00', ipc: '1.00' });
@@ -87,6 +90,9 @@ describe('execution values', () => {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     expect(doc.querySelectorAll('[title^="0x00020000:"]')).toHaveLength(2);
     expect(html).toContain('1CLK');
+    expect(html).toContain('C1');
+    expect(html).toContain('C2');
+    expect(html).not.toContain('C0');
   });
 
   it('allows pipeline playback to reach the actual final clock', () => {

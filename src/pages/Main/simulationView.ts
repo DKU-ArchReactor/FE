@@ -6,11 +6,16 @@ export const getActivity = (item: CycleHistoryItem) => item.stage_activity ?? it
 export function getCycleData(result: SimulationResult | null, position: number): CycleHistoryItem | null {
   if (!result) return null;
   if (position > 0) {
-    const item = result.history[Math.min(position, result.history.length) - 1];
+    const completedClocks = Math.min(position, result.history.length);
+    const item = result.history[completedClocks - 1];
     if (!item) return null;
-    return position >= result.history.length
-      ? { ...item, global_result: { ...item.global_result, console_output: result.console_output } }
-      : item;
+    // CORE clocks are zero-based; playback reserves 0 for the pre-execution state.
+    return {
+      ...item, clock: completedClocks,
+      global_result: position >= result.history.length
+        ? { ...item.global_result, console_output: result.console_output }
+        : item.global_result,
+    };
   }
   const events = result.history[0]?.cycle_events;
   if (!events) return null;

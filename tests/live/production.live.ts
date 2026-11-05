@@ -34,6 +34,7 @@ it.each([
     expect(result.status).toBe('halted');
     expect(getCycleData(result, 0)?.clock).toBe(0);
     const last = getCycleData(result, result.history.length)!;
+    expect(last.clock).toBe(result.summary.total_cycles);
     expect(Number(last.global_result.registers.x10)).toBe(expected);
     expect(getPerformanceStats(result, result.history.length)).toMatchObject({
       completedInstructions: result.summary.instructions_executed,
@@ -69,6 +70,7 @@ it('preserves cycle-limit status and diagnostics at the final clock', async () =
     const result = await runSimulation({ ...artifact, mode, max_cycles: 20 });
     expect(result.status).toBe('error');
     expect(result.history).toHaveLength(20);
+    expect(getCycleData(result, 20)?.clock).toBe(20);
     expect(getCycleData(result, 20)?.global_result.console_output).toContain('clock limit');
   }
 }, 60000);

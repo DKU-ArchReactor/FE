@@ -115,7 +115,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const history = useMemo(() => simulationData?.history.map((item) => ({ ...item, buffers: getActivity(item) })) ?? [], [simulationData]);
+  const history = useMemo(() => simulationData?.history.map((item, index) => ({ ...item, clock: index + 1, buffers: getActivity(item) })) ?? [], [simulationData]);
   const totalCycles = history.length;
 
   // 파이프라인 히스토리를 시간순으로 추적하여 계단식(Stair-step) 다이어그램 행 생성
