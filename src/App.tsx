@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import MainPage from "./pages/Main";
 import CToAsmPage from "./pages/CToAsm";
 import ComingSoonPage from "./pages/ComingSoon";
@@ -12,8 +12,10 @@ function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<MainPage />} />
-        <Route path="/c-to-asm" element={<CToAsmPage />} />
-        <Route path="/coming-soon" element={<ComingSoonPage />} />
+        <Route path="/pipeline" element={<MainPage />} />
+        <Route path="/management" element={<MainPage />} />
+        <Route path="/c-to-asm" element={<Navigate to="/" replace />} />
+        <Route path="/coming-soon" element={<Navigate to="/management" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/my" element={<MyPage />} />

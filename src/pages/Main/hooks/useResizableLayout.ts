@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { SectionConfig } from '../types';
 
+interface ResizingCol {
+  idx: number;
+  startX: number;
+  initialWidths: number[];
+  viewportWidth: number;
+}
+
 interface ResizingRowSlot {
   secIdx: number;
   slotIdx: number;
@@ -24,8 +31,8 @@ export function useResizableLayout(
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 1. 구역 간 가로 너비 리사이징
-  const [resizingSplitterIndex, setResizingSplitterIndex] = useState<number | null>(null);
+  // 1. 구역 간 가로 너비 리사이징 (델타 기반: 슬라이드 오프셋에 영향받지 않음)
+  const [resizingCol, setResizingCol] = useState<ResizingCol | null>(null);
 
   // 2. 구역 내 슬롯 간 세로 높이 리사이징
   const [resizingRowSlot, setResizingRowSlot] = useState<ResizingRowSlot | null>(null);
@@ -35,28 +42,59 @@ export function useResizableLayout(
 
   // 마우스 이동 및 업 이벤트 핸들러
   useEffect(() => {
-    if (resizingSplitterIndex === null && resizingRowSlot === null && resizingPair === null) return;
+    if (resizingCol === null && resizingRowSlot === null && resizingPair === null) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      // (1) 구역 간 가로 너비 리사이징
-      if (resizingSplitterIndex !== null && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        if (rect.width <= 0) return;
-        const idx = resizingSplitterIndex;
-        if (idx < 0 || idx >= sections.length - 1) return;
+      // (1) 구역 간 가로 너비 리사이징 (연쇄 캐스케이딩 밀기)
+      if (resizingCol !== null) {
+        const { idx, startX, initialWidths, viewportWidth } = resizingCol;
+        if (viewportWidth <= 0) return;
 
-        const currentSplitterLeft = e.clientX - rect.left;
-        const targetRatio = (currentSplitterLeft / rect.width) * 100;
-        const prevWidthSum = sections.slice(0, idx).reduce((acc, s) => acc + s.widthPercent, 0);
-        const combinedTwoWidths = sections[idx].widthPercent + sections[idx + 1].widthPercent;
+        const deltaX = e.clientX - startX;
+        const deltaPercent = (deltaX / viewportWidth) * 100;
+        const minPercent = 30;
 
-        const newLeftWidth = Math.max(12, Math.min(targetRatio - prevWidthSum, combinedTwoWidths - 12));
-        const newRightWidth = combinedTwoWidths - newLeftWidth;
+        const newWidths = [...initialWidths];
+
+        if (deltaPercent > 0) {
+          // 오른쪽으로 드래그: idx 컴포넌트를 늘리고, 오른쪽 컴포넌트들을 순차적으로 줄임
+          let needed = deltaPercent;
+          // 오른쪽 컴포넌트들(idx+1, idx+2, ...)에서 여유분을 깎아냄
+          for (let r = idx + 1; r < newWidths.length; r++) {
+            const available = newWidths[r] - minPercent;
+            if (available > 0) {
+              const reduce = Math.min(needed, available);
+              newWidths[r] -= reduce;
+              needed -= reduce;
+              if (needed <= 0.001) break;
+            }
+          }
+          // 실제로 오른쪽 컴포넌트들에서 확보된 폭만큼만 idx 컴포넌트를 늘림
+          const actualGained = deltaPercent - needed;
+          newWidths[idx] = initialWidths[idx] + actualGained;
+        } else if (deltaPercent < 0) {
+          // 왼쪽으로 드래그: idx+1 컴포넌트를 늘리고, 왼쪽 컴포넌트들을 순차적으로 줄임
+          let needed = -deltaPercent;
+          // 왼쪽 컴포넌트들(idx, idx-1, ...)에서 여유분을 깎아냄
+          for (let l = idx; l >= 0; l--) {
+            const available = newWidths[l] - minPercent;
+            if (available > 0) {
+              const reduce = Math.min(needed, available);
+              newWidths[l] -= reduce;
+              needed -= reduce;
+              if (needed <= 0.001) break;
+            }
+          }
+          // 실제로 왼쪽 컴포넌트들에서 확보된 폭만큼만 idx+1 컴포넌트를 늘림
+          const actualGained = (-deltaPercent) - needed;
+          newWidths[idx + 1] = initialWidths[idx + 1] + actualGained;
+        }
 
         setSections((prev) =>
           prev.map((s, i) => {
-            if (i === idx) return { ...s, widthPercent: Math.round(newLeftWidth * 10) / 10 };
-            if (i === idx + 1) return { ...s, widthPercent: Math.round(newRightWidth * 10) / 10 };
+            if (newWidths[i] !== undefined) {
+              return { ...s, widthPercent: Math.round(newWidths[i] * 10) / 10 };
+            }
             return s;
           })
         );
@@ -110,7 +148,7 @@ export function useResizableLayout(
     };
 
     const handleMouseUp = () => {
-      setResizingSplitterIndex(null);
+      setResizingCol(null);
       setResizingRowSlot(null);
       setResizingPair(null);
       document.body.style.cursor = '';
@@ -133,10 +171,21 @@ export function useResizableLayout(
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [resizingSplitterIndex, resizingRowSlot, resizingPair, sections, setSections]);
+  }, [resizingCol, resizingRowSlot, resizingPair, setSections]);
 
-  const handleColResizeStart = (colIdx: number) => {
-    setResizingSplitterIndex(colIdx);
+  const handleColResizeStart = (colIdx: number, e?: React.MouseEvent) => {
+    if (colIdx < 0 || colIdx >= sections.length - 1) return;
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const viewportWidth = containerRef.current?.clientWidth || window.innerWidth;
+    setResizingCol({
+      idx: colIdx,
+      startX: e ? e.clientX : 0,
+      initialWidths: sections.map((s) => s.widthPercent),
+      viewportWidth,
+    });
   };
 
   const handleSlotResizeStart = (
@@ -183,7 +232,7 @@ export function useResizableLayout(
 
   return {
     containerRef,
-    resizingSplitterIndex,
+    resizingSplitterIndex: resizingCol?.idx ?? null,
     resizingRowSlot,
     resizingPair,
     handleColResizeStart,

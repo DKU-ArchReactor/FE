@@ -3,443 +3,955 @@ import type { CycleHistoryItem } from '@/type/simulation';
 
 interface PipelineVisualizerProps {
   currentData: CycleHistoryItem | null;
+  loadingMessage?: string | null;
 }
 
-const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData }) => {
+const MASTER_WIDTH = 900;
+const MASTER_HEIGHT = 1350;
+
+const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, loadingMessage }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
 
-  if (!currentData) {
+  if (loadingMessage) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center text-slate-400">
-        시뮬레이션 데이터가 없습니다.
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center gap-3 text-center">
+        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-blue-700">{loadingMessage}</p>
+        <p className="text-xs text-slate-400">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
       </div>
     );
   }
 
-  const { buffers, cycle_events } = currentData;
+  if (!currentData) {
+    return (
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center text-slate-400 text-sm">
+        C 소스 코드를 작성하고 [⚡ 컴파일]을 누르면 파이프라인 데이터패스가 활성화됩니다.
+      </div>
+    );
+  }
+
+  const { buffers, cycle_events, clock } = currentData;
   const isStall = cycle_events.stall?.has_stall;
   const isForward = cycle_events.forwarding?.has_forwarded;
   const isBranchFlush = cycle_events.control_hazard?.has_flush;
 
-  // 각 파이프라인 단계별 명령어 추출
+  // 5단계별 명령어
   const ifInst = buffers.IF?.assembly || 'bubble';
   const idInst = buffers.ID?.assembly || 'bubble';
   const exInst = buffers.EX?.assembly || 'bubble';
   const memInst = buffers.MEM?.assembly || 'bubble';
   const wbInst = buffers.WB?.assembly || 'bubble';
 
-  // 활성 상태 판정
+  // 활성 여부
   const isIfActive = ifInst !== 'bubble' && ifInst !== 'empty';
   const isIdActive = idInst !== 'bubble' && idInst !== 'empty';
   const isExActive = exInst !== 'bubble' && exInst !== 'empty';
-  const isMemActive = memInst !== 'bubble' && memInst !== 'empty' && (memInst.startsWith('lw') || memInst.startsWith('sw'));
+  const isMemActive = memInst !== 'bubble' && memInst !== 'empty';
   const isWbActive = wbInst !== 'bubble' && wbInst !== 'empty';
 
-
-  // 줌 조절 핸들러
-  const handleZoomIn = () => setZoomLevel((prev) => Math.min(2.5, +(prev + 0.25).toFixed(2)));
-  const handleZoomOut = () => setZoomLevel((prev) => Math.max(0.5, +(prev - 0.25).toFixed(2)));
+  // 줌 조절
+  const handleZoomIn = () => setZoomLevel((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)));
+  const handleZoomOut = () => setZoomLevel((prev) => Math.max(0.5, +(prev - 0.15).toFixed(2)));
   const handleZoomReset = () => setZoomLevel(1.0);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-3.5 flex flex-col justify-between overflow-hidden relative">
-      {/* SVG 애니메이션 전용 스타일 */}
+    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0">
+      {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일 */}
       <style>{`
-        @keyframes flowRight {
-          from { stroke-dashoffset: 24; }
+        @keyframes streamDown {
+          from { stroke-dashoffset: 28; }
           to { stroke-dashoffset: 0; }
         }
-        @keyframes flowLeft {
+        @keyframes streamUp {
           from { stroke-dashoffset: 0; }
-          to { stroke-dashoffset: 24; }
+          to { stroke-dashoffset: 28; }
         }
-        @keyframes pulseForward {
-          0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 2px rgba(6, 182, 212, 0.4)); }
-          50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.8)); }
-        }
-        @keyframes pulseStall {
-          0%, 100% { filter: drop-shadow(0 0 2px rgba(244, 63, 94, 0.4)); }
-          50% { filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.9)); }
-        }
-        .anim-flow-main {
-          stroke-dasharray: 6 4;
-          animation: flowRight 1s linear infinite;
-        }
-        .anim-flow-wb {
+        .stream-down-active {
           stroke-dasharray: 8 5;
-          animation: flowLeft 1.2s linear infinite;
+          animation: streamDown 0.8s linear infinite;
         }
-        .anim-forwarding {
-          stroke-dasharray: 6 4;
-          animation: flowLeft 0.8s linear infinite, pulseForward 1.5s ease-in-out infinite;
+        .stream-feedback-active {
+          stroke-dasharray: 9 5;
+          animation: streamUp 1.1s linear infinite;
         }
-        .anim-stall {
-          animation: pulseStall 1.2s ease-in-out infinite;
+        @keyframes pulseGlowAmber {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(245, 158, 11, 0.35)); }
+          50% { filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.8)); }
+        }
+        .glow-active-ex {
+          animation: pulseGlowAmber 1.6s ease-in-out infinite;
         }
       `}</style>
 
-      {/* 우측 상단 플로팅 말풍선: 화면 비율 줌 컨트롤러 */}
-      <div className="absolute right-3.5 top-3.5 z-20 flex items-center bg-white/90 backdrop-blur-md px-1.5 py-1 rounded-xl border border-slate-200/90 shadow-sm text-slate-700">
-        <button
-          onClick={handleZoomOut}
-          disabled={zoomLevel <= 0.5}
-          title="축소"
-          className="w-6 h-6 flex items-center justify-center text-xs font-bold rounded-lg hover:bg-slate-100 active:bg-slate-200 disabled:opacity-30 transition-colors cursor-pointer"
-        >
-          −
-        </button>
-        <button
-          onClick={handleZoomReset}
-          title="원래 크기로 리셋 (더블클릭/클릭)"
-          className="px-2 py-0.5 text-[11px] font-mono font-bold text-slate-800 hover:text-blue-600 transition-colors cursor-pointer"
-        >
-          {Math.round(zoomLevel * 100)}%
-        </button>
-        <button
-          onClick={handleZoomIn}
-          disabled={zoomLevel >= 2.5}
-          title="확대"
-          className="w-6 h-6 flex items-center justify-center text-xs font-bold rounded-lg hover:bg-slate-100 active:bg-slate-200 disabled:opacity-30 transition-colors cursor-pointer"
-        >
-          +
-        </button>
+      {/* 1. 상단 헤더 & 컨트롤러 */}
+      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-100 shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+          <h3 className="text-xs font-bold text-slate-800">Vertical 5-Stage Datapath</h3>
+          <span className="text-[10px] text-slate-400 font-mono">(Clock {clock ?? 0})</span>
+        </div>
+
+        {/* 이벤트 뱃지 & 줌 컨트롤 */}
+        <div className="flex items-center gap-1.5">
+          {isStall && (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse shadow-2xs">
+              ⚠️ Stall
+            </span>
+          )}
+          {isForward && (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-600 text-white shadow-2xs">
+              ⇄ FWD
+            </span>
+          )}
+          {isBranchFlush && (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white shadow-2xs">
+              🔄 Flush
+            </span>
+          )}
+          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-1 py-0.5 text-slate-600 text-[10px]">
+            <button
+              onClick={handleZoomOut}
+              className="px-1 hover:text-blue-600 font-bold cursor-pointer"
+              title="축소"
+            >
+              −
+            </button>
+            <button
+              onClick={handleZoomReset}
+              className="px-1 font-mono font-semibold hover:text-blue-600 cursor-pointer"
+              title="100% (세로 맞춤)"
+            >
+              {Math.round(zoomLevel * 100)}%
+            </button>
+            <button
+              onClick={handleZoomIn}
+              className="px-1 hover:text-blue-600 font-bold cursor-pointer"
+              title="확대"
+            >
+              +
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* 가로/세로 스크롤 가능한 SVG Datapath 캔버스 영역 */}
-      <div className="flex-1 overflow-auto relative w-full h-full min-h-0 py-1 px-1 custom-scrollbar flex items-center justify-center">
+      {/* 2. 고해상도 마스터 SVG 뷰포트:
+           - 100%일 때 세로(height: 100%)를 꽉 채우고, SVG 고유 비율(900:1350 = 2:3)에 맞춰 가로 폭 자동 결정
+           - transform: scale() 대신 실제 레이아웃 크기(height %)와 m-auto를 사용하여 확대 시 상하좌우 잘림 없이 스크롤 가능 */}
+      <div className="flex-1 overflow-auto relative w-full min-h-0 p-1 custom-scrollbar flex">
         <div
-          className="transition-all duration-150 flex items-center justify-center max-w-full max-h-full w-full h-full mx-auto"
+          className="m-auto shrink-0 transition-[height] duration-150"
           style={{
-            transform: zoomLevel !== 1.0 ? `scale(${zoomLevel})` : undefined,
-            transformOrigin: 'center center',
+            height: `${zoomLevel * 100}%`,
+            aspectRatio: `${MASTER_WIDTH} / ${MASTER_HEIGHT}`,
           }}
         >
-          <svg 
-            viewBox="0 0 940 435" 
+          <svg
+            viewBox={`0 0 ${MASTER_WIDTH} ${MASTER_HEIGHT}`}
             preserveAspectRatio="xMidYMid meet"
-            className="w-full h-full max-h-full max-w-full select-none"
+            className="w-full h-full select-none block"
           >
             <defs>
-              {/* 화살표 마커들 */}
-              <marker id="arr-base" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                <path d="M 0 1 L 8 5 L 0 9 z" fill="#94A3B8" />
+              {/* 정밀 화살표 마커 (끝점 refX=8.5로 선 끝이 박스 경계에 정확히 닿도록 설정) */}
+              <marker id="m-arr-def" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#94A3B8" />
               </marker>
-              <marker id="arr-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                <path d="M 0 1 L 8 5 L 0 9 z" fill="#3B82F6" />
+              <marker id="m-arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#DC2626" />
               </marker>
-              <marker id="arr-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                <path d="M 0 1 L 8 5 L 0 9 z" fill="#06B6D4" />
+              <marker id="m-arr-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#EA580C" />
               </marker>
-              <marker id="arr-amber" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                <path d="M 0 1 L 8 5 L 0 9 z" fill="#F59E0B" />
+              <marker id="m-arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D97706" />
+              </marker>
+              <marker id="m-arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#16A34A" />
+              </marker>
+              <marker id="m-arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#2563EB" />
+              </marker>
+              <marker id="m-arr-cyan" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#0891B2" />
               </marker>
 
-              {/* 버전 3 네온 글로우 필터 */}
-              <filter id="glow-alu" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#F59E0B" floodOpacity="0.8" />
-              </filter>
-              <filter id="glow-mem" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#10B981" floodOpacity="0.8" />
-              </filter>
-
-              {/* 슬림 파이프라인 레지스터 그라데이션 */}
-              <linearGradient id="slimRegGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#FEF08A" />
-                <stop offset="100%" stopColor="#FACC15" />
+              {/* 하드웨어 부품 그라데이션 */}
+              <linearGradient id="g-pc" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#FEE2E2" />
+                <stop offset="100%" stopColor="#FECACA" />
               </linearGradient>
-
-              <linearGradient id="aluGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#FEF3C7" />
-                <stop offset="100%" stopColor="#FDE68A" />
+              <linearGradient id="g-imem" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#EFF6FF" />
+                <stop offset="100%" stopColor="#DBEAFE" />
               </linearGradient>
-
-              <linearGradient id="memGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#DCFCE7" />
-                <stop offset="100%" stopColor="#BBF7D0" />
+              <linearGradient id="g-regfile" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#F0FDF4" />
+                <stop offset="100%" stopColor="#DCFCE7" />
+              </linearGradient>
+              <linearGradient id="g-dmem" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#ECFDF5" />
+                <stop offset="100%" stopColor="#D1FAE5" />
+              </linearGradient>
+              <linearGradient id="g-buffer" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#F1F5F9" />
+                <stop offset="50%" stopColor="#E2E8F0" />
+                <stop offset="100%" stopColor="#F1F5F9" />
               </linearGradient>
             </defs>
 
             {/* ============================================================ */}
-            {/* 1. 하단 영역 세로 점선 가이드선                               */}
+            {/* [STAGE 1] INSTRUCTION FETCH (IF) : Y = 20 ~ 215               */}
             {/* ============================================================ */}
-            <g stroke="#E2E8F0" strokeWidth="1" strokeDasharray="4 3">
-              <line x1="189" y1="330" x2="189" y2="425" />
-              <line x1="389" y1="330" x2="389" y2="425" />
-              <line x1="589" y1="330" x2="589" y2="425" />
-              <line x1="759" y1="330" x2="759" y2="425" />
-            </g>
+            {/* 스테이지 헤더 & 명령어 뱃지 (전 스테이지 공통 규격: X=570, W=260, H=30) */}
+            <text x="115" y="42" fill="#DC2626" fontSize="16" fontWeight="800">
+              1. IF (Instruction Fetch)
+            </text>
+            <rect
+              x="570"
+              y="22"
+              width="260"
+              height="30"
+              rx="8"
+              fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
+              stroke={isIfActive ? "#F87171" : "#CBD5E1"}
+              strokeWidth="1.8"
+            />
+            <text
+              x="700"
+              y="42"
+              fill={isIfActive ? "#991B1B" : "#94A3B8"}
+              fontSize="13"
+              fontFamily="'D2Coding', Consolas, monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {ifInst}
+            </text>
+
+            {/* 부품 1: PC (중심 X = 430, Y = 72 ~ 116) */}
+            <rect
+              x="355"
+              y="72"
+              width="150"
+              height="44"
+              rx="8"
+              fill={isIfActive ? "url(#g-pc)" : "#FFFFFF"}
+              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
+              strokeWidth="2.2"
+            />
+            <text x="430" y="92" fill="#991B1B" fontSize="14" fontWeight="800" textAnchor="middle">
+              PC
+            </text>
+            <text x="430" y="109" fill="#B91C1C" fontSize="11.5" fontFamily="monospace" fontWeight="600" textAnchor="middle">
+              {buffers.IF?.pc ? buffers.IF.pc : "0x00000000"}
+            </text>
+
+            {/* PC ➔ Instruction Memory 직하강 화살표 (X = 430, Y = 116 ➔ 148) */}
+            <line
+              x1="430"
+              y1="116"
+              x2="430"
+              y2="146"
+              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
+              strokeWidth="3.2"
+              className={isIfActive ? "stream-down-active" : undefined}
+              markerEnd={isIfActive ? "url(#m-arr-red)" : "url(#m-arr-def)"}
+            />
+
+            {/* PC ➔ PC + 4 Adder 분기 화살표 (X = 505 ➔ 645, Y = 94) */}
+            <path
+              d="M 505,94 L 642,94"
+              fill="none"
+              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
+              strokeWidth="2.2"
+              markerEnd={isIfActive ? "url(#m-arr-red)" : "url(#m-arr-def)"}
+            />
+            {/* PC + 4 가산기 (중심 X = 695, Y = 76 ~ 112) */}
+            <polygon
+              points="645,76 745,76 725,112 665,112"
+              fill="#F8FAFC"
+              stroke="#94A3B8"
+              strokeWidth="1.8"
+            />
+            <text x="695" y="99" fill="#475569" fontSize="12" fontWeight="800" textAnchor="middle">
+              PC + 4
+            </text>
+            {/* PC + 4 루프백 피드백 화살표 (우측 위로 돌아 PC 상단으로 진입) */}
+            <path
+              d="M 695,112 L 695,128 L 785,128 L 785,60 L 430,60 L 430,70"
+              fill="none"
+              stroke="#94A3B8"
+              strokeWidth="1.6"
+              strokeDasharray="5 3"
+              markerEnd="url(#m-arr-def)"
+            />
+            <text x="792" y="98" fill="#64748B" fontSize="10.5" fontWeight="600">
+              Next PC
+            </text>
+
+            {/* 부품 2: Instruction Memory (중심 X = 430, Y = 148 ~ 208) */}
+            <rect
+              x="290"
+              y="148"
+              width="280"
+              height="60"
+              rx="10"
+              fill={isIfActive ? "url(#g-imem)" : "#FFFFFF"}
+              stroke={isIfActive ? "#3B82F6" : "#94A3B8"}
+              strokeWidth="2.5"
+            />
+            <text x="430" y="175" fill="#1E40AF" fontSize="15.5" fontWeight="800" textAnchor="middle">
+              Instruction Memory
+            </text>
+            <text x="430" y="196" fill="#64748B" fontSize="11.5" fontFamily="monospace" textAnchor="middle">
+              Read Inst [31:0] @ PC
+            </text>
+
+            {/* Instruction Memory ➔ IF/ID BUFFER 직하강 화살표 (X = 430, Y = 208 ➔ 240) */}
+            <line
+              x1="430"
+              y1="208"
+              x2="430"
+              y2="238"
+              stroke={isIfActive ? "#DC2626" : "#94A3B8"}
+              strokeWidth="3.2"
+              className={isIfActive ? "stream-down-active" : undefined}
+              markerEnd={isIfActive ? "url(#m-arr-red)" : "url(#m-arr-def)"}
+            />
 
             {/* ============================================================ */}
-            {/* 2. 초슬림 파이프라인 레지스터 바 (9px)                         */}
+            {/* 파이프라인 버퍼 1: IF / ID BUFFER (Y = 240 ~ 264)             */}
             {/* ============================================================ */}
-            <g transform="translate(185, 40)" className={isStall ? "anim-stall" : ""}>
-              <rect width="9" height="280" rx="3" fill={isStall ? "#FFE4E6" : isBranchFlush ? "#FEF3C7" : "url(#slimRegGrad)"} stroke={isStall ? "#F43F5E" : isBranchFlush ? "#F59E0B" : "#CA8A04"} strokeWidth="1.2" />
-            </g>
-            <g transform="translate(385, 40)">
-              <rect width="9" height="280" rx="3" fill="url(#slimRegGrad)" stroke="#CA8A04" strokeWidth="1.2" />
-            </g>
-            <g transform="translate(585, 40)">
-              <rect width="9" height="280" rx="3" fill="url(#slimRegGrad)" stroke="#CA8A04" strokeWidth="1.2" />
-            </g>
-            <g transform="translate(755, 40)">
-              <rect width="9" height="280" rx="3" fill="url(#slimRegGrad)" stroke="#CA8A04" strokeWidth="1.2" />
-            </g>
-
-            {/* ============================================================ */}
-            {/* 3. 기본 버스 배선 (레지스터 인-아웃 직결 연결)                 */}
-            {/* ============================================================ */}
-            <g stroke="#CBD5E1" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-              {/* Fetch */}
-              <path d="M 72 165 L 105 165" />
-              <path d="M 88 165 L 88 95 L 105 95" />
-              <path d="M 145 95 L 185 95" markerEnd="url(#arr-base)" />
-              <path d="M 175 165 L 185 165" markerEnd="url(#arr-base)" />
-
-              {/* Decode */}
-              <path d="M 194 85 L 245 50" markerEnd="url(#arr-base)" />
-              <path d="M 194 115 L 240 115" markerEnd="url(#arr-base)" />
-              <path d="M 194 165 L 240 165" markerEnd="url(#arr-base)" />
-              <path d="M 194 285 L 240 285" markerEnd="url(#arr-base)" />
-              <path d="M 194 95 L 385 95" markerEnd="url(#arr-base)" />
-              <path d="M 315 50 L 385 50" markerEnd="url(#arr-base)" />
-              <path d="M 310 180 L 385 180" markerEnd="url(#arr-base)" />
-              <path d="M 310 220 L 385 220" markerEnd="url(#arr-base)" />
-              <path d="M 310 285 L 385 285" markerEnd="url(#arr-base)" />
-
-              {/* Execute */}
-              <path d="M 394 50 L 585 50" markerEnd="url(#arr-base)" />
-              <path d="M 394 130 L 440 130" markerEnd="url(#arr-base)" />
-              <path d="M 394 190 L 440 190" markerEnd="url(#arr-base)" />
-              <path d="M 458 130 L 490 135" markerEnd="url(#arr-base)" />
-              <path d="M 458 190 L 490 185" markerEnd="url(#arr-base)" />
-              <path d="M 520 250 L 520 200" markerEnd="url(#arr-base)" />
-              <path d="M 552 160 L 585 160" markerEnd="url(#arr-base)" />
-              <path d="M 394 220 L 585 220" markerEnd="url(#arr-base)" />
-
-              {/* Memory */}
-              <path d="M 594 160 L 645 160" markerEnd="url(#arr-base)" />
-              <path d="M 594 200 L 645 200" markerEnd="url(#arr-base)" />
-              <path d="M 594 240 L 755 240" markerEnd="url(#arr-base)" />
-              <path d="M 720 175 L 755 175" markerEnd="url(#arr-base)" />
-
-              {/* Write-Back */}
-              <path d="M 764 175 L 803 175" markerEnd="url(#arr-base)" />
-              <path d="M 764 240 L 803 200" markerEnd="url(#arr-base)" />
-            </g>
+            <rect
+              x="115"
+              y="240"
+              width="715"
+              height="24"
+              rx="5"
+              fill="url(#g-buffer)"
+              stroke="#94A3B8"
+              strokeWidth="1.5"
+            />
+            <text
+              x="472"
+              y="256"
+              fill="#334155"
+              fontSize="12"
+              fontWeight="800"
+              textAnchor="middle"
+              letterSpacing="2.5"
+            >
+              IF / ID PIPELINE REGISTER
+            </text>
 
             {/* ============================================================ */}
-            {/* 4. 활성 데이터 흐름 점선 애니메이션                          */}
+            {/* [STAGE 2] INSTRUCTION DECODE (ID) : Y = 280 ~ 505            */}
             {/* ============================================================ */}
-            <g fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              {isIfActive && !isStall && (
-                <path d="M 72 165 L 105 165 M 88 165 L 88 95 L 105 95 M 145 95 L 185 95 M 175 165 L 185 165" stroke="#3B82F6" className="anim-flow-main" markerEnd="url(#arr-blue)" />
-              )}
-              {isIdActive && (
-                <path d="M 194 165 L 240 165 M 194 285 L 240 285 M 310 180 L 385 180 M 310 220 L 385 220 M 310 285 L 385 285" stroke="#6366F1" className="anim-flow-main" markerEnd="url(#arr-blue)" />
-              )}
-              {isExActive && (
-                <path d="M 394 130 L 440 130 M 394 190 L 440 190 M 458 130 L 490 135 M 458 190 L 490 185 M 552 160 L 585 160" stroke="#F59E0B" className="anim-flow-main" markerEnd="url(#arr-amber)" />
-              )}
-              {isMemActive && (
-                <path d="M 594 160 L 645 160 M 594 200 L 645 200 M 720 175 L 755 175" stroke="#10B981" className="anim-flow-main" markerEnd="url(#arr-blue)" />
-              )}
-            </g>
+            <text x="115" y="304" fill="#EA580C" fontSize="16" fontWeight="800">
+              2. ID (Instruction Decode)
+            </text>
+            <rect
+              x="570"
+              y="284"
+              width="260"
+              height="30"
+              rx="8"
+              fill={isIdActive ? "#FFF7ED" : "#F8FAFC"}
+              stroke={isIdActive ? "#FB923C" : "#CBD5E1"}
+              strokeWidth="1.8"
+            />
+            <text
+              x="700"
+              y="304"
+              fill={isIdActive ? "#C2410C" : "#94A3B8"}
+              fontSize="13"
+              fontFamily="'D2Coding', Consolas, monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {idInst}
+            </text>
+
+            {/* IF/ID BUFFER에서 Register File / Imm Gen / Control Unit으로 분기되는 명령어 버스 */}
+            {/* 메인 분기점: (430, 264) ➔ (430, 326) 에서 좌(350), 우(610, 775)로 분기 (명령어 박스 Y=284~316 아래쪽) */}
+            <path
+              d="M 430,264 L 430,326 L 350,326 L 350,346"
+              fill="none"
+              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="2.5"
+              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+            />
+            <path
+              d="M 430,326 L 610,326 L 610,346"
+              fill="none"
+              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="2.2"
+              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+            />
+            <path
+              d="M 610,326 L 775,326 L 775,356"
+              fill="none"
+              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="1.8"
+              strokeDasharray="4 2"
+              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+            />
+
+            {/* 부품 3: Registers (Register File) : X = 190 ~ 510, Y = 348 ~ 458 */}
+            <rect
+              x="190"
+              y="348"
+              width="320"
+              height="110"
+              rx="10"
+              fill={isIdActive ? "url(#g-regfile)" : "#FFFFFF"}
+              stroke={isIdActive ? "#16A34A" : "#94A3B8"}
+              strokeWidth="2.5"
+            />
+            {/* 좌측 옆구리 Write Data In 포트 핀 (X = 176 ~ 190, 중심 Y = 403)
+                - 글씨(Write Data / rd In)를 모두 화살표(Y = 403) 위쪽(Y = 374, 390)으로 배치하여 겹침 방지 */}
+            <rect x="176" y="391" width="14" height="24" fill="#2563EB" rx="3" />
+            <text x="170" y="374" fill="#1D4ED8" fontSize="11.5" fontWeight="800" textAnchor="end">
+              Write Data
+            </text>
+            <text x="170" y="389" fill="#2563EB" fontSize="10.5" fontFamily="monospace" fontWeight="bold" textAnchor="end">
+              (rd In)
+            </text>
+
+            <text x="350" y="376" fill="#15803D" fontSize="16" fontWeight="800" textAnchor="middle">
+              Registers (Register File)
+            </text>
+            <text x="215" y="402" fill="#475569" fontSize="12" fontFamily="monospace" fontWeight="600">
+              ▸ rs1 (Read Reg 1)
+            </text>
+            <text x="215" y="424" fill="#475569" fontSize="12" fontFamily="monospace" fontWeight="600">
+              ▸ rs2 (Read Reg 2)
+            </text>
+            {/* 출력 포트 라벨 (Data 1: X=290, Data 2: X=440) */}
+            <text x="290" y="448" fill="#15803D" fontSize="12" fontWeight="800" textAnchor="middle">
+              Read Data 1 ⬇
+            </text>
+            <text x="440" y="448" fill="#15803D" fontSize="12" fontWeight="800" textAnchor="middle">
+              Read Data 2 ⬇
+            </text>
+
+            {/* 부품 4: Imm Gen (X = 550 ~ 670, 중심 X = 610, Y = 348 ~ 458) */}
+            <rect
+              x="550"
+              y="348"
+              width="120"
+              height="110"
+              rx="16"
+              fill="#FFFFFF"
+              stroke={isIdActive ? "#0284C7" : "#94A3B8"}
+              strokeWidth="2.2"
+            />
+            <text x="610" y="384" fill="#1E293B" fontSize="14.5" fontWeight="800" textAnchor="middle">
+              Imm Gen
+            </text>
+            <text x="610" y="406" fill="#64748B" fontSize="11" textAnchor="middle">
+              32-bit Sign
+            </text>
+            <text x="610" y="422" fill="#64748B" fontSize="11" textAnchor="middle">
+              Extension
+            </text>
+            <text x="610" y="448" fill="#0284C7" fontSize="12" fontWeight="800" textAnchor="middle">
+              Imm [31:0] ⬇
+            </text>
+
+            {/* 부품 5: Control Unit (중심 X = 775, Y = 358 ~ 448) */}
+            <ellipse
+              cx="775"
+              cy="403"
+              rx="42"
+              ry="45"
+              fill="#F8FAFC"
+              stroke="#64748B"
+              strokeWidth="1.8"
+            />
+            <text x="775" y="398" fill="#334155" fontSize="12.5" fontWeight="800" textAnchor="middle">
+              Control
+            </text>
+            <text x="775" y="415" fill="#64748B" fontSize="11" fontWeight="600" textAnchor="middle">
+              Unit
+            </text>
+
+            {/* ID 단계 출력 3개 버스 ➔ ID/EX BUFFER (Y = 458 ➔ 515) */}
+            {/* 1) Read Data 1 (X = 290) */}
+            <line
+              x1="290"
+              y1="458"
+              x2="290"
+              y2="513"
+              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="3.2"
+              className={isIdActive ? "stream-down-active" : undefined}
+              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+            />
+            {/* 2) Read Data 2 (X = 440) */}
+            <line
+              x1="440"
+              y1="458"
+              x2="440"
+              y2="513"
+              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="3.2"
+              className={isIdActive ? "stream-down-active" : undefined}
+              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+            />
+            {/* 3) Imm [31:0] (X = 610에서 내려와 ID/EX 버퍼의 X = 545 지점으로 진입하여 EX 우측 명령어 박스와 완전 분리) */}
+            <path
+              d="M 610,458 L 610,486 L 545,486 L 545,513"
+              fill="none"
+              stroke={isIdActive ? "#0284C7" : "#94A3B8"}
+              strokeWidth="2.5"
+              strokeDasharray="5 3"
+              markerEnd={isIdActive ? "url(#m-arr-cyan)" : "url(#m-arr-def)"}
+            />
 
             {/* ============================================================ */}
-            {/* 5. WB 피드백 루프                                            */}
+            {/* 파이프라인 버퍼 2: ID / EX BUFFER (Y = 515 ~ 539)             */}
             {/* ============================================================ */}
-            <g fill="none">
-              <path d="M 822 185 L 855 185 L 855 345 L 225 345 L 225 200 L 240 200" stroke={isWbActive ? "#3B82F6" : "#E2E8F0"} strokeWidth={isWbActive ? "3" : "1.5"} className={isWbActive ? "anim-flow-wb" : ""} markerEnd={isWbActive ? "url(#arr-blue)" : "url(#arr-base)"} />
-            </g>
-            {isWbActive && (
-              <text x="540" y="340" fill="#2563EB" stroke="none" fontSize="10" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-                ✦ Data Written Back to Register File (Active)
-              </text>
-            )}
-
-            {/* ============================================================ */}
-            {/* 6. 포워딩 버스                                               */}
-            {/* ============================================================ */}
-            {isForward && (
-              <>
-                <g fill="none" stroke="#06B6D4" strokeWidth="2.5" markerEnd="url(#arr-cyan)">
-                  <path d="M 585 140 L 585 95 L 448 95 L 448 120" className="anim-forwarding" />
-                  <path d="M 755 155 L 755 85 L 448 85 L 448 120" className="anim-forwarding" />
-                </g>
-                <g transform="translate(485, 74)">
-                  <rect width="90" height="20" rx="5" fill="#ECFEFF" stroke="#06B6D4" strokeWidth="1" />
-                  <text x="45" y="14" fill="#0891B2" stroke="none" fontSize="9" fontWeight="bold" textAnchor="middle">
-                    ⚡ Forwarding
-                  </text>
-                </g>
-              </>
-            )}
+            <rect
+              x="115"
+              y="515"
+              width="715"
+              height="24"
+              rx="5"
+              fill="url(#g-buffer)"
+              stroke="#94A3B8"
+              strokeWidth="1.5"
+            />
+            <text
+              x="472"
+              y="531"
+              fill="#334155"
+              fontSize="12"
+              fontWeight="800"
+              textAnchor="middle"
+              letterSpacing="2.5"
+            >
+              ID / EX PIPELINE REGISTER
+            </text>
 
             {/* ============================================================ */}
-            {/* 7. 하드웨어 블록들 (버전 3에서는 글로우 필터 적용)            */}
+            {/* [STAGE 3] EXECUTE / ALU (EX) : Y = 555 ~ 830                 */}
             {/* ============================================================ */}
-            {/* Next PC MUX */}
-            <polygon points="23,135 41,145 41,185 23,195" fill="#F1F5F9" stroke="#64748B" strokeWidth="1.5" />
-            <g fill="#475569" stroke="none" fontSize="8" fontWeight="bold" textAnchor="middle">
-              <text x="32" y="156">M</text><text x="32" y="167">U</text><text x="32" y="178">X</text>
-            </g>
+            <text x="115" y="579" fill="#CA8A04" fontSize="16" fontWeight="800">
+              3. EX (Execute / ALU)
+            </text>
+            {/* EX 명령어 뱃지 박스: 전 스테이지 공통 X=570, W=260, H=30 */}
+            <rect
+              x="570"
+              y="557"
+              width="260"
+              height="30"
+              rx="8"
+              fill={isExActive ? "#FEFCE8" : "#F8FAFC"}
+              stroke={isExActive ? "#FACC15" : "#CBD5E1"}
+              strokeWidth="1.8"
+            />
+            <text
+              x="700"
+              y="577"
+              fill={isExActive ? "#854D0E" : "#94A3B8"}
+              fontSize="13"
+              fontFamily="'D2Coding', Consolas, monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {exInst}
+            </text>
 
-            {/* PC Register */}
-            <g transform="translate(45, 135)" className={isStall ? "anim-stall" : ""}>
-              <rect width="27" height="60" rx="4" fill={isStall ? "#FFE4E6" : "#F8FAFC"} stroke={isStall ? "#E11D48" : "#475569"} strokeWidth={isStall ? "2.5" : "1.5"} />
-              <text x="13.5" y="34" fill="#0F172A" stroke="none" fontSize="10" fontWeight="bold" textAnchor="middle">PC</text>
-              {isStall && <text x="13.5" y="47" fill="#E11D48" stroke="none" fontSize="7" fontWeight="bold" textAnchor="middle">FREEZE</text>}
-            </g>
+            {/* 1) Read Data 1 (X = 290) ➔ ALU 좌측 입력 포트(X = 290, Y = 668)로 직하강 */}
+            <line
+              x1="290"
+              y1="539"
+              x2="290"
+              y2="666"
+              stroke={isExActive ? "#D97706" : "#94A3B8"}
+              strokeWidth="3.2"
+              className={isExActive ? "stream-down-active" : undefined}
+              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
+            />
+            <text x="278" y="615" fill="#B45309" fontSize="11" fontWeight="700" textAnchor="end">
+              Operand A (rs1)
+            </text>
 
-            {/* +4 Adder */}
-            <g transform="translate(105, 80)">
-              <rect width="40" height="30" rx="4" fill="#DBEAFE" stroke="#2563EB" strokeWidth="1.5" />
-              <text x="20" y="19" fill="#1D4ED8" stroke="none" fontSize="11" fontWeight="bold" textAnchor="middle">+4</text>
-            </g>
+            {/* 2) Read Data 2 (X = 440) ➔ ALUSrc MUX 좌측 입력(X = 440, Y = 602) */}
+            <line
+              x1="440"
+              y1="539"
+              x2="440"
+              y2="600"
+              stroke={isExActive ? "#D97706" : "#94A3B8"}
+              strokeWidth="2.8"
+              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
+            />
 
-            {/* Instruction Memory */}
-            <g transform="translate(105, 135)">
-              <rect width="70" height="60" rx="6" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="2" className={isIfActive && !isStall ? "shadow-md" : ""} />
-              <text x="35" y="28" fill="#1E40AF" stroke="none" fontSize="10" fontWeight="bold" textAnchor="middle">Instruction</text>
-              <text x="35" y="42" fill="#1E40AF" stroke="none" fontSize="10" fontWeight="bold" textAnchor="middle">Memory</text>
-            </g>
+            {/* 3) Imm (X = 545) ➔ ALUSrc MUX 우측 입력(X = 498, Y = 602) 및 Branch Adder 분기 */}
+            <path
+              d="M 545,539 L 545,582 L 498,582 L 498,600"
+              fill="none"
+              stroke={isExActive ? "#0284C7" : "#94A3B8"}
+              strokeWidth="2.4"
+              strokeDasharray="5 3"
+              markerEnd={isExActive ? "url(#m-arr-cyan)" : "url(#m-arr-def)"}
+            />
 
-            {/* Control Unit */}
-            <g transform="translate(280, 50)">
-              <ellipse rx="35" ry="24" fill="#EEF2FF" stroke="#4F46E5" strokeWidth="1.5" />
-              <text x="0" y="-3" fill="#3730A3" stroke="none" fontSize="10" fontWeight="bold" textAnchor="middle">Control</text>
-              <text x="0" y="11" fill="#3730A3" stroke="none" fontSize="10" fontWeight="bold" textAnchor="middle">Unit</text>
-            </g>
+            {/* ALUSrc MUX (중심 X = 470, Y = 602 ~ 634) */}
+            <polygon
+              points="415,602 525,602 505,634 435,634"
+              fill="#EFF6FF"
+              stroke="#3B82F6"
+              strokeWidth="2"
+            />
+            <text x="470" y="623" fill="#1E40AF" fontSize="11.5" fontWeight="800" textAnchor="middle">
+              ALUSrc MUX
+            </text>
 
-            {/* Branch Unit */}
-            <g transform="translate(240, 95)">
-              <rect width="55" height="35" rx="5" fill="#F0FDF4" stroke="#16A34A" strokeWidth="1.5" />
-              <text x="27.5" y="18" fill="#15803D" stroke="none" fontSize="9" fontWeight="bold" textAnchor="middle">Branch</text>
-              <text x="27.5" y="28" fill="#15803D" stroke="none" fontSize="9" fontWeight="bold" textAnchor="middle">Unit</text>
-            </g>
+            {/* ALUSrc MUX 출력 (X = 470, Y = 634) ➔ ALU 우측 입력 포트(X = 470, Y = 668) */}
+            <line
+              x1="470"
+              y1="634"
+              x2="470"
+              y2="666"
+              stroke={isExActive ? "#D97706" : "#94A3B8"}
+              strokeWidth="3.2"
+              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
+            />
+            <text x="482" y="656" fill="#B45309" fontSize="11" fontWeight="700">
+              Operand B
+            </text>
 
-            {/* Register File */}
-            <g transform="translate(240, 145)">
-              <rect width="70" height="85" rx="6" fill={isWbActive ? "#EFF6FF" : "#F8FAFC"} stroke={isWbActive ? "#2563EB" : "#475569"} strokeWidth="1.5" />
-              <text x="35" y="24" fill="#0F172A" stroke="none" fontSize="11" fontWeight="bold" textAnchor="middle">Register</text>
-              <text x="35" y="38" fill="#0F172A" stroke="none" fontSize="11" fontWeight="bold" textAnchor="middle">File</text>
-              <text x="35" y="58" fill="#64748B" stroke="none" fontSize="8" textAnchor="middle">x0 ~ x31</text>
-            </g>
-
-            {/* Immediate Generation */}
-            <g transform="translate(240, 265)">
-              <rect width="70" height="40" rx="5" fill="#FAF5FF" stroke="#9333EA" strokeWidth="1.5" />
-              <text x="35" y="18" fill="#6B21A8" stroke="none" fontSize="9" fontWeight="bold" textAnchor="middle">Immediate</text>
-              <text x="35" y="30" fill="#6B21A8" stroke="none" fontSize="9" fontWeight="bold" textAnchor="middle">Generator</text>
-            </g>
-
-            {/* Hazard Detection */}
-            <g transform="translate(325, 295)" className={isStall ? "anim-stall" : ""}>
-              <rect width="50" height="30" rx="12" fill={isStall ? "#FFE4E6" : "#F0FDFA"} stroke={isStall ? "#F43F5E" : "#0D9488"} strokeWidth="2" />
-              <text x="25" y="13" fill={isStall ? "#E11D48" : "#0F766E"} stroke="none" fontSize="7" fontWeight="bold" textAnchor="middle">Hazard</text>
-              <text x="25" y="22" fill={isStall ? "#E11D48" : "#0F766E"} stroke="none" fontSize="7" fontWeight="bold" textAnchor="middle">Detection</text>
-            </g>
-
-            {/* Forwarding MUX A & B */}
-            <polygon points="440,115 455,122 455,142 440,150" fill={isForward ? "#CFFAFE" : "#F1F5F9"} stroke={isForward ? "#06B6D4" : "#64748B"} strokeWidth="1.5" />
-            <polygon points="440,175 455,182 455,202 440,210" fill={isForward ? "#CFFAFE" : "#F1F5F9"} stroke={isForward ? "#06B6D4" : "#64748B"} strokeWidth="1.5" />
-
-            {/* ALU */}
-            <g transform="translate(490, 120)">
+            {/* 부품 6: 모던 ALU (좌측 입력 중심 X=290, 우측 입력 중심 X=470, 전체 중앙 X=380, Y=668 ~ 788) */}
+            <g className={isExActive ? "glow-active-ex" : undefined}>
               <polygon
-                points="0,0 60,25 60,55 0,80 0,50 15,40 0,30"
-                fill={isExActive ? "url(#aluGrad)" : "#F8FAFC"}
+                points="
+                  230,668
+                  335,668
+                  380,712
+                  425,668
+                  530,668
+                  480,715
+                  480,750
+                  425,788
+                  335,788
+                  280,750
+                  280,715
+                "
+                fill={isExActive ? "#FEF9C3" : "#FFFFFF"}
                 stroke={isExActive ? "#D97706" : "#64748B"}
-                strokeWidth={isExActive ? "2.5" : "1.5"}
+                strokeWidth="3"
+                strokeLinejoin="round"
               />
-              <text x="35" y="44" fill={isExActive ? "#92400E" : "#334155"} stroke="none" fontSize="13" fontWeight="extrabold" textAnchor="middle">ALU</text>
-            </g>
-
-            {/* ALU Control */}
-            <g transform="translate(520, 265)">
-              <ellipse rx="30" ry="20" fill="#FFFBEB" stroke="#D97706" strokeWidth="1.5" />
-              <text x="0" y="-1" fill="#92400E" stroke="none" fontSize="9" fontWeight="bold" textAnchor="middle">ALU</text>
-              <text x="0" y="11" fill="#92400E" stroke="none" fontSize="9" fontWeight="bold" textAnchor="middle">Control</text>
-            </g>
-
-            {/* Data Memory */}
-            <g transform="translate(645, 135)">
-              <rect
-                width="75"
-                height="75"
-                rx="6"
-                fill={isMemActive ? "url(#memGrad)" : "#EFF6FF"}
-                stroke={isMemActive ? "#16A34A" : "#3B82F6"}
-                strokeWidth={isMemActive ? "2.5" : "1.5"}
+              {/* 내부 기하학적 인셋 라인 */}
+              <polygon
+                points="
+                  252,680
+                  328,680
+                  380,726
+                  432,680
+                  508,680
+                  466,720
+                  466,745
+                  418,776
+                  342,776
+                  294,745
+                  294,720
+                "
+                fill="none"
+                stroke={isExActive ? "#F59E0B" : "#E2E8F0"}
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
               />
-              <text x="37.5" y="32" fill="#1E40AF" stroke="none" fontSize="11" fontWeight="bold" textAnchor="middle">Data</text>
-              <text x="37.5" y="47" fill="#1E40AF" stroke="none" fontSize="11" fontWeight="bold" textAnchor="middle">Memory</text>
+              <text x="380" y="746" fill="#78350F" fontSize="22" fontWeight="900" textAnchor="middle" letterSpacing="2">
+                ALU
+              </text>
+              <text x="380" y="766" fill="#92400E" fontSize="11.5" fontWeight="700" textAnchor="middle">
+                (Arithmetic &amp; Logic Unit)
+              </text>
             </g>
 
-            {/* Write-Back MUX */}
-            <polygon points="803,160 821,170 821,210 803,220" fill={isWbActive ? "#DBEAFE" : "#F1F5F9"} stroke={isWbActive ? "#2563EB" : "#64748B"} strokeWidth="1.5" />
-            <g fill="#1E3A8A" stroke="none" fontSize="8" fontWeight="bold" textAnchor="middle">
-              <text x="812" y="181">M</text><text x="812" y="192">U</text><text x="812" y="203">X</text>
-            </g>
+            {/* 우측 Branch Adder (EX 명령어 박스 Y=555~587 보다 아래쪽인 Y=605에서 우측 X=700으로 분기) */}
+            <path
+              d="M 545,582 L 545,605 L 700,605 L 700,683"
+              fill="none"
+              stroke="#94A3B8"
+              strokeWidth="1.8"
+              strokeDasharray="5 3"
+              markerEnd="url(#m-arr-def)"
+            />
+            <polygon
+              points="640,685 760,685 740,725 660,725"
+              fill="#F8FAFC"
+              stroke="#94A3B8"
+              strokeWidth="1.8"
+            />
+            <text x="700" y="710" fill="#475569" fontSize="12" fontWeight="800" textAnchor="middle">
+              Branch Add
+            </text>
+            <line
+              x1="700"
+              y1="725"
+              x2="700"
+              y2="838"
+              stroke="#94A3B8"
+              strokeWidth="1.8"
+              strokeDasharray="5 3"
+              markerEnd="url(#m-arr-def)"
+            />
+            <text x="710" y="785" fill="#64748B" fontSize="10.5" fontWeight="600">
+              Branch Target
+            </text>
 
+            {/* ALU 출력(X = 380, Y = 788) ➔ EX/MEM BUFFER (Y = 840) 직하강 */}
+            <line
+              x1="380"
+              y1="788"
+              x2="380"
+              y2="838"
+              stroke={isExActive ? "#D97706" : "#94A3B8"}
+              strokeWidth="3.6"
+              className={isExActive ? "stream-down-active" : undefined}
+              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
+            />
+            <text x="392" y="820" fill="#B45309" fontSize="11.5" fontWeight="800">
+              ALU Result
+            </text>
 
             {/* ============================================================ */}
-            {/* 8. 하단 단계 레이블 + 바로 아래 명령어 카드 (일체형 통합 배치) */}
+            {/* 파이프라인 버퍼 3: EX / MEM BUFFER (Y = 840 ~ 864)            */}
             {/* ============================================================ */}
-            {/* 1) FETCH 단계 (IF - 빨강) */}
-            <g transform="translate(30, 365)">
-              <text x="60" y="14" fill="#DC2626" stroke="none" fontSize="11" fontWeight="extrabold" textAnchor="middle">
-                Instruction Fetch (IF)
-              </text>
-              <rect x="5" y="22" width="110" height="26" rx="6" fill={ifInst === 'bubble' ? '#F8FAFC' : '#FEF2F2'} stroke={ifInst === 'bubble' ? '#CBD5E1' : '#F87171'} strokeWidth="1.2" />
-              <text x="60" y="39" fill={ifInst === 'bubble' ? '#94A3B8' : '#B91C1C'} stroke="none" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">
-                {ifInst}
-              </text>
-            </g>
+            <rect
+              x="115"
+              y="840"
+              width="715"
+              height="24"
+              rx="5"
+              fill="url(#g-buffer)"
+              stroke="#94A3B8"
+              strokeWidth="1.5"
+            />
+            <text
+              x="472"
+              y="856"
+              fill="#334155"
+              fontSize="12"
+              fontWeight="800"
+              textAnchor="middle"
+              letterSpacing="2.5"
+            >
+              EX / MEM PIPELINE REGISTER
+            </text>
 
-            {/* 2) DECODE 단계 (ID - 주황) */}
-            <g transform="translate(225, 365)">
-              <text x="60" y="14" fill="#EA580C" stroke="none" fontSize="11" fontWeight="extrabold" textAnchor="middle">
-                Instruction Decode (ID)
-              </text>
-              <rect x="5" y="22" width="110" height="26" rx="6" fill={idInst === 'bubble' ? '#F8FAFC' : '#FFF7ED'} stroke={idInst === 'bubble' ? '#CBD5E1' : '#FB923C'} strokeWidth="1.2" />
-              <text x="60" y="39" fill={idInst === 'bubble' ? '#94A3B8' : '#C2410C'} stroke="none" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">
-                {idInst}
-              </text>
-            </g>
+            {/* ============================================================ */}
+            {/* [STAGE 4] MEMORY ACCESS (MEM) : Y = 880 ~ 1095               */}
+            {/* ============================================================ */}
+            <text x="115" y="904" fill="#16A34A" fontSize="16" fontWeight="800">
+              4. MEM (Memory Access)
+            </text>
+            <rect
+              x="570"
+              y="884"
+              width="260"
+              height="30"
+              rx="8"
+              fill={isMemActive ? "#F0FDF4" : "#F8FAFC"}
+              stroke={isMemActive ? "#4ADE80" : "#CBD5E1"}
+              strokeWidth="1.8"
+            />
+            <text
+              x="700"
+              y="904"
+              fill={isMemActive ? "#15803D" : "#94A3B8"}
+              fontSize="13"
+              fontFamily="'D2Coding', Consolas, monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {memInst}
+            </text>
 
-            {/* 3) EXECUTE 단계 (EX - 노랑) */}
-            <g transform="translate(425, 365)">
-              <text x="60" y="14" fill="#CA8A04" stroke="none" fontSize="11" fontWeight="extrabold" textAnchor="middle">
-                Execute / ALU (EX)
-              </text>
-              <rect x="5" y="22" width="110" height="26" rx="6" fill={exInst === 'bubble' ? '#F8FAFC' : '#FEFCE8'} stroke={exInst === 'bubble' ? '#CBD5E1' : '#FACC15'} strokeWidth="1.2" />
-              <text x="60" y="39" fill={exInst === 'bubble' ? '#94A3B8' : '#854D0E'} stroke="none" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">
-                {exInst}
-              </text>
-            </g>
+            {/* EX/MEM 버퍼에서 내려온 ALU Result(X = 380)가 두 갈래로 분기:
+                1) Data Memory의 Address 포트(X = 380, Y = 945)로 직하강
+                2) 스테이지 제목(4. MEM, 5. WB)과 절대 겹치지 않도록 Y=926(제목 아래)에서 X=285 통로를 타고 내려감 */}
+            <path
+              d="M 380,864 L 380,943"
+              fill="none"
+              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
+              strokeWidth="3.2"
+              markerEnd={isMemActive ? "url(#m-arr-green)" : "url(#m-arr-def)"}
+            />
+            <path
+              d="M 380,926 L 285,926 L 285,1103"
+              fill="none"
+              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
+              strokeWidth="2.5"
+              strokeDasharray="6 3"
+              markerEnd={isMemActive ? "url(#m-arr-green)" : "url(#m-arr-def)"}
+            />
+            <text
+              x="270"
+              y="1015"
+              fill="#15803D"
+              fontSize="11.5"
+              fontWeight="800"
+              transform="rotate(-90, 270, 1015)"
+              textAnchor="middle"
+            >
+              ALU Result Bypass ⬇
+            </text>
 
-            {/* 4) MEMORY 단계 (MA - 초록) */}
-            <g transform="translate(610, 365)">
-              <text x="60" y="14" fill="#16A34A" stroke="none" fontSize="11" fontWeight="extrabold" textAnchor="middle">
-                Memory Access (MA)
-              </text>
-              <rect x="5" y="22" width="110" height="26" rx="6" fill={memInst === 'bubble' ? '#F8FAFC' : '#F0FDF4'} stroke={memInst === 'bubble' ? '#CBD5E1' : '#4ADE80'} strokeWidth="1.2" />
-              <text x="60" y="39" fill={memInst === 'bubble' ? '#94A3B8' : '#15803D'} stroke="none" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">
-                {memInst}
-              </text>
-            </g>
+            {/* 부품 7: Data Memory (X = 320 ~ 620, 중심 X = 470, Y = 945 ~ 1055) */}
+            <rect
+              x="320"
+              y="945"
+              width="300"
+              height="110"
+              rx="10"
+              fill={isMemActive ? "url(#g-dmem)" : "#FFFFFF"}
+              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
+              strokeWidth="2.5"
+            />
+            <text x="470" y="974" fill="#14532D" fontSize="16" fontWeight="800" textAnchor="middle">
+              Data Memory
+            </text>
+            <text x="345" y="1002" fill="#374151" fontSize="12" fontFamily="monospace" fontWeight="600">
+              ▸ Address (from ALU)
+            </text>
+            <text x="345" y="1024" fill="#374151" fontSize="12" fontFamily="monospace" fontWeight="600">
+              ▸ Write Data (Store)
+            </text>
+            <text x="530" y="1044" fill="#15803D" fontSize="12" fontWeight="800" textAnchor="middle">
+              Read Data ⬇
+            </text>
 
-            {/* 5) WRITE-BACK 단계 (WB - 파랑) */}
-            <g transform="translate(780, 365)">
-              <text x="60" y="14" fill="#2563EB" stroke="none" fontSize="11" fontWeight="extrabold" textAnchor="middle">
-                Write-Back (WB)
-              </text>
-              <rect x="5" y="22" width="110" height="26" rx="6" fill={wbInst === 'bubble' ? '#F8FAFC' : '#EFF6FF'} stroke={wbInst === 'bubble' ? '#CBD5E1' : '#60A5FA'} strokeWidth="1.2" />
-              <text x="60" y="39" fill={wbInst === 'bubble' ? '#94A3B8' : '#1D4ED8'} stroke="none" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">
-                {wbInst}
-              </text>
-            </g>
+            {/* Data Memory 출력(X = 530, Y = 1055) ➔ MEM/WB BUFFER (Y = 1105) */}
+            <line
+              x1="530"
+              y1="1055"
+              x2="530"
+              y2="1103"
+              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
+              strokeWidth="3.2"
+              className={isMemActive ? "stream-down-active" : undefined}
+              markerEnd={isMemActive ? "url(#m-arr-green)" : "url(#m-arr-def)"}
+            />
+
+            {/* ============================================================ */}
+            {/* 파이프라인 버퍼 4: MEM / WB BUFFER (Y = 1105 ~ 1129)          */}
+            {/* ============================================================ */}
+            <rect
+              x="115"
+              y="1105"
+              width="715"
+              height="24"
+              rx="5"
+              fill="url(#g-buffer)"
+              stroke="#94A3B8"
+              strokeWidth="1.5"
+            />
+            <text
+              x="472"
+              y="1121"
+              fill="#334155"
+              fontSize="12"
+              fontWeight="800"
+              textAnchor="middle"
+              letterSpacing="2.5"
+            >
+              MEM / WB PIPELINE REGISTER
+            </text>
+
+            {/* ============================================================ */}
+            {/* [STAGE 5] WRITE-BACK (WB) : Y = 1145 ~ 1320                  */}
+            {/* ============================================================ */}
+            <text x="115" y="1169" fill="#2563EB" fontSize="16" fontWeight="800">
+              5. WB (Write-Back)
+            </text>
+            <rect
+              x="570"
+              y="1149"
+              width="260"
+              height="30"
+              rx="8"
+              fill={isWbActive ? "#EFF6FF" : "#F8FAFC"}
+              stroke={isWbActive ? "#60A5FA" : "#CBD5E1"}
+              strokeWidth="1.8"
+            />
+            <text
+              x="700"
+              y="1169"
+              fill={isWbActive ? "#1D4ED8" : "#94A3B8"}
+              fontSize="13"
+              fontFamily="'D2Coding', Consolas, monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {wbInst}
+            </text>
+
+            {/* 1) ALU Result Bypass (X = 285, 5. WB 제목 우측 끝 X=260 바깥쪽) ➔ MemtoReg MUX 좌측 입력(X = 400, Y = 1205) */}
+            <path
+              d="M 285,1129 L 285,1186 L 400,1186 L 400,1203"
+              fill="none"
+              stroke={isWbActive ? "#2563EB" : "#94A3B8"}
+              strokeWidth="2.6"
+              strokeDasharray="6 3"
+              markerEnd={isWbActive ? "url(#m-arr-blue)" : "url(#m-arr-def)"}
+            />
+
+            {/* 2) Data Memory Read Data (X = 530) ➔ MemtoReg MUX 우측 입력(X = 530, Y = 1205) */}
+            <line
+              x1="530"
+              y1="1129"
+              x2="530"
+              y2="1203"
+              stroke={isWbActive ? "#2563EB" : "#94A3B8"}
+              strokeWidth="2.8"
+              markerEnd={isWbActive ? "url(#m-arr-blue)" : "url(#m-arr-def)"}
+            />
+
+            {/* 부품 8: MemtoReg MUX (중심 X = 465, Y = 1205 ~ 1245) */}
+            <polygon
+              points="375,1205 555,1205 525,1245 405,1245"
+              fill={isWbActive ? "#DBEAFE" : "#FFFFFF"}
+              stroke={isWbActive ? "#2563EB" : "#94A3B8"}
+              strokeWidth="2.5"
+            />
+            <text x="465" y="1230" fill="#1E40AF" fontSize="13.5" fontWeight="800" textAnchor="middle">
+              MemtoReg MUX
+            </text>
+
+            {/* ============================================================ */}
+            {/* ★ 역방향 피드백 버스 (WB MemtoReg MUX ➔ ID RegFile Write Data In) */}
+            {/* MUX 하단(X=465, Y=1245) ➔ 아래(Y=1305) ➔ 좌측 레일(X=68) ➔ ID RegFile 핀(X=174, Y=403) */}
+            {/* ============================================================ */}
+            <path
+              d="M 465,1245 L 465,1305 L 68,1305 L 68,403 L 174,403"
+              fill="none"
+              stroke={isWbActive ? "#2563EB" : "#CBD5E1"}
+              strokeWidth={isWbActive ? "3.4" : "2.2"}
+              strokeDasharray={isWbActive ? "9 5" : undefined}
+              className={isWbActive ? "stream-feedback-active" : undefined}
+              markerEnd={isWbActive ? "url(#m-arr-blue)" : "url(#m-arr-def)"}
+            />
+            <text x="479" y="1285" fill="#1D4ED8" fontSize="12.5" fontWeight="800">
+              Write Data to rd
+            </text>
+            {/* 좌측 세로 피드백 버스 안내 라벨 */}
+            <text
+              x="46"
+              y="850"
+              fill={isWbActive ? "#2563EB" : "#64748B"}
+              fontSize="13"
+              fontWeight="800"
+              transform="rotate(-90, 46, 850)"
+              textAnchor="middle"
+              letterSpacing="1"
+            >
+              ▲ RegFile Write-Back Feedback Bus (rd)
+            </text>
           </svg>
         </div>
       </div>

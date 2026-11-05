@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import type { StageBuffer } from '@/type/simulation';
+import type { FileSummary } from '@/type/file';
 
 export interface CodeLineSelectInfo {
   tab: 'c' | 'asm';
@@ -13,6 +14,12 @@ interface SourceViewerProps {
   activeTab: 'c' | 'asm';
   fileName?: string;
   content?: string;
+  isLoggedIn?: boolean;
+  showFileSelector?: boolean;
+  showStageLegendBar?: boolean;
+  savedFiles?: FileSummary[];
+  selectedFileId?: string | null;
+  onSelectSavedFile?: (fileId: string) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
     ID?: StageBuffer | null;
@@ -121,6 +128,12 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
   activeTab, 
   fileName, 
   content, 
+  isLoggedIn = false,
+  showFileSelector = true,
+  showStageLegendBar = true,
+  savedFiles = [],
+  selectedFileId = null,
+  onSelectSavedFile,
   stageBuffers,
   selectedLine,
   onSelectLine,
@@ -128,23 +141,34 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
   const hasContent = !!content;
   const activeLineRef = useRef<HTMLDivElement | null>(null);
 
-  // PC별 활성화된 파이프라인 단계 매핑 (어셈블리용)
-  const activeStagesByPc = useMemo(() => {
-    const map: Record<string, StageBadgeInfo[]> = {};
-    if (!stageBuffers) return map;
+  // PC별 및 명령어 텍스트별 활성화된 파이프라인 단계 매핑 (어셈블리용)
+  const { activeStagesByPc, activeStagesByInst } = useMemo(() => {
+    const pcMap: Record<string, StageBadgeInfo[]> = {};
+    const instMap: Record<string, StageBadgeInfo[]> = {};
+    if (!stageBuffers) return { activeStagesByPc: pcMap, activeStagesByInst: instMap };
 
     STAGES_CONFIG.forEach(({ key, name, textColor, bgColor, borderColor, badgeBg }) => {
       const buf = stageBuffers[key];
-      if (buf && buf.pc && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
-        const pcKey = buf.pc.toLowerCase();
-        if (!map[pcKey]) {
-          map[pcKey] = [];
+      if (buf && buf.assembly && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
+        const badge: StageBadgeInfo = { stage: name, badgeBg, textColor, bgColor, borderColor };
+        if (buf.pc) {
+          const pcKey = buf.pc.toLowerCase();
+          if (!pcMap[pcKey]) {
+            pcMap[pcKey] = [];
+          }
+          pcMap[pcKey].push(badge);
         }
-        map[pcKey].push({ stage: name, badgeBg, textColor, bgColor, borderColor });
+        const normInst = buf.assembly.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (normInst) {
+          if (!instMap[normInst]) {
+            instMap[normInst] = [];
+          }
+          instMap[normInst].push(badge);
+        }
       }
     });
 
-    return map;
+    return { activeStagesByPc: pcMap, activeStagesByInst: instMap };
   }, [stageBuffers]);
 
   // C언어 라인 인덱스별 활성화된 파이프라인 단계 매핑 (C언어용)
@@ -204,10 +228,39 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 text-left min-h-0">
-      {hasContent && fileName && (
-        <div className="px-4 py-2 border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 flex items-center justify-between shrink-0">
-          <span>{fileName}</span>
-          <span className="text-[10px] text-slate-400 font-normal">
+      {((isLoggedIn && showFileSelector) || (hasContent && fileName)) && (
+        <div className="px-3 py-2 border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 flex items-center justify-between gap-2 shrink-0">
+          {isLoggedIn && showFileSelector ? (
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <select
+                value={selectedFileId || ''}
+                onChange={(e) => {
+                  if (e.target.value && onSelectSavedFile) {
+                    onSelectSavedFile(e.target.value);
+                  }
+                }}
+                className="max-w-full min-w-[160px] flex-1 px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer truncate"
+              >
+                <option value="" disabled>
+                  {fileName && !selectedFileId
+                    ? `[로컬 파일] ${fileName}`
+                    : savedFiles.length > 0
+                    ? '내 저장 파일 선택...'
+                    : '저장된 파일 없음'}
+                </option>
+                {savedFiles.map((f) => (
+                  <option key={f.file_id} value={f.file_id}>
+                    {activeTab === 'asm' && selectedFileId === f.file_id && fileName
+                      ? `${f.title} (${fileName})`
+                      : f.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <span className="truncate">{fileName}</span>
+          )}
+          <span className="text-[10px] text-slate-400 font-normal shrink-0">
             더블클릭 시 튜터 해설 연동
           </span>
         </div>
@@ -223,7 +276,14 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
               if (activeTab === 'asm') {
                 const pcMatch = line.match(/(0x[0-9a-fA-F]+)/);
                 const linePc = pcMatch ? pcMatch[1].toLowerCase() : null;
-                activeStages = linePc ? activeStagesByPc[linePc] : null;
+                if (linePc && activeStagesByPc[linePc]) {
+                  activeStages = activeStagesByPc[linePc];
+                } else {
+                  const trimmedLine = line.replace(/#.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+                  if (trimmedLine && !trimmedLine.startsWith('.') && !trimmedLine.endsWith(':')) {
+                    activeStages = activeStagesByInst[trimmedLine] || null;
+                  }
+                }
               } else {
                 activeStages = activeStagesByCLine[i] || null;
               }
@@ -294,8 +354,8 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
         )}
       </div>
 
-      {/* 하단 파이프라인 단계 색상 범례 (어셈블리 모드에서만 노출) */}
-      {hasContent && activeTab === 'asm' && (
+      {/* 하단 파이프라인 단계 색상 범례 (어셈블리 모드에서만 노출, asm-only일 때는 헤더 바에 통합) */}
+      {hasContent && activeTab === 'asm' && showStageLegendBar && (
         <div className="px-3 py-1.5 bg-white border-t border-slate-200 flex items-center justify-between text-[11px] shrink-0">
           <span className="font-semibold text-slate-500 text-[10px]">단계 색상:</span>
           <div className="flex items-center gap-1 text-[9px] font-bold">
