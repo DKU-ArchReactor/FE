@@ -794,6 +794,21 @@ const MainPage: React.FC = () => {
                 </span>
               )}
             </div>
+
+            {/* 구역 간 가로 조절 스플리터 바 */}
+            {secIdx < sections.length - 1 && (
+              <div
+                onMouseDown={() => handleColResizeStart(secIdx)}
+                title="드래그하여 구역 간 너비 조절"
+                className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-blue-50/50 rounded-sm transition-colors"
+              >
+                <div className={`w-[3px] rounded-full transition-all duration-200 ${
+                  resizingSplitterIndex === secIdx 
+                    ? 'h-24 bg-blue-600 shadow-sm' 
+                    : 'h-10 bg-slate-300 group-hover:h-20 group-hover:bg-blue-500'
+                }`} />
+              </div>
+            )}
           </div>
         )}
       </div>
