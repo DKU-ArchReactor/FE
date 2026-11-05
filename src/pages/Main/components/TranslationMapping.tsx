@@ -185,20 +185,20 @@ export default function TranslationMapping({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs select-none"
       aria-label="RISC-V 어셈블리 결과"
     >
-      {/* 헤더 */}
-      <header className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-2.5 py-2 min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
+      {/* 통일된 상단 헤더 바 */}
+      <header className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-          <strong className="text-xs text-slate-700 whitespace-nowrap truncate">RISC-V 어셈블리</strong>
-          {assembly && (
-            <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap hidden @[220px]:inline">
-              ({rows.length} lines)
-            </span>
-          )}
+          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap truncate">RISC-V 어셈블리</h3>
         </div>
+        {assembly && (
+          <span className="text-[10px] font-mono text-slate-400 font-semibold whitespace-nowrap">
+            {rows.length} lines
+          </span>
+        )}
       </header>
 
       {/* 본문 어셈블리 리스트 */}

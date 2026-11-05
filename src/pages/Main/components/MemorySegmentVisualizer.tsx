@@ -323,23 +323,24 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3.5 flex flex-col min-h-0 overflow-hidden select-none">
+    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
       {/* 1. 상단 미니멀 헤더 */}
-      <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-slate-100 shrink-0">
-        <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-          <span>💾</span>
-          <span>Memory</span>
-        </h3>
-        <span className="text-[10px] font-mono text-slate-400">High ➔ Low</span>
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs">💾</span>
+          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">Memory</h3>
+        </div>
+        <span className="text-[10px] font-mono text-slate-400 font-semibold">High ➔ Low</span>
       </div>
 
-      {/* 2. 최상단 시작 주소 헤더 바 */}
-      <div className="shrink-0 flex flex-col mb-1">
-        <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pb-1 px-0.5">
-          <span
-            title="Hex: 0x7FFFEFFC"
-            className="font-semibold text-slate-600 cursor-help"
-          >
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-3 py-2">
+        {/* 2. 최상단 시작 주소 헤더 바 */}
+        <div className="shrink-0 flex flex-col mb-1">
+          <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pb-1 px-0.5">
+            <span
+              title="Hex: 0x7FFFEFFC"
+              className="font-semibold text-slate-600 cursor-help"
+            >
             {formatAddressDecimal('0x7FFFEFFC')}
           </span>
           <span className="text-slate-400">High Address (Top)</span>
@@ -579,6 +580,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
           </span>
           <span className="text-slate-400">Low Address (Origin)</span>
         </div>
+      </div>
       </div>
     </div>
   );

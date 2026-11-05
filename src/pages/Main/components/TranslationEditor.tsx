@@ -97,18 +97,18 @@ export default function TranslationEditor({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs select-none"
       aria-label="Translation C 편집기"
     >
-      <header className="shrink-0 flex items-center justify-between gap-1.5 border-b border-slate-200 bg-slate-50/80 px-2.5 py-2 min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0 shrink">
+      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 shrink">
           <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-          <strong className="text-xs text-slate-700 truncate whitespace-nowrap">C 소스 코드</strong>
+          <h3 className="text-xs font-bold text-slate-800 truncate whitespace-nowrap">C 소스 코드</h3>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           <button
             type="button"
-            className="rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs"
             onClick={() => input.current?.click()}
             disabled={busy}
             title="파일 열기"
@@ -129,7 +129,7 @@ export default function TranslationEditor({
           />
           <button
             type="button"
-            className="rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs"
             onClick={onReset}
             disabled={busy}
             title="초기화"
@@ -139,7 +139,7 @@ export default function TranslationEditor({
           </button>
           <button
             type="button"
-            className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+            className="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1 shrink-0"
             onClick={onCompile}
             disabled={busy || !source.trim()}
             title="컴파일"

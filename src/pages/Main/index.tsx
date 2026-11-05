@@ -8,6 +8,9 @@ import PipelineVisualizer from "./components/PipelineVisualizer";
 import StateVisualizer from "./components/StateVisualizer";
 import RegisterVisualizer from "./components/RegisterVisualizer";
 import MemorySegmentVisualizer from "./components/MemorySegmentVisualizer";
+import MultiCycleDiagram from "./components/MultiCycleDiagram";
+import PerformanceMetrics from "./components/PerformanceMetrics";
+import HazardDiagnostics from "./components/HazardDiagnostics";
 import ControlPanel from "./components/ControlPanel";
 import FlyoutPanel from "./components/FlyoutPanel";
 
@@ -67,25 +70,20 @@ const MainPage: React.FC = () => {
     return () => window.removeEventListener("resize", checkAspectRatio);
   }, []);
 
-  const visibleCount =
-    aspectTier === "superwide" ? 5 : aspectTier === "ultrawide" ? 4 : 3;
+  void aspectTier;
 
   const isManagementPath =
     location.pathname === "/management" || location.pathname === "/coming-soon";
   const isPipelinePath = location.pathname === "/pipeline";
 
-  const slideStartIndex = useMemo(() => {
-    if (aspectTier === "superwide") return 0;
-    if (aspectTier === "ultrawide") {
-      return isManagementPath ? 1 : 0;
-    }
+  const rightViewportIndex = useMemo(() => {
     if (isManagementPath) return 2;
     if (isPipelinePath) return 1;
     return 0;
-  }, [isManagementPath, isPipelinePath, aspectTier]);
+  }, [isManagementPath, isPipelinePath]);
 
-  // 1섹션(C 코드 + File List)이 화면에 함께 보이는 상태인지 여부 (시작 인덱스가 0일 때)
-  void slideStartIndex;
+  // 좌측 1, 2섹션은 항상 화면에 고정 노출됨
+  const isTranslationPage = true;
 
   // ========================================================
   // 1. 1섹션(C 전용) & 2섹션(ASM / C·ASM 전환) 간 공유 소스 상태
@@ -127,7 +125,6 @@ const MainPage: React.FC = () => {
     setTranslationSelectedLine(line);
     setTranslationSelectedAsmIndex(asmIndex);
   };
-  const isTranslationPage = slideStartIndex === 0;
 
   const updateTranslationSource = (
     source: string,
@@ -573,6 +570,49 @@ const MainPage: React.FC = () => {
   // ========================================================
   const [sections, setSections] = useState<SectionConfig[]>(getDefaultSections);
 
+  // 좌측 고정 패널 너비 비율 (전체 메인 영역 대비 %, 기본 45%)
+  const [leftPaneWidth, setLeftPaneWidth] = useState<number>(45);
+  const [resizingLeftPane, setResizingLeftPane] = useState<boolean>(false);
+  const mainWorkspaceRef = useRef<HTMLDivElement>(null);
+
+  // 좌-우 분할선 드래그 핸들러
+  const handleMainDividerResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizingLeftPane(true);
+  };
+
+  useEffect(() => {
+    if (!resizingLeftPane) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!mainWorkspaceRef.current) return;
+      const rect = mainWorkspaceRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const percent = (currentX / rect.width) * 100;
+      // 좌측 최소 30%, 최대 65% 제한
+      setLeftPaneWidth(Math.max(30, Math.min(65, Math.round(percent * 10) / 10)));
+    };
+
+    const handleMouseUp = () => {
+      setResizingLeftPane(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [resizingLeftPane]);
+
   const {
     containerRef,
     resizingSplitterIndex,
@@ -583,48 +623,18 @@ const MainPage: React.FC = () => {
     handlePairResizeStart,
   } = useResizableLayout(sections, setSections);
 
-  // 슬라이드 뷰 전환 또는 21:9(4섹션) / 일반(3섹션) 전환 시 현재 보이는 섹션들의 너비 합이 100%가 되도록 자동 보정
-  useEffect(() => {
-    setSections((prev) => {
-      const visibleSlice = prev.slice(slideStartIndex, slideStartIndex + visibleCount);
-      const visibleSum = visibleSlice.reduce((acc, s) => acc + s.widthPercent, 0);
-      if (Math.abs(visibleSum - 100) < 0.2 || visibleSum <= 0) return prev;
-
-      const scale = 100 / visibleSum;
-      return prev.map((sec) => ({
-        ...sec,
-        widthPercent: Math.round(sec.widthPercent * scale * 100) / 100,
-      }));
-    });
-  }, [slideStartIndex, visibleCount]);
-
-  // 현재 시작 인덱스 이전 섹션들의 너비 합만큼 왼쪽으로 슬라이드 이동 (%)
-  const slideOffsetPercent = useMemo(() => {
-    return sections
-      .slice(0, slideStartIndex)
-      .reduce((acc, s) => acc + s.widthPercent, 0);
-  }, [sections, slideStartIndex]);
-
-  // 좌/우 뷰포트 네비게이션 액션
-  const canGoPrevViewport = slideStartIndex > 0;
-  const canGoNextViewport = slideStartIndex + visibleCount < sections.length;
+  // 좌/우 뷰포트 네비게이션 액션 (우측 슬라이딩 뷰포트 전환)
+  const canGoPrevViewport = rightViewportIndex > 0;
+  const canGoNextViewport = rightViewportIndex < 2;
 
   const handleGoPrevViewport = () => {
-    if (aspectTier === "ultrawide") {
-      navigate("/");
-    } else {
-      if (slideStartIndex === 2) navigate("/pipeline");
-      else if (slideStartIndex === 1) navigate("/");
-    }
+    if (rightViewportIndex === 2) navigate("/pipeline");
+    else if (rightViewportIndex === 1) navigate("/");
   };
 
   const handleGoNextViewport = () => {
-    if (aspectTier === "ultrawide") {
-      navigate("/management");
-    } else {
-      if (slideStartIndex === 0) navigate("/pipeline");
-      else if (slideStartIndex === 1) navigate("/management");
-    }
+    if (rightViewportIndex === 0) navigate("/pipeline");
+    else if (rightViewportIndex === 1) navigate("/management");
   };
 
   // 우측 책갈피 말풍선 상태 (AI 에이전트 전용)
@@ -911,6 +921,32 @@ const MainPage: React.FC = () => {
             cycle={activeCycleIndex}
           />
         );
+      case "multiCycle":
+        return (
+          <MultiCycleDiagram
+            simulationData={simulationData}
+            currentCycleData={currentData}
+            currentCycle={activeCycleIndex}
+            translationAssembly={translationAssembly || asmContent}
+            onJumpToCycle={handleJumpToCycle}
+          />
+        );
+      case "metrics":
+        return (
+          <PerformanceMetrics
+            simulationData={simulationData}
+            currentCycleData={currentData}
+            currentCycle={activeCycleIndex}
+          />
+        );
+      case "hazardDiag":
+        return (
+          <HazardDiagnostics
+            simulationData={simulationData}
+            currentCycleData={currentData}
+            currentCycle={activeCycleIndex}
+          />
+        );
       case "queues":
         return renderPlaceholderBox("Queues");
       case "ioDevice":
@@ -947,205 +983,280 @@ const MainPage: React.FC = () => {
       </div>
 
       {/* ============================================================ */}
-      {/* [동적 5섹션 가로 슬라이드 컨테이너]: 필요할 때만 여백 버튼 노출 */}
+      {/* [분할 레이아웃]: 좌측 고정 (C & ASM) + 우측 슬라이딩 뷰포트   */}
       {/* ============================================================ */}
-      <div className="flex-1 flex w-full min-h-0 overflow-hidden items-stretch gap-1.5">
-        {/* 좌측 네비게이션 레일 (Translation 등 맨 왼쪽 끝일 때는 여백 없이 꽉 채움) */}
-        {canGoPrevViewport && (
-          <div className="w-8 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
-            <button
-              type="button"
-              onClick={handleGoPrevViewport}
-              title="이전 뷰포트(왼쪽 영역)로 이동"
-              className="w-full h-28 rounded-xl bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
-            >
-              <span className="text-lg font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:-translate-x-0.5">‹</span>
-              <span className="text-[9px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
-                PREV
-              </span>
-            </button>
-          </div>
-        )}
-
-        {/* 슬라이드 뷰포트 영역 */}
+      <div
+        ref={mainWorkspaceRef}
+        className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch gap-1.5 ${
+          resizingLeftPane || resizingSplitterIndex !== null ? "select-none" : ""
+        }`}
+      >
+        {/* ======================================================== */}
+        {/* [좌측 고정 영역]: 1섹션 (C 소스/파일) + 2섹션 (ASM/튜터)   */}
+        {/* ======================================================== */}
         <div
-          ref={containerRef}
-          className={`flex-1 h-full min-w-0 overflow-hidden relative ${
-            resizingSplitterIndex !== null ? "select-none" : ""
-          }`}
+          className="flex h-full min-h-0 overflow-hidden"
+          style={{ width: `${leftPaneWidth}%` }}
         >
-          {/* 5개 섹션을 가로로 나열하는 슬라이딩 트랙 */}
-          <div
-            className={`flex h-full w-full ${
-              resizingSplitterIndex !== null
-                ? ""
-                : "transition-transform duration-500 ease-in-out"
-            }`}
-            style={{
-              transform: `translate3d(-${slideOffsetPercent}%, 0, 0)`,
-            }}
-          >
-            {sections.map((section, secIdx) => {
-              const isLastVisibleInWindow =
-                secIdx === slideStartIndex + visibleCount - 1;
-              const showColSplitter =
-                secIdx < sections.length - 1 && !isLastVisibleInWindow;
+          {sections.slice(0, 2).map((section, secIdx) => {
+            return (
+              <div
+                key={section.id}
+                className="flex h-full min-h-0 shrink-0 overflow-hidden pr-1"
+                style={{ width: `${section.widthPercent}%` }}
+              >
+                {/* 섹션 내부 세로 슬롯 렌더링 */}
+                <div className="flex-1 flex flex-col gap-1.5 min-w-0 h-full overflow-hidden">
+                  {section.slots.map((slot, slotIdx) => {
+                    const defaultRatio = 1;
+                    const flexVal = slot.flexRatio ?? defaultRatio;
 
-              return (
-                <div
-                  key={section.id}
-                  className="flex h-full min-h-0 shrink-0 overflow-hidden pr-1"
-                  style={{ width: `${section.widthPercent}%` }}
-                >
-                  {/* 구역 내부 세로 슬롯 렌더링 */}
-                  <div className="flex-1 flex flex-col gap-1.5 min-w-0 h-full overflow-hidden">
-                    {section.slots.map((slot, slotIdx) => {
-                      const defaultRatio =
-                        section.slots.length === 2 &&
-                        slot.type === "single" &&
-                        slot.panel === "pipeline"
-                          ? 1.9
-                          : 1;
-                      const flexVal = slot.flexRatio ?? defaultRatio;
-
-                      return (
-                        <React.Fragment key={slotIdx}>
-                          <div
-                            className="min-h-0 overflow-hidden flex"
-                            style={{ flex: `${flexVal} 1 0%` }}
-                          >
-                            {slot.type === "single" ? (
-                              /* 1) 단일 컴포넌트 렌더링 */
-                              <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
-                                {renderPanelComponent(slot.panel)}
-                              </div>
-                            ) : (
-                              /* 2) 가로 2개 묶음 렌더링 + 내부 좌우 가로 스플리터 바 */
-                              <div className="w-full h-full flex min-h-0 overflow-hidden relative">
-                                <div
-                                  className="flex flex-col min-h-0 overflow-hidden"
-                                  style={{ width: `${slot.pairRatio ?? 50}%` }}
-                                >
-                                  {renderPanelComponent(slot.left)}
-                                </div>
-
-                                {/* 2개 묶음 내부 좌우 분할 조절 스플리터 바 */}
-                                <div
-                                  onMouseDown={(e) =>
-                                    handlePairResizeStart(
-                                      secIdx,
-                                      slotIdx,
-                                      slot.pairRatio ?? 50,
-                                      e
-                                    )
-                                  }
-                                  title="좌우로 드래그하여 가로 분할 비율 조절"
-                                  className="w-2.5 -mx-1 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
-                                >
-                                  <div
-                                    className={`w-[3px] rounded-full transition-all duration-200 ${
-                                      resizingPair?.secIdx === secIdx &&
-                                      resizingPair?.slotIdx === slotIdx
-                                        ? "h-16 bg-indigo-600 shadow-sm"
-                                        : "h-8 bg-slate-300 group-hover:h-14 group-hover:bg-indigo-500"
-                                    }`}
-                                  />
-                                </div>
-
-                                <div
-                                  className="flex flex-col min-h-0 overflow-hidden"
-                                  style={{
-                                    width: `${100 - (slot.pairRatio ?? 50)}%`,
-                                  }}
-                                >
-                                  {renderPanelComponent(slot.right)}
-                                </div>
-                              </div>
-                            )}
+                    return (
+                      <React.Fragment key={slotIdx}>
+                        <div
+                          className="min-h-0 overflow-hidden flex"
+                          style={{ flex: `${flexVal} 1 0%` }}
+                        >
+                          <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
+                            {renderPanelComponent(slot.type === "single" ? slot.panel : slot.left)}
                           </div>
+                        </div>
 
-                          {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
-                          {slotIdx < section.slots.length - 1 && (
+                        {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
+                        {slotIdx < section.slots.length - 1 && (
+                          <div
+                            onMouseDown={(e) => {
+                              const topSlot = section.slots[slotIdx];
+                              const btmSlot = section.slots[slotIdx + 1];
+                              const topRatio = topSlot.flexRatio ?? 1;
+                              const btmRatio = btmSlot.flexRatio ?? 1;
+                              handleSlotResizeStart(
+                                secIdx,
+                                slotIdx,
+                                topRatio,
+                                btmRatio,
+                                e
+                              );
+                            }}
+                            title="위아래로 드래그하여 슬롯 높이 비율 조절"
+                            className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
+                          >
                             <div
-                              onMouseDown={(e) => {
-                                const topSlot = section.slots[slotIdx];
-                                const btmSlot = section.slots[slotIdx + 1];
-                                const topDefault =
-                                  topSlot.type === "single" &&
-                                  topSlot.panel === "pipeline"
-                                    ? 1.9
-                                    : 1;
-                                const btmDefault =
-                                  btmSlot.type === "single" &&
-                                  btmSlot.panel === "pipeline"
-                                    ? 1.9
-                                    : 1;
-                                const topRatio = topSlot.flexRatio ?? topDefault;
-                                const btmRatio = btmSlot.flexRatio ?? btmDefault;
-                                handleSlotResizeStart(
-                                  secIdx,
-                                  slotIdx,
-                                  topRatio,
-                                  btmRatio,
-                                  e
-                                );
-                              }}
-                              title="위아래로 드래그하여 슬롯 높이 비율 조절"
-                              className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
-                            >
-                              <div
-                                className={`h-[3px] rounded-full transition-all duration-200 ${
-                                  resizingRowSlot?.secIdx === secIdx &&
-                                  resizingRowSlot?.slotIdx === slotIdx
-                                    ? "w-24 bg-indigo-600 shadow-sm"
-                                    : "w-10 bg-slate-300 group-hover:w-20 group-hover:bg-indigo-500"
-                                }`}
-                              />
-                            </div>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
-
-                  {/* 구역 간 가로 조절 스플리터 바 */}
-                  {showColSplitter && (
-                    <div
-                      onMouseDown={(e) => handleColResizeStart(secIdx, e)}
-                      title="드래그하여 구역 간 너비 조절"
-                      className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-blue-50/50 rounded-sm transition-colors"
-                    >
-                      <div
-                        className={`w-[3px] rounded-full transition-all duration-200 ${
-                          resizingSplitterIndex === secIdx
-                            ? "h-24 bg-blue-600 shadow-sm"
-                            : "h-10 bg-slate-300 group-hover:h-20 group-hover:bg-blue-500"
-                        }`}
-                      />
-                    </div>
-                  )}
+                              className={`h-[3px] rounded-full transition-all duration-200 ${
+                                resizingRowSlot?.secIdx === secIdx &&
+                                resizingRowSlot?.slotIdx === slotIdx
+                                  ? "w-24 bg-indigo-600 shadow-sm"
+                                  : "w-10 bg-slate-300 group-hover:w-20 group-hover:bg-indigo-500"
+                              }`}
+                            />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* 1섹션과 2섹션 사이 가로 분할 조절 스플리터 바 */}
+                {secIdx === 0 && (
+                  <div
+                    onMouseDown={(e) => handleColResizeStart(secIdx, e)}
+                    title="드래그하여 C 코드와 ASM 영역 너비 조절"
+                    className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-blue-50/50 rounded-sm transition-colors"
+                  >
+                    <div
+                      className={`w-[3px] rounded-full transition-all duration-200 ${
+                        resizingSplitterIndex === secIdx
+                          ? "h-24 bg-blue-600 shadow-sm"
+                          : "h-10 bg-slate-300 group-hover:h-20 group-hover:bg-blue-500"
+                      }`}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* 우측 네비게이션 레일 (Management 등 맨 오른쪽 끝일 때는 여백 없이 꽉 채움) */}
-        {canGoNextViewport && (
-          <div className="w-8 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
-            <button
-              type="button"
-              onClick={handleGoNextViewport}
-              title="다음 뷰포트(오른쪽 영역)로 이동"
-              className="w-full h-28 rounded-xl bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
+        {/* ======================================================== */}
+        {/* [메인 구분 스플리터]: 좌측 고정 패널 <-> 우측 슬라이딩 뷰포트 */}
+        {/* ======================================================== */}
+        <div
+          onMouseDown={handleMainDividerResizeStart}
+          title="드래그하여 좌측 고정 영역과 우측 뷰포트 분할 비율 조절"
+          className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-sky-100/60 rounded-md transition-colors"
+        >
+          <div
+            className={`w-[4px] rounded-full transition-all duration-200 ${
+              resizingLeftPane
+                ? "h-36 bg-sky-600 shadow-md ring-2 ring-sky-300"
+                : "h-16 bg-slate-300 group-hover:h-28 group-hover:bg-sky-500"
+            }`}
+          />
+        </div>
+
+        {/* ======================================================== */}
+        {/* [우측 슬라이딩 뷰포트 영역]: Sec-3, Sec-4, Sec-5 전환    */}
+        {/* ======================================================== */}
+        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch gap-1">
+          {/* 이전 뷰포트 이동 버튼 (PREV 레일) */}
+          {canGoPrevViewport && (
+            <div className="w-7 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
+              <button
+                type="button"
+                onClick={handleGoPrevViewport}
+                title="이전 뷰포트(왼쪽 영역)로 이동"
+                className="w-full h-24 rounded-lg bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
+              >
+                <span className="text-base font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:-translate-x-0.5">‹</span>
+                <span className="text-[8px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
+                  PREV
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* 슬라이딩 컨테이너 트랙 */}
+          <div
+            ref={containerRef}
+            className="flex-1 h-full min-w-0 overflow-hidden relative"
+          >
+            <div
+              className="flex h-full w-full transition-transform duration-500 ease-in-out"
+              style={{
+                transform: `translate3d(-${rightViewportIndex * 100}%, 0, 0)`,
+              }}
             >
-              <span className="text-lg font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:translate-x-0.5">›</span>
-              <span className="text-[9px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
-                NEXT
-              </span>
-            </button>
+              {sections.slice(2).map((section, rightOffsetIdx) => {
+                const secIdx = rightOffsetIdx + 2;
+
+                return (
+                  <div
+                    key={section.id}
+                    className="flex h-full min-h-0 shrink-0 w-full overflow-hidden px-0.5"
+                  >
+                    {/* 구역 내부 세로 슬롯 렌더링 */}
+                    <div className="flex-1 flex flex-col gap-1.5 min-w-0 h-full overflow-hidden">
+                      {section.slots.map((slot, slotIdx) => {
+                        const defaultRatio =
+                          section.slots.length === 2 &&
+                          slot.type === "single" &&
+                          slot.panel === "pipeline"
+                            ? 1.9
+                            : 1;
+                        const flexVal = slot.flexRatio ?? defaultRatio;
+
+                        return (
+                          <React.Fragment key={slotIdx}>
+                            <div
+                              className="min-h-0 overflow-hidden flex"
+                              style={{ flex: `${flexVal} 1 0%` }}
+                            >
+                              {slot.type === "single" ? (
+                                /* 1) 단일 컴포넌트 렌더링 */
+                                <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
+                                  {renderPanelComponent(slot.panel)}
+                                </div>
+                              ) : (
+                                /* 2) 가로 2개 묶음 렌더링 + 내부 좌우 가로 스플리터 바 */
+                                <div className="w-full h-full flex min-h-0 overflow-hidden relative">
+                                  <div
+                                    className="flex flex-col min-h-0 overflow-hidden"
+                                    style={{ width: `${slot.pairRatio ?? 50}%` }}
+                                  >
+                                    {renderPanelComponent(slot.left)}
+                                  </div>
+
+                                  {/* 2개 묶음 내부 좌우 분할 조절 스플리터 바 */}
+                                  <div
+                                    onMouseDown={(e) =>
+                                      handlePairResizeStart(
+                                        secIdx,
+                                        slotIdx,
+                                        slot.pairRatio ?? 50,
+                                        e
+                                      )
+                                    }
+                                    title="좌우로 드래그하여 가로 분할 비율 조절"
+                                    className="w-2.5 -mx-1 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
+                                  >
+                                    <div
+                                      className={`w-[3px] rounded-full transition-all duration-200 ${
+                                        resizingPair?.secIdx === secIdx &&
+                                        resizingPair?.slotIdx === slotIdx
+                                          ? "h-16 bg-indigo-600 shadow-sm"
+                                          : "h-8 bg-slate-300 group-hover:h-14 group-hover:bg-indigo-500"
+                                      }`}
+                                    />
+                                  </div>
+
+                                  <div
+                                    className="flex flex-col min-h-0 overflow-hidden"
+                                    style={{
+                                      width: `${100 - (slot.pairRatio ?? 50)}%`,
+                                    }}
+                                  >
+                                    {renderPanelComponent(slot.right)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
+                            {slotIdx < section.slots.length - 1 && (
+                              <div
+                                onMouseDown={(e) => {
+                                  const topSlot = section.slots[slotIdx];
+                                  const btmSlot = section.slots[slotIdx + 1];
+                                  const topRatio = topSlot.flexRatio ?? 1;
+                                  const btmRatio = btmSlot.flexRatio ?? 1;
+                                  handleSlotResizeStart(
+                                    secIdx,
+                                    slotIdx,
+                                    topRatio,
+                                    btmRatio,
+                                    e
+                                  );
+                                }}
+                                title="위아래로 드래그하여 슬롯 높이 비율 조절"
+                                className="h-2.5 -my-1 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-indigo-50/50 rounded-sm transition-colors"
+                              >
+                                <div
+                                  className={`h-[3px] rounded-full transition-all duration-200 ${
+                                    resizingRowSlot?.secIdx === secIdx &&
+                                    resizingRowSlot?.slotIdx === slotIdx
+                                      ? "w-24 bg-indigo-600 shadow-sm"
+                                      : "w-10 bg-slate-300 group-hover:w-20 group-hover:bg-indigo-500"
+                                  }`}
+                                />
+                              </div>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        )}
+
+          {/* 다음 뷰포트 이동 버튼 (NEXT 레일) */}
+          {canGoNextViewport && (
+            <div className="w-7 shrink-0 flex items-center justify-center py-2 select-none animate-in fade-in duration-200">
+              <button
+                type="button"
+                onClick={handleGoNextViewport}
+                title="다음 뷰포트(오른쪽 영역)로 이동"
+                className="w-full h-24 rounded-lg bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer group active:scale-95"
+              >
+                <span className="text-base font-bold leading-none text-slate-500 group-hover:text-sky-600 transition-transform group-hover:translate-x-0.5">›</span>
+                <span className="text-[8px] font-sans font-bold tracking-tighter text-slate-400 group-hover:text-sky-600 [writing-mode:vertical-rl]">
+                  NEXT
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ============================================================ */}

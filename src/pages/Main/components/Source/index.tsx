@@ -391,7 +391,7 @@ const SourceArea: React.FC<SourceAreaProps> = ({
   const activeLoadingMessage = externalLoadingMessage || loadingMessage;
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden min-h-0 relative">
+    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col overflow-hidden min-h-0 relative select-none">
       {errorMsg && (
         <div className="px-3 py-2 bg-rose-50 border-b border-rose-200 text-rose-600 text-xs font-medium flex items-center justify-between shrink-0">
           <span>{errorMsg}</span>

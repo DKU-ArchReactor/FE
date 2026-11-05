@@ -157,17 +157,18 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3.5 flex flex-col min-h-0 overflow-hidden select-none">
-      {/* 상단 헤더 */}
-      <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-slate-100 shrink-0">
-        <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-          <span>📋</span>
-          <span>Registers (x0 ~ x31)</span>
-        </h3>
+    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+      {/* 통일된 상단 헤더 바 */}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs">📋</span>
+          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">Registers</h3>
+        </div>
+        <span className="text-[10px] font-mono text-slate-400 font-semibold">x0 ~ x31</span>
       </div>
 
       {/* 32개 레지스터: 전체 가용 높이를 1/32로 균등 분할(flex-1 min-h-0)하여 스크롤 없이 100% 핏 */}
-      <div className="flex-1 flex flex-col font-mono min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col font-mono min-h-0 overflow-hidden px-1.5 py-1">
         {regKeys.map((regKey, idx) => {
           const val = registers[regKey] || '0x00000000';
           const isPulsing = pulsingKeys.has(regKey);

@@ -81,14 +81,14 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs select-none"
       aria-label="AI 튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}
-      <header className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-3 py-2 min-w-0">
+      <header className="shrink-0 flex items-center justify-between border-b border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 min-w-0">
         <div className="flex items-center gap-2 min-w-0 shrink">
           <span className="text-sm shrink-0">🎓</span>
-          <strong className="text-xs text-slate-800 whitespace-nowrap shrink-0">ArchReactor Tutor</strong>
+          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap shrink-0">ArchReactor Tutor</h3>
           {selectedTranslationLine ? (
             isUserSelected ? (
               <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200 font-mono whitespace-nowrap flex items-center gap-1">

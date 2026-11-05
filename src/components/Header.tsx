@@ -66,39 +66,39 @@ const Header = () => {
     navigate("/login");
   };
 
-  // 3단계 뷰포트 내비게이션 아이템:
-  // 1번: Compile -> Execution (/)
-  // 2번: 5-Stage Pipeline (/pipeline)
-  // 3번: Management (/management)
+  // 우측 3단계 뷰포트 내비게이션 아이템:
+  // 1: State -> /
+  // 2: Timing -> /pipeline
+  // 3: Pipeline -> /management
   const navItems =
     aspectTier === "superwide"
       ? []
       : aspectTier === "ultrawide"
       ? [
           {
-            label: "Compile ➔ Pipeline",
+            label: "State ➔ Timing",
             path: "/",
             active: location.pathname === "/" || location.pathname === "/pipeline" || location.pathname === "/c-to-asm",
           },
           {
-            label: "Pipeline ➔ Management",
+            label: "Timing ➔ Pipeline",
             path: "/management",
             active: location.pathname === "/management" || location.pathname === "/coming-soon",
           },
         ]
       : [
           {
-            label: "Compile ➔ Execution",
+            label: "State",
             path: "/",
             active: isActive("/") || isActive("/c-to-asm"),
           },
           {
-            label: "5-Stage Pipeline",
+            label: "Timing",
             path: "/pipeline",
             active: isActive("/pipeline"),
           },
           {
-            label: "Management",
+            label: "Pipeline",
             path: "/management",
             active: isActive("/management") || isActive("/coming-soon"),
           },
