@@ -1,30 +1,7 @@
 import apiConfig from "@/api/config";
-import type { SimulationRunRequest, SimulationResult, CycleHistoryItem } from "@/type/simulation";
-
-const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
-  if (!raw || !Array.isArray(raw.history)) {
-    return raw;
-  }
-
-  const normalizedHistory: CycleHistoryItem[] = raw.history.map((item) => {
-    const buffers = item.buffers ?? {
-      IF: item.if_stage ?? item.stage_activity?.IF ?? null,
-      ID: item.id_stage ?? item.stage_activity?.ID ?? null,
-      EX: item.ex_stage ?? item.stage_activity?.EX ?? null,
-      MEM: item.mem_stage ?? item.stage_activity?.MEM ?? null,
-      WB: item.wb_stage ?? item.stage_activity?.WB ?? null,
-    };
-    return {
-      ...item,
-      buffers,
-    };
-  });
-
-  return {
-    ...raw,
-    history: normalizedHistory,
-  };
-};
+import type { SimulationRunRequest, SimulationResult } from "@/type/simulation";
+import { assertSimulationResult } from "@/pages/Main/components/simulationView";
+import type { SimulationBundle, SimulationMode } from "@/pages/Main/components/simulationView";
 
 export const runSimulation = async (
   data: SimulationRunRequest
@@ -39,7 +16,6 @@ export const runSimulation = async (
 
   const response = await apiConfig.post("/api/v1/simulation/run", payload);
 
-  console.log("Raw Simulation API Response:", response.data);
   let resultData = response.data;
 
   const fetchJsonFromUrl = async (rawUrl: string) => {
@@ -51,6 +27,7 @@ export const runSimulation = async (
     if (!res.ok && fetchUrl !== rawUrl) {
       res = await fetch(rawUrl);
     }
+    if (!res.ok) throw new Error(`실행 결과를 불러오지 못했습니다. (HTTP ${res.status})`);
     return res.json();
   };
 
@@ -82,6 +59,19 @@ export const runSimulation = async (
     }
   }
 
-  return normalizeSimulationResult(resultData as SimulationResult);
+  assertSimulationResult(resultData, (data.mode ?? "pipeline") as SimulationMode);
+  return resultData;
 };
+
+export async function runSimulationModes(target: Pick<SimulationRunRequest, "build_id" | "simulation_token">): Promise<SimulationBundle> {
+  const modes = ["single", "pipeline"] as const;
+  const settled = await Promise.allSettled(modes.map(mode => runSimulation({ ...target, mode, max_cycles: 2000 })));
+  const bundle: SimulationBundle = { results: {}, errors: {} };
+  settled.forEach((item, index) => {
+    const mode = modes[index];
+    if (item.status === "fulfilled") bundle.results[mode] = item.value;
+    else bundle.errors[mode] = item.reason instanceof Error ? item.reason.message : "시뮬레이션에 실패했습니다.";
+  });
+  return bundle;
+}
 

@@ -31,7 +31,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 }) => {
   const isSingle = mode === "single";
   // Single 모드에서는 Step 0(대기) ~ Step totalCycles까지 슬라이더가 0~totalCycles 이동
-  const maxCycle = isSingle ? totalCycles : Math.max(0, totalCycles - 1);
+  const maxCycle = totalCycles;
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 px-4 py-2 flex items-center justify-between gap-4 transition-all">
@@ -67,7 +67,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             type="range"
             min={0}
             max={maxCycle}
-            disabled={!isReady || totalCycles <= 1}
+            disabled={!isReady || totalCycles < 1}
             value={currentCycle}
             onChange={(e) => onJumpToCycle(Number(e.target.value))}
             className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -110,7 +110,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
         <button
           onClick={onTogglePlay}
-          disabled={!isReady || totalCycles <= 1}
+          disabled={!isReady || totalCycles < 1}
           title={isPlaying ? "일시정지" : "재생 (Play)"}
           className={`w-[84px] justify-center px-2.5 py-1.5 rounded-xl font-semibold text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer border border-transparent outline-none focus:outline-none focus:ring-0 disabled:opacity-40 disabled:cursor-not-allowed ${
             isPlaying 

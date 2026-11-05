@@ -1,3 +1,4 @@
+import { getDisassemblyPc } from "../simulationView";
 import React, { useMemo, useEffect, useRef } from 'react';
 import type { StageBuffer } from '@/type/simulation';
 import type { FileSummary } from '@/type/file';
@@ -54,76 +55,6 @@ const STAGES_CONFIG: {
   { key: 'WB', name: 'WB', textColor: 'text-blue-700', bgColor: 'bg-blue-50/90', borderColor: 'border-l-4 border-blue-600', badgeBg: 'bg-blue-600 text-white' },
 ];
 
-// PC 주소 ↔ C언어 소스 코드 라인 인덱스(0-based) 매핑 테이블
-export const PC_TO_C_LINE_MAP: Record<string, number> = {
-  // main 함수 진입 & 스택 프레임 생성 ("int main() {")
-  '0x00010094': 3,
-  '0x00010098': 3,
-  '0x0001009c': 3,
-  '0x000100a0': 3,
-  '0x000100a4': 3,
-  '0x000100a8': 3,
-  '0x000100ac': 3,
-
-  // int a = 50;
-  '0x000100b0': 4,
-  '0x000100b4': 4,
-  '0x000100b8': 4,
-
-  // int b = 100;
-  '0x000100bc': 5,
-  '0x000100c0': 5,
-  '0x000100c4': 5,
-  '0x000100c8': 5,
-  '0x000100cc': 5,
-
-  // int c = 500;
-  '0x000100d0': 6,
-
-  // int d = 0;
-  '0x000100d4': 7,
-
-  // int div = c / d; (Zero division test)
-  '0x000100d8': 9,
-
-  // if (a == 50 && b == 100) {
-  '0x000100dc': 10,
-  '0x000100e0': 10,
-  '0x000100e4': 10,
-  '0x000100e8': 10,
-  '0x000100ec': 10,
-  '0x000100f0': 10,
-
-  // printf("Pipeline Check OK\n");
-  '0x000100f4': 11,
-  '0x000100f8': 11,
-  '0x000100fc': 11,
-  '0x00010100': 11,
-  '0x00010104': 11,
-  '0x00010108': 11,
-  '0x0001010c': 11,
-  '0x00010110': 11,
-  '0x00010114': 11,
-  '0x00010118': 11,
-  '0x0001011c': 11,
-  '0x00010120': 11,
-  '0x00010124': 11,
-  '0x00010128': 11,
-  '0x0001012c': 11,
-  '0x00010130': 11,
-  '0x00010134': 11,
-  '0x00010144': 11,
-  '0x00010148': 11,
-
-  // return 0;
-  '0x0001014c': 14,
-  '0x00010150': 14,
-  '0x00010154': 14,
-  '0x00010158': 14,
-  '0x0001017c': 14,
-  '0x00010180': 14,
-};
-
 const SourceViewer: React.FC<SourceViewerProps> = ({ 
   activeTab, 
   fileName, 
@@ -142,58 +73,19 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
   const activeLineRef = useRef<HTMLDivElement | null>(null);
 
   // PC별 및 명령어 텍스트별 활성화된 파이프라인 단계 매핑 (어셈블리용)
-  const { activeStagesByPc, activeStagesByInst } = useMemo(() => {
-    const pcMap: Record<string, StageBadgeInfo[]> = {};
-    const instMap: Record<string, StageBadgeInfo[]> = {};
-    if (!stageBuffers) return { activeStagesByPc: pcMap, activeStagesByInst: instMap };
-
+  const activeStagesByPc = useMemo(() => {
+    const map: Record<string, StageBadgeInfo[]> = {};
     STAGES_CONFIG.forEach(({ key, name, textColor, bgColor, borderColor, badgeBg }) => {
-      const buf = stageBuffers[key];
-      if (buf && buf.assembly && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
-        const badge: StageBadgeInfo = { stage: name, badgeBg, textColor, bgColor, borderColor };
-        if (buf.pc) {
-          const pcKey = buf.pc.toLowerCase();
-          if (!pcMap[pcKey]) {
-            pcMap[pcKey] = [];
-          }
-          pcMap[pcKey].push(badge);
-        }
-        const normInst = buf.assembly.replace(/\s+/g, ' ').trim().toLowerCase();
-        if (normInst) {
-          if (!instMap[normInst]) {
-            instMap[normInst] = [];
-          }
-          instMap[normInst].push(badge);
-        }
+      const stage = stageBuffers?.[key];
+      if (stage?.pc && !['empty', 'flushed', 'stalled'].includes(stage.status)) {
+        const pc = stage.pc.toLowerCase();
+        map[pc] = [...(map[pc] ?? []), { stage: name, badgeBg, textColor, bgColor, borderColor }];
       }
     });
-
-    return { activeStagesByPc: pcMap, activeStagesByInst: instMap };
-  }, [stageBuffers]);
-
-  // C언어 라인 인덱스별 활성화된 파이프라인 단계 매핑 (C언어용)
-  const activeStagesByCLine = useMemo(() => {
-    const map: Record<number, StageBadgeInfo[]> = {};
-    if (!stageBuffers) return map;
-
-    STAGES_CONFIG.forEach(({ key, name, textColor, bgColor, borderColor, badgeBg }) => {
-      const buf = stageBuffers[key];
-      if (buf && buf.pc && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
-        const pcKey = buf.pc.toLowerCase();
-        const lineIdx = PC_TO_C_LINE_MAP[pcKey];
-        if (lineIdx !== undefined) {
-          if (!map[lineIdx]) {
-            map[lineIdx] = [];
-          }
-          if (!map[lineIdx].some((item) => item.stage === name)) {
-            map[lineIdx].push({ stage: name, badgeBg, textColor, bgColor, borderColor });
-          }
-        }
-      }
-    });
-
     return map;
   }, [stageBuffers]);
+  // C source highlighting requires a real debug-line map for this ELF.
+  const activeStagesByCLine = useMemo<Record<number, StageBadgeInfo[]>>(() => ({}), []);
 
   // 활성 라인으로 부드러운 스크롤 이동
   useEffect(() => {
@@ -208,13 +100,9 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
     let instPart = lineText.trim();
 
     if (activeTab === 'asm') {
-      const pcMatch = lineText.match(/(0x[0-9a-fA-F]+)/);
-      linePc = pcMatch ? pcMatch[1].toLowerCase() : undefined;
+      linePc = getDisassemblyPc(lineText);
       const parts = lineText.split(':');
       instPart = parts.length > 1 ? parts.slice(1).join(':').trim() : lineText.trim();
-    } else {
-      const foundEntry = Object.entries(PC_TO_C_LINE_MAP).find(([_, cLine]) => cLine === lineIndex);
-      linePc = foundEntry ? foundEntry[0] : undefined;
     }
 
     onSelectLine({
@@ -274,14 +162,13 @@ const SourceViewer: React.FC<SourceViewerProps> = ({
               let activeStages: StageBadgeInfo[] | null = null;
 
               if (activeTab === 'asm') {
-                const pcMatch = line.match(/(0x[0-9a-fA-F]+)/);
-                const linePc = pcMatch ? pcMatch[1].toLowerCase() : null;
+                const linePc = getDisassemblyPc(line);
                 if (linePc && activeStagesByPc[linePc]) {
                   activeStages = activeStagesByPc[linePc];
                 } else {
                   const trimmedLine = line.replace(/#.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
                   if (trimmedLine && !trimmedLine.startsWith('.') && !trimmedLine.endsWith(':')) {
-                    activeStages = activeStagesByInst[trimmedLine] || null;
+                    activeStages = null;
                   }
                 }
               } else {

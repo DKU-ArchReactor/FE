@@ -29,7 +29,7 @@ export default function TranslationEditor({
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<any>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const selectedLineRef = useRef<number | null | undefined>(selectedLine);
 
