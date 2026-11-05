@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface RegisterVisualizerProps {
   registers: Record<string, string>;
@@ -111,14 +111,50 @@ const REG_KEYS = Array.from({ length: 32 }, (_, i) => `x${i}`);
 const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   registers,
   prevRegisters,
+  playSpeed = 1000,
+  cycle = 0,
 }) => {
   // x0부터 x31까지 고정 순서 (32개)
   const regKeys = REG_KEYS;
 
-  // Compare the selected adjacent clocks, never the previous render/navigation.
-  const pulsingKeys = new Set(regKeys.filter(key =>
-    prevRegisters?.[key] !== undefined && registers[key] !== undefined &&
-    Number.parseInt(prevRegisters[key], 16) !== Number.parseInt(registers[key], 16)));
+  // 새로 값이 쓰인 레지스터에 대해 절반 주기 동안 점등(Flash/Pulse) 상태 유지
+  const [pulsingKeys, setPulsingKeys] = useState<Set<string>>(() => new Set());
+
+  const prevRegsRef = React.useRef<Record<string, string> | undefined>(undefined);
+
+  useEffect(() => {
+    // 1. 이전 값 기준: prevRegisters prop이 있으면 사용하고, 없으면 ref에 기억된 이전 상태 활용
+    const referencePrev = prevRegisters || prevRegsRef.current;
+    prevRegsRef.current = registers;
+
+    if (!referencePrev) {
+      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      return;
+    }
+
+    const changed = new Set<string>();
+    regKeys.forEach((key) => {
+      const currentVal = registers[key] || '0x00000000';
+      const prevVal = referencePrev[key];
+      // 이전 값이 정의되어 있고 현재 값과 다를 때만 점등
+      if (prevVal !== undefined && prevVal !== currentVal) {
+        changed.add(key);
+      }
+    });
+
+    if (changed.size > 0) {
+      setPulsingKeys(changed);
+      // 속도의 절반(50%) 동안 점등 상태 유지 후 원래 파스텔 색상으로 복귀
+      const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
+      const timer = window.setTimeout(() => {
+        setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      }, halfDuration);
+
+      return () => clearTimeout(timer);
+    } else {
+      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+    }
+  }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3.5 flex flex-col min-h-0 overflow-hidden select-none">
@@ -133,9 +169,9 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
       {/* 32개 레지스터: 전체 가용 높이를 1/32로 균등 분할(flex-1 min-h-0)하여 스크롤 없이 100% 핏 */}
       <div className="flex-1 flex flex-col font-mono min-h-0 overflow-hidden">
         {regKeys.map((regKey, idx) => {
-          const val = registers[regKey];
+          const val = registers[regKey] || '0x00000000';
           const isPulsing = pulsingKeys.has(regKey);
-          const hasVal = val !== undefined && Number.parseInt(val, 16) !== 0;
+          const hasVal = val !== '0x00000000';
           const meta = REGISTER_METAS[regKey] || { abi: regKey, group: 'temp' as RegisterGroup };
           const groupStyle = REGISTER_GROUP_STYLES[meta.group];
 
@@ -183,7 +219,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
 
               {/* 우측: 10진수 값 (폰트 크기 12px) */}
               <div
-                title={val === undefined ? '값 정보 없음' : `Hex: ${val} (Unsigned: ${parseInt(val, 16)})`}
+                title={`Hex: ${val} (Unsigned: ${parseInt(val, 16) || 0})`}
                 className="flex items-center gap-2 shrink-0 cursor-help"
               >
                 <span className={`font-mono text-[12px] tracking-wide ${
@@ -193,7 +229,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                     ? 'text-slate-950 font-bold'
                     : 'text-slate-400'
                 }`}>
-                  {val === undefined ? '—' : formatSignedDec(val)}
+                  {formatSignedDec(val)}
                 </span>
               </div>
             </div>

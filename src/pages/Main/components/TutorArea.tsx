@@ -26,12 +26,16 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   simulationData,
   currentCycleData,
   loadingMessage,
+  selectedCodeLine: _selectedCodeLine,
+  onClearSelectedCodeLine: _onClearSelectedCodeLine,
   translationSource,
   translationAssembly,
   selectedTranslationLine,
   selectedAsmIndex,
   currentActiveAsmIndex,
+  executionLine: _executionLine,
   isUserSelected = false,
+  onSelectTranslationLine: _onSelectTranslationLine,
 }) => {
   // 1. C 소스 코드 라인별 배열
   const cLines = useMemo(() => {
@@ -307,20 +311,17 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-xs font-bold text-slate-800">
-                      현재 클록 활동 분석 ({currentCycleData.clock + 1}클록 완료)
+                      현재 사이클({currentCycleData.clock} Clock) 실행 분석
                     </span>
                   </div>
                   <span className="text-[10px] font-mono text-slate-400">
-                    완료 클록 {currentCycleData.clock + 1} / {simulationData?.summary?.total_cycles || 0}
+                    Cycle {currentCycleData.clock} / {simulationData?.summary?.total_cycles || 0}
                   </span>
                 </div>
 
                 {/* 현재 파이프라인 인출(IF) 명령어 */}
                 {(() => {
-                  const ifBuf = currentCycleData.stage_activity?.IF;
-                  if (!ifBuf || ['empty', 'flushed', 'stalled', 'error'].includes(ifBuf.status)) {
-                    return <p className="text-xs text-slate-500">IF 상태: {ifBuf?.status ?? '정보 없음'}</p>;
-                  }
+                  const ifBuf = currentCycleData.buffers?.IF || currentCycleData.if_stage;
                   const ifInst = ifBuf?.assembly || "bubble";
                   const ifAnalysis = analyzeAsmInstruction(ifInst);
                   return (
@@ -336,7 +337,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                         )}
                       </div>
                       <p className="text-[11px] text-slate-600 leading-relaxed">
-                        명령어 의미: {ifAnalysis.explanation} (인출만으로 실행 완료를 뜻하지는 않습니다.)
+                        {ifAnalysis.explanation}
                       </p>
                     </div>
                   );
@@ -345,7 +346,6 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                 {/* 해저드 및 스톨 여부 카드 */}
                 {(() => {
                   const { cycle_events } = currentCycleData;
-                  const runtimeError = cycle_events.runtime_error;
                   const isStall = cycle_events.stall?.has_stall;
                   const isForward = cycle_events.forwarding?.has_forwarded;
                   const isFlush = cycle_events.control_hazard?.has_flush;
@@ -353,7 +353,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   return (
                     <div
                       className={`p-2.5 rounded-lg border text-[11px] leading-relaxed ${
-                        runtimeError?.has_error || isStall
+                        isStall
                           ? "bg-rose-50 border-rose-200 text-rose-900"
                           : isFlush
                           ? "bg-amber-50 border-amber-200 text-amber-900"
@@ -363,22 +363,22 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                       }`}
                     >
                       <strong className="font-bold block mb-0.5">
-                        {runtimeError?.has_error ? `실행 오류: ${runtimeError.code}` : isStall
+                        {isStall
                           ? "⚠️ 데이터 해저드 (Data Stall)"
                           : isFlush
                           ? "🔄 제어 해저드 (Branch Flush)"
                           : isForward
                           ? "⚡ 데이터 포워딩 (Forwarding 활성화)"
-                          : "현재 클록 이벤트 없음"}
+                          : "✅ 정상 파이프라인 전진"}
                       </strong>
                       <span className="opacity-90">
-                        {runtimeError?.has_error ? runtimeError.message : isStall
+                        {isStall
                           ? cycle_events.stall?.stall_desc || "필요한 피연산자가 준비되지 않아 파이프라인이 1사이클 정지되었습니다."
                           : isFlush
-                          ? cycle_events.control_hazard?.flush_reason || "분기 또는 점프가 결정되어 더 어린 IF/ID 명령을 폐기합니다."
+                          ? cycle_events.control_hazard?.flush_reason || "분기 예측 실패로 인해 파이프라인 버블이 플러시되었습니다."
                           : isForward
                           ? cycle_events.forwarding?.forwarding_desc || "ALU 결과를 후속 명령어에 직접 포워딩하여 지연 없이 실행합니다."
-                          : "이 클록에 스톨·포워딩·플러시 이벤트가 기록되지 않았습니다."}
+                          : "현재 사이클에 해저드 없이 5개 스테이지가 순차적으로 실행되고 있습니다."}
                       </span>
                     </div>
                   );

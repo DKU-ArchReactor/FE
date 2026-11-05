@@ -3,11 +3,10 @@ import axios from 'axios';
 import SourceHeader from './SourceHeader';
 import SourceViewer from './SourceViewer';
 import { compileCode } from '@/api/build';
-import { runSimulationModes } from '@/api/simulation';
+import { runSimulation } from '@/api/simulation';
 import { getFiles, getFileById, saveFile, deleteFile } from '@/api/file';
 
-import type { StageBuffer } from '@/type/simulation';
-import type { SimulationBundle } from '../simulationView';
+import type { StageBuffer, SimulationResult } from '@/type/simulation';
 import type { FileSummary } from '@/type/file';
 import type { CodeLineSelectInfo } from './SourceViewer';
 
@@ -37,7 +36,7 @@ interface SourceAreaProps {
   fileId?: string | null;
   loadingMessage?: string | null;
   onStartSimulation?: () => void;
-  onSimulationComplete?: (data: SimulationBundle) => void;
+  onSimulationComplete?: (data: SimulationResult) => void;
   onLoadingChange?: (loadingMessage: string | null) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
@@ -159,7 +158,7 @@ const SourceArea: React.FC<SourceAreaProps> = ({
           };
 
       const result = await compileCode(compilePayload);
-
+      console.log("Compile Result:", result);
 
       if (result.status === 'success' && result.assembly_url) {
         try {
@@ -172,7 +171,6 @@ const SourceArea: React.FC<SourceAreaProps> = ({
           if (!asmResponse.ok && fetchUrl !== result.assembly_url) {
             asmResponse = await fetch(result.assembly_url);
           }
-          if (!asmResponse.ok) throw new Error(`어셈블리 HTTP ${asmResponse.status}`);
           const asmText = await asmResponse.text();
 
           setAsmContent(asmText);
@@ -184,13 +182,26 @@ const SourceArea: React.FC<SourceAreaProps> = ({
           console.error("Assembly Fetch Error:", asmErr);
         }
 
-        const target = result.build_id ? { build_id: result.build_id }
-          : result.simulation_token ? { simulation_token: result.simulation_token } : null;
-        if (target) {
-          updateLoading('2/2 싱글 및 파이프라인 시뮬레이션 실행 중...');
-          onSimulationComplete?.(await runSimulationModes(target));
+        if (result.build_id) {
+          updateLoading('2/2 파이프라인 시뮬레이션 실행 중...');
+          const simResult = await runSimulation({
+            build_id: result.build_id,
+            mode: 'pipeline',
+            max_cycles: 2000,
+          });
+          console.log("Simulation Result:", simResult);
+          onSimulationComplete?.(simResult);
+        } else if (result.simulation_token) {
+          updateLoading('2/2 파이프라인 시뮬레이션 실행 중...');
+          const simResult = await runSimulation({
+            simulation_token: result.simulation_token,
+            mode: 'pipeline',
+            max_cycles: 2000,
+          });
+          console.log("Simulation Result:", simResult);
+          onSimulationComplete?.(simResult);
         } else {
-          setErrorMsg('시뮬레이션 실행 권한이 반환되지 않았습니다.');
+          setErrorMsg('시뮬레이션 실행에 필요한 build_id 또는 simulation_token이 반환되지 않았습니다.');
         }
       } else {
         setErrorMsg(result.log || '컴파일에 실패했습니다.');
