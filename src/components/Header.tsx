@@ -46,7 +46,6 @@ const Header = () => {
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
-      setUser(null);
       return;
     }
 
@@ -187,7 +186,7 @@ const Header = () => {
 
           <div className="h-4 w-px bg-slate-200 mx-1" />
 
-          {user ? (
+          {user && localStorage.getItem("access_token") ? (
             <>
               <span className="text-sm font-medium text-slate-700">
                 <strong className="text-sky-600 font-semibold">{user.name}</strong>님

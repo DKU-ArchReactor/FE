@@ -29,7 +29,7 @@ and help students learn computer architecture more intuitively.
 
 ## Key Features
 
-- RISC-V (RV32I) instruction simulation
+- RISC-V (RV32IM supported subset) instruction simulation
 - Pipeline visualization (IF, ID, EX, MEM, WB)
 - Cycle-by-cycle execution view
 - Register and memory state tracking
@@ -37,7 +37,11 @@ and help students learn computer architecture more intuitively.
 - Code saving and reloading
 - Execution statistics (cycles, CPI)
 
-_(C language support and AI-based optimization advice are planned features.)_
+_C compilation is implemented in the backend. Generative AI advice is planned;
+the current tutor uses local rules and static compiler translation information._
+
+See [simulation information audit](doc/simulation-information-audit.md) for
+verified clock/state semantics, local CORE JSON playback, and remaining gaps.
 
 ---
 
@@ -73,7 +77,6 @@ ArchReactor is built with three main components:
 ### Frontend
 
 ```bash
-cd frontend
-npm install
+npm ci
 npm run dev
 ```

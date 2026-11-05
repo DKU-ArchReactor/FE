@@ -11,7 +11,8 @@ import MemorySegmentVisualizer from "./components/MemorySegmentVisualizer";
 import ControlPanel from "./components/ControlPanel";
 import FlyoutPanel from "./components/FlyoutPanel";
 
-import type { SimulationResult } from "@/type/simulation";
+import { getPlaybackFrame, assertSimulationResult } from "./components/simulationView";
+import type { SimulationBundle } from "./components/simulationView";
 import type { FileSummary } from "@/type/file";
 import { getFiles, getFileById } from "@/api/file";
 import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
@@ -20,7 +21,7 @@ import { getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 import TranslationEditor from "./components/TranslationEditor";
 import TranslationMapping from "./components/TranslationMapping";
-import { compileTranslation, mapAssembly } from "./components/translationCompile";
+import { compileTranslation } from "./components/translationCompile";
 
 const DEFAULT_TRANSLATION_SOURCE = "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
 const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
@@ -104,6 +105,7 @@ const MainPage: React.FC = () => {
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null);
   const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
   const loadedInitialFileIdRef = useRef<string | null>(null);
+  const sourceRevisionRef = useRef(0);
   const [translationSource, setTranslationSource] = useState(
     () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE
   );
@@ -135,6 +137,7 @@ const MainPage: React.FC = () => {
     resetSimulation = false,
     keepFileId: string | null = null
   ) => {
+    sourceRevisionRef.current += 1;
     setTranslationSource(source);
     setCContent(source);
     setCFileName(fileName);
@@ -146,9 +149,11 @@ const MainPage: React.FC = () => {
     setTranslationSelectedLine(null);
     setTranslationSelectedAsmIndex(null);
 
-    // 초기화 버튼 클릭 등으로 시뮬레이션 상태도 함께 리셋해야 할 때
-    if (resetSimulation) {
-      setSimulationData(null);
+    // Edited source must never retain results from an older build.
+    void resetSimulation;
+    {
+      setSimulationBundle({ results: {}, errors: {} });
+      setCurrentStepIndex(0);
       setCurrentCycle(0);
       setIsPlaying(false);
     }
@@ -224,16 +229,20 @@ const MainPage: React.FC = () => {
     setTranslationBusy(true);
     setTranslationError("");
     setAsmContent("");
+    setSimulationBundle({ results: {}, errors: {} });
+    setCurrentStepIndex(0);
+    setCurrentCycle(0);
+    setIsPlaying(false);
+    const sourceRevision = sourceRevisionRef.current;
     try {
-      const { assembly, simulationResult } = await compileTranslation(translationSource);
+      const { assembly, simulation } = await compileTranslation(translationSource);
+      if (sourceRevision !== sourceRevisionRef.current) return;
       setTranslationAssembly(assembly);
       setAsmContent(assembly);
       setAsmFileName("assembly.s");
 
       // 5개 컴포넌트 전체가 공유하는 시뮬레이션 상태 갱신
-      if (simulationResult) {
-        handleSimulationComplete(simulationResult);
-      }
+      handleSimulationComplete(simulation);
     } catch (error) {
       setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
     } finally {
@@ -279,168 +288,39 @@ const MainPage: React.FC = () => {
   // ========================================================
   // 2. 시뮬레이션 제어 상태 관리 (Single-Cycle vs 5-Stage Pipeline 모드)
   // ========================================================
-  const [simulationData, setSimulationData] = useState<SimulationResult | null>(null);
+  const [simulationBundle, setSimulationBundle] = useState<SimulationBundle>({ results: {}, errors: {} });
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
-
-  // 현재 뷰포트가 Compile ➔ Execution(1번 뷰)인지 5-Stage Pipeline(2번 뷰)인지 판별
   const isSingleCycleViewport = location.pathname === "/" || location.pathname === "/c-to-asm";
-  const simulationMode: "single" | "pipeline" = isSingleCycleViewport ? "single" : "pipeline";
-  // 1) 어셈블리 뷰어의 실제 실행 가능한 명령어 행들 (매핑된 rows)
-  const mappedAssemblyRows = useMemo(() => {
-    if (!translationAssembly) return [];
-    return mapAssembly(translationAssembly, 1000);
-  }, [translationAssembly]);
-
-  // 2) 5-Stage 파이프라인 전체 히스토리
-  const pipelineHistory = simulationData?.history ?? [];
-  const totalPipelineCycles = pipelineHistory.length;
-
-  const isSimulationReady = isSingleCycleViewport
-    ? Boolean(simulationData && mappedAssemblyRows.length > 0)
-    : totalPipelineCycles > 0;
-
-  // 3) Single-Cycle 모드: 어셈블리 줄 수(예: 18줄)와 1:1로 정확하게 일치하는 Step 인덱스 생성
-  const singleCycleHistoryIndices = useMemo(() => {
-    if (!mappedAssemblyRows.length) {
-      return [0];
-    }
-
-    // 각 어셈블리 라인마다 파이프라인 히스토리 중 해당 명령어가 실행 완료된(WB/MEM) 사이클 시점 매핑:
-    // Single-Cycle 관점에서는 명령어가 완전히 실행되어 레지스터에 결과가 쓰여진 시점(WB)이 보여야
-    // 레지스터와 메모리 변경 사항이 직관적으로 반영됩니다.
-    let lastFoundIdx = 0;
-    return mappedAssemblyRows.map((row, rowIdx) => {
-      const cleanRow = row.text.replace(/\s+/g, " ").trim().toLowerCase();
-
-      // 1순위: WB(Write Back) 단계에서 해당 명령어가 실행 완료된 사이클 탐색 (이전 명령어 이후 시점부터)
-      let foundIdx = pipelineHistory.findIndex(
-        (item, idx) =>
-          idx >= lastFoundIdx &&
-          item.buffers?.WB?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow
-      );
-
-      // 2순위: Store 계열(sw, sh, sb)은 WB에 레지스터를 쓰지 않고 MEM 단계에서 메모리에 쓰므로 MEM 단계 탐색
-      if (foundIdx === -1) {
-        foundIdx = pipelineHistory.findIndex(
-          (item, idx) =>
-            idx >= lastFoundIdx &&
-            item.buffers?.MEM?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow
-        );
-      }
-
-      // 3순위: EX 단계 탐색
-      if (foundIdx === -1) {
-        foundIdx = pipelineHistory.findIndex(
-          (item, idx) =>
-            idx >= lastFoundIdx &&
-            item.buffers?.EX?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow
-        );
-      }
-
-      // 4순위: 파이프라인 어느 단계든 매칭
-      if (foundIdx === -1) {
-        foundIdx = pipelineHistory.findIndex(
-          (item, idx) =>
-            idx >= lastFoundIdx &&
-            (item.buffers?.WB?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
-              item.buffers?.MEM?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
-              item.buffers?.EX?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
-              item.buffers?.ID?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow ||
-              item.buffers?.IF?.assembly?.replace(/\s+/g, " ").trim().toLowerCase() === cleanRow)
-        );
-      }
-
-      if (foundIdx !== -1) {
-        lastFoundIdx = foundIdx;
-        return foundIdx;
-      }
-
-      // 못 찾으면 이전 인덱스 + 1 또는 비례 분배
-      const fallback = Math.min(
-        pipelineHistory.length - 1,
-        Math.max(
-          lastFoundIdx + 1,
-          Math.floor((rowIdx / Math.max(1, mappedAssemblyRows.length - 1)) * (pipelineHistory.length - 1))
-        )
-      );
-      lastFoundIdx = fallback;
-      return fallback;
-    });
-  }, [mappedAssemblyRows, pipelineHistory]);
-
-  // Step 0(대기 상태)을 포함하여 총 스텝 수는 어셈블리 행 수와 동일 (0 ~ totalSingleSteps)
-  // 예: 18줄의 경우 Step 0(준비/연관코드만 표시) ~ Step 18(마지막 명령어 실행)
-  const totalSingleSteps = mappedAssemblyRows.length > 0 ? mappedAssemblyRows.length : 0;
-
-  // 모드별 총 스텝/사이클 수 (Single 모드는 0부터 18까지 탐색 가능하도록 totalSingleSteps)
+  const simulationMode = isSingleCycleViewport ? "single" : "pipeline";
+  const simulationData = simulationBundle.results[simulationMode] ?? null;
+  const totalSingleSteps = simulationBundle.results.single?.history.length ?? 0;
+  const totalPipelineCycles = simulationBundle.results.pipeline?.history.length ?? 0;
   const totalCycles = isSingleCycleViewport ? totalSingleSteps : totalPipelineCycles;
-
-  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
-  const [currentCycle, setCurrentCycle] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [playSpeed, setPlaySpeed] = useState<number>(1000); // 기본값: 1.0 (초당 1스텝 = 1000ms)
+  const isSimulationReady = totalCycles > 0;
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentCycle, setCurrentCycle] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playSpeed, setPlaySpeed] = useState(1000);
   const [selectedCodeLine, setSelectedCodeLine] = useState<CodeLineSelectInfo | null>(null);
-
-  // Play / Pause 토글 시 화면 중앙에 잠깐 떴다가 사라지는 오버레이 인디케이터 상태
-  const [playbackFeedback, setPlaybackFeedback] = useState<{
-    type: "play" | "pause";
-    id: number;
-  } | null>(null);
-
-  // Single 모드와 Pipeline 모드 간 인덱스 동기화:
-  // Step 0일 때는 아직 1번째 명령어가 실행되기 전(대기 상태)이므로 0번 인덱스 히스토리를 가리키되,
-  // Step 1부터 1번째 명령어(mappedAssemblyRows[0])의 실행 히스토리를 가리킴
-  const activeCycleIndex = isSingleCycleViewport
-    ? currentStepIndex === 0
-      ? 0
-      : singleCycleHistoryIndices[currentStepIndex - 1] ?? 0
-    : currentCycle;
-
-  const prevCycleIndex = isSingleCycleViewport
-    ? currentStepIndex <= 1
-      ? 0
-      : singleCycleHistoryIndices[currentStepIndex - 2] ?? 0
-    : activeCycleIndex > 0
-    ? activeCycleIndex - 1
-    : null;
-
-  const currentData = pipelineHistory[activeCycleIndex] ?? null;
-  const prevData = prevCycleIndex !== null && prevCycleIndex !== activeCycleIndex
-    ? pipelineHistory[prevCycleIndex] ?? null
-    : null;
-
-  // Single 모드에서 현재 활성 실행 중인 어셈블리 행:
-  // Step 0일 때는 아직 실행 전이므로 activeRow 없음 (연관 라인만 표시하거나 대기)
-  // Step 1일 때 0번째 줄(1번째 줄)이 실행됨
-  const currentActiveRow = isSingleCycleViewport
-    ? currentStepIndex === 0
-      ? null
-      : mappedAssemblyRows[currentStepIndex - 1] ?? null
-    : null;
-
-  // 현재 실행 중인 어셈블리 줄의 C 소스 라인 번호
-  // Step 0일 때도 1번째 C 라인의 연관 코드 관계를 알 수 있도록 첫 번째 행의 sourceLine을 기본 연관으로 제공
-  const activeExecutionCLine = currentActiveRow
-    ? currentActiveRow.sourceLine
-    : isSingleCycleViewport && currentStepIndex === 0 && mappedAssemblyRows.length > 0
-    ? mappedAssemblyRows[0].sourceLine
-    : null;
-
-  // 실제 "진행 중/실행 중"인 상태인지 (Step 0이 아닐 때만 실제 실행 중)
-  const isActuallyExecuting = isSingleCycleViewport ? currentStepIndex > 0 : true;
-
-  // 현재 활성화된 선택 라인: 사용자가 명시적으로 클릭하지 않았으면 activeExecutionCLine을 자동 선택
-  const effectiveSelectedLine = translationSelectedLine ?? activeExecutionCLine;
+  const [playbackFeedback, setPlaybackFeedback] = useState<{ type: "play" | "pause"; id: number } | null>(null);
+  const activeCycleIndex = isSingleCycleViewport ? currentStepIndex : currentCycle;
+  const currentData = getPlaybackFrame(simulationData, activeCycleIndex);
+  const prevData = activeCycleIndex > 0 ? getPlaybackFrame(simulationData, activeCycleIndex - 1) : null;
+  // Compiler .s text contains pseudo-instructions, not linked ELF addresses.
+  // Without PC-to-source metadata, static source rows cannot identify execution.
+  const activeExecutionCLine = null;
+  const isActuallyExecuting = activeCycleIndex > 0;
+  const effectiveSelectedLine = translationSelectedLine;
 
   const timerRef = useRef<number | null>(null);
 
-  const handleSimulationComplete = (data: SimulationResult) => {
+  const handleSimulationComplete = (data: SimulationBundle) => {
     setIsPlaying(false);
     setCurrentStepIndex(0);
     setCurrentCycle(0);
     setPlaySpeed(1000); // 컴파일 완료 즉시 1.0에 포커스
     setSelectedCodeLine(null);
-    setSimulationData(data);
+    setSimulationBundle(data);
   };
 
   // 자동 재생 타이머: 재생 중에는 튜터 및 에디터가 현재 실행 라인을 실시간으로 따라가도록 수동 선택 자동 해제
@@ -461,7 +341,7 @@ const MainPage: React.FC = () => {
           });
         } else {
           setCurrentCycle((prev) => {
-            if (prev >= totalPipelineCycles - 1) {
+            if (prev >= totalPipelineCycles) {
               setIsPlaying(false);
               return prev;
             }
@@ -504,7 +384,7 @@ const MainPage: React.FC = () => {
     if (isSingleCycleViewport) {
       setCurrentStepIndex((prev) => Math.min(totalSingleSteps, prev + 1));
     } else {
-      setCurrentCycle((prev) => Math.min(totalPipelineCycles - 1, prev + 1));
+      setCurrentCycle((prev) => Math.min(totalPipelineCycles, prev + 1));
     }
   };
 
@@ -514,7 +394,7 @@ const MainPage: React.FC = () => {
 
   const handleTogglePlay = () => {
     const currentPos = isSingleCycleViewport ? currentStepIndex : currentCycle;
-    const maxPos = isSingleCycleViewport ? totalSingleSteps : totalPipelineCycles - 1;
+    const maxPos = isSingleCycleViewport ? totalSingleSteps : totalPipelineCycles;
 
     // 재생 토글 시 수동 선택을 해제하여 실시간 실행 라인 추적 모드로 전환
     setTranslationSelectedLine(null);
@@ -822,7 +702,7 @@ const MainPage: React.FC = () => {
             onStartSimulation={handleStartSimulation}
             onSimulationComplete={handleSimulationComplete}
             onLoadingChange={setLoadingMessage}
-            stageBuffers={currentData?.buffers}
+            stageBuffers={currentData?.stage_activity}
             selectedLine={selectedCodeLine}
             onSelectLine={setSelectedCodeLine}
           />
@@ -840,15 +720,8 @@ const MainPage: React.FC = () => {
             selectedAsmIndex={translationSelectedAsmIndex}
             executionLine={activeExecutionCLine}
             onSelectLine={handleSelectTranslationLine}
-            stageBuffers={currentData?.buffers}
             mode={simulationMode}
-            currentActiveStep={
-              isSingleCycleViewport
-                ? currentStepIndex > 0
-                  ? currentStepIndex - 1
-                  : null
-                : null
-            }
+            currentActiveStep={null}
           />
         );
       case "tutor":
@@ -863,13 +736,7 @@ const MainPage: React.FC = () => {
             translationAssembly={translationAssembly || asmContent}
             selectedTranslationLine={effectiveSelectedLine}
             selectedAsmIndex={translationSelectedAsmIndex}
-            currentActiveAsmIndex={
-              isSingleCycleViewport
-                ? currentStepIndex > 0
-                  ? currentStepIndex - 1
-                  : null
-                : null
-            }
+            currentActiveAsmIndex={null}
             executionLine={isActuallyExecuting ? activeExecutionCLine : null}
             isUserSelected={translationSelectedLine !== null}
             onSelectTranslationLine={handleSelectTranslationLine}
@@ -878,6 +745,7 @@ const MainPage: React.FC = () => {
       case "pipeline":
         return (
           <PipelineVisualizer
+            mode={simulationMode}
             currentData={currentData}
             loadingMessage={loadingMessage}
           />
@@ -924,6 +792,43 @@ const MainPage: React.FC = () => {
 
   return (
     <main className="flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative">
+      <label className="shrink-0 text-xs py-1 cursor-pointer text-sky-700">
+        로컬 CORE 실행 결과(JSON) 열기
+        <input className="ml-2" type="file" accept=".json,application/json" onChange={async event => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          try {
+            const result: unknown = JSON.parse(await file.text());
+            const mode = (result as { simulator?: { mode?: string } }).simulator?.mode;
+            if (mode !== 'single' && mode !== 'pipeline') throw new Error('실행 모드를 확인할 수 없습니다.');
+            assertSimulationResult(result, mode);
+            setSimulationBundle(previous => {
+              const other = mode === 'single' ? 'pipeline' : 'single';
+              const sameProgram = result.program.fingerprint && result.program.fingerprint === previous.results[other]?.program.fingerprint;
+              return { results: { ...(sameProgram ? previous.results : {}), [mode]: result }, errors: {} };
+            });
+            setCurrentStepIndex(0);
+            setCurrentCycle(0);
+            setIsPlaying(false);
+            navigate(mode === 'single' ? '/' : '/pipeline');
+          } catch (error) {
+            setSimulationBundle(previous => ({ ...previous, errors: { ...previous.errors, [simulationMode]: error instanceof Error ? error.message : '실행 결과를 읽지 못했습니다.' } }));
+          }
+          event.target.value = '';
+        }} />
+      </label>
+      {simulationBundle.errors[simulationMode] && (
+        <p role="alert" className="shrink-0 p-2 text-xs text-rose-700 bg-rose-50">{simulationBundle.errors[simulationMode]}</p>
+      )}
+      {simulationData && (
+        <div className="shrink-0 p-2 text-xs text-slate-700 bg-slate-50">
+          {activeCycleIndex === 0 ? "실행 전" : `${activeCycleIndex}클록 완료`} · {simulationData.status === "error" ? "실행 오류/제한 도달" : simulationData.status === "halted" ? "실행 종료" : simulationData.status}
+          <span className="ml-2">전체 결과: {simulationData.summary.instructions_executed}명령 · {simulationData.summary.total_cycles}클록 · CPI {simulationData.summary.instructions_executed ? (simulationData.summary.total_cycles / simulationData.summary.instructions_executed).toFixed(2) : '—'}</span>
+          {currentData?.stage_activity?.IF?.pc && <> · IF PC {currentData.stage_activity.IF.pc}: {currentData.stage_activity.IF.assembly}</>}
+          <span className="ml-2">C/ASM 연결은 정적 번역 정보입니다. 실행 위치는 실제 PC를 기준으로 확인하세요.</span>
+          {activeCycleIndex === totalCycles && simulationData.console_output && <pre className="whitespace-pre-wrap">{simulationData.console_output}</pre>}
+        </div>
+      )}
       {/* ============================================================ */}
       {/* [최상단 제어 바]: 재생 컨트롤러                               */}
       {/* ============================================================ */}
