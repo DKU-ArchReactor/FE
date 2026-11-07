@@ -87,9 +87,9 @@ const MainPage: React.FC = () => {
 
   const isSingleEngine = simulationEngineMode === "single";
 
-  // 어셈블리 행 파싱: 1순위는 시뮬레이션 로그에서 직접 추출(단일 진실 원천) + C 매핑 결합
+  // 어셈블리 행 파싱: 백엔드가 시뮬레이션 로그에 직접 주입한 source_line 매핑을 단일 진실 원천으로 사용
   const mappedAssemblyRows = useMemo(() => {
-    const fromSim = extractAssemblyFromSimulation(simulationData, fileMgr.translationAssembly);
+    const fromSim = extractAssemblyFromSimulation(simulationData);
     if (fromSim.length > 0) return fromSim;
     if (!fileMgr.translationAssembly) return [];
     return mapAssembly(fileMgr.translationAssembly, 1000);
