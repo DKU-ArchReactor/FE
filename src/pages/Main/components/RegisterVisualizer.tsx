@@ -175,22 +175,32 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                 )}
               </div>
 
-              {/* 우측: 16진수 & 10진수 값 매핑 */}
+              {/* 우측: 10진수 & 16진수 값 매핑 (위치 고정 및 0 (0x...) 순서) */}
               <div
-                title={`Hex: ${val}`}
-                className="flex items-center gap-2 shrink-0"
+                title={`Dec: ${formatSignedDec(val)}, Hex: ${val}`}
+                className="flex items-center gap-1.5 shrink-0 tabular-nums font-mono select-text"
               >
-                <span className={`text-[10.5px] ${
-                  isPulsing
-                    ? 'text-[#CF222E] dark:text-[#F44747] font-bold'
-                    : hasVal
-                    ? 'text-[#953800] dark:text-[#CE9178]'
-                    : 'text-[#8C959F] dark:text-[#5A5A5A]'
-                }`}>
-                  {val}
+                <span
+                  className={`w-14 text-right text-[10px] font-semibold truncate ${
+                    isPulsing
+                      ? 'text-[#CF222E] dark:text-[#F44747] font-bold'
+                      : hasVal
+                      ? 'text-[#005FB8] dark:text-[#79C0FF]'
+                      : 'text-[#656D76] dark:text-[#858585]'
+                  }`}
+                >
+                  {formatSignedDec(val)}
                 </span>
-                <span className="text-[9.5px] text-[#656D76] dark:text-[#6E7681]">
-                  ({formatSignedDec(val)})
+                <span
+                  className={`w-[88px] text-right text-[10px] ${
+                    isPulsing
+                      ? 'text-[#9A6700] dark:text-[#E5B567] font-bold'
+                      : hasVal
+                      ? 'text-[#953800] dark:text-[#CE9178]'
+                      : 'text-[#8C959F] dark:text-[#5A5A5A]'
+                  }`}
+                >
+                  ({val})
                 </span>
               </div>
             </div>

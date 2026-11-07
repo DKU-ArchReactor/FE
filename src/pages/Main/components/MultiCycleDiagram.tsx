@@ -112,7 +112,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   currentCycle,
   onJumpToCycle,
 }) => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const cycleScrollRef = useRef<HTMLDivElement>(null);
 
   const history = simulationData?.history ?? [];
   const totalCycles = history.length;
@@ -348,17 +349,23 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     return rows;
   }, [history, isSingleMode]);
 
-  // 현재 사이클이 바뀔 때 해당 사이클 열과 현재 실행 중인 명령어 행이 화면 중앙에 오도록 가로·세로 자동 스크롤
+  // 현재 사이클이 바뀔 때 해당 사이클 열(C0~CN)과 현재 실행 중인 명령어 행이 화면에 오도록 자동 스크롤
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !traceRows.length) return;
+    const cycleContainer = cycleScrollRef.current;
+    const tableContainer = tableContainerRef.current;
+    if (!cycleContainer || !tableContainer || !traceRows.length) return;
 
+    // 수평 스크롤 (C0 ~ CN 사이클 영역만 스크롤)
     const targetLeft = Math.max(
       0,
-      currentCycle * COL_WIDTH - (container.clientWidth - LEFT_COL_WIDTH) / 2 + COL_WIDTH / 2
+      currentCycle * COL_WIDTH - cycleContainer.clientWidth / 2 + COL_WIDTH / 2
     );
+    cycleContainer.scrollTo({
+      left: targetLeft,
+      behavior: 'smooth',
+    });
 
-    // 현재 사이클에 활성화된 첫 번째/중간 행 찾기
+    // 수직 스크롤 (활성 행 추적)
     const activeRowIndices: number[] = [];
     traceRows.forEach((row, idx) => {
       if (row.cells[currentCycle]) {
@@ -370,16 +377,10 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       const midRowIdx = activeRowIndices[Math.floor(activeRowIndices.length / 2)];
       const targetTop = Math.max(
         0,
-        midRowIdx * ROW_HEIGHT - (container.clientHeight - 30) / 2 + ROW_HEIGHT / 2
+        midRowIdx * ROW_HEIGHT - (tableContainer.clientHeight - 30) / 2 + ROW_HEIGHT / 2
       );
-      container.scrollTo({
-        left: targetLeft,
+      tableContainer.scrollTo({
         top: targetTop,
-        behavior: 'smooth',
-      });
-    } else {
-      container.scrollTo({
-        left: targetLeft,
         behavior: 'smooth',
       });
     }
@@ -443,165 +444,188 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
         </div>
       ) : (
         <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-auto min-h-0 relative select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
+          ref={tableContainerRef}
+          className="flex-1 overflow-y-auto min-h-0 flex relative select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
         >
+          {/* 좌측 고정 명령어 열 (가로 휠 스크롤 대상에서 제외하여 항상 위치 고정) */}
           <div
-            className="relative min-w-max"
-            style={{
-              width: `${LEFT_COL_WIDTH + history.length * COL_WIDTH}px`,
-            }}
+            className="shrink-0 flex flex-col border-r border-[#E5E5E5] dark:border-[#333333] z-10 bg-white dark:bg-[#1E1E1E]"
+            style={{ width: `${LEFT_COL_WIDTH}px` }}
           >
-            {/* 상단 고정 헤더 행 (Sticky Top) */}
-            <div className="h-7 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-20 shadow-2xs">
-              {/* 좌상단 고정 코너 셀 (Sticky Top & Left) */}
-              <div
-                className="shrink-0 px-2.5 flex items-center justify-between border-r border-[#E5E5E5] dark:border-[#333333] bg-[#EAEAEA] dark:bg-[#2D2D2D] sticky left-0 z-30 text-[10px] font-bold text-[#57606A] dark:text-[#858585]"
-                style={{ width: `${LEFT_COL_WIDTH}px` }}
-              >
-                <span>Instruction</span>
-                <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] font-mono">Now</span>
-              </div>
-
-              {/* 각 사이클 번호 헤더 (클릭 시 해당 사이클로 이동) */}
-              {history.map((item, cIdx) => {
-                const isCurrent = cIdx === currentCycle;
-                const hasStall = item.cycle_events?.stall?.has_stall;
-                const hasFlush = item.cycle_events?.control_hazard?.has_flush;
-
-                return (
-                  <button
-                    key={cIdx}
-                    type="button"
-                    onClick={() => onJumpToCycle?.(cIdx)}
-                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${isCurrent
-                        ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
-                        : hasStall
-                          ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
-                          : hasFlush
-                            ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
-                            : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
-                      }`}
-                    style={{ width: `${COL_WIDTH}px` }}
-                    title={`Clock ${item.clock ?? cIdx}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
-                      }`}
-                  >
-                    <span>C{item.clock ?? cIdx}</span>
-                    {(hasStall || hasFlush) && !isCurrent && (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-red-500' : 'bg-purple-500'
-                          }`}
-                      />
-                    )}
-                  </button>
-                );
-              })}
+            {/* 좌상단 고정 코너 셀 (Sticky Top) */}
+            <div className="h-7 shrink-0 px-2.5 flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#333333] bg-[#EAEAEA] dark:bg-[#2D2D2D] sticky top-0 z-20 text-[10px] font-bold text-[#57606A] dark:text-[#858585]">
+              <span>Instruction</span>
+              <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] font-mono">Now</span>
             </div>
 
-            {/* 본문 행 영역 */}
-            <div className="relative">
-              {/* 현재 선택된 사이클 수직 하이라이트 기둥 */}
-              <div
-                className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
-                style={{
-                  left: `${LEFT_COL_WIDTH + currentCycle * COL_WIDTH}px`,
-                  width: `${COL_WIDTH}px`,
-                }}
-              />
+            {/* 좌측 명령어 행 목록 */}
+            {traceRows.map((row, rIdx) => {
+              const activeCellNow = row.cells[currentCycle];
+              const isRowActiveNow = Boolean(activeCellNow);
+              const activeStyle = activeCellNow ? STAGE_STYLES[activeCellNow.type] : null;
 
-              {traceRows.map((row, rIdx) => {
-                const activeCellNow = row.cells[currentCycle];
-                const isRowActiveNow = Boolean(activeCellNow);
-                const activeStyle = activeCellNow ? STAGE_STYLES[activeCellNow.type] : null;
+              return (
+                <div
+                  key={row.id}
+                  onClick={() => onJumpToCycle?.(row.firstCycle)}
+                  className={`h-[28px] shrink-0 px-2 flex items-center justify-between gap-1.5 border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 text-[10px] font-mono cursor-pointer transition-colors ${
+                    isRowActiveNow
+                      ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
+                      : rIdx % 2 === 1
+                      ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30 hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
+                      : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
+                  }`}
+                  title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
+                >
+                  <div className="flex items-center gap-1 min-w-0 flex-1">
+                    <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
+                      {rIdx + 1}.
+                    </span>
+                    <span className="truncate">{row.assembly}</span>
+                  </div>
 
-                return (
-                  <div
-                    key={row.id}
-                    className={`flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${isRowActiveNow
-                        ? 'bg-blue-50/50 dark:bg-[#04395E]/30'
-                        : rIdx % 2 === 1
+                  {/* 현재 선택된 사이클에서 이 명령어가 어느 단계에 있는지 즉시 표시 */}
+                  {activeCellNow && activeStyle ? (
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
+                    >
+                      {activeCellNow.label}
+                    </span>
+                  ) : row.pc ? (
+                    <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
+                      {row.pc.slice(-4)}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 우측 사이클 그리드 영역 (C0 ~ CN 가로 휠 스크롤 전용 영역) */}
+          <div
+            ref={cycleScrollRef}
+            className="flex-1 min-w-0 overflow-x-auto select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
+          >
+            <div
+              className="relative min-w-max flex flex-col"
+              style={{
+                width: `${history.length * COL_WIDTH}px`,
+              }}
+            >
+              {/* 상단 사이클 번호 헤더 행 (Sticky Top) */}
+              <div className="h-7 shrink-0 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-10 shadow-2xs">
+                {history.map((item, cIdx) => {
+                  const isCurrent = cIdx === currentCycle;
+                  const hasStall = item.cycle_events?.stall?.has_stall;
+                  const hasFlush = item.cycle_events?.control_hazard?.has_flush;
+
+                  return (
+                    <button
+                      key={cIdx}
+                      type="button"
+                      onClick={() => onJumpToCycle?.(cIdx)}
+                      className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${
+                        isCurrent
+                          ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
+                          : hasStall
+                          ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
+                          : hasFlush
+                          ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                          : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
+                      style={{ width: `${COL_WIDTH}px` }}
+                      title={`Clock ${item.clock ?? cIdx}${
+                        hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
+                      }`}
+                    >
+                      <span>C{item.clock ?? cIdx}</span>
+                      {(hasStall || hasFlush) && !isCurrent && (
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${
+                            hasStall ? 'bg-red-500' : 'bg-purple-500'
+                          }`}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 본문 행 영역 */}
+              <div className="relative">
+                {/* 현재 선택된 사이클 수직 하이라이트 기둥 */}
+                <div
+                  className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
+                  style={{
+                    left: `${currentCycle * COL_WIDTH}px`,
+                    width: `${COL_WIDTH}px`,
+                  }}
+                />
+
+                {traceRows.map((row, rIdx) => {
+                  const activeCellNow = row.cells[currentCycle];
+                  const isRowActiveNow = Boolean(activeCellNow);
+
+                  return (
+                    <div
+                      key={row.id}
+                      className={`h-[28px] shrink-0 flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${
+                        isRowActiveNow
+                          ? 'bg-blue-50/50 dark:bg-[#04395E]/30'
+                          : rIdx % 2 === 1
                           ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30'
                           : ''
                       }`}
-                    style={{ height: `${ROW_HEIGHT}px` }}
-                  >
-                    {/* 좌측 고정 명령어 열 (Sticky Left) */}
-                    <div
-                      onClick={() => onJumpToCycle?.(row.firstCycle)}
-                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-[#E5E5E5] dark:border-[#333333] sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${isRowActiveNow
-                          ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
-                          : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
-                        }`}
-                      style={{ width: `${LEFT_COL_WIDTH}px` }}
-                      title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
                     >
-                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
-                          {rIdx + 1}.
-                        </span>
-                        <span className="truncate">{row.assembly}</span>
-                      </div>
+                      {history.map((_, cIdx) => {
+                        const cell = row.cells[cIdx];
+                        const isCurrentCol = cIdx === currentCycle;
 
-                      {/* 현재 선택된 사이클에서 이 명령어가 어느 단계에 있는지 즉시 표시 */}
-                      {activeCellNow && activeStyle ? (
-                        <span
-                          className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
-                        >
-                          {activeCellNow.label}
-                        </span>
-                      ) : row.pc ? (
-                        <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
-                          {row.pc.slice(-4)}
-                        </span>
-                      ) : null}
-                    </div>
+                        if (!cell) {
+                          return (
+                            <div
+                              key={cIdx}
+                              onClick={() => onJumpToCycle?.(cIdx)}
+                              className="shrink-0 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer hover:bg-slate-100/40 dark:hover:bg-[#2A2D2E]/40"
+                              style={{ width: `${COL_WIDTH}px` }}
+                            />
+                          );
+                        }
 
-                    {/* 우측 각 사이클 셀 */}
-                    {history.map((_, cIdx) => {
-                      const cell = row.cells[cIdx];
-                      const isCurrentCol = cIdx === currentCycle;
+                        const style = STAGE_STYLES[cell.type];
 
-                      if (!cell) {
                         return (
                           <div
                             key={cIdx}
                             onClick={() => onJumpToCycle?.(cIdx)}
-                            className="shrink-0 border-r border-slate-100/60 cursor-pointer hover:bg-slate-100/40"
+                            className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer relative z-1"
                             style={{ width: `${COL_WIDTH}px` }}
-                          />
-                        );
-                      }
-
-                      const style = STAGE_STYLES[cell.type];
-
-                      return (
-                        <div
-                          key={cIdx}
-                          onClick={() => onJumpToCycle?.(cIdx)}
-                          className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 cursor-pointer relative z-1"
-                          style={{ width: `${COL_WIDTH}px` }}
-                          title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${cell.isStall
-                              ? `${cell.stage} 단계 지연 (Stall / EX에 Bubble 삽입)`
-                              : cell.isBubble
+                            title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${
+                              cell.isStall
+                                ? `${cell.stage} 단계 지연 (Stall / EX에 Bubble 삽입)`
+                                : cell.isBubble
                                 ? '분기 플러시로 인해 버블(Bubble) 처리됨'
                                 : `${cell.stage} 단계 실행 중`
                             }`}
-                        >
-                          <span
-                            className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${style.bg
-                              } ${style.text} ${style.border} ${isCurrentCol
-                                ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
-                                : 'hover:scale-105'
-                              }`}
                           >
-                            {cell.label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                            <span
+                              className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${
+                                style.bg
+                              } ${style.text} ${style.border} ${
+                                isCurrentCol
+                                  ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
+                                  : 'hover:scale-105'
+                              }`}
+                            >
+                              {cell.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

@@ -209,6 +209,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           onClearSelectedCodeLine={onClearSelectedCodeLine}
           translationSource={translationSource || cContent}
           translationAssembly={translationAssembly || asmContent}
+          mappedRows={mappedAssemblyRows}
           selectedTranslationLine={effectiveSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           currentActiveAsmIndex={

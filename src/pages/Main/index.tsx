@@ -73,7 +73,7 @@ const MainPage: React.FC = () => {
     pipeline: SimulationResult | null;
   }>({ single: null, pipeline: null });
 
-  const [simulationEngineMode, setSimulationEngineMode] = useState<"single" | "pipeline">("pipeline");
+  const [simulationEngineMode, setSimulationEngineMode] = useState<"single" | "pipeline">("single");
   const simulationData = simulationCache[simulationEngineMode];
   const loadingMessage = null;
   const [activeBuildId, setActiveBuildId] = useState<string | null>(null);

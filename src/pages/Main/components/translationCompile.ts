@@ -48,7 +48,7 @@ export interface TranslationCompileResult {
 
 export async function compileTranslation(
   source: string,
-  preferredMode: "single" | "pipeline" = "pipeline"
+  preferredMode: "single" | "pipeline" = "single"
 ): Promise<TranslationCompileResult> {
   const result = await compileCode({
     content: source,
@@ -111,7 +111,7 @@ export async function compileTranslation(
 
 export async function compileAssemblyDirectly(
   assemblySource: string,
-  preferredMode: "single" | "pipeline" = "pipeline"
+  preferredMode: "single" | "pipeline" = "single"
 ): Promise<TranslationCompileResult> {
   const result = await compileCode({
     content: assemblySource,

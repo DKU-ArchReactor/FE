@@ -45,56 +45,66 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
       {/* 1. 모드 알약 버튼군 & 사이클/스텝 정보 및 슬라이더 */}
       <div className="flex items-center gap-2.5 flex-1 min-w-0">
-        {/* [모드 1]: C - ASM 알약 버튼 */}
-        <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
-          <button
-            type="button"
-            onClick={() => onChangeEditorTarget?.("c")}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
-              editorTarget === "c"
-                ? "bg-[var(--ar-accent)] text-white border-[var(--ar-accent)] shadow-xs"
-                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
-            }`}
-          >
-            C
-          </button>
-          <button
-            type="button"
-            onClick={() => onChangeEditorTarget?.("asm")}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
-              editorTarget === "asm"
-                ? "bg-[var(--ar-accent)] text-white border-[var(--ar-accent)] shadow-xs"
-                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
-            }`}
-          >
-            ASM
-          </button>
+        {/* [모드 1]: C - ASM 알약 버튼 (좌측 라벨 명시) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight">
+            작성:
+          </span>
+          <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
+            <button
+              type="button"
+              onClick={() => onChangeEditorTarget?.("c")}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+                editorTarget === "c"
+                  ? "bg-[var(--ar-accent)] text-white border-[var(--ar-accent)] shadow-xs"
+                  : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+              }`}
+            >
+              C
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeEditorTarget?.("asm")}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+                editorTarget === "asm"
+                  ? "bg-[var(--ar-accent)] text-white border-[var(--ar-accent)] shadow-xs"
+                  : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+              }`}
+            >
+              ASM
+            </button>
+          </div>
         </div>
 
-        {/* [모드 2]: Single - Pipeline 알약 버튼 */}
-        <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
-          <button
-            type="button"
-            onClick={() => onChangeSimulationMode?.("single")}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
-              isSingle
-                ? "bg-sky-600 dark:bg-sky-500 text-white border-sky-600 dark:border-sky-500 shadow-xs"
-                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
-            }`}
-          >
-            Single
-          </button>
-          <button
-            type="button"
-            onClick={() => onChangeSimulationMode?.("pipeline")}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
-              !isSingle
-                ? "bg-purple-600 dark:bg-purple-500 text-white border-purple-600 dark:border-purple-500 shadow-xs"
-                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
-            }`}
-          >
-            Pipeline
-          </button>
+        {/* [모드 2]: Single - Pipeline 알약 버튼 (좌측 라벨 명시) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight">
+            엔진:
+          </span>
+          <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
+            <button
+              type="button"
+              onClick={() => onChangeSimulationMode?.("single")}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+                isSingle
+                  ? "bg-sky-600 dark:bg-sky-500 text-white border-sky-600 dark:border-sky-500 shadow-xs"
+                  : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+              }`}
+            >
+              Single
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeSimulationMode?.("pipeline")}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+                !isSingle
+                  ? "bg-purple-600 dark:bg-purple-500 text-white border-purple-600 dark:border-purple-500 shadow-xs"
+                  : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+              }`}
+            >
+              Pipeline
+            </button>
+          </div>
         </div>
 
         {/* [사이클/스텝 정보] */}
@@ -156,7 +166,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           onClick={onTogglePlay}
           disabled={!isReady || totalCycles <= 1}
           title={isPlaying ? "일시정지 (Pause)" : "계속 실행 (Continue / Play)"}
-          className={`px-2.5 py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-30 ${
+          className={`w-[74px] shrink-0 justify-center py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-30 ${
             isPlaying 
               ? 'bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold' 
               : 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
@@ -174,7 +184,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </svg>
             )}
           </span>
-          <span>{isPlaying ? "PAUSE" : "RUN"}</span>
+          <span className="w-10 text-center tracking-wide">{isPlaying ? "PAUSE" : "RUN"}</span>
         </button>
 
         <button

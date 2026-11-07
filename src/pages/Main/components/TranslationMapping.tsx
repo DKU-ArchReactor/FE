@@ -346,6 +346,7 @@ export default function TranslationMapping({
 
             // 실행 중인 라인이면서 동시에 사용자가 선택한 라인인 경우
             const isExecutingAndSelected = isCurrentSingleActive && isSelectedPrimary;
+            const isCrt = row.sourceLine === null;
 
             return (
               <div
@@ -406,7 +407,7 @@ export default function TranslationMapping({
                   {index + 1}
                 </div>
 
-                {/* 3. Opcode */}
+                {/* 3. Opcode (CRT 비매핑 코드는 회색, C 매핑 코드는 파란색) */}
                 <div className="w-[52px] shrink-0 font-bold select-text">
                   <span
                     className={
@@ -418,6 +419,8 @@ export default function TranslationMapping({
                         ? "text-emerald-800 dark:text-[#7EE787] font-bold"
                         : isExecutionSibling
                         ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
+                        : isCrt
+                        ? "text-[#6E7681] dark:text-[#858585] font-semibold"
                         : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
                     }
                   >
@@ -437,6 +440,8 @@ export default function TranslationMapping({
                         ? "text-slate-950 dark:text-white font-bold"
                         : isExecutionSibling
                         ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
+                        : isCrt
+                        ? "text-[#6E7681]/90 dark:text-[#858585]"
                         : "text-[#24292F] dark:text-[#CCCCCC]"
                     }
                   >
@@ -463,7 +468,7 @@ export default function TranslationMapping({
                   )}
                 </div>
 
-                {/* 5. 우측 C 매핑 라인 태그 */}
+                {/* 5. 우측 C 매핑 라인 태그 (CRT와 C: L$ 규격/스타일 일원화) */}
                 <div className="shrink-0 pr-4 flex items-center select-none">
                   {row.sourceLine !== null ? (
                     <span
@@ -483,8 +488,18 @@ export default function TranslationMapping({
                     </span>
                   ) : (
                     <span
-                      className="text-[9px] px-1.5 py-0.5 rounded font-mono font-medium text-[#8C959F] dark:text-[#858585] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
-                      title="런타임 진입/초기화 코드"
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${
+                        isSelectedPrimary
+                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
+                          : isCurrentSingleActive
+                          ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                          : isSelectedSibling
+                          ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                          : isExecutionSibling
+                          ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
+                          : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
+                      }`}
+                      title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
                     >
                       CRT
                     </span>
