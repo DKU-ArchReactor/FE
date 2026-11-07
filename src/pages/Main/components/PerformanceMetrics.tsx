@@ -69,12 +69,12 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
   }, [history, currentCycle]);
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
-      {/* 1. 상단 타이틀 바 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
+      {/* 1. 상단 타이틀 바 (지표 전용 에메랄드 액센트 바) */}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-emerald-500">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs">📊</span>
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">
+          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
             Pipeline Performance & CPI
           </h3>
         </div>
@@ -88,20 +88,20 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
         {/* 상단 2단 KPI 요약 카드 */}
         <div className="grid grid-cols-2 gap-2 shrink-0">
           {/* CPI 카드 */}
-          <div className="p-2.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col justify-between">
+          <div className="p-2.5 rounded-lg bg-[var(--ar-header-bg)] border border-[var(--ar-border)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-[var(--ar-text-muted)] uppercase tracking-wider">
                 CPI (Cycles / Inst)
               </span>
               <span className="text-[10px]">⚡</span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-2xl font-black font-mono text-[#005FB8] dark:text-[#79C0FF]">
+              <span className="text-2xl font-black font-mono text-[var(--ar-accent)]">
                 {simulationData ? stats.cpi : '—'}
               </span>
-              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">cycles</span>
+              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">cycles</span>
             </div>
-            <span className="text-[9px] text-[#57606A] dark:text-[#858585] mt-0.5">
+            <span className="text-[9px] text-[var(--ar-text-muted)] mt-0.5">
               {Number(stats.cpi) <= 1.2
                 ? '최적의 파이프라인 처리량'
                 : '스톨 발생으로 지연 증가'}

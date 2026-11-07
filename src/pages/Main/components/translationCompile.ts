@@ -7,9 +7,16 @@ export type MappedAssemblyRow = { sourceLine: number; text: string };
 export interface TranslationCompileResult {
   assembly: string;
   simulationResult: SimulationResult | null;
+  singleSimulationResult?: SimulationResult | null;
+  pipelineSimulationResult?: SimulationResult | null;
+  buildId?: string | null;
+  simulationToken?: string | null;
 }
 
-export async function compileTranslation(source: string): Promise<TranslationCompileResult> {
+export async function compileTranslation(
+  source: string,
+  preferredMode: "single" | "pipeline" = "pipeline"
+): Promise<TranslationCompileResult> {
   const result = await compileCode({
     content: source,
     lang: "c",
@@ -26,29 +33,44 @@ export async function compileTranslation(source: string): Promise<TranslationCom
   if (!response.ok) throw new Error(`어셈블리 파일을 불러오지 못했습니다. (HTTP ${response.status})`);
   const assembly = await response.text();
 
-  // 2. 전체 페이지(3번 레지스터/메모리, 4번 파이프라인 등) 시뮬레이션 즉시 실행 연동
-  let simulationResult: SimulationResult | null = null;
-  const targetToken = result.build_id ? { build_id: result.build_id } : result.simulation_token ? { simulation_token: result.simulation_token } : null;
+  // 2. Single과 Pipeline 모드를 백그라운드 병렬(Promise.all)로 동시 실행하여 즉시 캐싱
+  let singleResult: SimulationResult | null = null;
+  let pipelineResult: SimulationResult | null = null;
+  const targetToken = result.build_id
+    ? { build_id: result.build_id }
+    : result.simulation_token
+    ? { simulation_token: result.simulation_token }
+    : null;
 
   if (targetToken) {
     try {
-      simulationResult = await runSimulation({
-        ...targetToken,
-        mode: "pipeline",
-        max_cycles: 2000,
-      });
+      const [pRes, sRes] = await Promise.allSettled([
+        runSimulation({ ...targetToken, mode: "pipeline", max_cycles: 2000 }),
+        runSimulation({ ...targetToken, mode: "single", max_cycles: 2000 }),
+      ]);
+      if (pRes.status === "fulfilled") pipelineResult = pRes.value;
+      if (sRes.status === "fulfilled") singleResult = sRes.value;
     } catch (simError) {
-      console.warn("시뮬레이션 자동 연동 실패 (어셈블리는 로드됨):", simError);
+      console.warn("시뮬레이션 동시 실행 실패:", simError);
     }
   }
 
+  const activeResult = preferredMode === "single" ? (singleResult ?? pipelineResult) : (pipelineResult ?? singleResult);
+
   return {
     assembly,
-    simulationResult,
+    simulationResult: activeResult,
+    singleSimulationResult: singleResult,
+    pipelineSimulationResult: pipelineResult,
+    buildId: result.build_id,
+    simulationToken: result.simulation_token,
   };
 }
 
-export async function compileAssemblyDirectly(assemblySource: string): Promise<TranslationCompileResult> {
+export async function compileAssemblyDirectly(
+  assemblySource: string,
+  preferredMode: "single" | "pipeline" = "pipeline"
+): Promise<TranslationCompileResult> {
   const result = await compileCode({
     content: assemblySource,
     lang: "asm",
@@ -59,7 +81,8 @@ export async function compileAssemblyDirectly(assemblySource: string): Promise<T
     throw new Error(result.log || "어셈블리 빌드에 실패했습니다.");
   }
 
-  let simulationResult: SimulationResult | null = null;
+  let singleResult: SimulationResult | null = null;
+  let pipelineResult: SimulationResult | null = null;
   const targetToken = result.build_id
     ? { build_id: result.build_id }
     : result.simulation_token
@@ -68,19 +91,26 @@ export async function compileAssemblyDirectly(assemblySource: string): Promise<T
 
   if (targetToken) {
     try {
-      simulationResult = await runSimulation({
-        ...targetToken,
-        mode: "pipeline",
-        max_cycles: 2000,
-      });
+      const [pRes, sRes] = await Promise.allSettled([
+        runSimulation({ ...targetToken, mode: "pipeline", max_cycles: 2000 }),
+        runSimulation({ ...targetToken, mode: "single", max_cycles: 2000 }),
+      ]);
+      if (pRes.status === "fulfilled") pipelineResult = pRes.value;
+      if (sRes.status === "fulfilled") singleResult = sRes.value;
     } catch (simError) {
-      console.warn("어셈블리 시뮬레이션 연동 실패:", simError);
+      console.warn("어셈블리 시뮬레이션 동시 실행 실패:", simError);
     }
   }
 
+  const activeResult = preferredMode === "single" ? (singleResult ?? pipelineResult) : (pipelineResult ?? singleResult);
+
   return {
     assembly: assemblySource,
-    simulationResult,
+    simulationResult: activeResult,
+    singleSimulationResult: singleResult,
+    pipelineSimulationResult: pipelineResult,
+    buildId: result.build_id,
+    simulationToken: result.simulation_token,
   };
 }
 

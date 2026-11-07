@@ -3,16 +3,67 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ======================================================== */
+/* ArchReactor IDE 테마 CSS 변수 & 계층화 팔레트              */
+/* ======================================================== */
+:root {
+  --ar-canvas-bg: #F0F2F5;
+  --ar-panel-bg: #FFFFFF;
+  --ar-header-bg: #F8F9FA;
+  --ar-border: #D8DEE4;
+  --ar-border-subtle: #E8ECEF;
+  --ar-text-primary: #1F2328;
+  --ar-text-muted: #656D76;
+  --ar-accent: #005FB8;
+}
+
+html.dark {
+  --ar-canvas-bg: #141416;
+  --ar-panel-bg: #1E1E22;
+  --ar-header-bg: #26262B;
+  --ar-border: #33353F;
+  --ar-border-subtle: #2A2C35;
+  --ar-text-primary: #D4D4D8;
+  --ar-text-muted: #8E8EA0;
+  --ar-accent: #007ACC;
+}
+
+/* Single Mode (정밀/시퀀셜) Ambient 틴트 */
+html.mode-single {
+  --ar-canvas-bg: #EEF2F6;
+  --ar-accent: #0284C7;
+}
+html.dark.mode-single {
+  --ar-canvas-bg: #12151B;
+  --ar-panel-bg: #1A1E26;
+  --ar-header-bg: #222733;
+  --ar-border: #2C3545;
+  --ar-accent: #38BDF8;
+}
+
+/* Pipeline Mode (병렬/파이프라인) Ambient 틴트 */
+html.mode-pipeline {
+  --ar-canvas-bg: #F2EEF8;
+  --ar-accent: #7C3AED;
+}
+html.dark.mode-pipeline {
+  --ar-canvas-bg: #15131C;
+  --ar-panel-bg: #1D1A27;
+  --ar-header-bg: #262234;
+  --ar-border: #36304A;
+  --ar-accent: #A855F7;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #F8F8F8;
-  color: #1E1E1E;
-  transition: background-color 350ms cubic-bezier(0.4, 0, 0.2, 1), color 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--ar-canvas-bg);
+  color: var(--ar-text-primary);
+  transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 html.dark body {
-  background-color: #181818;
-  color: #CCCCCC;
+  background-color: var(--ar-canvas-bg);
+  color: var(--ar-text-primary);
 }
 
 /* ======================================================== */

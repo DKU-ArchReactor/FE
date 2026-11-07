@@ -398,7 +398,7 @@ export default function TranslationEditor({
           {/* 4. 컴파일 버튼 */}
           <button
             type="button"
-            className="rounded bg-[#005FB8] dark:bg-[#007ACC] px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] disabled:opacity-50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1 shrink-0"
+            className="rounded border border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] disabled:opacity-50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1 shrink-0"
             onClick={onCompile}
             disabled={busy || !source.trim()}
             title="C 코드 컴파일 및 어셈블리 변환"
@@ -616,8 +616,8 @@ export default function TranslationEditor({
         }`}
       >
         {activeTarget !== "c" && (
-          <div className="absolute inset-x-0 top-3 z-10 flex justify-center pointer-events-none select-none">
-            <div className="px-3 py-1 rounded-full bg-[#24292F]/85 dark:bg-[#252528]/95 text-white dark:text-[#E0E0E0] text-[11px] font-medium backdrop-blur-xs shadow-md border border-black/10 dark:border-white/10 flex items-center gap-1.5 animate-fadeIn">
+          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none select-none">
+            <div className="px-3.5 py-1.5 rounded-full bg-[#24292F]/85 dark:bg-[#252528]/95 text-white dark:text-[#E0E0E0] text-[11px] font-medium backdrop-blur-xs shadow-lg border border-black/10 dark:border-white/10 flex items-center gap-1.5 animate-fadeIn">
               <span>🔒</span>
               <span>어셈블리 작성 모드 (C 코드 읽기 전용)</span>
             </div>

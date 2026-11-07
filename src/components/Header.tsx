@@ -93,17 +93,21 @@ const Header = () => {
         ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#F3F3F3] dark:bg-[#1E1E1E] border-b border-[#E5E5E5] dark:border-[#333333] select-none transition-colors duration-150">
-      <div className="w-full px-4 h-11 flex justify-between items-center">
+    <header className="sticky top-0 z-50 w-full bg-[var(--ar-panel-bg)] border-b border-[var(--ar-border)] select-none transition-colors duration-150 shadow-xs">
+      <div className="w-full px-4 h-12 flex justify-between items-center">
         {/* 좌측: 로고 및 뷰포트 내비게이션 탭 */}
         <div className="flex items-center gap-6">
           <div 
-            className="text-[#005FB8] dark:text-[#007ACC] font-bold text-base cursor-pointer tracking-tight flex items-center gap-1.5" 
+            className="text-[var(--ar-accent)] font-bold text-lg cursor-pointer tracking-tight flex items-center gap-2 group" 
             onClick={() => navigate("/")}
             title="ArchReactor - RISC-V Pipeline Visualizer"
           >
-            <span className="text-sm">⚡</span>
-            <span>ArchReactor</span>
+            <img 
+              src="/logo.png" 
+              alt="ArchReactor Logo" 
+              className="w-7 h-7 object-contain transition-transform duration-200 group-hover:scale-105" 
+            />
+            <span className="font-extrabold tracking-tight">ArchReactor</span>
           </div>
 
           <div className="flex items-center gap-1">
@@ -111,10 +115,10 @@ const Header = () => {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`px-3 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded text-xs font-semibold border transition-all cursor-pointer ${
                   item.active
-                    ? "bg-white dark:bg-[#252526] text-[#005FB8] dark:text-[#007ACC] border border-[#E5E5E5] dark:border-[#3E3E42] shadow-2xs"
-                    : "text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC] hover:bg-black/5 dark:hover:bg-white/5"
+                    ? "bg-[var(--ar-header-bg)] text-[var(--ar-accent)] border-[var(--ar-border)] shadow-xs"
+                    : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
                 {item.label}

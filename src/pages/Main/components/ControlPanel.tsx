@@ -12,7 +12,12 @@ interface ControlPanelProps {
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
-  mode?: "single" | "pipeline"; // Single-Cycle 또는 5-Stage Pipeline 모드
+  mode?: "single" | "pipeline"; // Single-Cycle(Serial) 또는 5-Stage Pipeline(Parallel) 모드
+  // C ↔ ASM 모드 제어
+  editorTarget?: "c" | "asm";
+  onChangeEditorTarget?: (target: "c" | "asm") => void;
+  // Serial ↔ Parallel 모드 제어
+  onChangeSimulationMode?: (mode: "single" | "pipeline") => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -28,31 +33,72 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onChangeSpeed,
   isReady = true,
   mode = "pipeline",
+  editorTarget = "c",
+  onChangeEditorTarget,
+  onChangeSimulationMode,
 }) => {
   const isSingle = mode === "single";
   // Single 모드에서는 Step 0(대기) ~ Step totalCycles까지 슬라이더가 0~totalCycles 이동
   const maxCycle = isSingle ? totalCycles : Math.max(0, totalCycles - 1);
 
   return (
-    <div className="flex-1 h-full bg-white dark:bg-[#252526] rounded-md shadow-xs dark:shadow-md border border-[#E5E5E5] dark:border-[#333333] px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
-      {/* 1. 모드 뱃지 & 사이클/스텝 정보 및 슬라이더 */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        {/* 모드 뱃지 */}
-        <div className="shrink-0">
-          {isSingle ? (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 dark:bg-[#1E1E1E] border border-emerald-200 dark:border-[#3E3E42] text-emerald-800 dark:text-[#4EC9B0] text-[10px] font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#4EC9B0] animate-pulse" />
-              <span>SINGLE</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-50 dark:bg-[#1E1E1E] border border-sky-200 dark:border-[#3E3E42] text-sky-800 dark:text-[#9CDCFE] text-[10px] font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#005FB8] dark:bg-[#007ACC] animate-pulse" />
-              <span>PIPELINE</span>
-            </span>
-          )}
+    <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
+      {/* 1. 모드 알약 버튼군 & 사이클/스텝 정보 및 슬라이더 */}
+      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+        {/* [모드 1]: C - ASM 알약 버튼 */}
+        <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
+          <button
+            type="button"
+            onClick={() => onChangeEditorTarget?.("c")}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              editorTarget === "c"
+                ? "bg-[var(--ar-accent)] text-white border-[var(--ar-accent)] shadow-xs"
+                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+            }`}
+          >
+            C
+          </button>
+          <button
+            type="button"
+            onClick={() => onChangeEditorTarget?.("asm")}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              editorTarget === "asm"
+                ? "bg-[var(--ar-accent)] text-white border-[var(--ar-accent)] shadow-xs"
+                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+            }`}
+          >
+            ASM
+          </button>
         </div>
 
-        <div className="flex items-baseline gap-1 shrink-0 text-[#24292F] dark:text-[#CCCCCC]">
+        {/* [모드 2]: Single - Pipeline 알약 버튼 */}
+        <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
+          <button
+            type="button"
+            onClick={() => onChangeSimulationMode?.("single")}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              isSingle
+                ? "bg-sky-600 dark:bg-sky-500 text-white border-sky-600 dark:border-sky-500 shadow-xs"
+                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+            }`}
+          >
+            Single
+          </button>
+          <button
+            type="button"
+            onClick={() => onChangeSimulationMode?.("pipeline")}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              !isSingle
+                ? "bg-purple-600 dark:bg-purple-500 text-white border-purple-600 dark:border-purple-500 shadow-xs"
+                : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
+            }`}
+          >
+            Pipeline
+          </button>
+        </div>
+
+        {/* [사이클/스텝 정보] */}
+        <div className="flex items-baseline gap-1 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5">
           <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
             {isSingle ? "Step" : "Cycle"}:
           </span>

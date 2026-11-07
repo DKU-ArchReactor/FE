@@ -112,22 +112,22 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[#24292F] dark:text-[#CCCCCC] shadow-2xs transition-colors duration-150">
-      {/* VS Code VARIABLES / WATCH 스타일 헤더 */}
-      <div className="shrink-0 flex items-center justify-between px-3 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-xs transition-colors duration-150">
+      {/* VS Code VARIABLES / WATCH 스타일 헤더 (레지스터 전용 앰버 액센트 바) */}
+      <div className="shrink-0 flex items-center justify-between px-3 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-amber-500">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[11px] text-[#8C959F] dark:text-[#858585]">▼</span>
-          <h3 className="text-[11px] font-semibold text-[#1F2328] dark:text-[#CCCCCC] uppercase tracking-wider whitespace-nowrap">
+          <span className="text-[11px] text-amber-500 font-bold">◆</span>
+          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
             REGISTERS (x0 ~ x31)
           </h3>
         </div>
-        <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">
+        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
           CLK:{cycle ?? 0}
         </span>
       </div>
 
       {/* 32개 레지스터 그리드: VS Code 디버거 변수 인스펙터 룩앤필 */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1.5 py-0.5 divide-y divide-[#F0F0F0] dark:divide-[#2A2D2E]">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1.5 py-0.5 divide-y divide-[var(--ar-border-subtle)]">
         {regKeys.map((regKey, idx) => {
           const val = registers[regKey] || '0x00000000';
           const isPulsing = pulsingKeys.has(regKey);

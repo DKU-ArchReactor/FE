@@ -117,10 +117,37 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   const history = simulationData?.history ?? [];
   const totalCycles = history.length;
 
-  // 파이프라인 히스토리를 시간순으로 추적하여 계단식(Stair-step) 다이어그램 행 생성
+  // 파이프라인/싱글사이클 히스토리를 추적하여 다이어그램 행 생성
+  const isSingleMode = simulationData?.simulator?.mode === 'single' || simulationData?.simulator?.pipeline_model === 'single-cycle';
+
   const traceRows = useMemo<TraceRow[]>(() => {
     if (!history.length) return [];
 
+    // [Single-Cycle 모드 전용 다이어그램]: 매 클럭 1개 명령어가 IF-ID-EX-MEM-WB 전 과정을 1칸에 직렬 완료
+    if (isSingleMode) {
+      return history.map((item, cIdx) => {
+        const stageInfo = item.buffers?.IF || item.if_stage || item.stage_activity?.IF;
+        const pc = stageInfo?.pc || '';
+        const assembly = stageInfo?.assembly || `inst_${cIdx}`;
+
+        const cells: Record<number, CellInfo> = {};
+        cells[cIdx] = {
+          type: 'WB',
+          stage: 'WB',
+          label: 'DONE',
+        };
+
+        return {
+          id: cIdx,
+          pc,
+          assembly,
+          firstCycle: cIdx,
+          cells,
+        };
+      });
+    }
+
+    // [5-Stage Pipeline 모드]: 계단식(Stair-step) 다이어그램 행 생성
     const rows: TraceRow[] = [];
     let prevStageRow: Partial<Record<'IF' | 'ID' | 'EX' | 'MEM' | 'WB', number>> = {};
 
@@ -319,7 +346,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     });
 
     return rows;
-  }, [history]);
+  }, [history, isSingleMode]);
 
   // 현재 사이클이 바뀔 때 해당 사이클 열과 현재 실행 중인 명령어 행이 화면 중앙에 오도록 가로·세로 자동 스크롤
   useEffect(() => {
@@ -361,34 +388,42 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   return (
     <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 & 범례 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0 gap-2">
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0 gap-2 border-l-2 border-l-indigo-500">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs">📈</span>
           <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">
-            Pipeline Timing Diagram
+            {isSingleMode ? 'Single-Cycle Execution Diagram (1 Inst / 1 Cycle)' : 'Pipeline Timing Diagram (Stair-step)'}
           </h3>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           {/* 스테이지 컬러 레전드 미니 뱃지 */}
-          <div className="hidden sm:flex items-center gap-1 text-[9px] font-mono font-bold">
-            <span className="px-1.5 py-0.5 rounded bg-indigo-500 text-white">IF</span>
-            <span className="px-1.5 py-0.5 rounded bg-sky-500 text-white">ID</span>
-            <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white">EX</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white">MEM</span>
-            <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white">WB</span>
-            <span
-              className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 border-dashed"
-              title="데이터 해저드로 인한 파이프라인 대기 (Stall)"
-            >
-              STL(지연)
-            </span>
-            <span
-              className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 border-dashed"
-              title="분기/점프 플러시로 인해 버블(Bubble)로 변환됨"
-            >
-              BBL(버블)
-            </span>
-          </div>
+          {isSingleMode ? (
+            <div className="flex items-center gap-1 text-[9px] font-mono font-bold">
+              <span className="px-2 py-0.5 rounded bg-sky-600 text-white">
+                직렬 실행 (No Pipeline Hazard)
+              </span>
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-1 text-[9px] font-mono font-bold">
+              <span className="px-1.5 py-0.5 rounded bg-indigo-500 text-white">IF</span>
+              <span className="px-1.5 py-0.5 rounded bg-sky-500 text-white">ID</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white">EX</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white">MEM</span>
+              <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white">WB</span>
+              <span
+                className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 border-dashed"
+                title="데이터 해저드로 인한 파이프라인 대기 (Stall)"
+              >
+                STL(지연)
+              </span>
+              <span
+                className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 border-dashed"
+                title="분기/점프 플러시로 인해 버블(Bubble)로 변환됨"
+              >
+                BBL(버블)
+              </span>
+            </div>
+          )}
           <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585] font-semibold px-2 py-0.5 rounded bg-[#EAEAEA] dark:bg-[#333333]">
             {totalCycles > 0 ? `${totalCycles} Cycles` : 'Ready'}
           </span>
@@ -439,26 +474,23 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     key={cIdx}
                     type="button"
                     onClick={() => onJumpToCycle?.(cIdx)}
-                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${
-                      isCurrent
+                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${isCurrent
                         ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
                         : hasStall
-                        ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
-                        : hasFlush
-                        ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
-                        : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
-                    }`}
+                          ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
+                          : hasFlush
+                            ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                            : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
                     style={{ width: `${COL_WIDTH}px` }}
-                    title={`Clock ${item.clock ?? cIdx}${
-                      hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
-                    }`}
+                    title={`Clock ${item.clock ?? cIdx}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
+                      }`}
                   >
                     <span>C{item.clock ?? cIdx}</span>
                     {(hasStall || hasFlush) && !isCurrent && (
                       <span
-                        className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${
-                          hasStall ? 'bg-red-500' : 'bg-purple-500'
-                        }`}
+                        className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-red-500' : 'bg-purple-500'
+                          }`}
                       />
                     )}
                   </button>
@@ -485,23 +517,21 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                 return (
                   <div
                     key={row.id}
-                    className={`flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${
-                      isRowActiveNow 
-                        ? 'bg-blue-50/50 dark:bg-[#04395E]/30' 
-                        : rIdx % 2 === 1 
-                        ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30' 
-                        : ''
-                    }`}
+                    className={`flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${isRowActiveNow
+                        ? 'bg-blue-50/50 dark:bg-[#04395E]/30'
+                        : rIdx % 2 === 1
+                          ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30'
+                          : ''
+                      }`}
                     style={{ height: `${ROW_HEIGHT}px` }}
                   >
                     {/* 좌측 고정 명령어 열 (Sticky Left) */}
                     <div
                       onClick={() => onJumpToCycle?.(row.firstCycle)}
-                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-[#E5E5E5] dark:border-[#333333] sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${
-                        isRowActiveNow
+                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-[#E5E5E5] dark:border-[#333333] sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${isRowActiveNow
                           ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
                           : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
-                      }`}
+                        }`}
                       style={{ width: `${LEFT_COL_WIDTH}px` }}
                       title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
                     >
@@ -550,22 +580,19 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                           onClick={() => onJumpToCycle?.(cIdx)}
                           className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 cursor-pointer relative z-1"
                           style={{ width: `${COL_WIDTH}px` }}
-                          title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${
-                            cell.isStall
+                          title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${cell.isStall
                               ? `${cell.stage} 단계 지연 (Stall / EX에 Bubble 삽입)`
                               : cell.isBubble
-                              ? '분기 플러시로 인해 버블(Bubble) 처리됨'
-                              : `${cell.stage} 단계 실행 중`
-                          }`}
+                                ? '분기 플러시로 인해 버블(Bubble) 처리됨'
+                                : `${cell.stage} 단계 실행 중`
+                            }`}
                         >
                           <span
-                            className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${
-                              style.bg
-                            } ${style.text} ${style.border} ${
-                              isCurrentCol
+                            className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${style.bg
+                              } ${style.text} ${style.border} ${isCurrentCol
                                 ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
                                 : 'hover:scale-105'
-                            }`}
+                              }`}
                           >
                             {cell.label}
                           </span>

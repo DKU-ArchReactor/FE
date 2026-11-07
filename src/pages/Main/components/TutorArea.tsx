@@ -87,31 +87,13 @@ const TutorArea: React.FC<TutorAreaProps> = ({
       aria-label="AI 튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}
-      <header className="shrink-0 flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#333333] bg-[#F3F3F3] dark:bg-[#252526] px-3.5 py-1.5 min-w-0">
+      <header className="shrink-0 flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#252526] px-3.5 py-1.5 min-w-0">
         <div className="flex items-center gap-2 min-w-0 shrink">
           <span className="text-sm shrink-0">🎓</span>
           <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap shrink-0">ArchReactor Tutor</h3>
-          {activeTarget === "asm" ? (
-            <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate">
-              어셈블리 파이프라인 분석
-            </span>
-          ) : selectedTranslationLine ? (
-            isUserSelected ? (
-              <span className="text-[10px] bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold px-2 py-0.5 rounded border border-blue-300 dark:border-[#007ACC] font-mono whitespace-nowrap flex items-center gap-1">
-                <span>🔍</span>
-                <span className="hidden @[460px]:inline">선택 라인</span>
-                <span>(L{selectedTranslationLine})</span>
-              </span>
-            ) : (
-              <span className="text-[10px] bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold px-2 py-0.5 rounded border border-emerald-300 dark:border-[#23D18B] font-mono whitespace-nowrap flex items-center gap-1">
-                <span>⚡</span>
-                <span className="hidden @[460px]:inline">실행 중</span>
-                <span>(L{selectedTranslationLine})</span>
-              </span>
-            )
-          ) : (
-            <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate">명령어 & 컴파일 해설</span>
-          )}
+          <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate">
+            {activeTarget === "asm" ? "어셈블리 파이프라인 분석" : "명령어 & 컴파일 해설"}
+          </span>
         </div>
       </header>
 
@@ -203,12 +185,12 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                     return (
                       <div
                         key={`${asmRow.asmIndex}-${idx}`}
-                        className={`rounded-lg bg-white dark:bg-[#1E1E1E] p-2.5 shadow-2xs transition-all flex flex-col gap-1.5 ${
+                        className={`rounded-lg bg-white dark:bg-[#1E1E1E] p-2.5 shadow-2xs transition-all flex flex-col gap-1.5 border ${
                           isRowSelectedFocus
-                            ? "border-2 border-blue-500 dark:border-[#007ACC] ring-2 ring-blue-100/80 dark:ring-[#007ACC]/30 bg-blue-50/20 dark:bg-[#007ACC]/10"
+                            ? "border-blue-500 dark:border-[#007ACC] ring-2 ring-blue-100/80 dark:ring-[#007ACC]/30 bg-blue-50/20 dark:bg-[#007ACC]/10"
                             : isRowExecuting
-                            ? "border-2 border-emerald-500 dark:border-[#23D18B] ring-2 ring-emerald-100/80 dark:ring-[#23D18B]/30 bg-emerald-50/20 dark:bg-[#23D18B]/10"
-                            : "border border-slate-200/90 dark:border-[#333333] hover:border-slate-300 dark:hover:border-[#3E3E42]"
+                            ? "border-emerald-500 dark:border-[#23D18B] ring-2 ring-emerald-100/80 dark:ring-[#23D18B]/30 bg-emerald-50/20 dark:bg-[#23D18B]/10"
+                            : "border-slate-200/90 dark:border-[#333333] hover:border-slate-300 dark:hover:border-[#3E3E42]"
                         }`}
                       >
                         {/* 명령어 뱃지 & 라인 번호 & 포커스 상태 뱃지 */}
@@ -293,8 +275,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           <div className="flex flex-col gap-3">
             {/* 상단 인터랙션 안내 카드 */}
             {activeTarget === "asm" ? (
-              <div className="rounded-xl border border-slate-200 dark:border-[#333333] bg-slate-50/50 dark:bg-[#252526]/40 p-3 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#3E3E42] flex items-center justify-center text-sm shadow-2xs shrink-0">
+              <div className="rounded-xl border border-slate-200 dark:border-[#333333] bg-slate-50/50 dark:bg-[#252526]/40 p-3.5 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#3E3E42] flex items-center justify-center text-lg shadow-2xs shrink-0">
                   ⚙️
                 </div>
                 <div className="flex flex-col gap-0.5">

@@ -249,10 +249,10 @@ export default function TranslationMapping({
             type="button"
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
-            className={`rounded px-2.5 py-0.5 text-[11px] font-medium transition-colors shadow-2xs flex items-center gap-1 shrink-0 ${
+            className={`rounded border px-2.5 py-0.5 text-[11px] font-medium transition-colors shadow-2xs flex items-center gap-1 shrink-0 ${
               activeTarget === "asm"
-                ? "bg-[#005FB8] dark:bg-[#007ACC] text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] cursor-pointer"
-                : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
+                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] cursor-pointer"
+                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
             }`}
             title={activeTarget === "asm" ? "작성된 어셈블리로 시뮬레이션 실행" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
           >

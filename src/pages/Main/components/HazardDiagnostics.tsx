@@ -39,12 +39,12 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
   const isBranchFlush = cycle_events.control_hazard?.has_flush;
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
-      {/* 1. 상단 타이틀 바 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
+      {/* 1. 상단 타이틀 바 (하저드 전용 로즈/오렌지 액센트 바) */}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-rose-500">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs">💡</span>
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">
+          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
             Hazard & Stall Diagnostics
           </h3>
         </div>
