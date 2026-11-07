@@ -6,13 +6,40 @@ interface PerformanceMetricsProps {
   simulationData: SimulationResult | null;
   currentCycleData?: CycleHistoryItem | null;
   currentCycle: number;
+  loadingMessage?: string | null;
 }
 
 export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
   simulationData,
   currentCycle,
+  loadingMessage,
 }) => {
   const stats = getPerformanceStats(simulationData, currentCycle);
+
+  if (loadingMessage) {
+    return (
+      <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+        <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs">📊</span>
+            <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">
+              Pipeline Performance & CPI
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-emerald-600 font-semibold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+            Ideal CPI: 1.00
+          </span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2">
+          <div className="w-6 h-6 border-2.5 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
+          <span className="text-[11px] text-slate-400">
+            CPI 및 파이프라인 성능 지표를 계산하고 있습니다.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">

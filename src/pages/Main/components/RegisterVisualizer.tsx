@@ -5,6 +5,7 @@ interface RegisterVisualizerProps {
   prevRegisters?: Record<string, string>;
   playSpeed?: number;
   cycle?: number;
+  loadingMessage?: string | null;
 }
 
 // 16진수 문자열을 사람이 읽기 편한 부호 있는 10진수로 변환 (32비트 2의 보수)
@@ -113,6 +114,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   prevRegisters,
   playSpeed = 1000,
   cycle = 0,
+  loadingMessage,
 }) => {
   // x0부터 x31까지 고정 순서 (32개)
   const regKeys = REG_KEYS;
@@ -157,7 +159,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none relative">
       {/* 통일된 상단 헤더 바 */}
       <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -166,6 +168,13 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
         </div>
         <span className="text-[10px] font-mono text-slate-400 font-semibold">x0 ~ x31</span>
       </div>
+
+      {loadingMessage && (
+        <div className="absolute inset-x-0 top-9 bottom-0 z-20 bg-white/85 backdrop-blur-[1px] flex flex-col items-center justify-center p-4 text-center gap-2">
+          <div className="w-6 h-6 border-2.5 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
+        </div>
+      )}
 
       {/* 32개 레지스터: 전체 가용 높이를 1/32로 균등 분할(flex-1 min-h-0)하여 스크롤 없이 100% 핏 */}
       <div className="flex-1 flex flex-col font-mono min-h-0 overflow-hidden px-1.5 py-1">

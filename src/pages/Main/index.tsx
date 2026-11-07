@@ -117,7 +117,11 @@ const MainPage: React.FC = () => {
   const simulationMode = isSingleCycleViewport ? "single" : "pipeline";
   const simulation = useSimulationSession(simulationMode, translationSource);
   const simulationData = simulation.data;
-  const loadingMessage = simulation.busy ? "시뮬레이션 실행 중..." : null;
+  const loadingMessage = translationBusy
+    ? "C 소스 코드 컴파일 중..."
+    : simulation.busy
+    ? "시뮬레이션 실행 중..."
+    : null;
   const compileRevision = useRef(0);
 
   const handleSelectTranslationLine = (line: number | null, asmIndex: number | null = null) => {
@@ -766,6 +770,7 @@ const MainPage: React.FC = () => {
             prevRegisters={prevData?.global_result.registers}
             playSpeed={playSpeed}
             cycle={activeCycleIndex}
+            loadingMessage={loadingMessage}
           />
         );
       case "memory":
@@ -777,6 +782,7 @@ const MainPage: React.FC = () => {
             translationAssembly={translationAssembly || asmContent}
             playSpeed={playSpeed}
             cycle={activeCycleIndex}
+            loadingMessage={loadingMessage}
           />
         );
       case "multiCycle":
@@ -787,6 +793,7 @@ const MainPage: React.FC = () => {
             currentCycle={activeCycleIndex}
             translationAssembly={translationAssembly || asmContent}
             onJumpToCycle={(index) => handleJumpToCycle(index + 1)}
+            loadingMessage={loadingMessage}
           />
         );
       case "metrics":
@@ -795,6 +802,7 @@ const MainPage: React.FC = () => {
             simulationData={simulationData}
             currentCycleData={currentData}
             currentCycle={currentCycle}
+            loadingMessage={loadingMessage}
           />
         );
       case "hazardDiag":
@@ -803,6 +811,7 @@ const MainPage: React.FC = () => {
             simulationData={simulationData}
             currentCycleData={currentData}
             currentCycle={currentCycle}
+            loadingMessage={loadingMessage}
           />
         );
       case "queues":

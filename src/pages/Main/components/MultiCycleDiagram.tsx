@@ -8,6 +8,7 @@ interface MultiCycleDiagramProps {
   currentCycle: number;
   translationAssembly?: string;
   onJumpToCycle?: (cycle: number) => void;
+  loadingMessage?: string | null;
 }
 
 type CellType = 'IF' | 'ID' | 'EX' | 'MEM' | 'WB' | 'STALL_IF' | 'STALL_ID' | 'BUBBLE';
@@ -112,6 +113,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   simulationData,
   currentCycle,
   onJumpToCycle,
+  loadingMessage,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -407,7 +409,15 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       </div>
 
       {/* 2. 계단식 타이밍 매트릭스 테이블 (가로·세로 통합 스크롤) */}
-      {!simulationData || traceRows.length === 0 ? (
+      {loadingMessage ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2.5">
+          <div className="w-7 h-7 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
+          <span className="text-[11px] text-slate-400">
+            사이클별 명령어 타이밍 및 버블/스톨 데이터를 생성하고 있습니다.
+          </span>
+        </div>
+      ) : !simulationData || traceRows.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-slate-400 gap-1.5">
           <span className="text-xl">📊</span>
           <span className="text-xs font-semibold text-slate-500">

@@ -9,6 +9,7 @@ interface MemorySegmentVisualizerProps {
   translationAssembly?: string | null;
   playSpeed?: number;
   cycle?: number;
+  loadingMessage?: string | null;
 }
 
 export type MemorySegmentKey = 'stack' | 'heap' | 'bss' | 'data' | 'code' | 'reserved';
@@ -136,6 +137,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   simulationData,
   playSpeed = 1000,
   cycle = 0,
+  loadingMessage,
 }) => {
   const memorySnapshot = currentData?.global_result.memory_snapshot ?? EMPTY_MEMORY_SNAPSHOT;
   const prevMemorySnapshot = prevData?.global_result.memory_snapshot;
@@ -255,7 +257,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc, simulationData]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none relative">
       {/* 1. 상단 미니멀 헤더 */}
       <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -264,6 +266,13 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
         </div>
         <span className="text-[10px] font-mono text-slate-400 font-semibold">High ➔ Low</span>
       </div>
+
+      {loadingMessage && (
+        <div className="absolute inset-x-0 top-9 bottom-0 z-20 bg-white/85 backdrop-blur-[1px] flex flex-col items-center justify-center p-4 text-center gap-2">
+          <div className="w-6 h-6 border-2.5 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-3 py-2">
         {/* 2. 최상단 시작 주소 헤더 바 */}

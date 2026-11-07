@@ -6,13 +6,37 @@ interface HazardDiagnosticsProps {
   simulationData: SimulationResult | null;
   currentCycleData: CycleHistoryItem | null;
   currentCycle: number;
+  loadingMessage?: string | null;
 }
 
 export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
   simulationData,
   currentCycleData,
   currentCycle,
+  loadingMessage,
 }) => {
+  if (loadingMessage) {
+    return (
+      <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+        <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs">💡</span>
+            <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">
+              Hazard & Stall Diagnostics
+            </h3>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2">
+          <div className="w-6 h-6 border-2.5 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
+          <span className="text-[11px] text-slate-400">
+            사이클별 해저드 및 스톨 진단 데이터를 분석하고 있습니다.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   if (!simulationData || !currentCycleData) {
     return (
       <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
