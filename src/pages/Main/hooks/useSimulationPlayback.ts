@@ -52,12 +52,20 @@ export function useSimulationPlayback({
     if (!currentData || !mappedAssemblyRows.length) return null;
 
     if (isSingleEngine) {
+      // Step 0: 실행 전 초기 대기 상태이므로 실행 포커스 없음
+      if (currentCycle === 0) return null;
+
+      // Step 1일 때 historyList[0], Step 2일 때 historyList[1], ...
+      const stepIdx = Math.min(currentCycle - 1, historyList.length - 1);
+      const stepData = historyList[stepIdx];
+      if (!stepData) return null;
+
       // 1순위: PC 기반 직접 매칭 (가장 정확)
       const currentPc = (
-        currentData.buffers?.IF?.pc ||
-        currentData.if_stage?.pc ||
-        currentData.stage_activity?.IF?.pc ||
-        currentData.global_result?.current_pc ||
+        stepData.buffers?.IF?.pc ||
+        stepData.if_stage?.pc ||
+        stepData.stage_activity?.IF?.pc ||
+        stepData.global_result?.current_pc ||
         ""
       ).trim().toLowerCase();
 
@@ -68,9 +76,9 @@ export function useSimulationPlayback({
 
       // 2순위: 활성 명령어 텍스트 매칭
       const activeAsm = (
-        currentData.buffers?.IF?.assembly ||
-        currentData.if_stage?.assembly ||
-        currentData.stage_activity?.IF?.assembly ||
+        stepData.buffers?.IF?.assembly ||
+        stepData.if_stage?.assembly ||
+        stepData.stage_activity?.IF?.assembly ||
         ""
       )
         .replace(/\s+/g, " ")
@@ -123,7 +131,8 @@ export function useSimulationPlayback({
 
       timerRef.current = window.setInterval(() => {
         setCurrentCycle((prev) => {
-          if (prev >= totalCycles - 1) {
+          const maxLimit = isSingleEngine ? totalCycles : Math.max(0, totalCycles - 1);
+          if (prev >= maxLimit) {
             setIsPlaying(false);
             return prev;
           }
@@ -141,7 +150,7 @@ export function useSimulationPlayback({
         clearInterval(timerRef.current);
       }
     };
-  }, [isPlaying, playSpeed, totalCycles, onClearSelection]);
+  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection]);
 
   const handleStepBack = () => {
     setIsPlaying(false);
@@ -154,12 +163,13 @@ export function useSimulationPlayback({
     setIsPlaying(false);
     triggerPlaybackFeedback("pause");
     onClearSelection();
-    setCurrentCycle((prev) => Math.min(totalCycles - 1, prev + 1));
+    const maxLimit = isSingleEngine ? totalCycles : Math.max(0, totalCycles - 1);
+    setCurrentCycle((prev) => Math.min(maxLimit, prev + 1));
   };
 
   const handleTogglePlay = () => {
     const currentPos = currentCycle;
-    const maxPos = totalCycles - 1;
+    const maxPos = isSingleEngine ? totalCycles : Math.max(0, totalCycles - 1);
 
     onClearSelection();
 
@@ -181,6 +191,13 @@ export function useSimulationPlayback({
     onClearSelection();
     setCurrentCycle(0);
     triggerPlaybackFeedback("reset");
+  };
+
+  const handleResetAndPlay = () => {
+    onClearSelection();
+    setCurrentCycle(0);
+    setIsPlaying(true);
+    triggerPlaybackFeedback("play");
   };
 
   const handleJumpToCycle = (val: number) => {
@@ -215,6 +232,7 @@ export function useSimulationPlayback({
     handleStepForward,
     handleTogglePlay,
     handleReset,
+    handleResetAndPlay,
     handleJumpToCycle,
     triggerPlaybackFeedback,
   };

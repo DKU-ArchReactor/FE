@@ -9,6 +9,7 @@ interface ControlPanelProps {
   onStepForward: () => void;
   onTogglePlay: () => void;
   onReset: () => void;
+  onResetAndPlay?: () => void;
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
@@ -29,6 +30,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onStepForward,
   onTogglePlay,
   onReset,
+  onResetAndPlay,
   onJumpToCycle,
   onChangeSpeed,
   isReady = true,
@@ -126,7 +128,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             disabled={!isReady || totalCycles <= 1}
             value={currentCycle}
             onChange={(e) => onJumpToCycle(Number(e.target.value))}
-            className="w-full h-1 bg-[#E1E4E8] dark:bg-[#333333] rounded appearance-none cursor-pointer focus:outline-none accent-[#005FB8] dark:accent-[#007ACC] disabled:opacity-30"
+            className="w-full h-1 bg-[#E1E4E8] dark:bg-[#333333] rounded appearance-none cursor-pointer focus:outline-none accent-[#005FB8] dark:accent-[#007ACC] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none"
           />
 
           {!isReady && (
@@ -140,33 +142,52 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
       {/* 2. VS Code 디버그 액션 툴바 (Control Buttons) */}
       <div className="flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] dark:bg-[#333333] p-0.5 rounded border border-[#D0D7DE] dark:border-[#3E3E42]">
+        {/* 1) 초기화 버튼 (⏮ Skip to Start) */}
         <button
           onClick={onReset}
           disabled={!isReady || currentCycle === 0}
-          title="재시작 (Restart / Reset)"
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          title="처음으로 초기화 (Reset / Skip to Start)"
+          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <rect x="4" y="5" width="2.5" height="14" rx="1" />
+            <path d="M13 12l6-4.5v9L13 12z" />
+            <path d="M7.5 12l6-4.5v9L7.5 12z" />
           </svg>
         </button>
 
+        {/* 2) 초기화 후 재생 버튼 (|▶ Play from Beginning) */}
+        <button
+          type="button"
+          onClick={onResetAndPlay}
+          disabled={!isReady || totalCycles <= 1}
+          title="처음부터 재생 (Reset & Play)"
+          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <rect x="4.5" y="4.5" width="2.5" height="15" rx="1" />
+            <path d="M10 5l10 7-10 7V5z" />
+          </svg>
+        </button>
+
+        {/* 3) 이전 스텝 버튼 */}
         <button
           onClick={onStepBack}
           disabled={!isReady || currentCycle <= 0}
           title="이전 단계 (Step Back)"
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
+        {/* 4) 재생 / 일시정지 (PLAY / PAUSE) 버튼 */}
         <button
           onClick={onTogglePlay}
           disabled={!isReady || totalCycles <= 1}
-          title={isPlaying ? "일시정지 (Pause)" : "계속 실행 (Continue / Play)"}
-          className={`w-[74px] shrink-0 justify-center py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-30 ${
+          title={isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
+          className={`w-[76px] shrink-0 justify-center py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
             isPlaying 
               ? 'bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold' 
               : 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
@@ -184,14 +205,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </svg>
             )}
           </span>
-          <span className="w-10 text-center tracking-wide">{isPlaying ? "PAUSE" : "RUN"}</span>
+          <span className="w-10 text-center tracking-wide">{isPlaying ? "PAUSE" : "PLAY"}</span>
         </button>
 
+        {/* 5) 다음 스텝 버튼 */}
         <button
           onClick={onStepForward}
           disabled={!isReady || currentCycle >= maxCycle}
           title="한 단계 실행 (Step Over / Forward)"
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -214,7 +236,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               type="button"
               disabled={!isReady}
               onClick={() => onChangeSpeed(speed)}
-              className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 ${
+              className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
                 isSelected
                   ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold"
                   : "text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC] hover:bg-[#EAEAEA] dark:hover:bg-[#333333]"

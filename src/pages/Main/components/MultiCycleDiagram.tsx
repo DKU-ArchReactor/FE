@@ -105,7 +105,7 @@ const isSameInstruction = (
 
 const COL_WIDTH = 40;
 const ROW_HEIGHT = 28;
-const LEFT_COL_WIDTH = 176;
+const LEFT_COL_WIDTH = 250;
 
 export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   simulationData,

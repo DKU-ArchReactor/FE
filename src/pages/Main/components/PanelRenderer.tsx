@@ -189,7 +189,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
             isSingleEngine
               ? currentActiveRow
                 ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : activeCycleIndex
+                : null
               : null
           }
           activeTarget={editorTarget}
@@ -216,7 +216,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
             isSingleEngine
               ? currentActiveRow
                 ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : activeCycleIndex
+                : null
               : null
           }
           executionLine={isActuallyExecuting && editorTarget === "c" ? activeExecutionCLine : null}
