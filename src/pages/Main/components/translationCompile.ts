@@ -9,10 +9,17 @@ export type MappedAssemblyRow = {
   pc?: string;
 };
 
-export function extractAssemblyFromSimulation(simulationResult: SimulationResult | null): MappedAssemblyRow[] {
+export function extractAssemblyFromSimulation(
+  simulationResult: SimulationResult | null,
+  fallbackAssembly?: string
+): MappedAssemblyRow[] {
   if (!simulationResult || !simulationResult.history || !simulationResult.history.length) return [];
   const rows: MappedAssemblyRow[] = [];
   const seenPc = new Set<string>();
+
+  // fallbackAssembly (source.s)에서 파싱된 C 매핑 테이블 준비
+  const textMappedRows = fallbackAssembly ? mapAssembly(fallbackAssembly, 1000) : [];
+  let textMatchPointer = 0;
 
   for (const item of simulationResult.history) {
     const ifBuf = item.buffers?.IF || item.if_stage || item.stage_activity?.IF;
@@ -22,7 +29,22 @@ export function extractAssemblyFromSimulation(simulationResult: SimulationResult
     if (pcKey && seenPc.has(pcKey)) continue;
     if (pcKey) seenPc.add(pcKey);
 
-    const sLine = ifBuf.source_line !== undefined ? ifBuf.source_line : null;
+    let sLine = ifBuf.source_line !== undefined ? ifBuf.source_line : null;
+
+    // 만약 백엔드가 아직 source_line을 안 줬거나 null이라면, fallbackAssembly 매핑과 텍스트 매칭
+    if (sLine === null && textMappedRows.length > 0) {
+      const normAsm = ifBuf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
+      // textMatchPointer부터 앞으로 전진하며 매칭되는 행 탐색
+      for (let i = textMatchPointer; i < textMappedRows.length; i++) {
+        const rowNorm = textMappedRows[i].text.replace(/\s+/g, " ").trim().toLowerCase();
+        if (rowNorm === normAsm) {
+          sLine = textMappedRows[i].sourceLine;
+          textMatchPointer = i + 1;
+          break;
+        }
+      }
+    }
+
     rows.push({
       pc: ifBuf.pc,
       text: ifBuf.assembly,
