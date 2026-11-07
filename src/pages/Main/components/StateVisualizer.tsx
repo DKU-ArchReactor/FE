@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
+import { getActivity, getCodeMap } from '../simulationView';
+const EMPTY_VALUES: Record<string, string> = {};
 
 interface StateVisualizerProps {
   currentData: CycleHistoryItem | null;
@@ -109,11 +111,13 @@ const extractPrintableAscii = (hexStr: string): string | undefined => {
   return chars.length >= 2 ? `"${chars.join('')}"` : undefined;
 };
 
-const classifyAddress = (addrHex: string, maxCodePcNum: number): MemorySegmentKey => {
+const classifyAddress = (addrHex: string, maxCodePcNum: number, simulationData: SimulationResult | null): MemorySegmentKey => {
   const num = parseInt(addrHex, 16) >>> 0;
+  const region = simulationData?.program.memory_regions.find((item) => num >= Number(item.start) && num < Number(item.end_exclusive));
+  if (region) return region.kind === 'code' ? 'code' : 'data';
   if (num >= 0x70000000) return 'stack';
   if (num >= 0x10000000) return 'heap';
-  if (num <= maxCodePcNum) return 'code';
+  if (num >= 0x00010000 && num <= maxCodePcNum) return 'code';
   return 'data';
 };
 
@@ -215,95 +219,37 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
   const isHorizontal =
     manualLayout === 'auto' ? autoHorizontal : manualLayout === 'horizontal';
 
-  const registers = currentData?.global_result.registers || {};
+  const registers = currentData?.global_result.registers ?? EMPTY_VALUES;
   const prevRegisters = prevData?.global_result.registers;
-  const memorySnapshot = currentData?.global_result.memory_snapshot || {};
+  const memorySnapshot = currentData?.global_result.memory_snapshot ?? EMPTY_VALUES;
   const prevMemorySnapshot = prevData?.global_result.memory_snapshot;
   const currentPc = currentData?.global_result.current_pc?.toLowerCase();
 
-  // 시뮬레이션 히스토리에서 Code 영역 명령어들 추출
   const { codeMap, maxCodePcNum } = useMemo(() => {
-    const map: Record<string, { raw: string; asm: string }> = {};
-    let maxPc = 0x0001017f;
-    if (simulationData?.history) {
-      simulationData.history.forEach((cycle) => {
-        const stages = [
-          cycle.buffers?.IF,
-          cycle.buffers?.ID,
-          cycle.buffers?.EX,
-          cycle.buffers?.MEM,
-          cycle.buffers?.WB,
-        ];
-        stages.forEach((buf) => {
-          if (buf?.pc && buf.assembly && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
-            const pcLower = buf.pc.toLowerCase();
-            map[pcLower] = {
-              raw: buf.raw_instruction || '0x00000000',
-              asm: buf.assembly,
-            };
-            const num = parseInt(pcLower, 16) >>> 0;
-            if (!isNaN(num) && num < 0x00010180 && num > maxPc) {
-              maxPc = num;
-            }
-          }
-        });
-      });
-    }
-    return { codeMap: map, maxCodePcNum: maxPc };
+    const map = getCodeMap(simulationData);
+    return { codeMap: map, maxCodePcNum: Math.max(0, ...Object.keys(map).map(Number)) };
   }, [simulationData]);
 
   // 현재 사이클 Load / Store 이동 활동 감지
   const transferActivity: TransferActivity | null = useMemo(() => {
     if (!currentData?.buffers) return null;
 
-    const candidates: { stage: 'MEM' | 'WB' | 'EX'; inst?: string }[] = [
-      { stage: 'MEM', inst: currentData.buffers.MEM?.assembly },
-      { stage: 'WB', inst: currentData.buffers.WB?.assembly },
-      { stage: 'EX', inst: currentData.buffers.EX?.assembly },
-    ];
-
-    for (const { stage, inst } of candidates) {
-      if (!inst || inst === 'bubble' || inst === 'empty') continue;
-      const trimmed = inst.trim();
-
-      const match = trimmed.match(
-        /^(lw|lh|lb|lhu|lbu|sw|sh|sb)\s+([a-zA-Z0-9]+)\s*,\s*(-?\d+)\s*\(([a-zA-Z0-9]+)\)/i
-      );
-      if (match) {
-        const op = match[1].toLowerCase();
-        const isLoad = op.startsWith('l');
-        const targetRegToken = match[2].toLowerCase();
-        const offset = parseInt(match[3], 10);
-        const baseRegToken = match[4].toLowerCase();
-
-        const regKey = ABI_TO_REG[targetRegToken] || 'x0';
-        const baseRegKey = ABI_TO_REG[baseRegToken] || 'x2';
-        const meta = REGISTER_METAS[regKey] || { abi: regKey };
-
-        const baseValHex = registers[baseRegKey] || '0x7fffeffc';
-        const baseValNum = parseInt(baseValHex, 16) >>> 0;
-        const effectiveAddrNum = (baseValNum + offset) >>> 0;
-        const targetAddress = `0x${effectiveAddrNum.toString(16).padStart(8, '0')}`;
-        const segment = classifyAddress(targetAddress, maxCodePcNum);
-
-        const valueHex = isLoad
-          ? memorySnapshot[targetAddress] || registers[regKey] || '0x00000000'
-          : registers[regKey] || memorySnapshot[targetAddress] || '0x00000000';
-
-        return {
-          type: isLoad ? 'load' : 'store',
-          stage,
-          instruction: trimmed,
-          regKey,
-          abiName: meta.abi,
-          targetAddress,
-          segment,
-          valueHex,
-        };
-      }
-    }
-    return null;
-  }, [currentData, registers, memorySnapshot, maxCodePcNum]);
+    const mem = getActivity(currentData).MEM;
+    if (!mem || mem.status === 'error' || mem.flush_info?.is_flushed ||
+        (mem.memory_operation !== 'load' && mem.memory_operation !== 'store') || !mem.target_address) return null;
+    const match = mem.assembly.match(/^(?:lw|lh|lb|lhu|lbu|sw|sh|sb)\s+([a-zA-Z0-9]+)/i);
+    if (!match) return null;
+    const regKey = ABI_TO_REG[match[1].toLowerCase()];
+    if (!regKey) return null;
+    const value = mem.memory_operation === 'load' ? mem.read_data : mem.write_data;
+    if (value == null) return null;
+    return {
+      type: mem.memory_operation, stage: 'MEM', instruction: mem.assembly,
+      regKey, abiName: REGISTER_METAS[regKey]?.abi ?? regKey,
+      targetAddress: mem.target_address.toLowerCase(),
+      segment: classifyAddress(mem.target_address, maxCodePcNum, simulationData), valueHex: value,
+    };
+  }, [currentData, maxCodePcNum, simulationData]);
 
   // 메모리 4개 영역별 데이터 분류
   const segmentedMemory = useMemo(() => {
@@ -319,7 +265,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
     // 1. memorySnapshot 엔트리 분류
     Object.entries(memorySnapshot).forEach(([addr, val]) => {
       const addrLower = addr.toLowerCase();
-      const seg = classifyAddress(addrLower, maxCodePcNum);
+      const seg = classifyAddress(addrLower, maxCodePcNum, simulationData);
       const prevVal = prevMemorySnapshot ? prevMemorySnapshot[addr] : undefined;
       const isChanged = prevVal !== undefined && prevVal !== val;
       const isAccessed = transferActivity?.targetAddress.toLowerCase() === addrLower;
@@ -382,7 +328,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
     result.code.sort((a, b) => (parseInt(a.address, 16) >>> 0) - (parseInt(b.address, 16) >>> 0));
 
     return result;
-  }, [memorySnapshot, prevMemorySnapshot, registers, codeMap, maxCodePcNum, transferActivity, currentPc]);
+  }, [memorySnapshot, prevMemorySnapshot, registers, codeMap, maxCodePcNum, transferActivity, currentPc, simulationData]);
 
   // 기존 RegisterVisualizer와 동일한 레지스터 키 및 스마트 정렬
   const regKeys = useMemo(() => Array.from({ length: 32 }, (_, i) => `x${i}`), []);
@@ -418,7 +364,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="@container flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex flex-col min-h-0 overflow-hidden relative"
+      className="@container flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 p-3.5 flex flex-col min-h-0 overflow-hidden relative select-none"
     >
       {/* 애니메이션 키프레임 */}
       <style>{`

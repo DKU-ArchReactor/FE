@@ -56,15 +56,15 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
     fileInputRef.current?.click();
   };
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 bg-slate-50/50 shrink-0">
+    <div className="flex items-center justify-between px-3.5 py-2.5 border-t border-slate-200/80 bg-slate-50/80 shrink-0 select-none">
       <div className="flex space-x-1.5">
         {mode !== 'asm-only' && (
           <button
             onClick={() => setActiveTab('c')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer border ${
               activeTab === 'c'
-                ? 'bg-blue-50 text-blue-600 shadow-xs'
-                : 'text-slate-500 hover:bg-slate-100'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-100'
             }`}
           >
             C
@@ -73,10 +73,10 @@ const SourceHeader: React.FC<SourceHeaderProps> = ({
         {mode !== 'c-only' && (
           <button
             onClick={() => setActiveTab('asm')}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer border ${
               activeTab === 'asm'
-                ? 'bg-blue-50 text-blue-600 shadow-xs'
-                : 'text-slate-500 hover:bg-slate-100'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-100'
             }`}
           >
             ASM

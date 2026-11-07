@@ -27,7 +27,8 @@ const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
 };
 
 export const runSimulation = async (
-  data: SimulationRunRequest
+  data: SimulationRunRequest,
+  signal?: AbortSignal,
 ): Promise<SimulationResult> => {
   const payload: SimulationRunRequest = {
     mode: data.mode ?? "pipeline",
@@ -37,9 +38,8 @@ export const runSimulation = async (
       : { simulation_token: data.simulation_token }),
   };
 
-  const response = await apiConfig.post("/api/v1/simulation/run", payload);
+  const response = await apiConfig.post("/api/v1/simulation/run", payload, { signal });
 
-  console.log("Raw Simulation API Response:", response.data);
   let resultData = response.data;
 
   const fetchJsonFromUrl = async (rawUrl: string) => {
@@ -47,10 +47,11 @@ export const runSimulation = async (
     if (import.meta.env.DEV && import.meta.env.VITE_S3_BUCKET_URL) {
       fetchUrl = fetchUrl.replace(import.meta.env.VITE_S3_BUCKET_URL, "/s3-proxy");
     }
-    let res = await fetch(fetchUrl);
+    let res = await fetch(fetchUrl, { signal });
     if (!res.ok && fetchUrl !== rawUrl) {
-      res = await fetch(rawUrl);
+      res = await fetch(rawUrl, { signal });
     }
+    if (!res.ok) throw new Error(`시뮬레이션 결과를 불러오지 못했습니다. (HTTP ${res.status})`);
     return res.json();
   };
 
@@ -82,6 +83,10 @@ export const runSimulation = async (
     }
   }
 
+  if (!resultData || resultData.simulator?.mode !== payload.mode ||
+      !Array.isArray(resultData.history) || !resultData.initial_state ||
+      resultData.summary?.total_cycles !== resultData.history.length) {
+    throw new Error('시뮬레이션 응답의 모드 또는 실행 기록이 올바르지 않습니다.');
+  }
   return normalizeSimulationResult(resultData as SimulationResult);
 };
-
