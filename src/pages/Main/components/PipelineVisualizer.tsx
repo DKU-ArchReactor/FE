@@ -106,6 +106,16 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
         <div className="flex items-center gap-1.5">
+          {/* CRT 런타임 진입/초기화 식별 뱃지 */}
+          {((ifInst && (ifInst.startsWith("auipc") || ifInst.startsWith("jal") || ifInst.startsWith("li") || ifInst.startsWith("csrw"))) ||
+            (clock !== undefined && clock < 10 && !cycle_events.stall?.has_stall && !cycle_events.forwarding?.has_forwarded)) && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/30"
+              title="C main() 진입 전 또는 종료 후 런타임 시스템 코드"
+            >
+              Runtime/CRT
+            </span>
+          )}
           {isSingle ? (
             <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
               Single-Cycle (No Hazard)

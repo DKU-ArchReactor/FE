@@ -4,6 +4,7 @@ export interface StageBuffer {
   assembly: string;
   status: string; // "normal" | "empty" | "bubble" | "stall" | "flush"
   stage?: string;
+  source_line?: number | null;
   flush_info?: {
     is_flushed: boolean;
     reason: string | null;

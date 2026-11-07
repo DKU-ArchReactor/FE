@@ -52,15 +52,24 @@ export function useSimulationPlayback({
     if (!currentData || !mappedAssemblyRows.length) return null;
 
     if (isSingleEngine) {
-      const activeAsm = (currentData.buffers?.IF?.assembly || currentData.if_stage?.assembly || "")
+      const activeAsm = (
+        currentData.buffers?.IF?.assembly ||
+        currentData.if_stage?.assembly ||
+        currentData.stage_activity?.IF?.assembly ||
+        ""
+      )
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
+
+      if (!activeAsm || activeAsm === "bubble" || activeAsm === "empty") return null;
+
+      // 1순위: 활성 명령어 텍스트와 정확히 일치하는 행 매칭
       const matched = mappedAssemblyRows.find((r) => {
         const rowNorm = r.text.replace(/\s+/g, " ").trim().toLowerCase();
         return rowNorm === activeAsm;
       });
-      return matched ?? mappedAssemblyRows[activeCycleIndex] ?? null;
+      return matched ?? null;
     }
     return null;
   })();

@@ -463,21 +463,30 @@ export default function TranslationMapping({
 
                 {/* 5. 우측 C 매핑 라인 태그 */}
                 <div className="shrink-0 pr-4 flex items-center select-none">
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${
-                      isSelectedPrimary
-                        ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                        : isCurrentSingleActive
-                        ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                        : isSelectedSibling
-                        ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                        : isExecutionSibling
-                        ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                        : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
-                    }`}
-                  >
-                    C: L{row.sourceLine}
-                  </span>
+                  {row.sourceLine !== null ? (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${
+                        isSelectedPrimary
+                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
+                          : isCurrentSingleActive
+                          ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                          : isSelectedSibling
+                          ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                          : isExecutionSibling
+                          ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
+                          : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
+                      }`}
+                    >
+                      C: L{row.sourceLine}
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[9px] px-1.5 py-0.5 rounded font-mono font-medium text-[#8C959F] dark:text-[#858585] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
+                      title="런타임 진입/초기화 코드"
+                    >
+                      CRT
+                    </span>
+                  )}
                 </div>
               </div>
             );

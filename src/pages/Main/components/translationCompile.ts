@@ -2,7 +2,37 @@ import { compileCode } from "@/api/build";
 import { runSimulation } from "@/api/simulation";
 import type { SimulationResult } from "@/type/simulation";
 
-export type MappedAssemblyRow = { sourceLine: number; text: string };
+export type MappedAssemblyRow = {
+  sourceLine: number | null;
+  text: string;
+  isRuntime?: boolean;
+  pc?: string;
+};
+
+export function extractAssemblyFromSimulation(simulationResult: SimulationResult | null): MappedAssemblyRow[] {
+  if (!simulationResult || !simulationResult.history || !simulationResult.history.length) return [];
+  const rows: MappedAssemblyRow[] = [];
+  const seenPc = new Set<string>();
+
+  for (const item of simulationResult.history) {
+    const ifBuf = item.buffers?.IF || item.if_stage || item.stage_activity?.IF;
+    if (!ifBuf || !ifBuf.assembly || ifBuf.assembly === "bubble" || ifBuf.assembly === "empty") continue;
+
+    const pcKey = (ifBuf.pc || "").trim().toLowerCase();
+    if (pcKey && seenPc.has(pcKey)) continue;
+    if (pcKey) seenPc.add(pcKey);
+
+    const sLine = ifBuf.source_line !== undefined ? ifBuf.source_line : null;
+    rows.push({
+      pc: ifBuf.pc,
+      text: ifBuf.assembly,
+      sourceLine: sLine,
+      isRuntime: sLine === null,
+    });
+  }
+
+  return rows;
+}
 
 export interface TranslationCompileResult {
   assembly: string;
@@ -28,14 +58,23 @@ export async function compileTranslation(
   }
   if (!result.assembly_url) throw new Error("어셈블리 결과를 찾을 수 없습니다.");
 
-  // 1. 어셈블리 텍스트 가져오기
-  const response = await fetch(result.assembly_url);
-  if (!response.ok) throw new Error(`어셈블리 파일을 불러오지 못했습니다. (HTTP ${response.status})`);
-  const assembly = await response.text();
-
-  // 2. Single과 Pipeline 모드를 백그라운드 병렬(Promise.all)로 동시 실행하여 즉시 캐싱
+  // 1. Single과 Pipeline 모드를 백그라운드 병렬(Promise.all)로 동시 실행하여 즉시 캐싱
   let singleResult: SimulationResult | null = null;
   let pipelineResult: SimulationResult | null = null;
+  let assembly = "";
+
+  // 어셈블리 텍스트 가져오기 (선택적 / 폴백 지원)
+  if (result.assembly_url) {
+    try {
+      const response = await fetch(result.assembly_url);
+      if (response.ok) {
+        assembly = await response.text();
+      }
+    } catch {
+      // S3 다운로드 실패 시에도 시뮬레이션 로그에서 어셈블리를 자동 추출하므로 차단하지 않음
+    }
+  }
+
   const targetToken = result.build_id
     ? { build_id: result.build_id }
     : result.simulation_token
@@ -163,8 +202,12 @@ export function mapAssembly(assembly: string, sourceLineCount: number): MappedAs
     }
     if (!executable || !line || line.startsWith(".")) continue;
     if (/^[.$\w]+:$/.test(line)) continue;
-    if (/^[a-zA-Z][\w.]*\s*[^=]*$/.test(line) && sourceLine !== null) {
-      mapped.push({ sourceLine, text: line });
+    if (/^[a-zA-Z][\w.]*\s*[^=]*$/.test(line)) {
+      mapped.push({
+        sourceLine: sourceLine,
+        text: line,
+        isRuntime: sourceLine === null,
+      });
     }
   }
   return mapped;
