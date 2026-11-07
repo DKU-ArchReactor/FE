@@ -181,7 +181,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                 className="flex items-center gap-1.5 shrink-0 tabular-nums font-mono select-text"
               >
                 <span
-                  className={`w-14 text-right text-[10px] font-semibold truncate ${
+                  className={`w-28 text-right text-[10px] font-semibold ${
                     isPulsing
                       ? 'text-[#CF222E] dark:text-[#F44747] font-bold'
                       : hasVal

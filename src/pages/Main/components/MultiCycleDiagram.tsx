@@ -112,8 +112,32 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   currentCycle,
   onJumpToCycle,
 }) => {
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const cycleScrollRef = useRef<HTMLDivElement>(null);
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingLeft = useRef(false);
+  const isSyncingRight = useRef(false);
+
+  const handleLeftScroll = () => {
+    if (isSyncingLeft.current) {
+      isSyncingLeft.current = false;
+      return;
+    }
+    if (rightScrollRef.current && leftScrollRef.current) {
+      isSyncingRight.current = true;
+      rightScrollRef.current.scrollTop = leftScrollRef.current.scrollTop;
+    }
+  };
+
+  const handleRightScroll = () => {
+    if (isSyncingRight.current) {
+      isSyncingRight.current = false;
+      return;
+    }
+    if (leftScrollRef.current && rightScrollRef.current) {
+      isSyncingLeft.current = true;
+      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
+    }
+  };
 
   const history = simulationData?.history ?? [];
   const totalCycles = history.length;
@@ -351,19 +375,15 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 
   // 현재 사이클이 바뀔 때 해당 사이클 열(C0~CN)과 현재 실행 중인 명령어 행이 화면에 오도록 자동 스크롤
   useEffect(() => {
-    const cycleContainer = cycleScrollRef.current;
-    const tableContainer = tableContainerRef.current;
-    if (!cycleContainer || !tableContainer || !traceRows.length) return;
+    const rightContainer = rightScrollRef.current;
+    const leftContainer = leftScrollRef.current;
+    if (!rightContainer || !traceRows.length) return;
 
     // 수평 스크롤 (C0 ~ CN 사이클 영역만 스크롤)
     const targetLeft = Math.max(
       0,
-      currentCycle * COL_WIDTH - cycleContainer.clientWidth / 2 + COL_WIDTH / 2
+      currentCycle * COL_WIDTH - rightContainer.clientWidth / 2 + COL_WIDTH / 2
     );
-    cycleContainer.scrollTo({
-      left: targetLeft,
-      behavior: 'smooth',
-    });
 
     // 수직 스크롤 (활성 행 추적)
     const activeRowIndices: number[] = [];
@@ -377,10 +397,22 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       const midRowIdx = activeRowIndices[Math.floor(activeRowIndices.length / 2)];
       const targetTop = Math.max(
         0,
-        midRowIdx * ROW_HEIGHT - (tableContainer.clientHeight - 30) / 2 + ROW_HEIGHT / 2
+        midRowIdx * ROW_HEIGHT - (rightContainer.clientHeight - 30) / 2 + ROW_HEIGHT / 2
       );
-      tableContainer.scrollTo({
+      rightContainer.scrollTo({
+        left: targetLeft,
         top: targetTop,
+        behavior: 'smooth',
+      });
+      if (leftContainer) {
+        leftContainer.scrollTo({
+          top: targetTop,
+          behavior: 'smooth',
+        });
+      }
+    } else {
+      rightContainer.scrollTo({
+        left: targetLeft,
         behavior: 'smooth',
       });
     }
@@ -443,13 +475,12 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
           </span>
         </div>
       ) : (
-        <div
-          ref={tableContainerRef}
-          className="flex-1 overflow-y-auto min-h-0 flex relative select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
-        >
-          {/* 좌측 고정 명령어 열 (가로 휠 스크롤 대상에서 제외하여 항상 위치 고정) */}
+        <div className="flex-1 min-h-0 flex relative select-none bg-white dark:bg-[#1E1E1E]">
+          {/* 좌측 고정 명령어 열 (가로 휠 스크롤 대상에서 완전히 제외된 독립 컨테이너) */}
           <div
-            className="shrink-0 flex flex-col border-r border-[#E5E5E5] dark:border-[#333333] z-10 bg-white dark:bg-[#1E1E1E]"
+            ref={leftScrollRef}
+            onScroll={handleLeftScroll}
+            className="shrink-0 flex flex-col border-r border-[#E5E5E5] dark:border-[#333333] z-10 bg-white dark:bg-[#1E1E1E] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             style={{ width: `${LEFT_COL_WIDTH}px` }}
           >
             {/* 좌상단 고정 코너 셀 (Sticky Top) */}
@@ -501,10 +532,11 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
             })}
           </div>
 
-          {/* 우측 사이클 그리드 영역 (C0 ~ CN 가로 휠 스크롤 전용 영역) */}
+          {/* 우측 사이클 그리드 영역 (C0 ~ CN 가로·세로 스크롤 전용 컨테이너) */}
           <div
-            ref={cycleScrollRef}
-            className="flex-1 min-w-0 overflow-x-auto select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
+            ref={rightScrollRef}
+            onScroll={handleRightScroll}
+            className="flex-1 min-w-0 overflow-auto select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
           >
             <div
               className="relative min-w-max flex flex-col"

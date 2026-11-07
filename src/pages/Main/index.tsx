@@ -112,6 +112,7 @@ const MainPage: React.FC = () => {
     setSimulationCache({ single: null, pipeline: null });
     playback.setCurrentCycle(0);
     playback.setIsPlaying(false);
+    playback.triggerPlaybackFeedback("reset");
   };
 
   // 6. 분할 레이아웃 & 스플리터 훅
@@ -238,6 +239,9 @@ const MainPage: React.FC = () => {
 
   // 모드 전환 시 즉시 캐시 스위칭 (0ms 딜레이)
   const handleSimulationModeChange = async (m: "single" | "pipeline") => {
+    if (playback.isPlaying || playback.currentCycle > 0) {
+      playback.triggerPlaybackFeedback("reset");
+    }
     setSimulationEngineMode(m);
     const cachedResult = simulationCache[m];
     if (cachedResult) {
@@ -392,6 +396,9 @@ const MainPage: React.FC = () => {
             mode={simulationEngineMode}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
+              if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
+                playback.triggerPlaybackFeedback("reset");
+              }
               setEditorTarget(target);
               if (target === "asm") {
                 setTranslationSelectedLine(null);
@@ -623,11 +630,13 @@ const MainPage: React.FC = () => {
         {activeFlyout && renderPanel(activeFlyout)}
       </FlyoutPanel>
 
-      {/* Play / Pause 화면 중앙 애니메이션 피드백 */}
+      {/* Play / Pause / Reset 화면 중앙 애니메이션 피드백 (옵션 1: ⏮ 되감기) */}
       {playback.playbackFeedback && (
         <div
           key={playback.playbackFeedback.id}
-          className="playback-indicator-overlay fixed inset-0 m-auto w-24 h-24 rounded-3xl bg-slate-900/80 backdrop-blur-md shadow-2xl flex items-center justify-center pointer-events-none z-50 text-white border border-white/20"
+          className={`playback-indicator-overlay fixed inset-0 m-auto rounded-3xl bg-slate-900/85 backdrop-blur-md shadow-2xl flex flex-col items-center justify-center pointer-events-none z-50 text-white border border-white/20 ${
+            playback.playbackFeedback.type === "reset" ? "w-36 h-28 p-3 gap-1.5" : "w-24 h-24"
+          }`}
         >
           {playback.playbackFeedback.type === "play" ? (
             <svg
@@ -636,7 +645,7 @@ const MainPage: React.FC = () => {
             >
               <path d="M6 4.5l14 7.5-14 7.5v-15z" />
             </svg>
-          ) : (
+          ) : playback.playbackFeedback.type === "pause" ? (
             <svg
               className="w-12 h-12 fill-white drop-shadow-md"
               viewBox="0 0 24 24"
@@ -644,6 +653,21 @@ const MainPage: React.FC = () => {
               <rect x="5.5" y="4.5" width="4" height="15" rx="1.5" />
               <rect x="14.5" y="4.5" width="4" height="15" rx="1.5" />
             </svg>
+          ) : (
+            <>
+              {/* 1번 옵션: ⏮️ 되감기 / 첫 단계 복귀 (Skip to Start / Rewind) */}
+              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sky-400">
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <rect x="4" y="5" width="2.5" height="14" rx="1" />
+                  <path d="M13 12l6-4.5v9L13 12z" />
+                  <path d="M7.5 12l6-4.5v9L7.5 12z" />
+                </svg>
+              </div>
+              <span className="text-[11px] font-bold tracking-tight text-white">시뮬레이션 초기화</span>
+              <span className="text-[9.5px] font-mono font-medium text-sky-300">
+                {isSingleEngine ? "Step 0" : "Cycle 0"}
+              </span>
+            </>
           )}
         </div>
       )}

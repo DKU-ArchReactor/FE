@@ -48,7 +48,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* [모드 1]: C - ASM 알약 버튼 (좌측 라벨 명시) */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight">
-            작성:
+            작성 모드:
           </span>
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
             <button
@@ -79,7 +79,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* [모드 2]: Single - Pipeline 알약 버튼 (좌측 라벨 명시) */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight">
-            엔진:
+            시뮬레이션 모드:
           </span>
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
             <button

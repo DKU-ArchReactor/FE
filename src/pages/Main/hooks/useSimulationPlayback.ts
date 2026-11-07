@@ -28,13 +28,13 @@ export function useSimulationPlayback({
   const [playSpeed, setPlaySpeed] = useState<number>(1000);
 
   const [playbackFeedback, setPlaybackFeedback] = useState<{
-    type: "play" | "pause";
+    type: "play" | "pause" | "reset";
     id: number;
   } | null>(null);
 
   const timerRef = useRef<number | null>(null);
 
-  const triggerPlaybackFeedback = (type: "play" | "pause") => {
+  const triggerPlaybackFeedback = (type: "play" | "pause" | "reset") => {
     setPlaybackFeedback({ type, id: Date.now() });
   };
 
@@ -180,6 +180,7 @@ export function useSimulationPlayback({
     setIsPlaying(false);
     onClearSelection();
     setCurrentCycle(0);
+    triggerPlaybackFeedback("reset");
   };
 
   const handleJumpToCycle = (val: number) => {
