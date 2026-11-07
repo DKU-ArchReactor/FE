@@ -176,6 +176,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
         <TranslationMapping
           source={translationSource || cContent}
           assembly={editorTarget === "asm" ? customAssembly : (translationAssembly || asmContent)}
+          mappedRows={editorTarget === "asm" ? undefined : mappedAssemblyRows}
           busy={translationBusy}
           error={translationError}
           selectedLine={translationSelectedLine}

@@ -7,6 +7,7 @@ import type { StageBuffer } from "@/type/simulation";
 type Props = {
   source: string;
   assembly: string;
+  mappedRows?: MappedAssemblyRow[];
   busy: boolean;
   error: string;
   selectedLine?: number | null;
@@ -59,6 +60,7 @@ function splitInstruction(text: string): { opcode: string; operands: string } {
 export default function TranslationMapping({
   source,
   assembly,
+  mappedRows,
   busy,
   error,
   selectedLine,
@@ -75,10 +77,10 @@ export default function TranslationMapping({
 }: Props) {
   const { theme } = useTheme();
   const sourceLines = source.split(/\r?\n/);
-  const rows: MappedAssemblyRow[] = useMemo(
-    () => mapAssembly(assembly, sourceLines.length),
-    [assembly, sourceLines.length]
-  );
+  const rows: MappedAssemblyRow[] = useMemo(() => {
+    if (mappedRows && mappedRows.length > 0) return mappedRows;
+    return mapAssembly(assembly, sourceLines.length);
+  }, [mappedRows, assembly, sourceLines.length]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const rowElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
