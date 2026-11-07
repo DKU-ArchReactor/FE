@@ -90,4 +90,3 @@ export const runSimulation = async (
   }
   return normalizeSimulationResult(resultData as SimulationResult);
 };
-

@@ -5,27 +5,29 @@ import type { CycleHistoryItem } from '@/type/simulation';
 interface PipelineVisualizerProps {
   currentData: CycleHistoryItem | null;
   loadingMessage?: string | null;
+  mode?: "single" | "pipeline";
 }
 
 const MASTER_WIDTH = 900;
 const MASTER_HEIGHT = 1350;
 
-const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, loadingMessage }) => {
+const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, loadingMessage, mode = "pipeline" }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const isSingle = mode === "single";
 
   if (loadingMessage) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center gap-3 text-center">
-        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-semibold text-blue-700">{loadingMessage}</p>
-        <p className="text-xs text-slate-400">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150">
+        <div className="w-9 h-9 border-3 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-[var(--ar-accent)]">{loadingMessage}</p>
+        <p className="text-xs text-[var(--ar-text-muted)]">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
       </div>
     );
   }
 
   if (!currentData) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-center text-slate-400 text-sm">
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] p-6 flex items-center justify-center text-[var(--ar-text-muted)] text-sm transition-colors duration-150">
         C 소스 코드를 작성하고 [⚡ 컴파일]을 누르면 파이프라인 데이터패스가 활성화됩니다.
       </div>
     );
@@ -33,16 +35,25 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
 
   const { cycle_events, clock } = currentData;
   const buffers = getActivity(currentData);
-  const isStall = cycle_events.stall?.has_stall;
-  const isForward = cycle_events.forwarding?.has_forwarded;
-  const isBranchFlush = cycle_events.control_hazard?.has_flush;
+  const isStall = !isSingle && cycle_events.stall?.has_stall;
+  const isForward = !isSingle && cycle_events.forwarding?.has_forwarded;
+  const isBranchFlush = !isSingle && cycle_events.control_hazard?.has_flush;
+
+  // Single-cycle 모드: 1클럭에 1개 명령어 전체가 IF~WB 전 단계를 한 번에 통과
+  // Pipeline 모드: 각 스테이지 버퍼에 개별 명령어가 순차적으로 위치
+  const singleCycleInst = isSingle
+    ? (buffers.IF?.assembly || currentData.stage_activity?.IF?.assembly || currentData.if_stage?.assembly || 'bubble')
+    : null;
+  const singleCyclePc = isSingle
+    ? (buffers.IF?.pc || currentData.stage_activity?.IF?.pc || currentData.if_stage?.pc || currentData.global_result?.current_pc)
+    : null;
 
   // 5단계별 명령어
-  const ifInst = buffers.IF?.assembly || 'bubble';
-  const idInst = buffers.ID?.assembly || 'bubble';
-  const exInst = buffers.EX?.assembly || 'bubble';
-  const memInst = buffers.MEM?.assembly || 'bubble';
-  const wbInst = buffers.WB?.assembly || 'bubble';
+  const ifInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.IF?.assembly || 'bubble');
+  const idInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.ID?.assembly || 'bubble');
+  const exInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.EX?.assembly || 'bubble');
+  const memInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.MEM?.assembly || 'bubble');
+  const wbInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.WB?.assembly || 'bubble');
 
   // 활성 여부
   const isIfActive = ifInst !== 'bubble' && ifInst !== 'empty';
@@ -57,7 +68,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
   const handleZoomReset = () => setZoomLevel(1.0);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0">
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
       {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일 */}
       <style>{`
         @keyframes streamDown {
@@ -86,48 +97,58 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
       `}</style>
 
       {/* 1. 상단 헤더 & 컨트롤러 */}
-      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-100 shrink-0">
+      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-[#E5E5E5] dark:border-[#333333] shrink-0">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-          <h3 className="text-xs font-bold text-slate-800">Vertical 5-Stage Datapath</h3>
-          <span className="text-[10px] text-slate-400 font-mono">(Clock {clock ?? 0})</span>
+          <span className={`w-2 h-2 rounded-full animate-pulse ${isSingle ? "bg-amber-500 dark:bg-amber-400" : "bg-[#005FB8] dark:bg-[#007ACC]"}`} />
+          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+            {isSingle ? "Single-Cycle Datapath (1 Inst / Cycle)" : "Vertical 5-Stage Datapath"}
+          </h3>
+          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">(Clock {clock ?? 0})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
         <div className="flex items-center gap-1.5">
-          {isStall && (
-            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse shadow-2xs">
-              ⚠️ Stall
+          {isSingle ? (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+              Single-Cycle (No Hazard)
             </span>
+          ) : (
+            <>
+              {isStall && (
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse shadow-2xs">
+                  ⚠️ Stall
+                </span>
+              )}
+              {isForward && (
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-600 text-white shadow-2xs">
+                  ⇄ FWD
+                </span>
+              )}
+              {isBranchFlush && (
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white shadow-2xs">
+                  🔄 Flush
+                </span>
+              )}
+            </>
           )}
-          {isForward && (
-            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-600 text-white shadow-2xs">
-              ⇄ FWD
-            </span>
-          )}
-          {isBranchFlush && (
-            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white shadow-2xs">
-              🔄 Flush
-            </span>
-          )}
-          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-1 py-0.5 text-slate-600 text-[10px]">
+          <div className="flex items-center bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] rounded px-1 py-0.5 text-[#57606A] dark:text-[#CCCCCC] text-[10px]">
             <button
               onClick={handleZoomOut}
-              className="px-1 hover:text-blue-600 font-bold cursor-pointer"
+              className="px-1 hover:text-[#005FB8] dark:hover:text-[#007ACC] font-bold cursor-pointer"
               title="축소"
             >
               −
             </button>
             <button
               onClick={handleZoomReset}
-              className="px-1 font-mono font-semibold hover:text-blue-600 cursor-pointer"
+              className="px-1 font-mono font-semibold hover:text-[#005FB8] dark:hover:text-[#007ACC] cursor-pointer"
               title="100% (세로 맞춤)"
             >
               {Math.round(zoomLevel * 100)}%
             </button>
             <button
               onClick={handleZoomIn}
-              className="px-1 hover:text-blue-600 font-bold cursor-pointer"
+              className="px-1 hover:text-[#005FB8] dark:hover:text-[#007ACC] font-bold cursor-pointer"
               title="확대"
             >
               +
@@ -244,7 +265,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
               PC
             </text>
             <text x="430" y="109" fill="#B91C1C" fontSize="11.5" fontFamily="monospace" fontWeight="600" textAnchor="middle">
-              {buffers.IF?.pc ? buffers.IF.pc : "0x00000000"}
+              {isSingle ? (singleCyclePc || "0x00000000") : (buffers.IF?.pc ? buffers.IF.pc : "0x00000000")}
             </text>
 
             {/* PC ➔ Instruction Memory 직하강 화살표 (X = 430, Y = 116 ➔ 148) */}

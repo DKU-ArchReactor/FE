@@ -25,11 +25,41 @@ export async function compileTranslation(source: string): Promise<TranslationCom
   if (!response.ok) throw new Error(`어셈블리 파일을 불러오지 못했습니다. (HTTP ${response.status})`);
   const assembly = await response.text();
 
-  const targetToken = result.build_id ? { build_id: result.build_id } : result.simulation_token ? { simulation_token: result.simulation_token } : null;
-  if (!targetToken) throw new Error('시뮬레이션 실행에 필요한 빌드 정보가 없습니다.');
+  const targetToken = result.build_id
+    ? { build_id: result.build_id }
+    : result.simulation_token
+    ? { simulation_token: result.simulation_token }
+    : null;
+  if (!targetToken) throw new Error("시뮬레이션 실행에 필요한 빌드 정보가 없습니다.");
 
   return {
     assembly,
+    artifact: targetToken,
+  };
+}
+
+export async function compileAssemblyDirectly(
+  assemblySource: string
+): Promise<TranslationCompileResult> {
+  const result = await compileCode({
+    content: assemblySource,
+    lang: "asm",
+    compile_profile: "rv32im",
+    compiler_opt: "",
+  });
+  if (result.status !== "success") {
+    throw new Error(result.log || "어셈블리 빌드에 실패했습니다.");
+  }
+
+  const targetToken = result.build_id
+    ? { build_id: result.build_id }
+    : result.simulation_token
+    ? { simulation_token: result.simulation_token }
+    : null;
+  if (!targetToken) throw new Error("시뮬레이션 실행에 필요한 빌드 정보가 없습니다.");
+
+  return {
+    assembly: assemblySource,
     artifact: targetToken,
   };
 }

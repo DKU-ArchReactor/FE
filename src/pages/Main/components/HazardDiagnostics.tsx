@@ -17,19 +17,19 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
 }) => {
   if (loadingMessage) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
-        <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
+        <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-rose-500">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs">💡</span>
-            <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">
+            <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
               Hazard & Stall Diagnostics
             </h3>
           </div>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2">
-          <div className="w-6 h-6 border-2.5 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
-          <span className="text-[11px] text-slate-400">
+          <div className="w-6 h-6 border-2.5 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-[#005FB8] dark:text-[#79C0FF]">{loadingMessage}</span>
+          <span className="text-[11px] text-[var(--ar-text-muted)]">
             사이클별 해저드 및 스톨 진단 데이터를 분석하고 있습니다.
           </span>
         </div>
@@ -39,18 +39,18 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
 
   if (!simulationData || !currentCycleData) {
     return (
-      <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
-        <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+      <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
+        <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs">💡</span>
-            <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">
+            <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">
               Hazard & Stall Diagnostics
             </h3>
           </div>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-slate-400 gap-1">
-          <span className="text-sm font-semibold text-slate-500">대기 중</span>
-          <span className="text-[11px] text-slate-400">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-[#57606A] dark:text-[#858585] gap-1 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
+          <span className="text-sm font-semibold text-[#1F2328] dark:text-[#CCCCCC]">대기 중</span>
+          <span className="text-[11px] text-[#57606A] dark:text-[#858585]">
             시뮬레이션을 재생하면 각 사이클별 해저드 원인이 실시간 분석됩니다.
           </span>
         </div>
@@ -69,16 +69,16 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
     ? simulationData.console_output : null;
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
-      {/* 1. 상단 타이틀 바 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
+      {/* 1. 상단 타이틀 바 (하저드 전용 로즈/오렌지 액센트 바) */}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-rose-500">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs">💡</span>
-          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">
+          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
             Hazard & Stall Diagnostics
           </h3>
         </div>
-        <span className="text-[10px] font-mono font-semibold text-slate-500">
+        <span className="text-[10px] font-mono font-semibold text-[#57606A] dark:text-[#858585]">
           Cycle {currentCycle}
         </span>
       </div>
@@ -88,35 +88,35 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
         {/* 상태 태그 배지들 */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {isStall && (
-            <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-bold border border-red-200 animate-pulse">
+            <span className="px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/70 text-red-700 dark:text-red-300 text-[10px] font-bold border border-red-200 dark:border-red-800 animate-pulse">
               🔴 Data Hazard (Stall)
             </span>
           )}
           {isForward && (
-            <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200">
+            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 text-[10px] font-bold border border-amber-200 dark:border-amber-800">
               🟡 Forwarding 활성화
             </span>
           )}
           {isBranchFlush && (
-            <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold border border-purple-200">
+            <span className="px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 text-[10px] font-bold border border-purple-200 dark:border-purple-800">
               🟣 Control Hazard (Flush)
             </span>
           )}
           {!isStall && !isForward && !isBranchFlush && (
-            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+            <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
               {errorMessage ? '실행 오류 또는 사이클 제한' : currentCycle === 0 ? '실행 전 초기 상태' : '🟢 Normal Execution (스톨 없음)'}
             </span>
           )}
         </div>
 
         {/* 상세 설명 텍스트 박스 */}
-        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs leading-relaxed flex flex-col gap-1.5 text-slate-700">
+        <div className="p-2.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] text-xs leading-relaxed flex flex-col gap-1.5 text-[#24292F] dark:text-[#CCCCCC]">
           {isStall && (
             <div>
-              <p className="font-bold text-red-700">
+              <p className="font-bold text-red-600 dark:text-red-400">
                 [Load-Use Hazard 감지]
               </p>
-              <p className="text-[11px] text-slate-600 mt-0.5">
+              <p className="text-[11px] text-[#57606A] dark:text-[#858585] mt-0.5">
                 {cycle_events.stall.stall_desc ||
                   '메모리 로드(lw) 명령어의 결과를 바로 다음 명령어가 참조하여 1사이클 버블이 삽입되었습니다.'}
               </p>
@@ -125,10 +125,10 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
 
           {isForward && (
             <div>
-              <p className="font-bold text-amber-800">
+              <p className="font-bold text-amber-700 dark:text-amber-400">
                 [하드웨어 데이터 포워딩]
               </p>
-              <p className="text-[11px] text-slate-600 mt-0.5">
+              <p className="text-[11px] text-[#57606A] dark:text-[#858585] mt-0.5">
                 {cycle_events.forwarding.forwarding_desc ||
                   '이전 명령어의 연산 결과를 레지스터에 기록되기 전에 파이프라인 버퍼에서 직접 당겨와 스톨을 방지했습니다.'}
               </p>
@@ -137,10 +137,10 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
 
           {isBranchFlush && (
             <div>
-              <p className="font-bold text-purple-800">
+              <p className="font-bold text-purple-700 dark:text-purple-400">
                 [분기 플러시 발생]
               </p>
-              <p className="text-[11px] text-slate-600 mt-0.5">
+              <p className="text-[11px] text-[#57606A] dark:text-[#858585] mt-0.5">
                 {cycle_events.control_hazard.flush_reason ||
                   '분기(Branch/Jump) 예측이 실패하거나 점프가 확정되어 잘못 인출된 앞선 명령어들을 파이프라인에서 비웠습니다.'}
               </p>
@@ -148,14 +148,14 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
           )}
 
           {!isStall && !isForward && !isBranchFlush && (
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-[#57606A] dark:text-[#858585]">
               {errorMessage || (currentCycle === 0 ? '아직 명령어를 실행하지 않았습니다.' : '현재 클록에 스톨·포워딩·분기 플러시 이벤트가 없습니다.')}
             </p>
           )}
         </div>
 
         {/* 현재 파이프라인에 물려있는 핵심 명령어 힌트 */}
-        <div className="mt-auto pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+        <div className="mt-auto pt-1 border-t border-[#E5E5E5] dark:border-[#333333] flex items-center justify-between text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">
           <span>EX: {buffers.EX?.assembly || 'bubble'}</span>
           <span>MEM: {buffers.MEM?.assembly || 'bubble'}</span>
           <span>WB: {buffers.WB?.assembly || 'bubble'}</span>

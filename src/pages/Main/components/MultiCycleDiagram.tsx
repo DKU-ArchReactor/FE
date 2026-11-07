@@ -120,21 +120,35 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   const history = useMemo(() => simulationData?.history.map((item, index) => ({ ...item, clock: index + 1, buffers: getActivity(item) })) ?? [], [simulationData]);
   const totalCycles = history.length;
 
-  // 파이프라인 히스토리를 시간순으로 추적하여 계단식(Stair-step) 다이어그램 행 생성
+  // 파이프라인/싱글사이클 히스토리를 추적하여 다이어그램 행 생성
+  const isSingleMode = simulationData?.simulator?.mode === 'single' || simulationData?.simulator?.pipeline_model === 'single-cycle';
+
   const traceRows = useMemo<TraceRow[]>(() => {
     if (!history.length) return [];
 
-    const rows: TraceRow[] = [];
-    if (simulationData?.simulator.mode === 'single') {
+    // [Single-Cycle 모드 전용 다이어그램]: 매 클럭 1개 명령어가 IF-ID-EX-MEM-WB 전 과정을 1칸에 직렬 완료
+    if (isSingleMode) {
       return history.flatMap((item, index) => {
         const instruction = item.buffers.IF;
         if (!instruction?.pc) return [];
         return [{
-          id: index, pc: instruction.pc, assembly: instruction.assembly, firstCycle: index,
-          cells: { [index]: { type: 'WB' as const, stage: 'WB' as const, label: item.cycle_events.runtime_error.has_error ? 'ERR' : '1CLK' } },
+          id: index,
+          pc: instruction.pc,
+          assembly: instruction.assembly,
+          firstCycle: index,
+          cells: {
+            [index]: {
+              type: 'WB' as const,
+              stage: 'WB' as const,
+              label: item.cycle_events.runtime_error.has_error ? 'ERR' : '1CLK',
+            },
+          },
         }];
       });
     }
+
+    // [5-Stage Pipeline 모드]: 계단식(Stair-step) 다이어그램 행 생성
+    const rows: TraceRow[] = [];
     let prevStageRow: Partial<Record<'IF' | 'ID' | 'EX' | 'MEM' | 'WB', number>> = {};
 
     const createRow = (buf: StageBuffer, cIdx: number): number => {
@@ -332,7 +346,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     });
 
     return rows;
-  }, [history, simulationData]);
+  }, [history, isSingleMode]);
 
   // 현재 사이클이 바뀔 때 해당 사이클 열과 현재 실행 중인 명령어 행이 화면 중앙에 오도록 가로·세로 자동 스크롤
   useEffect(() => {
@@ -372,37 +386,45 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   }, [currentCycle, traceRows]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 & 범례 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2 bg-slate-50/80 border-b border-slate-200/80 min-w-0 gap-2">
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0 gap-2 border-l-2 border-l-indigo-500">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs">📈</span>
-          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">
-            Pipeline Timing Diagram
+          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">
+            {isSingleMode ? 'Single-Cycle Execution Diagram (1 Inst / 1 Cycle)' : 'Pipeline Timing Diagram (Stair-step)'}
           </h3>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           {/* 스테이지 컬러 레전드 미니 뱃지 */}
-          <div className="hidden sm:flex items-center gap-1 text-[9px] font-mono font-bold">
-            <span className="px-1.5 py-0.5 rounded bg-indigo-500 text-white">IF</span>
-            <span className="px-1.5 py-0.5 rounded bg-sky-500 text-white">ID</span>
-            <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white">EX</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white">MEM</span>
-            <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white">WB</span>
-            <span
-              className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-300 border-dashed"
-              title="데이터 해저드로 인한 파이프라인 대기 (Stall)"
-            >
-              STL(지연)
-            </span>
-            <span
-              className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-300 border-dashed"
-              title="분기/점프 플러시로 인해 버블(Bubble)로 변환됨"
-            >
-              BBL(버블)
-            </span>
-          </div>
-          <span className="text-[10px] font-mono text-slate-500 font-semibold px-2 py-0.5 rounded-full bg-slate-200/60">
+          {isSingleMode ? (
+            <div className="flex items-center gap-1 text-[9px] font-mono font-bold">
+              <span className="px-2 py-0.5 rounded bg-sky-600 text-white">
+                직렬 실행 (No Pipeline Hazard)
+              </span>
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-1 text-[9px] font-mono font-bold">
+              <span className="px-1.5 py-0.5 rounded bg-indigo-500 text-white">IF</span>
+              <span className="px-1.5 py-0.5 rounded bg-sky-500 text-white">ID</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white">EX</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white">MEM</span>
+              <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white">WB</span>
+              <span
+                className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 border-dashed"
+                title="데이터 해저드로 인한 파이프라인 대기 (Stall)"
+              >
+                STL(지연)
+              </span>
+              <span
+                className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 border-dashed"
+                title="분기/점프 플러시로 인해 버블(Bubble)로 변환됨"
+              >
+                BBL(버블)
+              </span>
+            </div>
+          )}
+          <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585] font-semibold px-2 py-0.5 rounded bg-[#EAEAEA] dark:bg-[#333333]">
             {totalCycles > 0 ? `${totalCycles} Cycles` : 'Ready'}
           </span>
         </div>
@@ -410,27 +432,27 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 
       {/* 2. 계단식 타이밍 매트릭스 테이블 (가로·세로 통합 스크롤) */}
       {loadingMessage ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2.5">
-          <div className="w-7 h-7 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-blue-700">{loadingMessage}</span>
-          <span className="text-[11px] text-slate-400">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2.5 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
+          <div className="w-7 h-7 border-3 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-[#005FB8] dark:text-[#79C0FF]">{loadingMessage}</span>
+          <span className="text-[11px] text-[#57606A] dark:text-[#858585]">
             사이클별 명령어 타이밍 및 버블/스톨 데이터를 생성하고 있습니다.
           </span>
         </div>
       ) : !simulationData || traceRows.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-slate-400 gap-1.5">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-[#57606A] dark:text-[#858585] gap-1.5 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
           <span className="text-xl">📊</span>
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
             시뮬레이션을 실행하면 계단식 파이프라인 타이밍 다이어그램이 생성됩니다
           </span>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-[#57606A] dark:text-[#858585]">
             사이클별 각 명령어의 진행 단계(IF·ID·EX·MEM·WB)와 버블(BBL)/스톨(STL) 발생 위치를 한눈에 추적합니다.
           </span>
         </div>
       ) : (
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-auto min-h-0 relative select-none scrollbar-thin"
+          className="flex-1 overflow-auto min-h-0 relative select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
         >
           <div
             className="relative min-w-max"
@@ -439,14 +461,14 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
             }}
           >
             {/* 상단 고정 헤더 행 (Sticky Top) */}
-            <div className="h-7 flex items-stretch border-b border-slate-200 sticky top-0 bg-slate-50 z-20 shadow-2xs">
+            <div className="h-7 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-20 shadow-2xs">
               {/* 좌상단 고정 코너 셀 (Sticky Top & Left) */}
               <div
-                className="shrink-0 px-2.5 flex items-center justify-between border-r border-slate-200 bg-slate-100/95 sticky left-0 z-30 text-[10px] font-bold text-slate-600"
+                className="shrink-0 px-2.5 flex items-center justify-between border-r border-[#E5E5E5] dark:border-[#333333] bg-[#EAEAEA] dark:bg-[#2D2D2D] sticky left-0 z-30 text-[10px] font-bold text-[#57606A] dark:text-[#858585]"
                 style={{ width: `${LEFT_COL_WIDTH}px` }}
               >
                 <span>Instruction</span>
-                <span className="text-[9px] text-slate-400 font-mono">Now</span>
+                <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] font-mono">Now</span>
               </div>
 
               {/* 각 사이클 번호 헤더 (클릭 시 해당 사이클로 이동) */}
@@ -460,26 +482,23 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     key={cIdx}
                     type="button"
                     onClick={() => onJumpToCycle?.(cIdx)}
-                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-slate-200/70 cursor-pointer transition-colors relative ${
-                      isCurrent
-                        ? 'bg-blue-600 text-white shadow-inner font-extrabold'
+                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${isCurrent
+                        ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
                         : hasStall
-                        ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                        : hasFlush
-                        ? 'bg-purple-50 text-purple-600 hover:bg-purple-100'
-                        : 'text-slate-500 hover:bg-sky-50 hover:text-sky-600'
-                    }`}
+                          ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
+                          : hasFlush
+                            ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                            : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
                     style={{ width: `${COL_WIDTH}px` }}
-                    title={`Clock ${item.clock ?? cIdx}${
-                      hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
-                    }`}
+                    title={`Clock ${item.clock ?? cIdx}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
+                      }`}
                   >
                     <span>C{item.clock ?? cIdx}</span>
                     {(hasStall || hasFlush) && !isCurrent && (
                       <span
-                        className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${
-                          hasStall ? 'bg-red-500' : 'bg-purple-500'
-                        }`}
+                        className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-red-500' : 'bg-purple-500'
+                          }`}
                       />
                     )}
                   </button>
@@ -491,7 +510,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
             <div className="relative">
               {/* 현재 선택된 사이클 수직 하이라이트 기둥 */}
               <div
-                className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-blue-500/80 bg-blue-500/10 transition-all duration-150"
+                className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
                 style={{
                   left: `${LEFT_COL_WIDTH + currentCycle * COL_WIDTH}px`,
                   width: `${COL_WIDTH}px`,
@@ -506,24 +525,26 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                 return (
                   <div
                     key={row.id}
-                    className={`flex items-stretch border-b border-slate-100/90 relative transition-colors ${
-                      isRowActiveNow ? 'bg-sky-50/60' : rIdx % 2 === 1 ? 'bg-slate-50/25' : ''
-                    }`}
+                    className={`flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${isRowActiveNow
+                        ? 'bg-blue-50/50 dark:bg-[#04395E]/30'
+                        : rIdx % 2 === 1
+                          ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30'
+                          : ''
+                      }`}
                     style={{ height: `${ROW_HEIGHT}px` }}
                   >
                     {/* 좌측 고정 명령어 열 (Sticky Left) */}
                     <div
                       onClick={() => onJumpToCycle?.(row.firstCycle)}
-                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-slate-200 sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${
-                        isRowActiveNow
-                          ? 'bg-sky-50 border-l-3 border-l-blue-600 font-bold text-slate-900 shadow-2xs'
-                          : 'bg-white hover:bg-slate-50 text-slate-600'
-                      }`}
+                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-[#E5E5E5] dark:border-[#333333] sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${isRowActiveNow
+                          ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
+                          : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
+                        }`}
                       style={{ width: `${LEFT_COL_WIDTH}px` }}
                       title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
                     >
                       <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <span className="text-[9px] text-slate-400 shrink-0 w-4 text-right">
+                        <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
                           {rIdx + 1}.
                         </span>
                         <span className="truncate">{row.assembly}</span>
@@ -537,7 +558,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                           {activeCellNow.label}
                         </span>
                       ) : row.pc ? (
-                        <span className="text-[8.5px] text-slate-400 shrink-0">
+                        <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
                           {row.pc.slice(-4)}
                         </span>
                       ) : null}
@@ -567,22 +588,19 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                           onClick={() => onJumpToCycle?.(cIdx)}
                           className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 cursor-pointer relative z-1"
                           style={{ width: `${COL_WIDTH}px` }}
-                          title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${
-                            cell.isStall
+                          title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${cell.isStall
                               ? `${cell.stage} 단계 지연 (Stall / EX에 Bubble 삽입)`
                               : cell.isBubble
-                              ? '분기 플러시로 인해 버블(Bubble) 처리됨'
-                              : `${cell.stage} 단계 실행 중`
-                          }`}
+                                ? '분기 플러시로 인해 버블(Bubble) 처리됨'
+                                : `${cell.stage} 단계 실행 중`
+                            }`}
                         >
                           <span
-                            className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${
-                              style.bg
-                            } ${style.text} ${style.border} ${
-                              isCurrentCol
+                            className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${style.bg
+                              } ${style.text} ${style.border} ${isCurrentCol
                                 ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
                                 : 'hover:scale-105'
-                            }`}
+                              }`}
                           >
                             {cell.label}
                           </span>
