@@ -203,32 +203,37 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
 }
 
-/* Play/Pause 화면 중앙 팝업 & 블러 페이드아웃 애니메이션 */
+/* Play/Pause/Reset/Trash 화면 중앙 팝업 & 블러 페이드아웃 애니메이션 (1.15초 프리미엄 트랜지션) */
 @keyframes playbackIndicatorAnim {
   0% {
     opacity: 0;
-    transform: scale(0.65);
-    filter: blur(8px);
+    transform: scale(0.75);
+    filter: blur(6px);
   }
-  20% {
-    opacity: 0.95;
-    transform: scale(1.05);
+  15% {
+    opacity: 0.98;
+    transform: scale(1.02);
     filter: blur(0px);
   }
-  35% {
-    opacity: 0.9;
+  25% {
+    opacity: 0.95;
+    transform: scale(1);
+    filter: blur(0px);
+  }
+  65% {
+    opacity: 0.95;
     transform: scale(1);
     filter: blur(0px);
   }
   100% {
     opacity: 0;
-    transform: scale(1.2);
-    filter: blur(12px);
+    transform: scale(1.08);
+    filter: blur(10px);
   }
 }
 
 .playback-indicator-overlay {
-  animation: playbackIndicatorAnim 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: playbackIndicatorAnim 1150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* AI 어시스턴트 팝업이 버튼 바로 아래에서 부드럽게 스르륵 펼쳐지며 내려오는 애니메이션 */

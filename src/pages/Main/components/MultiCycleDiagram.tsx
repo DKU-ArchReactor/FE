@@ -9,7 +9,7 @@ interface MultiCycleDiagramProps {
   onJumpToCycle?: (cycle: number) => void;
 }
 
-type CellType = 'IF' | 'ID' | 'EX' | 'MEM' | 'WB' | 'STALL_IF' | 'STALL_ID' | 'BUBBLE';
+type CellType = 'IF' | 'ID' | 'EX' | 'MEM' | 'WB' | 'DONE' | 'STALL_IF' | 'STALL_ID' | 'BUBBLE';
 
 interface CellInfo {
   type: CellType;
@@ -61,6 +61,12 @@ const STAGE_STYLES: Record<
     text: 'text-white',
     border: 'border-rose-600',
     activeRing: 'ring-rose-300',
+  },
+  DONE: {
+    bg: 'bg-emerald-600',
+    text: 'text-white',
+    border: 'border-emerald-700',
+    activeRing: 'ring-emerald-300',
   },
   STALL_IF: {
     bg: 'bg-red-100',
@@ -157,7 +163,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 
         const cells: Record<number, CellInfo> = {};
         cells[cIdx] = {
-          type: 'WB',
+          type: 'DONE',
           stage: 'WB',
           label: 'DONE',
         };
@@ -381,7 +387,6 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   // 현재 사이클이 바뀔 때 해당 사이클 열(C0~CN)과 현재 실행 중인 명령어 행이 화면에 오도록 자동 스크롤
   useEffect(() => {
     const rightContainer = rightScrollRef.current;
-    const leftContainer = leftScrollRef.current;
     if (!rightContainer || !traceRows.length) return;
 
     if (activeCycleCol < 0) {
@@ -390,22 +395,16 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
         top: 0,
         behavior: 'smooth',
       });
-      if (leftContainer) {
-        leftContainer.scrollTo({
-          top: 0,
-          behavior: 'smooth',
-        });
-      }
       return;
     }
 
-    // 수평 스크롤 (C0 ~ CN 사이클 영역만 스크롤)
+    // 수평 스크롤 (우측 35% 지점에 현재 사이클 열 배치 -> 다음 진행될 사이클들 시야 확보)
     const targetLeft = Math.max(
       0,
-      activeCycleCol * COL_WIDTH - rightContainer.clientWidth / 2 + COL_WIDTH / 2
+      activeCycleCol * COL_WIDTH - rightContainer.clientWidth * 0.35 + COL_WIDTH / 2
     );
 
-    // 수직 스크롤 (활성 행 추적)
+    // 수직 스크롤 (상단 35% 지점에 현재 실행 중인 명령어 행 배치 -> 다음 실행될 명령어들 시야 확보)
     const activeRowIndices: number[] = [];
     traceRows.forEach((row, idx) => {
       if (row.cells[activeCycleCol]) {
@@ -413,29 +412,22 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       }
     });
 
-    if (activeRowIndices.length > 0) {
-      const midRowIdx = activeRowIndices[Math.floor(activeRowIndices.length / 2)];
-      const targetTop = Math.max(
-        0,
-        midRowIdx * ROW_HEIGHT - (rightContainer.clientHeight - 30) / 2 + ROW_HEIGHT / 2
-      );
-      rightContainer.scrollTo({
-        left: targetLeft,
-        top: targetTop,
-        behavior: 'smooth',
-      });
-      if (leftContainer) {
-        leftContainer.scrollTo({
-          top: targetTop,
-          behavior: 'smooth',
-        });
-      }
-    } else {
-      rightContainer.scrollTo({
-        left: targetLeft,
-        behavior: 'smooth',
-      });
-    }
+    const midRowIdx =
+      activeRowIndices.length > 0
+        ? activeRowIndices[Math.floor(activeRowIndices.length / 2)]
+        : activeCycleCol;
+
+    const targetTop = Math.max(
+      0,
+      midRowIdx * ROW_HEIGHT - (rightContainer.clientHeight - 30) * 0.35 + ROW_HEIGHT / 2
+    );
+
+    // rightContainer를 부드럽게 스크롤하면 handleRightScroll이 좌측 컨테이너의 scrollTop을 프레임 단위로 완벽 동기화
+    rightContainer.scrollTo({
+      left: targetLeft,
+      top: targetTop,
+      behavior: 'smooth',
+    });
   }, [activeCycleCol, traceRows]);
 
   return (
@@ -538,7 +530,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                   {/* 현재 선택된 사이클에서 이 명령어가 어느 단계에 있는지 즉시 표시 */}
                   {activeCellNow && activeStyle ? (
                     <span
-                      className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
+                      key={`badge-${activeCycleCol}`}
+                      className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border shadow-2xs animate-in zoom-in-75 duration-200 ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
                     >
                       {activeCellNow.label}
                     </span>
@@ -605,10 +598,10 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 
               {/* 본문 행 영역 */}
               <div className="relative">
-                {/* 현재 선택된 사이클 수직 하이라이트 기둥 (Step 0 대기 상태에서는 렌더링하지 않음) */}
+                {/* 현재 선택된 사이클 수직 하이라이트 기둥 (스텝 이동 시 부드러운 슬라이딩 글라이드 트랜지션) */}
                 {activeCycleCol >= 0 && (
                   <div
-                    className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
+                    className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8]/15 dark:bg-[#007ACC]/15 shadow-sm transition-[left] duration-250 ease-out"
                     style={{
                       left: `${activeCycleCol * COL_WIDTH}px`,
                       width: `${COL_WIDTH}px`,
@@ -634,6 +627,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                       {history.map((_, cIdx) => {
                         const cell = row.cells[cIdx];
                         const isCurrentCol = cIdx === activeCycleCol;
+                        const isCurrentActiveCell = isCurrentCol && isRowActiveNow;
 
                         if (!cell) {
                           return (
@@ -663,10 +657,12 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                             }`}
                           >
                             <span
-                              className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${
+                              className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-all duration-200 ${
                                 style.bg
                               } ${style.text} ${style.border} ${
-                                isCurrentCol
+                                isCurrentActiveCell
+                                  ? `scale-110 ring-2 ${style.activeRing} shadow-md font-extrabold z-10 animate-in zoom-in-90 duration-150`
+                                  : isCurrentCol
                                   ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
                                   : 'hover:scale-105'
                               }`}

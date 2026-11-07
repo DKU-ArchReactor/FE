@@ -156,6 +156,7 @@ const MainPage: React.FC = () => {
 
       if (simulationResult) {
         playback.handleSimulationComplete(simulationResult);
+        playback.triggerPlaybackFeedback("check");
       }
     } catch (error) {
       fileMgr.setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
@@ -195,6 +196,7 @@ const MainPage: React.FC = () => {
 
       if (simulationResult) {
         playback.handleSimulationComplete(simulationResult);
+        playback.triggerPlaybackFeedback("check");
       }
     } catch (err: any) {
       console.error("Assembly simulation error:", err);
@@ -335,15 +337,20 @@ const MainPage: React.FC = () => {
       onUpdateTranslationSource={(val) =>
         fileMgr.updateTranslationSource(val, "main.c", false, null, onResetSimulation)
       }
-      onResetTranslationSource={() =>
+      onResetTranslationSource={() => {
+        playback.triggerPlaybackFeedback("trash");
         fileMgr.updateTranslationSource(
           fileMgr.DEFAULT_TRANSLATION_SOURCE,
           "main.c",
           true,
           null,
-          onResetSimulation
-        )
-      }
+          () => {
+            setSimulationCache({ single: null, pipeline: null });
+            playback.setCurrentCycle(0);
+            playback.setIsPlaying(false);
+          }
+        );
+      }}
       onTranslationCompile={handleTranslationCompile}
       onTranslationFile={handleTranslationFile}
       onSelectTranslationLine={handleSelectTranslationLine}
@@ -352,6 +359,7 @@ const MainPage: React.FC = () => {
       onCustomAssemblyChange={setCustomAssembly}
       onSimulateAssembly={handleAssemblySimulation}
       onResetCustomAssembly={() => {
+        playback.triggerPlaybackFeedback("trash");
         setCustomAssembly(
           [
             "# RISC-V 32IM 어셈블리 직접 작성",
@@ -365,6 +373,9 @@ const MainPage: React.FC = () => {
             "",
           ].join("\n")
         );
+        setSimulationCache({ single: null, pipeline: null });
+        playback.setCurrentCycle(0);
+        playback.setIsPlaying(false);
       }}
       onJumpToCycle={playback.handleJumpToCycle}
       savedFiles={fileMgr.savedFiles}
@@ -632,40 +643,82 @@ const MainPage: React.FC = () => {
         {activeFlyout && renderPanel(activeFlyout)}
       </FlyoutPanel>
 
-      {/* Play / Pause / Reset 화면 중앙 애니메이션 피드백 (아이콘 단독 규격 통일) */}
-      {playback.playbackFeedback && (
-        <div
-          key={playback.playbackFeedback.id}
-          className="playback-indicator-overlay fixed inset-0 m-auto w-24 h-24 rounded-3xl bg-slate-900/80 backdrop-blur-md shadow-2xl flex items-center justify-center pointer-events-none z-50 text-white border border-white/20"
-        >
-          {playback.playbackFeedback.type === "play" ? (
-            <svg
-              className="w-12 h-12 fill-white translate-x-1 drop-shadow-md"
-              viewBox="0 0 24 24"
-            >
-              <path d="M6 4.5l14 7.5-14 7.5v-15z" />
-            </svg>
-          ) : playback.playbackFeedback.type === "pause" ? (
-            <svg
-              className="w-12 h-12 fill-white drop-shadow-md"
-              viewBox="0 0 24 24"
-            >
-              <rect x="5.5" y="4.5" width="4" height="15" rx="1.5" />
-              <rect x="14.5" y="4.5" width="4" height="15" rx="1.5" />
-            </svg>
-          ) : (
-            /* 1번 옵션: ⏮️ 되감기 / 첫 단계 복귀 (Skip to Start / Rewind) 아이콘 단독 */
-            <svg
-              className="w-12 h-12 fill-white drop-shadow-md"
-              viewBox="0 0 24 24"
-            >
-              <rect x="4" y="5" width="2.5" height="14" rx="1" />
-              <path d="M13 12l6-4.5v9L13 12z" />
-              <path d="M7.5 12l6-4.5v9L7.5 12z" />
-            </svg>
-          )}
-        </div>
-      )}
+      {/* Play / Pause / Reset / Trash / Check 화면 중앙 애니메이션 피드백 (담백한 딥 톤 배경 & 순백색 아이콘) */}
+      {playback.playbackFeedback && (() => {
+        const type = playback.playbackFeedback.type;
+        const feedbackConfigs = {
+          check: {
+            bgClass: "bg-emerald-700/85",
+            icon: (
+              <svg
+                className="w-12 h-12 stroke-white fill-none drop-shadow-md"
+                viewBox="0 0 24 24"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+            ),
+          },
+          play: {
+            bgClass: "bg-blue-700/85",
+            icon: (
+              <svg
+                className="w-12 h-12 fill-white translate-x-1 drop-shadow-md"
+                viewBox="0 0 24 24"
+              >
+                <path d="M6 4.5l14 7.5-14 7.5v-15z" />
+              </svg>
+            ),
+          },
+          pause: {
+            bgClass: "bg-amber-700/85",
+            icon: (
+              <svg
+                className="w-12 h-12 fill-white drop-shadow-md"
+                viewBox="0 0 24 24"
+              >
+                <rect x="5.5" y="4.5" width="4" height="15" rx="1.5" />
+                <rect x="14.5" y="4.5" width="4" height="15" rx="1.5" />
+              </svg>
+            ),
+          },
+          trash: {
+            bgClass: "bg-rose-700/85",
+            icon: (
+              <svg
+                className="w-12 h-12 fill-white drop-shadow-md"
+                viewBox="0 0 24 24"
+              >
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+              </svg>
+            ),
+          },
+          reset: {
+            bgClass: "bg-slate-800/90",
+            icon: (
+              <svg
+                className="w-12 h-12 fill-white drop-shadow-md"
+                viewBox="0 0 24 24"
+              >
+                <rect x="4" y="5" width="2.5" height="14" rx="1" />
+                <path d="M13 12l6-4.5v9L13 12z" />
+                <path d="M7.5 12l6-4.5v9L7.5 12z" />
+              </svg>
+            ),
+          },
+        }[type];
+
+        return (
+          <div
+            key={playback.playbackFeedback.id}
+            className={`playback-indicator-overlay fixed inset-0 m-auto w-24 h-24 rounded-3xl ${feedbackConfigs.bgClass} backdrop-blur-md shadow-2xl flex items-center justify-center pointer-events-none z-50 text-white border border-white/20 transition-colors`}
+          >
+            {feedbackConfigs.icon}
+          </div>
+        );
+      })()}
     </main>
   );
 };

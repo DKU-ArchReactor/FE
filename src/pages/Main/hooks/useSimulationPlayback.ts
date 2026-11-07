@@ -28,13 +28,13 @@ export function useSimulationPlayback({
   const [playSpeed, setPlaySpeed] = useState<number>(1000);
 
   const [playbackFeedback, setPlaybackFeedback] = useState<{
-    type: "play" | "pause" | "reset";
+    type: "play" | "pause" | "reset" | "trash" | "check";
     id: number;
   } | null>(null);
 
   const timerRef = useRef<number | null>(null);
 
-  const triggerPlaybackFeedback = (type: "play" | "pause" | "reset") => {
+  const triggerPlaybackFeedback = (type: "play" | "pause" | "reset" | "trash" | "check") => {
     setPlaybackFeedback({ type, id: Date.now() });
   };
 
