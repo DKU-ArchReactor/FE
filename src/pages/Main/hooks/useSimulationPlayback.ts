@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../components/translationCompile";
 
@@ -38,14 +38,114 @@ export function useSimulationPlayback({
     setPlaybackFeedback({ type, id: Date.now() });
   };
 
-  const activeCycleIndex = Math.min(currentCycle, Math.max(0, historyList.length - 1));
-  const prevCycleIndex = activeCycleIndex > 0 ? activeCycleIndex - 1 : null;
+  // Single-Cycle 모드 전용: Step 0 (실행 시작 전 대기 상태) 초기 스냅샷
+  const initialSingleData: CycleHistoryItem | null = useMemo(() => {
+    if (!simulationData || !historyList.length) return null;
+    const entryPc = simulationData.program?.entry_point || "0x00010000";
+    const initialRegs: Record<string, string> = {
+      x0: "0x00000000",
+      x1: "0x00000000",
+      x2: "0x7fffeffc", // sp
+    };
+    for (let i = 0; i < 32; i++) {
+      const k = `x${i}`;
+      if (!initialRegs[k]) initialRegs[k] = "0x00000000";
+    }
 
-  const currentData: CycleHistoryItem | null = historyList[activeCycleIndex] ?? null;
-  const prevData: CycleHistoryItem | null =
-    prevCycleIndex !== null && prevCycleIndex !== activeCycleIndex
-      ? historyList[prevCycleIndex] ?? null
-      : null;
+    return {
+      clock: 0,
+      buffers: {
+        IF: {
+          pc: entryPc,
+          assembly: "empty",
+          status: "empty",
+        },
+        ID: null,
+        EX: null,
+        MEM: null,
+        WB: null,
+      },
+      stage_activity: {
+        IF: { pc: entryPc, assembly: "empty", status: "empty" },
+        ID: { assembly: "empty", status: "empty" },
+        EX: { assembly: "empty", status: "empty" },
+        MEM: { assembly: "empty", status: "empty" },
+        WB: { assembly: "empty", status: "empty" },
+      },
+      cycle_events: {
+        stall: {
+          has_stall: false,
+          stage: null,
+          assembly: null,
+          stall_reason: null,
+          stall_desc: null,
+        },
+        forwarding: {
+          has_forwarded: false,
+          stage: null,
+          assembly: null,
+          forwarded_operand_count: 0,
+          forwarding_info: {
+            has_forwarded: false,
+            forwarded_from: [],
+            forwarded_to: [],
+            target_register: [],
+            forwarded_value: [],
+          },
+          forwarding_desc: null,
+        },
+        control_hazard: {
+          has_control_instruction: false,
+          has_flush: false,
+          stage: null,
+          assembly: null,
+          taken: null,
+          target_pc: null,
+          fallthrough_pc: null,
+          flushed_stages: [],
+          flush_reason: null,
+          redirect_pc: null,
+        },
+        runtime_error: {
+          has_error: false,
+          code: null,
+          stage: null,
+          assembly: null,
+          message: null,
+          reason: null,
+        },
+      },
+      global_result: {
+        current_pc: entryPc,
+        registers: initialRegs,
+        memory_snapshot: {},
+        console_output: "",
+        metrics: {
+          accumulated_instructions: 0,
+          accumulated_stalls: 0,
+          accumulated_forwards: 0,
+        },
+      },
+    };
+  }, [simulationData, historyList.length]);
+
+  const activeCycleIndex = isSingleEngine
+    ? (currentCycle > 0 ? currentCycle - 1 : 0)
+    : Math.min(currentCycle, Math.max(0, historyList.length - 1));
+
+  const currentData: CycleHistoryItem | null = isSingleEngine
+    ? (currentCycle === 0
+        ? initialSingleData
+        : historyList[Math.min(currentCycle - 1, historyList.length - 1)] ?? null)
+    : (historyList[activeCycleIndex] ?? null);
+
+  const prevData: CycleHistoryItem | null = isSingleEngine
+    ? (currentCycle === 0
+        ? null
+        : currentCycle === 1
+        ? initialSingleData
+        : historyList[Math.min(currentCycle - 2, historyList.length - 1)] ?? null)
+    : (activeCycleIndex > 0 ? historyList[activeCycleIndex - 1] ?? null : null);
 
   // Single 모드 또는 Pipeline 모드에서 현재 활성 실행 중인 어셈블리 행 계산
   const currentActiveRow = (() => {

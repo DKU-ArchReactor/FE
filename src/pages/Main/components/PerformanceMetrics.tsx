@@ -27,6 +27,33 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
       };
     }
 
+    const isSingleMode =
+      simulationData?.simulator?.mode === 'single' ||
+      simulationData?.simulator?.pipeline_model === 'single-cycle';
+
+    if (isSingleMode) {
+      if (currentCycle === 0) {
+        return {
+          completedInstructions: 0,
+          totalCycles: 0,
+          cpi: '1.00',
+          ipc: '1.00',
+          stalls: 0,
+          forwards: 0,
+          bubbleRatio: 0,
+        };
+      }
+      return {
+        completedInstructions: currentCycle,
+        totalCycles: currentCycle,
+        cpi: '1.00',
+        ipc: '1.00',
+        stalls: 0,
+        forwards: 0,
+        bubbleRatio: 0,
+      };
+    }
+
     // 현재 사이클까지 WB를 완료한 고유 명령어 개수 추적
     const wbInstructions = new Set<string>();
     let totalStalls = 0;

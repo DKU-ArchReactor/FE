@@ -309,6 +309,7 @@ const MainPage: React.FC = () => {
       simulationData={simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
+      currentCycle={playback.currentCycle}
       activeCycleIndex={playback.activeCycleIndex}
       playSpeed={playback.playSpeed}
       loadingMessage={loadingMessage}

@@ -12,7 +12,11 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
   currentCycleData,
   currentCycle,
 }) => {
-  if (!simulationData || !currentCycleData) {
+  const isSingle =
+    simulationData?.simulator?.mode === 'single' ||
+    simulationData?.simulator?.pipeline_model === 'single-cycle';
+
+  if (!simulationData || !currentCycleData || (isSingle && currentCycle === 0)) {
     return (
       <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
         <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">

@@ -105,7 +105,7 @@ const isSameInstruction = (
 
 const COL_WIDTH = 40;
 const ROW_HEIGHT = 28;
-const LEFT_COL_WIDTH = 250;
+const LEFT_COL_WIDTH = 280;
 
 export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   simulationData,
@@ -373,22 +373,42 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     return rows;
   }, [history, isSingleMode]);
 
+  // Single-Cycle 모드에서는 Step 0이 초기 대기 상태(activeCycleCol = -1)이며, Step 1~N이 각 C0~CN-1 열에 매핑
+  const activeCycleCol = isSingleMode
+    ? (currentCycle > 0 ? currentCycle - 1 : -1)
+    : currentCycle;
+
   // 현재 사이클이 바뀔 때 해당 사이클 열(C0~CN)과 현재 실행 중인 명령어 행이 화면에 오도록 자동 스크롤
   useEffect(() => {
     const rightContainer = rightScrollRef.current;
     const leftContainer = leftScrollRef.current;
     if (!rightContainer || !traceRows.length) return;
 
+    if (activeCycleCol < 0) {
+      rightContainer.scrollTo({
+        left: 0,
+        top: 0,
+        behavior: 'smooth',
+      });
+      if (leftContainer) {
+        leftContainer.scrollTo({
+          top: 0,
+          behavior: 'smooth',
+        });
+      }
+      return;
+    }
+
     // 수평 스크롤 (C0 ~ CN 사이클 영역만 스크롤)
     const targetLeft = Math.max(
       0,
-      currentCycle * COL_WIDTH - rightContainer.clientWidth / 2 + COL_WIDTH / 2
+      activeCycleCol * COL_WIDTH - rightContainer.clientWidth / 2 + COL_WIDTH / 2
     );
 
     // 수직 스크롤 (활성 행 추적)
     const activeRowIndices: number[] = [];
     traceRows.forEach((row, idx) => {
-      if (row.cells[currentCycle]) {
+      if (row.cells[activeCycleCol]) {
         activeRowIndices.push(idx);
       }
     });
@@ -416,7 +436,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
         behavior: 'smooth',
       });
     }
-  }, [currentCycle, traceRows]);
+  }, [activeCycleCol, traceRows]);
 
   return (
     <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
@@ -491,14 +511,14 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 
             {/* 좌측 명령어 행 목록 */}
             {traceRows.map((row, rIdx) => {
-              const activeCellNow = row.cells[currentCycle];
+              const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
               const isRowActiveNow = Boolean(activeCellNow);
               const activeStyle = activeCellNow ? STAGE_STYLES[activeCellNow.type] : null;
 
               return (
                 <div
                   key={row.id}
-                  onClick={() => onJumpToCycle?.(row.firstCycle)}
+                  onClick={() => onJumpToCycle?.(isSingleMode ? row.firstCycle + 1 : row.firstCycle)}
                   className={`h-[28px] shrink-0 px-2 flex items-center justify-between gap-1.5 border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 text-[10px] font-mono cursor-pointer transition-colors ${
                     isRowActiveNow
                       ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
@@ -547,7 +567,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
               {/* 상단 사이클 번호 헤더 행 (Sticky Top) */}
               <div className="h-7 shrink-0 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-10 shadow-2xs">
                 {history.map((item, cIdx) => {
-                  const isCurrent = cIdx === currentCycle;
+                  const isCurrent = cIdx === activeCycleCol;
                   const hasStall = item.cycle_events?.stall?.has_stall;
                   const hasFlush = item.cycle_events?.control_hazard?.has_flush;
 
@@ -555,7 +575,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     <button
                       key={cIdx}
                       type="button"
-                      onClick={() => onJumpToCycle?.(cIdx)}
+                      onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
                       className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${
                         isCurrent
                           ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
@@ -585,17 +605,19 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 
               {/* 본문 행 영역 */}
               <div className="relative">
-                {/* 현재 선택된 사이클 수직 하이라이트 기둥 */}
-                <div
-                  className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
-                  style={{
-                    left: `${currentCycle * COL_WIDTH}px`,
-                    width: `${COL_WIDTH}px`,
-                  }}
-                />
+                {/* 현재 선택된 사이클 수직 하이라이트 기둥 (Step 0 대기 상태에서는 렌더링하지 않음) */}
+                {activeCycleCol >= 0 && (
+                  <div
+                    className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
+                    style={{
+                      left: `${activeCycleCol * COL_WIDTH}px`,
+                      width: `${COL_WIDTH}px`,
+                    }}
+                  />
+                )}
 
                 {traceRows.map((row, rIdx) => {
-                  const activeCellNow = row.cells[currentCycle];
+                  const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
                   const isRowActiveNow = Boolean(activeCellNow);
 
                   return (
@@ -611,13 +633,13 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     >
                       {history.map((_, cIdx) => {
                         const cell = row.cells[cIdx];
-                        const isCurrentCol = cIdx === currentCycle;
+                        const isCurrentCol = cIdx === activeCycleCol;
 
                         if (!cell) {
                           return (
                             <div
                               key={cIdx}
-                              onClick={() => onJumpToCycle?.(cIdx)}
+                              onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
                               className="shrink-0 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer hover:bg-slate-100/40 dark:hover:bg-[#2A2D2E]/40"
                               style={{ width: `${COL_WIDTH}px` }}
                             />
@@ -629,7 +651,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                         return (
                           <div
                             key={cIdx}
-                            onClick={() => onJumpToCycle?.(cIdx)}
+                            onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
                             className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer relative z-1"
                             style={{ width: `${COL_WIDTH}px` }}
                             title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${

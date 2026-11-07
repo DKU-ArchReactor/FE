@@ -27,6 +27,7 @@ interface PanelRendererProps {
   simulationData: SimulationResult | null;
   currentData: CycleHistoryItem | null;
   prevData: CycleHistoryItem | null;
+  currentCycle: number;
   activeCycleIndex: number;
   playSpeed: number;
   loadingMessage: string | null;
@@ -81,7 +82,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   simulationData,
   currentData,
   prevData,
-  activeCycleIndex,
+  currentCycle,
+  activeCycleIndex: _activeCycleIndex,
   playSpeed,
   loadingMessage,
   simulationMode,
@@ -251,7 +253,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           registers={currentData?.global_result.registers ?? EMPTY_REGISTERS}
           prevRegisters={prevData?.global_result.registers}
           playSpeed={playSpeed}
-          cycle={activeCycleIndex}
+          cycle={currentCycle}
         />
       );
 
@@ -263,7 +265,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           simulationData={simulationData}
           translationAssembly={translationAssembly || asmContent}
           playSpeed={playSpeed}
-          cycle={activeCycleIndex}
+          cycle={currentCycle}
         />
       );
 
@@ -272,7 +274,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
         <MultiCycleDiagram
           simulationData={simulationData}
           currentCycleData={currentData}
-          currentCycle={activeCycleIndex}
+          currentCycle={currentCycle}
           translationAssembly={translationAssembly || asmContent}
           onJumpToCycle={onJumpToCycle}
         />
@@ -283,7 +285,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
         <PerformanceMetrics
           simulationData={simulationData}
           currentCycleData={currentData}
-          currentCycle={activeCycleIndex}
+          currentCycle={currentCycle}
         />
       );
 
@@ -292,7 +294,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
         <HazardDiagnostics
           simulationData={simulationData}
           currentCycleData={currentData}
-          currentCycle={activeCycleIndex}
+          currentCycle={currentCycle}
         />
       );
 

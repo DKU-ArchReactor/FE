@@ -400,6 +400,26 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                 {(() => {
                   const ifBuf = currentCycleData.buffers?.IF || currentCycleData.if_stage;
                   const ifInst = ifBuf?.assembly || "bubble";
+                  const isIdleStep0 = ifInst === "empty" && currentCycleData.clock === 0;
+
+                  if (isIdleStep0) {
+                    return (
+                      <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-[#252526] border border-slate-100 dark:border-[#333333]">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-[#005FB8] dark:text-[#79C0FF] font-sans">
+                            [Step 0] 시뮬레이션 준비 완료
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585]">
+                            Entry: {ifBuf?.pc || "0x00010000"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 dark:text-[#858585] leading-relaxed">
+                          아직 실행된 명령어가 없습니다. 상단의 [PLAY] 또는 [다음 스텝] 버튼을 누르면 첫 번째 명령어부터 실행됩니다.
+                        </p>
+                      </div>
+                    );
+                  }
+
                   const isCrtCycle = ifBuf?.source_line === null || (ifBuf && ifBuf.source_line === undefined && (ifInst.startsWith("auipc") || ifInst.startsWith("jalr")));
                   const crtAnalysis = isCrtCycle ? analyzeCrtInstruction(ifInst, ifBuf?.pc) : null;
                   const ifAnalysis = analyzeAsmInstruction(ifInst);
@@ -431,6 +451,14 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
                 {/* 해저드 및 스톨 여부 카드 */}
                 {(() => {
+                  if (currentCycleData.clock === 0 && (currentCycleData.buffers?.IF?.assembly === 'empty' || currentCycleData.buffers?.IF?.status === 'empty')) {
+                    return (
+                      <div className="p-2.5 rounded-lg border text-[11px] leading-relaxed bg-slate-50 dark:bg-[#252526] border-slate-200 dark:border-[#333333] text-slate-700 dark:text-[#CCCCCC]">
+                        대기 상태: 하드웨어 파이프라인 및 레지스터가 초기화되었습니다.
+                      </div>
+                    );
+                  }
+
                   const { cycle_events } = currentCycleData;
                   const isStall = cycle_events.stall?.has_stall;
                   const isForward = cycle_events.forwarding?.has_forwarded;
