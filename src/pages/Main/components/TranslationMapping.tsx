@@ -349,7 +349,7 @@ export default function TranslationMapping({
 
             return (
               <div
-                key={`${row.sourceLine}-${index}`}
+                key={`${row.pc || index}-${row.sourceLine}-${index}`}
                 ref={(el) => {
                   if (el) rowElementsRef.current.set(index, el);
                   else rowElementsRef.current.delete(index);

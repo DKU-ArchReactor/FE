@@ -52,6 +52,21 @@ export function useSimulationPlayback({
     if (!currentData || !mappedAssemblyRows.length) return null;
 
     if (isSingleEngine) {
+      // 1순위: PC 기반 직접 매칭 (가장 정확)
+      const currentPc = (
+        currentData.buffers?.IF?.pc ||
+        currentData.if_stage?.pc ||
+        currentData.stage_activity?.IF?.pc ||
+        currentData.global_result?.current_pc ||
+        ""
+      ).trim().toLowerCase();
+
+      if (currentPc) {
+        const pcMatch = mappedAssemblyRows.find((r) => (r.pc || "").trim().toLowerCase() === currentPc);
+        if (pcMatch) return pcMatch;
+      }
+
+      // 2순위: 활성 명령어 텍스트 매칭
       const activeAsm = (
         currentData.buffers?.IF?.assembly ||
         currentData.if_stage?.assembly ||
@@ -64,14 +79,31 @@ export function useSimulationPlayback({
 
       if (!activeAsm || activeAsm === "bubble" || activeAsm === "empty") return null;
 
-      // 1순위: 활성 명령어 텍스트와 정확히 일치하는 행 매칭
+      const matched = mappedAssemblyRows.find((r) => {
+        const rowNorm = r.text.replace(/\s+/g, " ").trim().toLowerCase();
+        return rowNorm === activeAsm;
+      });
+      return matched ?? null;
+    } else {
+      // Pipeline 모드: 실행 중인 주요 스테이지(EX 또는 IF)의 명령어 매칭
+      const activeBuf = currentData.buffers?.EX || currentData.buffers?.ID || currentData.buffers?.IF;
+      if (!activeBuf) return null;
+
+      const bufPc = (activeBuf.pc || "").trim().toLowerCase();
+      if (bufPc) {
+        const pcMatch = mappedAssemblyRows.find((r) => (r.pc || "").trim().toLowerCase() === bufPc);
+        if (pcMatch) return pcMatch;
+      }
+
+      const activeAsm = (activeBuf.assembly || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (!activeAsm || activeAsm === "bubble" || activeAsm === "empty") return null;
+
       const matched = mappedAssemblyRows.find((r) => {
         const rowNorm = r.text.replace(/\s+/g, " ").trim().toLowerCase();
         return rowNorm === activeAsm;
       });
       return matched ?? null;
     }
-    return null;
   })();
 
   const activeExecutionCLine = currentActiveRow?.sourceLine ?? null;
