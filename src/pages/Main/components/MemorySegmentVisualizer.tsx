@@ -557,7 +557,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                             onClick={() => setIsUserCodeExpanded(!isUserCodeExpanded)}
                             className="text-[9.5px] font-medium text-amber-700 hover:text-amber-900 bg-amber-100/90 hover:bg-amber-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0"
                           >
-                            {isUserCodeExpanded ? '닫기 ▲' : '명령어 ▼'}
+                            {isUserCodeExpanded ? '닫기 ▼' : '열기 ▲'}
                           </button>
                         </div>
 

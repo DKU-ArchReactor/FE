@@ -98,7 +98,7 @@ const Header = () => {
         {/* 좌측: 로고 및 뷰포트 내비게이션 탭 */}
         <div className="flex items-center gap-6">
           <div 
-            className="text-[var(--ar-accent)] font-bold text-lg cursor-pointer tracking-tight flex items-center gap-2 group" 
+            className="text-[#005FB8] dark:text-[#007ACC] font-bold text-lg cursor-pointer tracking-tight flex items-center gap-2 group" 
             onClick={() => navigate("/")}
             title="ArchReactor - RISC-V Pipeline Visualizer"
           >
