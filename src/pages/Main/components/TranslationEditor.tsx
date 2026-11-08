@@ -296,7 +296,7 @@ export default function TranslationEditor({
             }`}
           />
           <h3
-            className={`text-[11px] font-semibold uppercase tracking-wider truncate whitespace-nowrap transition-colors ${
+            className={`font-sans text-[11px] font-semibold uppercase tracking-wide truncate whitespace-nowrap transition-colors ${
               activeTarget !== "c"
                 ? "text-[var(--ar-text-muted)]"
                 : "text-[var(--ar-text-primary)]"

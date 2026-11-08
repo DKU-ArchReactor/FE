@@ -22,7 +22,7 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
         <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-rose-500">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-[11px] text-rose-500 font-bold">◆</span>
-            <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
+            <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
               HAZARD DIAGNOSTICS
             </h3>
           </div>
@@ -51,7 +51,7 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
       <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-rose-500">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[11px] text-rose-500 font-bold">◆</span>
-          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             HAZARD DIAGNOSTICS
           </h3>
         </div>

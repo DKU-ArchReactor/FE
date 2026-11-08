@@ -210,7 +210,7 @@ export default function TranslationMapping({
                 : "bg-transparent scale-0"
               }`}
           />
-          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider truncate whitespace-nowrap">
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
             RISC-V ASSEMBLY
           </h3>
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">

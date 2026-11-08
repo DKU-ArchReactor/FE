@@ -33,7 +33,7 @@ export const FileListPanel: React.FC<FileListPanelProps> = ({
       <div className="px-3.5 py-1.5 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] flex items-center justify-between shrink-0 border-l-2 border-l-teal-500">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[11px] text-teal-500 font-bold">◆</span>
-          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             FILE EXPLORER
           </h3>
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono hidden sm:inline">
