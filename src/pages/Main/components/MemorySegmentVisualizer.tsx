@@ -184,43 +184,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   const prevMemorySnapshot = prevData?.global_result.memory_snapshot;
   const currentPc = currentData?.global_result.current_pc?.toLowerCase();
   const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(true);
-
-  // 새로 값이 쓰인 메모리 주소들에 대해 절반 주기(50%) 동안 점등 상태 유지
-  const [pulsingAddresses, setPulsingAddresses] = React.useState<Set<string>>(() => new Set());
-  const prevMemRef = React.useRef<Record<string, string> | undefined>(undefined);
-
-  React.useEffect(() => {
-    const referencePrev = prevMemorySnapshot || prevMemRef.current;
-    prevMemRef.current = memorySnapshot;
-
-    if (!referencePrev) {
-      setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
-      return;
-    }
-
-    const changed = new Set<string>();
-    Object.entries(memorySnapshot).forEach(([addr, val]) => {
-      const prevVal = referencePrev[addr];
-      if (prevVal !== undefined && prevVal !== val) {
-        changed.add(addr.toLowerCase());
-      } else if (prevVal === undefined && val !== undefined) {
-        // 새로 할당된 메모리 주소인 경우에도 점등
-        changed.add(addr.toLowerCase());
-      }
-    });
-
-    if (changed.size > 0) {
-      setPulsingAddresses(changed);
-      const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
-      const timer = window.setTimeout(() => {
-        setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
-      }, halfDuration);
-
-      return () => clearTimeout(timer);
-    } else {
-      setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
-    }
-  }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
+  const userCodeScrollRef = React.useRef<HTMLDivElement>(null);
 
   // 어셈블리 및 코드 세그먼트 메타데이터 추출: CORE가 제공하는 memory_layout 및 code_mapping을 최우선 SSOT로 사용
   const {
@@ -393,6 +357,50 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     return result;
   }, [memorySnapshot, prevMemorySnapshot, simulationData, maxCodePcNum, userInstructions, runtimeInstructions]);
 
+  // 새로 값이 쓰인 메모리 주소들에 대해 절반 주기(50%) 동안 점등 상태 유지
+  const [pulsingAddresses, setPulsingAddresses] = React.useState<Set<string>>(() => new Set());
+  const prevMemRef = React.useRef<Record<string, string> | undefined>(undefined);
+
+  React.useEffect(() => {
+    const referencePrev = prevMemorySnapshot || prevMemRef.current;
+    prevMemRef.current = memorySnapshot;
+
+    if (!referencePrev) {
+      setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
+      return;
+    }
+
+    const changed = new Set<string>();
+    Object.entries(memorySnapshot).forEach(([addr, val]) => {
+      const prevVal = referencePrev[addr];
+      if (prevVal !== undefined && prevVal !== val) {
+        changed.add(addr.toLowerCase());
+      } else if (prevVal === undefined && val !== undefined) {
+        // 새로 할당된 메모리 주소인 경우에도 점등
+        changed.add(addr.toLowerCase());
+      }
+    });
+
+    if (changed.size > 0) {
+      setPulsingAddresses(changed);
+      const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
+      const timer = window.setTimeout(() => {
+        setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
+      }, halfDuration);
+
+      return () => clearTimeout(timer);
+    } else {
+      setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
+    }
+  }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
+
+  // 사용자가 코드를 펼쳤거나 코드가 새로 로드되었을 때, 가장 낮은 주소(main 시작점)가 있는 맨 아래로 스크롤
+  React.useEffect(() => {
+    if (isUserCodeExpanded && userCodeScrollRef.current) {
+      userCodeScrollRef.current.scrollTop = userCodeScrollRef.current.scrollHeight;
+    }
+  }, [isUserCodeExpanded, userInstructions.length]);
+
   // 동적 세그먼트 경계선 주소 계산 (High ➔ Low)
   // [0] Stack ➔ Heap: 현재 $sp (유효할 경우) 또는 기본 Heap 한계선 0x10008000
   // [1] Heap ➔ BSS: 기본 0x10004000
@@ -516,7 +524,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                     </div>
                   ) : isCode ? (
                     <div className="flex flex-col gap-1.5 py-0.5">
-                      {/* 1. 사용자 프로그램 메인 코드 통합 블록 (세로 스택 최적화) */}
+                      {/* 1. 사용자 프로그램 메인 코드 통합 블록 (상위 주소 영역이므로 스타트업 위에 위치) */}
                       <div className="rounded-lg border border-amber-300 bg-amber-50/70 p-1.5 shadow-2xs flex flex-col gap-1">
                         {/* 1층: 주소 범위 & 뱃지 */}
                         <div className="flex items-center justify-between gap-1">
@@ -559,9 +567,12 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                           </span>
                         </div>
 
-                        {/* 펼쳤을 때: 명령어 리스트 (사용자 프로그램 코드만 전용 표시) */}
+                        {/* 펼쳤을 때: 명령어 리스트 (초기 스크롤이 main 시작점인 맨 아래로 가도록 ref 연결) */}
                         {isUserCodeExpanded && (
-                          <div className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 max-h-32 overflow-y-auto custom-scrollbar">
+                          <div
+                            ref={userCodeScrollRef}
+                            className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 max-h-32 overflow-y-auto custom-scrollbar"
+                          >
                             {userInstructions.length === 0 ? (
                               <div className="text-[10px] text-amber-800/60 font-sans italic py-2 text-center">
                                 컴파일 후 명령어가 로드됩니다.
@@ -585,7 +596,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         )}
                       </div>
 
-                      {/* 2. C 런타임 스타트업 영역 (세로 스택 최적화) */}
+                      {/* 2. C 런타임 스타트업 영역 (최하위 코드 주소 0x00010000 영역이므로 메인 코드 아래, NULL 바로 위에 위치) */}
                       <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80">
                         <div className="flex items-center justify-between">
                           <span
