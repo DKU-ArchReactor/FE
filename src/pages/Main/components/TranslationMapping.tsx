@@ -198,11 +198,11 @@ export default function TranslationMapping({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-sm select-none transition-colors duration-150"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="RISC-V 어셈블리 결과"
     >
       {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수) */}
-      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#252526] px-3.5 py-1.5 min-w-0">
+      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-sky-500">
         <div className="flex items-center gap-2 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
@@ -211,10 +211,10 @@ export default function TranslationMapping({
                 : "bg-transparent scale-0"
             }`}
           />
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] truncate whitespace-nowrap">
+          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] truncate whitespace-nowrap">
             RISC-V 어셈블리 {activeTarget === "asm" ? "에디터" : "매핑"}
           </h3>
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
             ({activeTarget === "asm" ? "main.s" : assembly ? `${rows.length} instrs` : "빈 코드"})
           </span>
         </div>

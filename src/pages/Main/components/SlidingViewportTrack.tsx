@@ -77,8 +77,8 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                           <div
                             className={
                               isMetricsFixed
-                                ? "w-full flex flex-col"
-                                : "w-full h-full flex flex-col min-h-0 overflow-hidden"
+                                ? "w-full flex flex-col p-[1.5px]"
+                                : "w-full h-full flex flex-col min-h-0 overflow-hidden p-[1.5px]"
                             }
                           >
                             {renderPanel(slot.panel)}
@@ -87,7 +87,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                           /* 2) 가로 2개 묶음 렌더링 + 내부 좌우 가로 스플리터 바 */
                           <div className="w-full h-full flex min-h-0 overflow-hidden relative">
                             <div
-                              className="flex flex-col min-h-0 overflow-hidden"
+                              className="flex flex-col min-h-0 overflow-hidden p-[1.5px]"
                               style={{ width: `${slot.pairRatio ?? 50}%` }}
                             >
                               {renderPanel(slot.left)}
@@ -128,7 +128,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                             </div>
 
                             <div
-                              className="flex flex-col min-h-0 overflow-hidden"
+                              className="flex flex-col min-h-0 overflow-hidden p-[1.5px]"
                               style={{
                                 width: `${100 - (slot.pairRatio ?? 50)}%`,
                               }}

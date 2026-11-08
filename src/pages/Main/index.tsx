@@ -494,7 +494,7 @@ const MainPage: React.FC = () => {
               className="flex-1 flex w-full min-h-0 overflow-hidden"
             >
               <div
-                className="flex flex-col h-full min-h-0 overflow-hidden"
+                className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
                 style={{ width: `${splitter.leftCodeColRatio}%` }}
               >
                 {renderPanel("cSource")}
@@ -529,7 +529,7 @@ const MainPage: React.FC = () => {
               </div>
 
               <div
-                className="flex flex-col h-full min-h-0 overflow-hidden"
+                className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
                 style={{ width: `${100 - splitter.leftCodeColRatio}%` }}
               >
                 {renderPanel("source")}
@@ -567,7 +567,7 @@ const MainPage: React.FC = () => {
 
           {/* 하단: 튜터 영역 */}
           <div
-            className="w-full min-h-0 overflow-hidden flex flex-col"
+            className="w-full min-h-0 overflow-hidden flex flex-col p-[1.5px]"
             style={{ height: `${100 - splitter.leftTopHeightPercent}%` }}
           >
             {renderPanel("tutor")}

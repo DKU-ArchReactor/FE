@@ -418,7 +418,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="@container flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 flex flex-col min-h-0 overflow-hidden relative select-none"
+      className="@container flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-3.5 flex flex-col min-h-0 overflow-hidden relative select-none"
     >
       {/* 애니메이션 키프레임 */}
       <style>{`

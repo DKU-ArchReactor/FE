@@ -98,15 +98,15 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-sm select-none transition-colors duration-150"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="AI 튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}
-      <header className="shrink-0 flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#252526] px-3.5 py-1.5 min-w-0">
+      <header className="shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-purple-500">
         <div className="flex items-center gap-2 min-w-0 shrink">
           <span className="text-sm shrink-0">🎓</span>
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap shrink-0">ArchReactor Tutor</h3>
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate">
+          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap shrink-0">ArchReactor Tutor</h3>
+          <span className="text-[10px] text-[var(--ar-text-muted)] truncate">
             {activeTarget === "asm" ? "어셈블리 파이프라인 분석" : "명령어 & 컴파일 해설"}
           </span>
         </div>

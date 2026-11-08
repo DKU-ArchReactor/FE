@@ -272,19 +272,19 @@ export default function TranslationEditor({
 
   return (
     <section
-      className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border shadow-sm select-none transition-all duration-200 ${
+      className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border shadow-sm select-none transition-all duration-200 ${
         activeTarget !== "c"
-          ? "border-[#D0D7DE] dark:border-[#2C2C2E] bg-[#EBECEF] dark:bg-[#141415]"
-          : "border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E]"
+          ? "border-[var(--ar-border)] bg-[#EBECEF] dark:bg-[#141415]"
+          : "border-[var(--ar-border)] bg-[var(--ar-panel-bg)]"
       }`}
       aria-label="Translation C 편집기"
     >
       {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명) */}
       <header
-        className={`shrink-0 flex items-center justify-between gap-2 border-b px-3.5 py-1.5 min-w-0 transition-colors ${
+        className={`shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 py-1.5 min-w-0 transition-colors border-l-2 border-l-blue-600 dark:border-l-blue-500 ${
           activeTarget !== "c"
-            ? "border-[#D0D7DE] dark:border-[#2C2C2E] bg-[#E2E4E8] dark:bg-[#1A1A1C]"
-            : "border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#252526]"
+            ? "bg-[#E2E4E8] dark:bg-[#1A1A1C]"
+            : "bg-[var(--ar-header-bg)]"
         }`}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -298,18 +298,14 @@ export default function TranslationEditor({
           <h3
             className={`text-xs font-semibold truncate whitespace-nowrap transition-colors ${
               activeTarget !== "c"
-                ? "text-[#6E7681] dark:text-[#8C959F]"
-                : "text-[#1F2328] dark:text-[#CCCCCC]"
+                ? "text-[var(--ar-text-muted)]"
+                : "text-[var(--ar-text-primary)]"
             }`}
           >
             C 소스 코드
           </h3>
           <span
-            className={`text-[10px] font-mono truncate transition-colors ${
-              activeTarget !== "c"
-                ? "text-[#8C959F] dark:text-[#6E7681]"
-                : "text-[#57606A] dark:text-[#858585]"
-            }`}
+            className="text-[10px] font-mono truncate text-[var(--ar-text-muted)]"
           >
             ({fileName})
           </span>

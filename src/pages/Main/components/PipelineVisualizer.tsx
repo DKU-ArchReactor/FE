@@ -66,7 +66,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
   const handleZoomReset = () => setZoomLevel(1.0);
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-sm border border-[#E5E5E5] dark:border-[#333333] p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
       {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일 */}
       <style>{`
         @keyframes streamDown {
@@ -95,13 +95,13 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
       `}</style>
 
       {/* 1. 상단 헤더 & 컨트롤러 */}
-      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-[#E5E5E5] dark:border-[#333333] shrink-0">
-        <div className="flex items-center gap-2">
+      <div className={`shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 ${isSingle ? "border-l-amber-500" : "border-l-blue-500"}`}>
+        <div className="flex items-center gap-2 min-w-0">
           <span className={`w-2 h-2 rounded-full animate-pulse ${isSingle ? "bg-amber-500 dark:bg-amber-400" : "bg-[#005FB8] dark:bg-[#007ACC]"}`} />
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
             {isSingle ? "Single-Cycle Datapath (1 Inst / Cycle)" : "Vertical 5-Stage Datapath"}
           </h3>
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">(Clock {clock ?? 0})</span>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(Clock {clock ?? 0})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
