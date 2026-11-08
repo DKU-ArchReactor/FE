@@ -61,18 +61,26 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                   return (
                     <React.Fragment key={slotIdx}>
                       <div
-                        className={`min-h-0 overflow-hidden flex ${
-                          isMetricsFixed ? "shrink-0" : ""
-                        }`}
+                        className={
+                          isMetricsFixed
+                            ? "shrink-0 min-h-fit flex w-full"
+                            : "min-h-0 overflow-hidden flex"
+                        }
                         style={
                           isMetricsFixed
-                            ? { flex: "0 0 185px", height: "185px" }
+                            ? { flex: "0 0 auto" }
                             : { flex: `${flexVal} 1 0%` }
                         }
                       >
                         {slot.type === "single" ? (
                           /* 1) 단일 컴포넌트 렌더링 */
-                          <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
+                          <div
+                            className={
+                              isMetricsFixed
+                                ? "w-full flex flex-col"
+                                : "w-full h-full flex flex-col min-h-0 overflow-hidden"
+                            }
+                          >
                             {renderPanel(slot.panel)}
                           </div>
                         ) : (

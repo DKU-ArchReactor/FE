@@ -96,7 +96,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
   }, [history, currentCycle]);
 
   return (
-    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
+    <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 (지표 전용 에메랄드 액센트 바) */}
       <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-emerald-500">
         <div className="flex items-center gap-2 min-w-0">
@@ -110,25 +110,25 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
         </span>
       </div>
 
-      {/* 2. 지표 카드 본문 */}
-      <div className="flex-1 p-2 flex flex-col justify-between min-h-0 gap-1 overflow-hidden">
+      {/* 2. 지표 카드 본문 (내부 요소가 절대 잘리지 않도록 자연스러운 높이 유지) */}
+      <div className="p-3 flex flex-col gap-2.5">
         {/* 상단 2단 KPI 요약 카드 */}
-        <div className="grid grid-cols-2 gap-1.5 shrink-0">
+        <div className="grid grid-cols-2 gap-2 shrink-0">
           {/* CPI 카드 */}
-          <div className="p-2 rounded-lg bg-[var(--ar-header-bg)] border border-[var(--ar-border)] flex flex-col justify-between">
+          <div className="p-2.5 rounded-lg bg-[var(--ar-header-bg)] border border-[var(--ar-border)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-[var(--ar-text-muted)] uppercase tracking-wider">
                 CPI (Cycles / Inst)
               </span>
               <span className="text-[10px]">⚡</span>
             </div>
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-xl font-black font-mono text-[var(--ar-accent)]">
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-2xl font-black font-mono text-[var(--ar-accent)]">
                 {simulationData ? stats.cpi : '—'}
               </span>
-              <span className="text-[9px] text-[var(--ar-text-muted)] font-mono">cycles</span>
+              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">cycles</span>
             </div>
-            <span className="text-[8.5px] text-[var(--ar-text-muted)] leading-tight truncate">
+            <span className="text-[9px] text-[var(--ar-text-muted)] mt-0.5">
               {Number(stats.cpi) <= 1.2
                 ? '최적의 파이프라인 처리량'
                 : '스톨 발생으로 지연 증가'}
@@ -136,50 +136,50 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
           </div>
 
           {/* IPC 카드 */}
-          <div className="p-2 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col justify-between">
+          <div className="p-2.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
                 IPC (Inst / Cycle)
               </span>
               <span className="text-[10px]">🎯</span>
             </div>
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-xl font-black font-mono text-emerald-700 dark:text-[#7EE787]">
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-2xl font-black font-mono text-emerald-700 dark:text-[#7EE787]">
                 {simulationData ? stats.ipc : '—'}
               </span>
-              <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] font-mono">inst/clk</span>
+              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">inst/clk</span>
             </div>
-            <span className="text-[8.5px] text-[#57606A] dark:text-[#858585] leading-tight truncate">
+            <span className="text-[9px] text-[#57606A] dark:text-[#858585] mt-0.5">
               1클럭당 평균 완수율
             </span>
           </div>
         </div>
 
         {/* 세부 수치 그리드 */}
-        <div className="grid grid-cols-3 gap-1 shrink-0 text-center">
-          <div className="p-1 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
-            <span className="text-[8.5px] text-[#57606A] dark:text-[#858585] block font-semibold">완수 명령어</span>
-            <span className="text-[11px] font-mono font-bold text-[#1F2328] dark:text-[#CCCCCC]">
+        <div className="grid grid-cols-3 gap-1.5 shrink-0 text-center">
+          <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
+            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">완수 명령어</span>
+            <span className="text-xs font-mono font-bold text-[#1F2328] dark:text-[#CCCCCC]">
               {stats.completedInstructions}
             </span>
           </div>
-          <div className="p-1 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
-            <span className="text-[8.5px] text-[#57606A] dark:text-[#858585] block font-semibold">스톨(Stall)</span>
-            <span className="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">
+          <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
+            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">스톨(Stall)</span>
+            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
               {stats.stalls} 회
             </span>
           </div>
-          <div className="p-1 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
-            <span className="text-[8.5px] text-[#57606A] dark:text-[#858585] block font-semibold">포워딩</span>
-            <span className="text-[11px] font-mono font-bold text-[#005FB8] dark:text-[#79C0FF]">
+          <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
+            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">포워딩</span>
+            <span className="text-xs font-mono font-bold text-[#005FB8] dark:text-[#79C0FF]">
               {stats.forwards} 회
             </span>
           </div>
         </div>
 
         {/* 버블 비율 프로그레스 바 */}
-        <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col gap-0.5 shrink-0">
-          <div className="flex items-center justify-between text-[9px]">
+        <div className="p-2 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col gap-1 shrink-0">
+          <div className="flex items-center justify-between text-[10px]">
             <span className="font-semibold text-[#57606A] dark:text-[#858585]">파이프라인 버블 비율</span>
             <span className="font-mono font-bold text-[#1F2328] dark:text-[#CCCCCC]">{stats.bubbleRatio}%</span>
           </div>

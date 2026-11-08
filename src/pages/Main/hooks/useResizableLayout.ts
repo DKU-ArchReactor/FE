@@ -107,9 +107,9 @@ export function useResizableLayout(
         if (containerHeight <= 0) return;
         const deltaY = e.clientY - startY;
 
-        // sec-4(다이어그램-CPI-해저드)인 경우, CPI(고정 185px)를 제외한 가용 높이 기준 연산
+        // sec-4(다이어그램-CPI-해저드)인 경우, CPI의 자연스러운 높이(~230px)를 제외한 가용 높이 기준 연산
         const isSec4 = sections[secIdx]?.id === 'sec-4';
-        const effectiveContainerHeight = isSec4 ? Math.max(100, containerHeight - 195) : containerHeight;
+        const effectiveContainerHeight = isSec4 ? Math.max(100, containerHeight - 240) : containerHeight;
 
         const combinedRatio = initialTopRatio + initialBtmRatio;
         const deltaRatio = (deltaY / effectiveContainerHeight) * combinedRatio;
