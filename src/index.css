@@ -103,15 +103,14 @@ html.mode-single:not(.dark) main.is-playing-single-light {
 /* 패널 외곽 소프트 섀도우 통일 (밝은 캔버스 위에서 깔끔한 입체감 유지) */
 .shadow-sm {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
-  transition: border-color 0.6s ease-in-out, box-shadow 0.6s ease-in-out;
+  transition: box-shadow 0.6s ease-in-out;
 }
 html.dark .shadow-sm {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.25) !important;
 }
 
-/* Single Light 재생(PLAY) 시 각 컴포넌트 외곽 바깥 테두리 및 그림자를 파스텔톤 하늘색으로 변환 */
+/* Single Light 재생(PLAY) 시 각 컴포넌트 그림자만 파스텔톤 하늘색으로 변환 (테두리는 기존 테두리 유지) */
 html.mode-single:not(.dark) main.is-playing-single-light .rounded-lg.shadow-sm {
-  border-color: #BAE6FD !important; /* Tailwind sky-200 (파스텔 스카이블루 외곽 테두리) */
   box-shadow: 0 4px 16px 0 rgba(56, 189, 248, 0.16), 0 1px 3px 0 rgba(14, 165, 233, 0.1) !important;
 }
 
