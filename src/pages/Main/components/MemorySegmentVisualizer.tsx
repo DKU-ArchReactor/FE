@@ -133,7 +133,7 @@ const SEGMENT_DEFS: SegmentDefinition[] = [
     name: 'Code',
     shape: 'rect',
     flexRatio: 3.5,
-    badgeAlignClass: 'justify-center',
+    badgeAlignClass: 'justify-end pb-1',
     color: {
       badgeBg: 'bg-amber-600',
       badgeText: 'text-white',
@@ -506,9 +506,9 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                   )}
                 </div>
 
-                {/* 우측: 데이터 리스트 */}
+                {/* 우측: 데이터 리스트 (Code 영역은 아래 경계선(65,536)부터 위로 차곡차곡 쌓이도록 justify-end 적용) */}
                 <div className={`flex-1 flex flex-col divide-y divide-slate-100 min-w-0 pl-1.5 py-1 overflow-y-auto custom-scrollbar ${
-                  items.length === 0 && !isCode && !isReserved ? 'justify-center' : 'justify-start'
+                  isCode ? 'justify-end' : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
                 }`}>
                   {isReserved ? (
                     <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 text-slate-500">
