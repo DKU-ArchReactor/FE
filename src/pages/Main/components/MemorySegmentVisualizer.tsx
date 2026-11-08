@@ -130,14 +130,14 @@ const SEGMENT_DEFS: SegmentDefinition[] = [
   },
 ];
 
-// 6대 세그먼트 사이의 5대 독립 경계선 주소 (High ➔ Low)
-// Stack ➔ [1] ➔ Heap ➔ [2] ➔ BSS ➔ [3] ➔ Data ➔ [4] ➔ Code ➔ [5] ➔ NULL
-const BOUNDARY_DIVIDERS = [
-  '0x10008000', // [1] Stack과 Heap 사이 (Heap 시작점: 268,468,224)
-  '0x10004000', // [2] Heap과 BSS 사이 (BSS 시작점: 268,451,840)
-  '0x10000000', // [3] BSS와 Data 사이 (Data 시작점: 268,435,456)
-  '0x00010000', // [4] Data와 Code 사이 (Code 시작점: 65,536)
-  '0x00000000', // [5] Code와 NULL 사이 (NULL 기준점: 0)
+// 6대 세그먼트 사이의 5대 독립 경계선 기본 주소 (High ➔ Low)
+// Stack ➔ [0] ➔ Heap ➔ [1] ➔ BSS ➔ [2] ➔ Data ➔ [3] ➔ Code ➔ [4] ➔ NULL
+const DEFAULT_BOUNDARY_DIVIDERS = [
+  '0x10008000', // [0] Stack과 Heap 사이 (Heap 최대 한계: 268,468,224)
+  '0x10004000', // [1] Heap과 BSS 사이 (Heap 시작점: 268,451,840)
+  '0x10000000', // [2] BSS와 Data 사이 (Data 시작점: 268,435,456)
+  '0x10000000', // [3] Data와 Code 사이 (Data 세그먼트 시작점: 268,435,456)
+  '0x00010000', // [4] Code와 NULL 사이 (Code 세그먼트 시작점: 65,536)
 ];
 
 const EMPTY_MEMORY_SNAPSHOT: Record<string, string> = {};
@@ -322,6 +322,38 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     return result;
   }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc]);
 
+  // 동적 세그먼트 경계선 주소 계산 (High ➔ Low)
+  // [0] Stack ➔ Heap: 현재 $sp (유효할 경우) 또는 기본 Heap 한계선 0x10008000
+  // [1] Heap ➔ BSS: 기본 0x10004000
+  // [2] BSS ➔ Data: 메모리에 Data 변수 존재 시 Data 최대 주소 + 4, 미존재 시 0x10000000
+  // [3] Data ➔ Code: Data 세그먼트 기준점 0x10000000
+  // [4] Code ➔ NULL: Code 세그먼트 기준점 0x00010000 (65,536)
+  const boundaryDividers = useMemo(() => {
+    const spVal =
+      currentData?.global_result?.registers?.['x2'] ||
+      currentData?.global_result?.registers?.['sp'];
+    const stackHeapDivider =
+      spVal && spVal !== '0x00000000' && spVal.toLowerCase() !== '0x7fffeffc'
+        ? spVal
+        : DEFAULT_BOUNDARY_DIVIDERS[0];
+
+    const heapBssDivider = DEFAULT_BOUNDARY_DIVIDERS[1];
+
+    let bssDataDivider = DEFAULT_BOUNDARY_DIVIDERS[2];
+    const dataAddrs = Object.keys(memorySnapshot)
+      .map((addr) => parseInt(addr, 16) >>> 0)
+      .filter((addr) => addr >= 0x10000000 && addr < 0x10008000);
+    if (dataAddrs.length > 0) {
+      const maxData = Math.max(...dataAddrs);
+      bssDataDivider = `0x${(maxData + 4).toString(16).padStart(8, '0')}`;
+    }
+
+    const dataCodeDivider = DEFAULT_BOUNDARY_DIVIDERS[3];
+    const codeNullDivider = DEFAULT_BOUNDARY_DIVIDERS[4];
+
+    return [stackHeapDivider, heapBssDivider, bssDataDivider, dataCodeDivider, codeNullDivider];
+  }, [currentData, memorySnapshot]);
+
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-sm transition-colors duration-150">
       {/* 1. 상단 미니멀 헤더 (레지스터 뷰와 통일된 VS Code VARIABLES 스타일) */}
@@ -358,7 +390,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
           const items = segmentedMemory[seg.key];
           const isCode = seg.key === 'code';
           const isReserved = seg.key === 'reserved';
-          const dividerHex = index < BOUNDARY_DIVIDERS.length ? BOUNDARY_DIVIDERS[index] : null;
+          const dividerHex = index < boundaryDividers.length ? boundaryDividers[index] : null;
 
           return (
             <React.Fragment key={seg.key}>
