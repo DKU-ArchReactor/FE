@@ -436,8 +436,8 @@ const MainPage: React.FC = () => {
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
           className={`h-full aspect-square rounded-md border flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none shadow-sm group ${
             isAiPopupOpen
-              ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 border-indigo-400/60 ring-2 ring-purple-400/40 scale-95"
-              : "bg-gradient-to-br from-indigo-500 via-purple-600 to-cyan-500 border-indigo-300/40 hover:from-indigo-600 hover:via-purple-700 hover:to-cyan-600 hover:shadow-md hover:shadow-indigo-500/25 active:scale-95"
+              ? "bg-gradient-to-br from-blue-700 via-sky-600 to-cyan-500 border-sky-400/60 ring-2 ring-sky-400/50 scale-95"
+              : "bg-gradient-to-br from-blue-600 via-sky-500 to-cyan-400 border-sky-300/40 hover:from-blue-700 hover:via-sky-600 hover:to-cyan-500 hover:shadow-md hover:shadow-sky-500/30 active:scale-95"
           }`}
         >
           <div className="relative flex items-center justify-center">
@@ -603,15 +603,15 @@ const MainPage: React.FC = () => {
         {/* 우측 슬라이딩 뷰포트 영역 */}
         <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch pl-1">
           {canGoPrevViewport && (
-            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 mr-1">
+            <div className="w-5 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 mr-1">
               <button
                 type="button"
                 onClick={handleGoPrevViewport}
                 title="이전 뷰포트(왼쪽 영역)로 이동"
-                className={`w-full h-full rounded-md border flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] shadow-xs ${
+                className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   isSingleEngine
-                    ? "border-sky-300/60 bg-sky-50/70 text-sky-600 hover:bg-sky-100/90 hover:border-sky-400 hover:text-sky-800 dark:border-sky-800/60 dark:bg-sky-950/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:hover:border-sky-700 dark:hover:text-sky-200"
-                    : "border-purple-300/60 bg-purple-50/70 text-purple-600 hover:bg-purple-100/90 hover:border-purple-400 hover:text-purple-800 dark:border-purple-800/60 dark:bg-purple-950/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:hover:border-purple-700 dark:hover:text-purple-200"
+                    ? "text-[#8C959F] dark:text-[#858585] hover:text-sky-600 dark:hover:text-sky-400 hover:bg-[#0284C7]/10 dark:hover:bg-[#0284C7]/20"
+                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
               >
                 <span className="text-base font-bold leading-none transition-transform group-hover:-translate-x-0.5">
@@ -638,15 +638,15 @@ const MainPage: React.FC = () => {
           />
 
           {canGoNextViewport && (
-            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 ml-1">
+            <div className="w-5 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 ml-1">
               <button
                 type="button"
                 onClick={handleGoNextViewport}
                 title="다음 뷰포트(오른쪽 영역)로 이동"
-                className={`w-full h-full rounded-md border flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] shadow-xs ${
+                className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   isSingleEngine
-                    ? "border-sky-300/60 bg-sky-50/70 text-sky-600 hover:bg-sky-100/90 hover:border-sky-400 hover:text-sky-800 dark:border-sky-800/60 dark:bg-sky-950/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:hover:border-sky-700 dark:hover:text-sky-200"
-                    : "border-purple-300/60 bg-purple-50/70 text-purple-600 hover:bg-purple-100/90 hover:border-purple-400 hover:text-purple-800 dark:border-purple-800/60 dark:bg-purple-950/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:hover:border-purple-700 dark:hover:text-purple-200"
+                    ? "text-[#8C959F] dark:text-[#858585] hover:text-sky-600 dark:hover:text-sky-400 hover:bg-[#0284C7]/10 dark:hover:bg-[#0284C7]/20"
+                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
               >
                 <span className="text-base font-bold leading-none transition-transform group-hover:translate-x-0.5">
