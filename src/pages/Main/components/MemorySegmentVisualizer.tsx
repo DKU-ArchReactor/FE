@@ -323,14 +323,18 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc]);
 
   return (
-    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
-      {/* 1. 상단 미니멀 헤더 */}
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-sm transition-colors duration-150">
+      {/* 1. 상단 미니멀 헤더 (레지스터 뷰와 통일된 VS Code VARIABLES 스타일) */}
       <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-cyan-500">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs">💾</span>
-          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">Virtual Memory</h3>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-cyan-500 font-bold">◆</span>
+          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
+            MEMORY LAYOUT
+          </h3>
         </div>
-        <span className="text-[10px] font-mono text-[var(--ar-text-muted)] font-semibold">High ➔ Low</span>
+        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
+          HIGH ➔ LOW
+        </span>
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-3 py-2">
