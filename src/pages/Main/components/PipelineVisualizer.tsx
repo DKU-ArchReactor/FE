@@ -14,6 +14,25 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const isSingle = mode === "single";
 
+  // Single-Cycle 모드에서는 파이프라인 5단계 분할 회로도가 맞지 않으므로 싱글모드 전용 다이어그램 개발 전까지 숨김/안내 처리
+  if (isSingle) {
+    return (
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-8 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150 select-none">
+        <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-2xl shadow-xs">
+          📐
+        </div>
+        <div className="flex flex-col gap-1 max-w-md">
+          <h3 className="text-sm font-bold text-[var(--ar-text-primary)]">
+            Single-Cycle 전용 데이터패스 다이어그램 준비 중
+          </h3>
+          <p className="text-xs text-[var(--ar-text-muted)] leading-relaxed">
+            단일 사이클 모드에서는 5단계 파이프라인 레지스터가 없는 전용 단일 사이클 하드웨어 다이어그램이 적용될 예정입니다.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loadingMessage) {
     return (
       <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150">
