@@ -648,7 +648,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                       return (
                         <div
                           key={item.address}
-                          className={`flex items-center justify-between px-2 py-1 rounded transition-colors duration-150 shrink-0 ${
+                          className={`flex items-center px-2 py-1 rounded transition-colors duration-150 shrink-0 gap-1 ${
                             isPulsing
                               ? isStack
                                 ? 'bg-violet-200 dark:bg-violet-950/70 text-violet-950 dark:text-violet-200 font-bold'
@@ -656,14 +656,16 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                               : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
                           }`}
                         >
-                          {/* 좌측 주소 그룹 (addr: 열 + 실제 주소 열) */}
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
-                              addr:
-                            </span>
+                          {/* 1열: addr: 라벨 (작은 폰트, 기본 두께, 고정폭 w-9) */}
+                          <span className="w-9 shrink-0 text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none">
+                            addr:
+                          </span>
+
+                          {/* 2열: 실제 주소값 (상대적으로 큰 폰트, 볼드, 유연 폭 + 호버 시 16진수) */}
+                          <div className="flex-1 flex items-center gap-1.5 min-w-0">
                             <span
                               title={`Hex: ${normalizeHex(item.address)}`}
-                              className={`text-[11.5px] font-mono font-semibold cursor-help ${
+                              className={`text-[11.5px] font-mono font-semibold cursor-help truncate ${
                                 isPulsing
                                   ? isStack
                                     ? 'text-violet-950 dark:text-violet-200 font-bold'
@@ -680,25 +682,25 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                             )}
                           </div>
 
-                          {/* 우측 값 그룹 (val: 열 + 실제 값 열) */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
-                              val:
-                            </span>
-                            <span
-                              className={`font-mono text-[11.5px] font-bold tracking-wide ${
-                                isPulsing
-                                  ? isStack
-                                    ? 'text-violet-950 dark:text-violet-200 font-black'
-                                    : 'text-amber-950 dark:text-amber-200 font-black'
-                                  : isCode
-                                  ? 'text-indigo-950 dark:text-[#9CDCFE]'
-                                  : 'text-[#005FB8] dark:text-[#79C0FF]'
-                              }`}
-                            >
-                              {item.decText}
-                            </span>
-                          </div>
+                          {/* 3열: val: 라벨 (작은 폰트, 기본 두께, 고정폭 w-7, 우측 정렬) */}
+                          <span className="w-7 shrink-0 text-right text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none">
+                            val:
+                          </span>
+
+                          {/* 4열: 실제 값 (상대적으로 큰 폰트, 볼드, 기본 흑백 톤, 고정폭 w-20, 우측 정렬) */}
+                          <span
+                            className={`w-20 shrink-0 text-right font-mono text-[11.5px] font-bold tracking-wide ${
+                              isPulsing
+                                ? isStack
+                                  ? 'text-violet-950 dark:text-violet-200 font-black'
+                                  : 'text-amber-950 dark:text-amber-200 font-black'
+                                : isCode
+                                ? 'text-indigo-950 dark:text-[#9CDCFE]'
+                                : 'text-[#1F2328] dark:text-[#CCCCCC]'
+                            }`}
+                          >
+                            {item.decText}
+                          </span>
                         </div>
                       );
                     })
