@@ -45,6 +45,11 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
               {/* 구역 내부 세로 슬롯 렌더링 */}
               <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {section.slots.map((slot, slotIdx) => {
+                  const isMetricsFixed =
+                    section.id === "sec-4" &&
+                    slot.type === "single" &&
+                    slot.panel === "metrics";
+
                   const defaultRatio =
                     section.slots.length === 2 &&
                     slot.type === "single" &&
@@ -56,8 +61,14 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                   return (
                     <React.Fragment key={slotIdx}>
                       <div
-                        className="min-h-0 overflow-hidden flex"
-                        style={{ flex: `${flexVal} 1 0%` }}
+                        className={`min-h-0 overflow-hidden flex ${
+                          isMetricsFixed ? "shrink-0" : ""
+                        }`}
+                        style={
+                          isMetricsFixed
+                            ? { flex: "0 0 185px", height: "185px" }
+                            : { flex: `${flexVal} 1 0%` }
+                        }
                       >
                         {slot.type === "single" ? (
                           /* 1) 단일 컴포넌트 렌더링 */
@@ -130,10 +141,11 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                               onSlotReset?.(secIdx, slotIdx);
                               return;
                             }
-                            const topSlot = section.slots[slotIdx];
-                            const btmSlot = section.slots[slotIdx + 1];
-                            const topRatio = topSlot.flexRatio ?? 1;
-                            const btmRatio = btmSlot.flexRatio ?? 1;
+                            const isSec4 = section.id === "sec-4";
+                            const topSlot = isSec4 ? section.slots[0] : section.slots[slotIdx];
+                            const btmSlot = isSec4 ? section.slots[2] : section.slots[slotIdx + 1];
+                            const topRatio = topSlot?.flexRatio ?? (isSec4 ? 1.8 : 1);
+                            const btmRatio = btmSlot?.flexRatio ?? (isSec4 ? 1.0 : 1);
                             onSlotResizeStart(
                               secIdx,
                               slotIdx,
@@ -147,7 +159,11 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                             e.stopPropagation();
                             onSlotReset?.(secIdx, slotIdx);
                           }}
-                          title="위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 1:1 리셋)"
+                          title={
+                            section.id === "sec-4"
+                              ? "위아래로 드래그하여 다이어그램과 해저드 영역 높이 조절 (더블클릭: 기본 위치 리셋)"
+                              : "위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 기본 리셋)"
+                          }
                           className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
                         >
                           <div
