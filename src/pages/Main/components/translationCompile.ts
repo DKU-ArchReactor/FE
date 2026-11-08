@@ -59,7 +59,6 @@ export async function compileTranslation(
   if (result.status !== "success") {
     throw new Error(result.log || "컴파일에 실패했습니다.");
   }
-  if (!result.assembly_url) throw new Error("어셈블리 결과를 찾을 수 없습니다.");
 
   // 1. Single과 Pipeline 모드를 백그라운드 병렬(Promise.all)로 동시 실행하여 즉시 캐싱
   let singleResult: SimulationResult | null = null;
