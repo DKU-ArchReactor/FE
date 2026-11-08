@@ -133,7 +133,7 @@ const SEGMENT_DEFS: SegmentDefinition[] = [
     name: 'Code',
     shape: 'rect',
     flexRatio: 3.5,
-    badgeAlignClass: 'justify-end pb-1',
+    badgeAlignClass: 'justify-center',
     color: {
       badgeBg: 'bg-amber-600',
       badgeText: 'text-white',
@@ -506,9 +506,9 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                   )}
                 </div>
 
-                {/* 우측: 데이터 리스트 (Code 영역은 아래 경계선(65,536)부터 위로 차곡차곡 쌓이도록 justify-end 적용) */}
+                {/* 우측: 데이터 리스트 (Code 영역은 닫혔을 땐 하단(65,536) 정렬, 펼쳤을 땐 상단 경계선 바로 아래에 오도록 justify-start 적용) */}
                 <div className={`flex-1 flex flex-col divide-y divide-slate-100 min-w-0 pl-1.5 py-1 overflow-y-auto custom-scrollbar ${
-                  isCode ? 'justify-end' : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
+                  isCode ? (isUserCodeExpanded ? 'justify-start' : 'justify-end') : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
                 }`}>
                   {isReserved ? (
                     <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 text-slate-500">
@@ -523,11 +523,13 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                       </span>
                     </div>
                   ) : isCode ? (
-                    <div className="flex flex-col gap-1.5 py-0.5">
-                      {/* 1. 사용자 프로그램 메인 코드 통합 블록 (상위 주소 영역이므로 스타트업 위에 위치) */}
-                      <div className="rounded-lg border border-amber-300 bg-amber-50/70 p-1.5 shadow-2xs flex flex-col gap-1">
+                    <div className={`flex flex-col gap-1.5 py-0.5 ${isUserCodeExpanded ? 'flex-1 min-h-0' : ''}`}>
+                      {/* 1. 사용자 프로그램 메인 코드 통합 블록 (펼쳤을 때 세로 영역을 유연하게 차지하며 내부 스크롤 보장) */}
+                      <div className={`rounded-lg border border-amber-300 bg-amber-50/70 p-1.5 shadow-2xs flex flex-col gap-1 ${
+                        isUserCodeExpanded ? 'flex-1 min-h-0' : ''
+                      }`}>
                         {/* 1층: 주소 범위 & 뱃지 */}
-                        <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center justify-between gap-1 shrink-0">
                           <span
                             title={
                               userRange.start && userRange.end
@@ -546,7 +548,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         </div>
 
                         {/* 2층: 영역 라벨 & 명령어 토글 버튼 */}
-                        <div className="flex items-center justify-between gap-1 text-[10px]">
+                        <div className="flex items-center justify-between gap-1 text-[10px] shrink-0">
                           <span className="font-semibold text-amber-900 font-sans">
                             User Program (main)
                           </span>
@@ -559,19 +561,19 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                           </button>
                         </div>
 
-                        {/* 3층: 현재 실행 중인 PC 위치 (라벨 위, 값 아래 또는 좌우 콤팩트 배치) */}
-                        <div className="flex items-center justify-between text-[9.5px] border-t border-amber-200/60 pt-1">
+                        {/* 3층: 현재 실행 중인 PC 위치 */}
+                        <div className="flex items-center justify-between text-[9.5px] border-t border-amber-200/60 pt-1 shrink-0">
                           <span className="text-slate-500 font-sans">Current PC</span>
                           <span className="font-mono font-bold text-amber-950">
                             {currentPc ? formatAddressDecimal(currentPc) : '—'}
                           </span>
                         </div>
 
-                        {/* 펼쳤을 때: 명령어 리스트 (초기 스크롤이 main 시작점인 맨 아래로 가도록 ref 연결) */}
+                        {/* 펼쳤을 때: 명령어 리스트 (자체 스크롤 컨테이너로 동작) */}
                         {isUserCodeExpanded && (
                           <div
                             ref={userCodeScrollRef}
-                            className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 max-h-32 overflow-y-auto custom-scrollbar"
+                            className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 flex-1 min-h-[70px] max-h-48 overflow-y-auto custom-scrollbar"
                           >
                             {userInstructions.length === 0 ? (
                               <div className="text-[10px] text-amber-800/60 font-sans italic py-2 text-center">
@@ -581,7 +583,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                               userInstructions.map((item) => (
                                 <div
                                   key={item.address}
-                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[10px] font-mono ${
+                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[10px] font-mono shrink-0 ${
                                     item.isChanged
                                       ? 'bg-amber-200/80 text-amber-950 font-bold'
                                       : 'text-slate-700 hover:bg-amber-100/50'
@@ -597,7 +599,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                       </div>
 
                       {/* 2. C 런타임 스타트업 영역 (최하위 코드 주소 0x00010000 영역이므로 메인 코드 아래, NULL 바로 위에 위치) */}
-                      <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80">
+                      <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 shrink-0">
                         <div className="flex items-center justify-between">
                           <span
                             title={

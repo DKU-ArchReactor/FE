@@ -89,7 +89,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               onClick={() => onChangeSimulationMode?.("single")}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
                 isSingle
-                  ? "bg-sky-600 dark:bg-sky-500 text-white border-sky-600 dark:border-sky-500 shadow-xs"
+                  ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -100,7 +100,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               onClick={() => onChangeSimulationMode?.("pipeline")}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
                 !isSingle
-                  ? "bg-purple-600 dark:bg-purple-500 text-white border-purple-600 dark:border-purple-500 shadow-xs"
+                  ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
