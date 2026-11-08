@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
-import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
-import { mapAssembly, extractAssemblyFromSimulation } from './translationCompile';
+import type { CycleHistoryItem, SimulationResult, ProgramMemoryLayout } from '@/type/simulation';
 
 interface MemorySegmentVisualizerProps {
   currentData: CycleHistoryItem | null;
@@ -33,16 +32,39 @@ const normalizeHex = (hexStr: string): string => {
   return `0x${clean.padStart(8, '0')}`;
 };
 
-// 주소 분류: 6대 세그먼트 (Stack, Heap, BSS, Data, Code, Reserved/NULL)
-const classifyAddress = (addrHex: string, valHex: string, maxCodePcNum: number): MemorySegmentKey => {
+// 주소 분류: CORE가 제공하는 정적 memory_layout SSOT를 최우선 기준으로 판별
+const classifyAddress = (
+  addrHex: string,
+  valHex: string,
+  layout?: ProgramMemoryLayout | null,
+  maxCodePcNum?: number
+): MemorySegmentKey => {
   const num = parseInt(addrHex, 16) >>> 0;
   if (num >= 0x70000000) return 'stack';
-  if (num >= 0x10008000) return 'heap';
-  if (maxCodePcNum > 0 && num >= 0x00010000 && num <= maxCodePcNum) return 'code';
+  if (num >= 0x10004000 && num < 0x10008000) return 'heap';
+  if (num >= 0x10008000) return 'stack';
+
+  if (layout) {
+    const bssStart = parseInt(layout.bss.start, 16) >>> 0;
+    const bssEnd = parseInt(layout.bss.end_exclusive, 16) >>> 0;
+    if (layout.bss.size_bytes > 0 && num >= bssStart && num < bssEnd) return 'bss';
+
+    const dataStart = parseInt(layout.data.start, 16) >>> 0;
+    const dataEnd = parseInt(layout.data.end_exclusive, 16) >>> 0;
+    if (layout.data.size_bytes > 0 && num >= dataStart && num < dataEnd) return 'data';
+
+    const codeStart = parseInt(layout.code.start, 16) >>> 0;
+    const codeEnd = parseInt(layout.code.end_exclusive, 16) >>> 0;
+    if (num >= codeStart && num < codeEnd) return 'code';
+  } else {
+    if (maxCodePcNum && maxCodePcNum > 0 && num >= 0x00010000 && num <= maxCodePcNum) return 'code';
+    if (num >= 0x10000000 && num < 0x10004000) {
+      const valNum = parseInt(valHex, 16) || 0;
+      return valNum === 0 ? 'bss' : 'data';
+    }
+  }
+
   if (num < 0x00010000) return 'reserved';
-  // 0x10000000 ~ 0x10007FFF 영역:
-  const valNum = parseInt(valHex, 16) || 0;
-  if (valNum === 0) return 'bss';
   return 'data';
 };
 
@@ -135,17 +157,17 @@ const SEGMENT_DEFS: SegmentDefinition[] = [
 const DEFAULT_BOUNDARY_DIVIDERS = [
   '0x10008000', // [0] Stack과 Heap 사이 (Heap 최대 한계: 268,468,224)
   '0x10004000', // [1] Heap과 BSS 사이 (Heap 시작점: 268,451,840)
-  '0x10000000', // [2] BSS와 Data 사이 (Data 시작점: 268,435,456)
-  '0x10000000', // [3] Data와 Code 사이 (Data 세그먼트 시작점: 268,435,456)
+  '0x10000000', // [2] BSS와 Data 사이 (컴파일 전 미정)
+  '0x10000000', // [3] Data와 Code 사이 (컴파일 전 미정)
   '0x00010000', // [4] Code와 NULL 사이 (Code 세그먼트 시작점: 65,536)
 ];
 
 interface CodeSegmentSummary {
-  codeMap: Record<string, { raw: string; asm: string }>;
+  userInstructions: Array<{ address: string; hexValue: string; decText: string; isChanged: boolean }>;
+  runtimeInstructions: Array<{ address: string; hexValue: string; decText: string; isChanged: boolean }>;
+  userRange: { start: string | null; end: string | null; count: number };
+  startupRange: { start: string | null; end: string | null; count: number; bytes: number };
   maxCodePcNum: number;
-  codeCount: number;
-  minCodePc: number | null;
-  maxCodePc: number | null;
 }
 
 const EMPTY_MEMORY_SNAPSHOT: Record<string, string> = {};
@@ -154,7 +176,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   currentData,
   prevData,
   simulationData,
-  translationAssembly,
+  translationAssembly: _translationAssembly,
   playSpeed = 1000,
   cycle = 0,
 }) => {
@@ -200,134 +222,128 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     }
   }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
 
-  // 어셈블리 컴포넌트(Section 2)에 들어가는 코드 라인들을 추출하여 Code 메모리 세그먼트에 매핑
-  const { codeMap, maxCodePcNum, codeCount, minCodePc, maxCodePc } = useMemo<CodeSegmentSummary>(() => {
-    const map: Record<string, { raw: string; asm: string }> = {};
-    let minPc: number | null = null;
-    let maxPc: number | null = null;
-
-    // 1순위: simulationData.program.code_mapping (CORE 정적 매핑 단일 진실 원천)
+  // 어셈블리 및 코드 세그먼트 메타데이터 추출: CORE가 제공하는 memory_layout 및 code_mapping을 최우선 SSOT로 사용
+  const {
+    userInstructions,
+    runtimeInstructions,
+    userRange,
+    startupRange,
+    maxCodePcNum,
+  } = useMemo<CodeSegmentSummary>(() => {
+    const layout = simulationData?.program?.memory_layout;
     const codeMapping = simulationData?.program?.code_mapping;
-    if (codeMapping && Object.keys(codeMapping).length > 0) {
-      const pcs = Object.keys(codeMapping)
-        .map((k) => parseInt(k, 16) >>> 0)
-        .sort((a, b) => a - b);
-      minPc = pcs[0];
-      maxPc = pcs[pcs.length - 1];
 
-      Object.entries(codeMapping).forEach(([pcHex, item]) => {
-        map[pcHex.toLowerCase()] = {
-          raw: item.raw_instruction || '0x00000000',
-          asm: item.assembly || '',
+    // 1순위: CORE가 계산한 layout과 code_mapping이 모두 있는 경우 (단일 진실 공급원 SSOT)
+    if (layout?.code && codeMapping && Object.keys(codeMapping).length > 0) {
+      const userList: Array<{ address: string; hexValue: string; decText: string; isChanged: boolean }> = [];
+      const runtimeList: Array<{ address: string; hexValue: string; decText: string; isChanged: boolean }> = [];
+
+      // High ➔ Low (주소 내림차순 정렬)
+      const sortedPcs = Object.keys(codeMapping).sort(
+        (a, b) => (parseInt(b, 16) >>> 0) - (parseInt(a, 16) >>> 0)
+      );
+
+      sortedPcs.forEach((pcHex) => {
+        const item = codeMapping[pcHex];
+        const isCurrent = currentPc === pcHex.toLowerCase();
+        const row = {
+          address: pcHex,
+          hexValue: item.raw_instruction || '0x00000000',
+          decText: item.assembly || '',
+          isChanged: isCurrent,
         };
+        if (item.source_line !== undefined && item.source_line !== null) {
+          userList.push(row);
+        } else {
+          runtimeList.push(row);
+        }
       });
 
+      const maxPc = parseInt(layout.code.end_exclusive, 16) - 4;
+
       return {
-        codeMap: map,
+        userInstructions: userList,
+        runtimeInstructions: runtimeList,
+        userRange: {
+          start: layout.code.user_program.start,
+          end: layout.code.user_program.end,
+          count: layout.code.user_program.instruction_count,
+        },
+        startupRange: {
+          start: layout.code.runtime_startup.start,
+          end: layout.code.runtime_startup.end,
+          count: layout.code.runtime_startup.instruction_count,
+          bytes: layout.code.runtime_startup.instruction_count * 4,
+        },
         maxCodePcNum: maxPc,
-        codeCount: pcs.length,
-        minCodePc: minPc,
-        maxCodePc: maxPc,
       };
     }
 
-    // 2순위: extractAssemblyFromSimulation (시뮬레이션 전체 어셈블리 목록)
-    const simRows = extractAssemblyFromSimulation(simulationData);
-    if (simRows.length > 0) {
-      simRows.forEach((row, idx) => {
-        const pcNum = row.pc ? parseInt(row.pc, 16) >>> 0 : 0x00010000 + idx * 4;
-        const pcHex = `0x${pcNum.toString(16).padStart(8, '0')}`;
-        if (minPc === null || pcNum < minPc) minPc = pcNum;
-        if (maxPc === null || pcNum > maxPc) maxPc = pcNum;
-        map[pcHex.toLowerCase()] = {
-          raw: '0x00000000',
-          asm: row.text,
+    // 2순위: code_mapping만 있고 memory_layout이 없는 경우
+    if (codeMapping && Object.keys(codeMapping).length > 0) {
+      const userList: Array<{ address: string; hexValue: string; decText: string; isChanged: boolean }> = [];
+      const runtimeList: Array<{ address: string; hexValue: string; decText: string; isChanged: boolean }> = [];
+
+      const sortedPcs = Object.keys(codeMapping).sort(
+        (a, b) => (parseInt(b, 16) >>> 0) - (parseInt(a, 16) >>> 0)
+      );
+
+      sortedPcs.forEach((pcHex) => {
+        const item = codeMapping[pcHex];
+        const isCurrent = currentPc === pcHex.toLowerCase();
+        const row = {
+          address: pcHex,
+          hexValue: item.raw_instruction || '0x00000000',
+          decText: item.assembly || '',
+          isChanged: isCurrent,
         };
+        if (item.source_line !== undefined && item.source_line !== null) {
+          userList.push(row);
+        } else {
+          runtimeList.push(row);
+        }
       });
+
+      const ascUserPcs = userList.map((r) => r.address).reverse();
+      const ascStartupPcs = runtimeList.map((r) => r.address).reverse();
+
+      const userStart = ascUserPcs.length > 0 ? ascUserPcs[0] : null;
+      const userEnd = ascUserPcs.length > 0 ? ascUserPcs[ascUserPcs.length - 1] : null;
+      const startupStart = ascStartupPcs.length > 0 ? ascStartupPcs[0] : null;
+      const startupEnd = ascStartupPcs.length > 0 ? ascStartupPcs[ascStartupPcs.length - 1] : null;
+      const maxPc = sortedPcs.length > 0 ? parseInt(sortedPcs[0], 16) >>> 0 : 0;
+
       return {
-        codeMap: map,
-        maxCodePcNum: maxPc ?? 0,
-        codeCount: simRows.length,
-        minCodePc: minPc,
-        maxCodePc: maxPc,
+        userInstructions: userList,
+        runtimeInstructions: runtimeList,
+        userRange: {
+          start: userStart,
+          end: userEnd,
+          count: userList.length,
+        },
+        startupRange: {
+          start: startupStart,
+          end: startupEnd,
+          count: runtimeList.length,
+          bytes: runtimeList.length * 4,
+        },
+        maxCodePcNum: maxPc,
       };
     }
 
-    // 3순위: translationAssembly가 있으면 mapAssembly로 추출
-    if (translationAssembly && translationAssembly.trim().length > 0) {
-      const mappedRows = mapAssembly(translationAssembly, 1000);
-      if (mappedRows.length > 0) {
-        const basePc = 0x00010018; // 65,560 (main 시작 지점)
-        minPc = basePc;
-        mappedRows.forEach((row, idx) => {
-          const pcNum = row.pc ? parseInt(row.pc, 16) >>> 0 : basePc + idx * 4;
-          const pcHex = `0x${pcNum.toString(16).padStart(8, '0')}`;
-          map[pcHex.toLowerCase()] = {
-            raw: '0x00000000',
-            asm: row.text,
-          };
-        });
-        maxPc = basePc + Math.max(0, mappedRows.length - 1) * 4;
-        return {
-          codeMap: map,
-          maxCodePcNum: maxPc,
-          codeCount: mappedRows.length,
-          minCodePc: minPc,
-          maxCodePc: maxPc,
-        };
-      }
-    }
-
-    // 4순위: 기존 파이프라인 버퍼 히스토리 폴백
-    if (simulationData?.history && simulationData.history.length > 0) {
-      let calcMax = 0;
-      simulationData.history.forEach((cycle) => {
-        const stages = [
-          cycle.buffers?.IF,
-          cycle.buffers?.ID,
-          cycle.buffers?.EX,
-          cycle.buffers?.MEM,
-          cycle.buffers?.WB,
-        ];
-        stages.forEach((buf) => {
-          if (buf?.pc && buf.assembly && buf.assembly !== 'bubble' && buf.assembly !== 'empty') {
-            const pcLower = buf.pc.toLowerCase();
-            map[pcLower] = {
-              raw: buf.raw_instruction || '0x00000000',
-              asm: buf.assembly,
-            };
-            const num = parseInt(pcLower, 16) >>> 0;
-            if (!isNaN(num)) {
-              if (minPc === null || num < minPc) minPc = num;
-              if (num > calcMax) calcMax = num;
-            }
-          }
-        });
-      });
-      const keys = Object.keys(map);
-      if (keys.length > 0) {
-        return {
-          codeMap: map,
-          maxCodePcNum: calcMax,
-          codeCount: keys.length,
-          minCodePc: minPc ?? 0x00010000,
-          maxCodePc: calcMax,
-        };
-      }
-    }
-
-    // 컴파일 전 초기 빈 화면 상태 (하드코딩 더미 범위 제거)
+    // 3순위: 컴파일 전 초기 빈 화면 상태 (하드코딩 더미 범위 제거)
     return {
-      codeMap: {},
+      userInstructions: [],
+      runtimeInstructions: [],
+      userRange: { start: null, end: null, count: 0 },
+      startupRange: { start: null, end: null, count: 0, bytes: 0 },
       maxCodePcNum: 0,
-      codeCount: 0,
-      minCodePc: null,
-      maxCodePc: null,
     };
-  }, [translationAssembly, simulationData]);
+  }, [simulationData, currentPc]);
 
   // 메모리 6대 세그먼트별 분류 및 정렬 (모든 섹션 High ➔ Low 일치)
   const segmentedMemory = useMemo(() => {
+    const layout = simulationData?.program?.memory_layout;
     const result: Record<
       MemorySegmentKey,
       Array<{
@@ -347,7 +363,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     };
 
     Object.entries(memorySnapshot).forEach(([addrHex, valHex]) => {
-      const segKey = classifyAddress(addrHex, valHex, maxCodePcNum);
+      const segKey = classifyAddress(addrHex, valHex, layout, maxCodePcNum);
       const prevVal = prevMemorySnapshot ? prevMemorySnapshot[addrHex] : undefined;
       const isChanged = prevVal !== undefined && prevVal !== valHex;
 
@@ -365,22 +381,8 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
       });
     });
 
-    // Code 영역 추출: High ➔ Low (내림차순 정렬) 적용
-    // 이렇게 하면 main() 시작점인 65,560이 맨 아래(NULL 경계선 바로 위)에 위치하고 위로 갈수록 주소가 증가함!
-    const codeAddresses = Object.keys(codeMap).sort(
-      (a, b) => (parseInt(b, 16) >>> 0) - (parseInt(a, 16) >>> 0)
-    );
-    codeAddresses.forEach((addrHex) => {
-      const info = codeMap[addrHex];
-      const isCurrentPc = currentPc === addrHex;
-      result.code.push({
-        address: addrHex,
-        hexValue: info.raw,
-        decText: info.asm,
-        isChanged: isCurrentPc,
-        label: isCurrentPc ? 'PC ▶' : undefined,
-      });
-    });
+    // Code 항목: 전체 명령어 수용
+    result.code = [...userInstructions, ...runtimeInstructions];
 
     // 모든 세그먼트 일관되게 주소 내림차순(High ➔ Low) 정렬
     result.stack.sort((a, b) => (parseInt(b.address, 16) >>> 0) - (parseInt(a.address, 16) >>> 0));
@@ -389,47 +391,38 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     result.data.sort((a, b) => (parseInt(b.address, 16) >>> 0) - (parseInt(a.address, 16) >>> 0));
 
     return result;
-  }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc]);
+  }, [memorySnapshot, prevMemorySnapshot, simulationData, maxCodePcNum, userInstructions, runtimeInstructions]);
 
   // 동적 세그먼트 경계선 주소 계산 (High ➔ Low)
   // [0] Stack ➔ Heap: 현재 $sp (유효할 경우) 또는 기본 Heap 한계선 0x10008000
   // [1] Heap ➔ BSS: 기본 0x10004000
-  // [2] BSS ➔ Data: 컴파일 전 '—' (컴파일 후 Data 변수 존재 시 maxData + 4, 미존재 시 0x10000000)
-  // [3] Data ➔ Code: 컴파일 전 '—' (컴파일 후 Data 세그먼트 기준점 0x10000000)
+  // [2] BSS ➔ Data: 컴파일 전 '—' (컴파일 후 CORE memory_layout boundary_dividers[2])
+  // [3] Data ➔ Code: 컴파일 전 '—' (컴파일 후 CORE memory_layout boundary_dividers[3])
   // [4] Code ➔ NULL: Code 세그먼트 기준점 0x00010000 (65,536) - 규격상 고정
   const boundaryDividers = useMemo(() => {
-    const isCompiled = Boolean(
-      simulationData ||
-      (translationAssembly && translationAssembly.trim().length > 0) ||
-      codeCount > 0
-    );
+    const layout = simulationData?.program?.memory_layout;
+    const isCompiled = Boolean(layout || (userRange.count > 0));
 
     const spVal =
+      currentData?.global_result?.active_stack_pointer ||
       currentData?.global_result?.registers?.['x2'] ||
       currentData?.global_result?.registers?.['sp'];
     const stackHeapDivider =
       spVal && spVal !== '0x00000000' && spVal.toLowerCase() !== '0x7fffeffc'
         ? spVal
-        : DEFAULT_BOUNDARY_DIVIDERS[0];
+        : layout?.boundary_dividers?.[0] || DEFAULT_BOUNDARY_DIVIDERS[0];
 
-    const heapBssDivider = DEFAULT_BOUNDARY_DIVIDERS[1];
-
-    let bssDataDivider: string = isCompiled ? DEFAULT_BOUNDARY_DIVIDERS[2] : '—';
-    if (isCompiled) {
-      const dataAddrs = Object.keys(memorySnapshot)
-        .map((addr) => parseInt(addr, 16) >>> 0)
-        .filter((addr) => addr >= 0x10000000 && addr < 0x10008000);
-      if (dataAddrs.length > 0) {
-        const maxData = Math.max(...dataAddrs);
-        bssDataDivider = `0x${(maxData + 4).toString(16).padStart(8, '0')}`;
-      }
-    }
-
-    const dataCodeDivider: string = isCompiled ? DEFAULT_BOUNDARY_DIVIDERS[3] : '—';
-    const codeNullDivider: string = DEFAULT_BOUNDARY_DIVIDERS[4];
+    const heapBssDivider = layout?.boundary_dividers?.[1] || DEFAULT_BOUNDARY_DIVIDERS[1];
+    const bssDataDivider: string = isCompiled
+      ? (layout?.boundary_dividers?.[2] || DEFAULT_BOUNDARY_DIVIDERS[2])
+      : '—';
+    const dataCodeDivider: string = isCompiled
+      ? (layout?.boundary_dividers?.[3] || DEFAULT_BOUNDARY_DIVIDERS[3])
+      : '—';
+    const codeNullDivider: string = layout?.boundary_dividers?.[4] || DEFAULT_BOUNDARY_DIVIDERS[4];
 
     return [stackHeapDivider, heapBssDivider, bssDataDivider, dataCodeDivider, codeNullDivider];
-  }, [currentData, memorySnapshot, simulationData, translationAssembly, codeCount]);
+  }, [currentData, simulationData, userRange.count]);
 
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-sm transition-colors duration-150">
@@ -529,18 +522,18 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         <div className="flex items-center justify-between gap-1">
                           <span
                             title={
-                              minCodePc !== null && maxCodePc !== null
-                                ? `Hex: ${normalizeHex(`0x${minCodePc.toString(16)}`)} ~ ${normalizeHex(`0x${maxCodePc.toString(16)}`)}`
+                              userRange.start && userRange.end
+                                ? `Hex: ${normalizeHex(userRange.start)} ~ ${normalizeHex(userRange.end)}`
                                 : undefined
                             }
                             className="text-[11px] font-bold text-amber-950 font-mono tracking-tight cursor-help"
                           >
-                            {minCodePc !== null && maxCodePc !== null
-                              ? `${minCodePc.toLocaleString()} ~ ${maxCodePc.toLocaleString()}`
+                            {userRange.start && userRange.end
+                              ? `${formatAddressDecimal(userRange.start)} ~ ${formatAddressDecimal(userRange.end)}`
                               : '— ~ —'}
                           </span>
                           <span className="text-[9px] px-1 py-0.2 rounded font-sans font-bold bg-amber-200 text-amber-800 shrink-0">
-                            {codeCount > 0 ? `${codeCount} instrs` : '컴파일 대기'}
+                            {userRange.count > 0 ? `${userRange.count} instrs` : '컴파일 대기'}
                           </span>
                         </div>
 
@@ -566,15 +559,15 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                           </span>
                         </div>
 
-                        {/* 펼쳤을 때: 명령어 리스트 */}
+                        {/* 펼쳤을 때: 명령어 리스트 (사용자 프로그램 코드만 전용 표시) */}
                         {isUserCodeExpanded && (
                           <div className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 max-h-32 overflow-y-auto custom-scrollbar">
-                            {items.length === 0 ? (
+                            {userInstructions.length === 0 ? (
                               <div className="text-[10px] text-amber-800/60 font-sans italic py-2 text-center">
                                 컴파일 후 명령어가 로드됩니다.
                               </div>
                             ) : (
-                              items.map((item) => (
+                              userInstructions.map((item) => (
                                 <div
                                   key={item.address}
                                   className={`flex items-center justify-between px-1 py-0.5 rounded text-[10px] font-mono ${
@@ -596,12 +589,20 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                       <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80">
                         <div className="flex items-center justify-between">
                           <span
-                            title="Hex: 0x00010000 ~ 0x00010017 (24 Bytes)"
+                            title={
+                              startupRange.start && startupRange.end
+                                ? `Hex: ${normalizeHex(startupRange.start)} ~ ${normalizeHex(startupRange.end)} (${startupRange.bytes} Bytes)`
+                                : undefined
+                            }
                             className="font-mono text-slate-600 font-semibold text-[10.5px] cursor-help"
                           >
-                            65,536 ~ 65,559
+                            {startupRange.start && startupRange.end
+                              ? `${formatAddressDecimal(startupRange.start)} ~ ${formatAddressDecimal(startupRange.end)}`
+                              : '— ~ —'}
                           </span>
-                          <span className="text-[9px] font-mono text-slate-400">24B</span>
+                          <span className="text-[9px] font-mono text-slate-400">
+                            {startupRange.bytes > 0 ? `${startupRange.bytes}B` : '—B'}
+                          </span>
                         </div>
                         <span className="font-sans text-[9.5px] text-slate-400 leading-tight">
                           System Runtime Startup (_start)
