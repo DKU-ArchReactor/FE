@@ -237,18 +237,18 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
           setHasAnimated(true);
         }
       }}
-      className={`fixed z-50 flex flex-col rounded-xl overflow-hidden select-none border border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_16px_48px_-8px_rgba(0,95,184,0.22),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_48px_-8px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)] ${
+      className={`fixed z-50 flex flex-col rounded-xl overflow-hidden select-none border border-[#005FB8]/30 dark:border-[#007ACC]/40 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)] ${
         isDragging
-          ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_20px_56px_-4px_rgba(0,95,184,0.32)]"
+          ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
           : ""
       } ${
         !hasAnimated ? "ai-popup-drop-anim" : ""
       } bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]`}
     >
-      {/* 팝업 헤더 (드래그 핸들 역할 - 플레이 버튼 블루 상단 액센트 라인 적용) */}
+      {/* 팝업 헤더 (드래그 핸들 역할 - 4면 균일 1px 테두리) */}
       <header
         onMouseDown={startDrag}
-        className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b border-[#005FB8]/20 dark:border-[#007ACC]/30 border-t-2 border-t-[#005FB8] dark:border-t-[#007ACC] cursor-grab active:cursor-grabbing transition-colors ${
+        className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b border-[#005FB8]/15 dark:border-[#007ACC]/25 cursor-grab active:cursor-grabbing transition-colors ${
           isDragging ? "bg-[#EAEAEA] dark:bg-[#2D2D2D]" : ""
         }`}
         title="드래그하여 원하는 위치로 이동할 수 있습니다."

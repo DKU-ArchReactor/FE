@@ -428,21 +428,21 @@ const MainPage: React.FC = () => {
           />
         </div>
 
-        {/* AI 어시스턴트 팝업 버튼 (플레이 버튼 #005FB8 / #007ACC 기반 정밀 그라데이션) */}
+        {/* AI 어시스턴트 팝업 버튼 (플레이 버튼 시그니처 사파이어 일렉트릭 그라데이션) */}
         <button
           ref={aiButtonRef}
           type="button"
           onClick={() => setIsAiPopupOpen((prev) => !prev)}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
-          className={`h-full aspect-square rounded-md border flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none shadow-sm group ${
+          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border border-white/25 dark:border-white/15 shadow-sm group active:scale-95 ${
             isAiPopupOpen
-              ? "bg-gradient-to-b from-[#004C99] to-[#003B75] dark:from-[#0062A3] dark:to-[#004C80] border-[#004C99] text-white ring-2 ring-[#005FB8]/40 scale-95"
-              : "bg-gradient-to-b from-[#0F75D3] via-[#005FB8] to-[#004C99] hover:from-[#1A82E2] hover:via-[#0069CA] hover:to-[#0052A3] dark:from-[#1F8AD2] dark:via-[#007ACC] dark:to-[#0062A3] dark:hover:from-[#2B95DC] dark:hover:via-[#0E8CE6] dark:hover:to-[#006EBA] border-[#005FB8]/70 dark:border-[#007ACC]/60 text-white shadow-blue-500/20 hover:shadow-md hover:shadow-blue-500/30 active:scale-95"
+              ? "bg-gradient-to-br from-[#003B75] via-[#0052A3] to-[#0284C7] text-white ring-2 ring-[#0284C7]/50 shadow-inner"
+              : "bg-gradient-to-br from-[#004C99] via-[#005FB8] to-[#0EA5E9] hover:from-[#003E80] hover:via-[#0052A3] hover:to-[#0284C7] text-white shadow-[#005FB8]/25 hover:shadow-md hover:shadow-[#005FB8]/35 hover:scale-[1.02]"
           }`}
         >
           <div className="relative flex items-center justify-center">
             <svg
-              className="w-5 h-5 text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-xs"
+              className="w-[18px] h-[18px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
