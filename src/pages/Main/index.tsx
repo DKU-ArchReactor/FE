@@ -428,21 +428,21 @@ const MainPage: React.FC = () => {
           />
         </div>
 
-        {/* AI 어시스턴트 팝업 버튼 (플레이 버튼 시그니처 사파이어 일렉트릭 그라데이션) */}
+        {/* AI 어시스턴트 팝업 버튼 (테두리 없는 비비드 일렉트릭 아주르 그라데이션) */}
         <button
           ref={aiButtonRef}
           type="button"
           onClick={() => setIsAiPopupOpen((prev) => !prev)}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
-          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border border-white/25 dark:border-white/15 shadow-sm group active:scale-95 ${
+          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 group active:scale-95 ${
             isAiPopupOpen
-              ? "bg-gradient-to-br from-[#003B75] via-[#0052A3] to-[#0284C7] text-white ring-2 ring-[#0284C7]/50 shadow-inner"
-              : "bg-gradient-to-br from-[#004C99] via-[#005FB8] to-[#0EA5E9] hover:from-[#003E80] hover:via-[#0052A3] hover:to-[#0284C7] text-white shadow-[#005FB8]/25 hover:shadow-md hover:shadow-[#005FB8]/35 hover:scale-[1.02]"
+              ? "bg-gradient-to-tr from-[#004C99] via-[#007ACC] to-[#0284C7] text-white ring-2 ring-[#38BDF8]/70 ring-offset-1 dark:ring-offset-[#18181B] shadow-inner"
+              : "bg-gradient-to-tr from-[#0066CC] via-[#0091FF] to-[#38BDF8] hover:from-[#0055B3] hover:via-[#0080FF] hover:to-[#7DD3FC] text-white shadow-[0_2px_12px_rgba(0,145,255,0.32)] hover:shadow-[0_4px_18px_rgba(0,145,255,0.48)] hover:scale-[1.03]"
           }`}
         >
           <div className="relative flex items-center justify-center">
             <svg
-              className="w-[18px] h-[18px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
+              className="w-[19px] h-[19px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
