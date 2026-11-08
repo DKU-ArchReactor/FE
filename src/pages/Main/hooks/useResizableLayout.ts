@@ -230,6 +230,29 @@ export function useResizableLayout(
     });
   };
 
+  const handlePairReset = (secIdx: number, slotIdx: number) => {
+    setSections((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const targetSlot = next[secIdx]?.slots[slotIdx];
+      if (targetSlot) {
+        targetSlot.pairRatio = 50;
+      }
+      return next;
+    });
+  };
+
+  const handleSlotReset = (secIdx: number, slotIdx: number) => {
+    setSections((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const slots = next[secIdx]?.slots;
+      if (slots && slots[slotIdx] && slots[slotIdx + 1]) {
+        slots[slotIdx].flexRatio = 1;
+        slots[slotIdx + 1].flexRatio = 1;
+      }
+      return next;
+    });
+  };
+
   return {
     containerRef,
     resizingSplitterIndex: resizingCol?.idx ?? null,
@@ -238,5 +261,7 @@ export function useResizableLayout(
     handleColResizeStart,
     handleSlotResizeStart,
     handlePairResizeStart,
+    handlePairReset,
+    handleSlotReset,
   };
 }
