@@ -477,7 +477,7 @@ const MainPage: React.FC = () => {
         {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) */}
         <div
           ref={splitter.leftPaneContainerRef}
-          className="flex flex-col h-full min-h-0 overflow-hidden"
+          className="flex flex-col h-full min-h-0 overflow-hidden pr-1"
           style={{ width: `${splitter.leftPaneWidth}%` }}
         >
           {/* 상단: C 소스 + ASM 가로 분할 */}
@@ -587,19 +587,19 @@ const MainPage: React.FC = () => {
             splitter.setLeftPaneWidth(45);
           }}
           title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 45:55 기본 리셋)"
-          className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+          className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-md transition-colors"
         >
           <div
-            className={`w-[3px] rounded-full transition-all duration-200 ${
+            className={`w-[4px] rounded-full transition-all duration-200 ${
               splitter.resizingLeftPane
-                ? "h-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                : "h-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                ? "h-36 bg-[#005FB8] dark:bg-[#007ACC] shadow-md ring-2 ring-[#005FB8]/30 dark:ring-[#007ACC]/30"
+                : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
             }`}
           />
         </div>
 
         {/* 우측 슬라이딩 뷰포트 영역 */}
-        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch">
+        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch pl-1">
           {canGoPrevViewport && (
             <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 mr-1">
               <button
