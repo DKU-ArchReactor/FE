@@ -17,6 +17,30 @@ const formatSignedDec = (hexStr: string): string => {
 
 type RegisterGroup = 'zero' | 'special' | 'args' | 'saved' | 'temp';
 
+// 레지스터 그룹별 고유 시그니처 색상 (이름 & 데이터값 매핑)
+const GROUP_COLORS: Record<RegisterGroup, { name: string; data: string }> = {
+  zero: {
+    name: 'text-slate-500 dark:text-slate-400',
+    data: 'text-slate-500 dark:text-slate-400',
+  },
+  special: {
+    name: 'text-purple-600 dark:text-purple-400',
+    data: 'text-purple-700 dark:text-purple-300',
+  },
+  args: {
+    name: 'text-emerald-600 dark:text-emerald-400',
+    data: 'text-emerald-700 dark:text-emerald-300',
+  },
+  saved: {
+    name: 'text-amber-600 dark:text-amber-400',
+    data: 'text-amber-700 dark:text-amber-300',
+  },
+  temp: {
+    name: 'text-sky-600 dark:text-sky-400',
+    data: 'text-sky-700 dark:text-sky-300',
+  },
+};
+
 // 레지스터 메타데이터: ABI 이름, 그룹, 역할 설명
 interface RegisterMeta {
   abi: string;
@@ -132,6 +156,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
           const isPulsing = pulsingKeys.has(regKey);
           const hasVal = val !== '0x00000000';
           const meta = REGISTER_METAS[regKey] || { abi: regKey, group: 'temp' as RegisterGroup };
+          const groupColor = GROUP_COLORS[meta.group] || GROUP_COLORS.temp;
 
           // 그룹 경계선
           const prevMeta = idx > 0 ? REGISTER_METAS[regKeys[idx - 1]] : undefined;
@@ -151,42 +176,50 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                   : 'hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E]/50 text-[#656D76] dark:text-[#6E7681]'
               }`}
             >
-              {/* 좌측: [ABI 이름] (레지스터 번호) */}
+              {/* 좌측: [ABI 이름] (레지스터 번호) - 그룹 고유 색상 적용 */}
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className={`w-7 font-bold ${
                   isPulsing 
                     ? 'text-[#9A6700] dark:text-[#E5B567]' 
-                    : hasVal 
-                    ? 'text-[#005FB8] dark:text-[#4EC9B0]' 
-                    : 'text-[#656D76] dark:text-[#858585]'
+                    : groupColor.name
                 }`}>
                   {meta.abi}
                 </span>
 
-                <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+                <span className={`text-[10px] ${
+                  isPulsing
+                    ? 'text-[#9A6700]/70 dark:text-[#E5B567]/70'
+                    : hasVal
+                    ? 'text-[#57606A] dark:text-[#CCCCCC] font-medium'
+                    : 'text-[#8C959F] dark:text-[#6E7681]'
+                }`}>
                   ({regKey})
                 </span>
               </div>
 
-              {/* 중앙: 레지스터 역할 간략 설명 */}
+              {/* 중앙: 레지스터 역할 간략 설명 (값이 있을 때 볼드체 + 진한 파란색으로 활성화 강조) */}
               <div className="flex-1 min-w-0 px-2 text-left truncate">
-                <span className="text-[9.5px] font-sans text-[#8C959F] dark:text-[#858585] tracking-tight">
+                <span className={`text-[9.5px] font-sans tracking-tight ${
+                  hasVal
+                    ? 'font-bold text-[#005FB8] dark:text-[#79C0FF]'
+                    : 'text-[#8C959F] dark:text-[#858585]'
+                }`}>
                   {meta.role}
                 </span>
               </div>
 
-              {/* 우측: 부호 있는 10진수 값 (우측 정렬 및 호버 시 16진수 툴팁) */}
+              {/* 우측: 부호 있는 10진수 값 (그룹 고유 색상 및 값이 0이면 뮤트 색상) */}
               <div
                 title={`Hex: ${val}`}
                 className="shrink-0 tabular-nums font-mono select-text cursor-help"
               >
                 <span
-                  className={`text-right text-[11px] font-semibold ${
+                  className={`text-right text-[11px] ${
                     isPulsing
-                      ? 'text-[#CF222E] dark:text-[#F44747] font-bold'
+                      ? 'text-[#CF222E] dark:text-[#F44747] font-black'
                       : hasVal
-                      ? 'text-[#005FB8] dark:text-[#79C0FF]'
-                      : 'text-[#656D76] dark:text-[#858585]'
+                      ? `${groupColor.data} font-bold`
+                      : 'text-[#8C959F] dark:text-[#6E7681] font-normal'
                   }`}
                 >
                   {formatSignedDec(val)}
