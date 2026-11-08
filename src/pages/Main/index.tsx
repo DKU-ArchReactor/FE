@@ -576,7 +576,7 @@ const MainPage: React.FC = () => {
             if (e.detail === 2) {
               e.preventDefault();
               e.stopPropagation();
-              splitter.setLeftPaneWidth(45);
+              splitter.setLeftPaneWidth(50);
               return;
             }
             splitter.handleMainDividerResizeStart(e);
@@ -584,9 +584,9 @@ const MainPage: React.FC = () => {
           onDoubleClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            splitter.setLeftPaneWidth(45);
+            splitter.setLeftPaneWidth(50);
           }}
-          title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 45:55 기본 리셋)"
+          title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 50:50 기본 리셋)"
           className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-md transition-colors"
         >
           <div

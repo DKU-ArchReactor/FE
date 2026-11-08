@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 export function useWorkspaceSplitter() {
-  const [leftPaneWidth, setLeftPaneWidth] = useState<number>(45);
+  const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
   const [resizingLeftPane, setResizingLeftPane] = useState<boolean>(false);
   const mainWorkspaceRef = useRef<HTMLDivElement>(null);
 
