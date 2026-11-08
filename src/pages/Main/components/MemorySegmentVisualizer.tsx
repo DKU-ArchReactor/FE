@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
-import { mapAssembly } from './translationCompile';
+import { mapAssembly, extractAssemblyFromSimulation } from './translationCompile';
 
 interface MemorySegmentVisualizerProps {
   currentData: CycleHistoryItem | null;
@@ -153,7 +153,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   const memorySnapshot = currentData?.global_result.memory_snapshot ?? EMPTY_MEMORY_SNAPSHOT;
   const prevMemorySnapshot = prevData?.global_result.memory_snapshot;
   const currentPc = currentData?.global_result.current_pc?.toLowerCase();
-  const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(false);
+  const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(true);
 
   // 새로 값이 쓰인 메모리 주소들에 대해 절반 주기(50%) 동안 점등 상태 유지
   const [pulsingAddresses, setPulsingAddresses] = React.useState<Set<string>>(() => new Set());
@@ -195,16 +195,63 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   // 어셈블리 컴포넌트(Section 2)에 들어가는 코드 라인들을 추출하여 Code 메모리 세그먼트에 매핑
   const { codeMap, maxCodePcNum, codeCount, minCodePc, maxCodePc } = useMemo(() => {
     const map: Record<string, { raw: string; asm: string }> = {};
-    let minPc = 0x00010018; // 65,560
-    let maxPc = 0x00010018;
+    let minPc = 0x00010000;
+    let maxPc = 0x00010000;
 
-    // 1. translationAssembly가 있으면 Section 2와 100% 동일한 어셈블리 명령어 추출
+    // 1순위: simulationData.program.code_mapping (CORE 정적 매핑 단일 진실 원천)
+    const codeMapping = simulationData?.program?.code_mapping;
+    if (codeMapping && Object.keys(codeMapping).length > 0) {
+      const pcs = Object.keys(codeMapping)
+        .map((k) => parseInt(k, 16) >>> 0)
+        .sort((a, b) => a - b);
+      minPc = pcs[0];
+      maxPc = pcs[pcs.length - 1];
+
+      Object.entries(codeMapping).forEach(([pcHex, item]) => {
+        map[pcHex.toLowerCase()] = {
+          raw: item.raw_instruction || '0x00000000',
+          asm: item.assembly || '',
+        };
+      });
+
+      return {
+        codeMap: map,
+        maxCodePcNum: maxPc,
+        codeCount: pcs.length,
+        minCodePc: minPc,
+        maxCodePc: maxPc,
+      };
+    }
+
+    // 2순위: extractAssemblyFromSimulation (시뮬레이션 전체 어셈블리 목록)
+    const simRows = extractAssemblyFromSimulation(simulationData);
+    if (simRows.length > 0) {
+      simRows.forEach((row, idx) => {
+        const pcNum = row.pc ? parseInt(row.pc, 16) >>> 0 : 0x00010000 + idx * 4;
+        const pcHex = `0x${pcNum.toString(16).padStart(8, '0')}`;
+        if (idx === 0 || pcNum < minPc) minPc = pcNum;
+        if (pcNum > maxPc) maxPc = pcNum;
+        map[pcHex.toLowerCase()] = {
+          raw: '0x00000000',
+          asm: row.text,
+        };
+      });
+      return {
+        codeMap: map,
+        maxCodePcNum: maxPc,
+        codeCount: simRows.length,
+        minCodePc: minPc,
+        maxCodePc: maxPc,
+      };
+    }
+
+    // 3순위: translationAssembly가 있으면 mapAssembly로 추출
     if (translationAssembly) {
       const mappedRows = mapAssembly(translationAssembly, 1000);
       const basePc = 0x00010018; // 65,560 (main 시작 지점)
       minPc = basePc;
       mappedRows.forEach((row, idx) => {
-        const pcNum = basePc + idx * 4;
+        const pcNum = row.pc ? parseInt(row.pc, 16) >>> 0 : basePc + idx * 4;
         const pcHex = `0x${pcNum.toString(16).padStart(8, '0')}`;
         map[pcHex.toLowerCase()] = {
           raw: '0x00000000',
@@ -221,7 +268,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
       };
     }
 
-    // 2. translationAssembly가 없을 때는 기존 파이프라인 버퍼 히스토리 폴백
+    // 4순위: 기존 파이프라인 버퍼 히스토리 폴백
     let calcMax = 0x0001017f;
     if (simulationData?.history) {
       simulationData.history.forEach((cycle) => {
@@ -252,7 +299,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
       codeMap: map,
       maxCodePcNum: calcMax,
       codeCount: keys.length,
-      minCodePc: 0x00010018,
+      minCodePc: 0x00010000,
       maxCodePc: calcMax,
     };
   }, [translationAssembly, simulationData]);

@@ -186,8 +186,10 @@ export async function compileAssemblyDirectly(
 export function mapAssembly(assembly: string, sourceLineCount: number): MappedAssemblyRow[] {
   const sourceFiles = new Map<number, string>();
   let sourceLine: number | null = null;
-  let executable = false;
-  let previousExecutable = false;
+  // 섹션 디렉티브(.text, .data 등)가 전혀 없는 순수 어셈블리 텍스트인 경우 기본적으로 실행 가능 코드로 간주
+  const hasSectionDirectives = /^\s*\.(?:text|data|bss|rodata|section|pushsection)\b/m.test(assembly);
+  let executable = !hasSectionDirectives;
+  let previousExecutable = executable;
   const sectionStack: boolean[] = [];
   const mapped: MappedAssemblyRow[] = [];
 
