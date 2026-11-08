@@ -384,10 +384,11 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
 
     if (changed.size > 0) {
       setPulsingAddresses(changed);
-      const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
+      // 부드러운 페이드아웃 효과를 위해 유지 시간을 재생 속도에 맞춰 탄력적으로 설정 (최소 300ms ~ 재생 주기의 70%)
+      const flashDuration = Math.max(300, Math.round(playSpeed * 0.7));
       const timer = window.setTimeout(() => {
         setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
-      }, halfDuration);
+      }, flashDuration);
 
       return () => clearTimeout(timer);
     } else {
@@ -520,7 +521,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                 {/* 우측: 데이터 리스트 (Code 영역은 닫혔을 땐 하단(65,536) 정렬, 펼쳤을 땐 상단 경계선 바로 아래에 오도록 justify-start 적용) */}
                 <div
                   ref={seg.key === 'stack' ? stackScrollRef : undefined}
-                  className={`flex-1 flex flex-col divide-y divide-slate-100 min-w-0 pl-1.5 py-1 overflow-y-auto custom-scrollbar ${
+                  className={`flex-1 flex flex-col min-w-0 pl-1.5 py-0.5 overflow-y-auto custom-scrollbar ${
                     isCode ? (isUserCodeExpanded ? 'justify-start' : 'justify-end') : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
                   }`}
                 >
@@ -643,33 +644,38 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                   ) : (
                     items.map((item) => {
                       const isPulsing = pulsingAddresses.has(item.address.toLowerCase());
-                      const isStack = seg.key === 'stack';
+                      
+                      // 세그먼트별 시그니처 배경 점멸 색상 매핑
+                      let pulsingBgClass = 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold';
+                      if (seg.key === 'stack') {
+                        pulsingBgClass = 'bg-violet-100 dark:bg-violet-950/80 text-violet-950 dark:text-violet-100 font-bold';
+                      } else if (seg.key === 'heap') {
+                        pulsingBgClass = 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-950 dark:text-emerald-100 font-bold';
+                      } else if (seg.key === 'bss') {
+                        pulsingBgClass = 'bg-sky-100 dark:bg-sky-950/80 text-sky-950 dark:text-sky-100 font-bold';
+                      } else if (seg.key === 'data') {
+                        pulsingBgClass = 'bg-blue-100 dark:bg-blue-950/80 text-blue-950 dark:text-blue-100 font-bold';
+                      }
 
                       return (
                         <div
                           key={item.address}
-                          className={`flex items-center px-2 py-1 rounded transition-colors duration-150 shrink-0 gap-1 ${
+                          className={`flex items-center px-2 py-1 border-b border-[#F0F2F5] dark:border-[#2D3139] last:border-b-0 transition-colors duration-300 ease-out shrink-0 ${
                             isPulsing
-                              ? isStack
-                                ? 'bg-violet-200 dark:bg-violet-950/70 text-violet-950 dark:text-violet-200 font-bold'
-                                : 'bg-amber-200/95 dark:bg-amber-950/70 text-amber-950 dark:text-amber-200 font-bold'
-                              : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
+                              ? pulsingBgClass
+                              : 'bg-transparent hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
                           }`}
                         >
-                          {/* 1열: addr: 라벨 (작은 폰트, 기본 두께, 고정폭 w-9) */}
-                          <span className="w-9 shrink-0 text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none">
-                            addr:
-                          </span>
-
-                          {/* 2열: 실제 주소값 (상대적으로 큰 폰트, 볼드, 유연 폭 + 호버 시 16진수) */}
-                          <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                          {/* 1열 & 2열: addr: 라벨 + 주소 (탄력적 비율 너비 w-[65%] shrink-0) */}
+                          <div className="w-[65%] shrink-0 flex items-center gap-1 min-w-0 pr-1">
+                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                              addr:
+                            </span>
                             <span
                               title={`Hex: ${normalizeHex(item.address)}`}
-                              className={`text-[11.5px] font-mono font-semibold cursor-help truncate ${
+                              className={`text-[11.5px] font-mono font-semibold cursor-help whitespace-nowrap ${
                                 isPulsing
-                                  ? isStack
-                                    ? 'text-violet-950 dark:text-violet-200 font-bold'
-                                    : 'text-amber-950 dark:text-amber-200 font-bold'
+                                  ? 'text-inherit font-bold'
                                   : 'text-[#24292F] dark:text-[#CCCCCC]'
                               }`}
                             >
@@ -682,25 +688,23 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                             )}
                           </div>
 
-                          {/* 3열: val: 라벨 (작은 폰트, 기본 두께, 고정폭 w-7, 우측 정렬) */}
-                          <span className="w-7 shrink-0 text-right text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none">
-                            val:
-                          </span>
-
-                          {/* 4열: 실제 값 (상대적으로 큰 폰트, 볼드, 기본 흑백 톤, 고정폭 w-20, 우측 정렬) */}
-                          <span
-                            className={`w-20 shrink-0 text-right font-mono text-[11.5px] font-bold tracking-wide ${
-                              isPulsing
-                                ? isStack
-                                  ? 'text-violet-950 dark:text-violet-200 font-black'
-                                  : 'text-amber-950 dark:text-amber-200 font-black'
-                                : isCode
-                                ? 'text-indigo-950 dark:text-[#9CDCFE]'
-                                : 'text-[#1F2328] dark:text-[#CCCCCC]'
-                            }`}
-                          >
-                            {item.decText}
-                          </span>
+                          {/* 3열 & 4열: val: 라벨 + 값 (탄력적 비율 너비 w-[35%] shrink-0) */}
+                          <div className="w-[35%] shrink-0 flex items-center gap-1 min-w-0">
+                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                              val:
+                            </span>
+                            <span
+                              className={`font-mono text-[11.5px] tracking-wide ${
+                                isPulsing
+                                  ? 'text-inherit font-black'
+                                  : isCode
+                                  ? 'text-indigo-950 dark:text-[#9CDCFE] font-bold'
+                                  : 'text-[#1F2328] dark:text-[#CCCCCC] font-bold'
+                              }`}
+                            >
+                              {item.decText}
+                            </span>
+                          </div>
                         </div>
                       );
                     })
