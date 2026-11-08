@@ -67,8 +67,8 @@ html.dark body {
 }
 
 /* ======================================================== */
-/* PLAY 상태 시 메인 배경 우하단 이동 화이트-스카이블루 안개 그라데이션 */
-/* (Single 모드 & Light 모드: 깨끗한 화이트와 파스텔 스카이블루 조화) */
+/* PLAY 상태 시 메인 배경 우하단 이동 밀키 파스텔 스카이 안개 */
+/* (Single 모드 & Light 모드: 뽀얗고 여리여리한 초극세사 파스텔 톤) */
 /* ======================================================== */
 @keyframes playPastelFogGlide {
   0% {
@@ -81,22 +81,22 @@ html.dark body {
 
 html.mode-single:not(.dark) main.is-playing-single-light {
   background:
-    radial-gradient(ellipse 90% 70% at 20% 20%, rgba(186, 230, 253, 0.45) 0%, rgba(255, 255, 255, 0) 70%),
-    radial-gradient(ellipse 80% 60% at 80% 80%, rgba(125, 211, 252, 0.35) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 90% 70% at 20% 20%, rgba(224, 242, 254, 0.35) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 80% 60% at 80% 80%, rgba(232, 244, 252, 0.3) 0%, rgba(255, 255, 255, 0) 70%),
     linear-gradient(
       135deg,
       #ffffff 0%,
-      #e0f2fe 12.5%,
-      #bae6fd 25%,
+      #f0f8ff 12.5%,
+      #e8f4fc 25%,
       #e0f2fe 37.5%,
       #ffffff 50%,
-      #e0f2fe 62.5%,
-      #bae6fd 75%,
+      #f0f8ff 62.5%,
+      #e8f4fc 75%,
       #e0f2fe 87.5%,
       #ffffff 100%
     );
   background-size: 100% 100%, 100% 100%, 200% 200%;
-  animation: playPastelFogGlide 16s linear infinite;
+  animation: playPastelFogGlide 18s linear infinite;
   transition: background 0.8s ease-in-out;
 }
 
