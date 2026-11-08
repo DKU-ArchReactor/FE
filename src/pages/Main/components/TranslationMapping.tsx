@@ -34,12 +34,12 @@ const STAGES_CONFIG: {
   name: string;
   badgeBg: string;
 }[] = [
-  { key: "IF", name: "IF", badgeBg: "bg-indigo-600 text-white" },
-  { key: "ID", name: "ID", badgeBg: "bg-sky-600 text-white" },
-  { key: "EX", name: "EX", badgeBg: "bg-amber-600 text-white" },
-  { key: "MEM", name: "MEM", badgeBg: "bg-emerald-600 text-white" },
-  { key: "WB", name: "WB", badgeBg: "bg-rose-600 text-white" },
-];
+    { key: "IF", name: "IF", badgeBg: "bg-indigo-600 text-white" },
+    { key: "ID", name: "ID", badgeBg: "bg-sky-600 text-white" },
+    { key: "EX", name: "EX", badgeBg: "bg-amber-600 text-white" },
+    { key: "MEM", name: "MEM", badgeBg: "bg-emerald-600 text-white" },
+    { key: "WB", name: "WB", badgeBg: "bg-rose-600 text-white" },
+  ];
 
 // 명령어(Opcode)와 피연산자(Operands) 분리 헬퍼
 function splitInstruction(text: string): { opcode: string; operands: string } {
@@ -205,11 +205,10 @@ export default function TranslationMapping({
       <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-sky-500">
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
-              activeTarget === "asm"
+            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${activeTarget === "asm"
                 ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
                 : "bg-transparent scale-0"
-            }`}
+              }`}
           />
           <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] truncate whitespace-nowrap">
             RISC-V 어셈블리 {activeTarget === "asm" ? "에디터" : "매핑"}
@@ -251,11 +250,10 @@ export default function TranslationMapping({
             type="button"
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
-            className={`rounded border px-2.5 py-0.5 text-[11px] font-medium transition-colors shadow-2xs flex items-center gap-1 shrink-0 ${
-              activeTarget === "asm"
+            className={`rounded border px-2.5 py-0.5 text-[11px] font-medium transition-colors shadow-2xs flex items-center gap-1 shrink-0 ${activeTarget === "asm"
                 ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] cursor-pointer"
                 : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
-            }`}
+              }`}
             title={activeTarget === "asm" ? "작성된 어셈블리로 시뮬레이션 실행" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
           >
             <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
@@ -305,8 +303,8 @@ export default function TranslationMapping({
             {busy
               ? "컴파일 및 어셈블리 매핑 중…"
               : error
-              ? "컴파일 오류로 어셈블리를 생성할 수 없습니다."
-              : "왼쪽 에디터에서 C 코드를 작성하고 [⚡ 컴파일]을 누르세요."}
+                ? "컴파일 오류로 어셈블리를 생성할 수 없습니다."
+                : "왼쪽 에디터에서 C 코드를 작성하고 [⚡ 컴파일]을 누르세요."}
           </p>
           <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
             컴파일 완료 후 C 코드의 줄을 클릭하면 매핑된 어셈블리 라인이 즉시 강조됩니다.
@@ -362,19 +360,18 @@ export default function TranslationMapping({
                     onSelectLine?.(row.sourceLine, index);
                   }
                 }}
-                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${
-                  isCurrentSingleActive && !isSelectedPrimary
+                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${isCurrentSingleActive && !isSelectedPrimary
                     ? "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs"
                     : isSelectedPrimary
-                    ? "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs"
-                    : isSelectedSibling
-                    ? "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal"
-                    : isExecutionSibling
-                    ? "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal"
-                    : activeStages.length > 0
-                    ? "bg-amber-50/70 dark:bg-[#3D2E12]/50 border-transparent"
-                    : "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
-                }`}
+                      ? "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs"
+                      : isSelectedSibling
+                        ? "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal"
+                        : isExecutionSibling
+                          ? "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal"
+                          : activeStages.length > 0
+                            ? "bg-amber-50/70 dark:bg-[#3D2E12]/50 border-transparent"
+                            : "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
+                  }`}
               >
                 {/* 1. 화살표 / 인디케이터 */}
                 <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
@@ -392,17 +389,16 @@ export default function TranslationMapping({
 
                 {/* 2. 라인 번호 */}
                 <div
-                  className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${
-                    isSelectedPrimary
+                  className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${isSelectedPrimary
                       ? "text-[#005FB8] dark:text-[#79C0FF] font-bold"
                       : isSelectedSibling
-                      ? "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
-                      : isCurrentSingleActive
-                      ? "text-emerald-700 dark:text-[#7EE787] font-bold"
-                      : isExecutionSibling
-                      ? "text-emerald-600 dark:text-[#7EE787]/70"
-                      : "text-[#8C959F] dark:text-[#858585]"
-                  }`}
+                        ? "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
+                        : isCurrentSingleActive
+                          ? "text-emerald-700 dark:text-[#7EE787] font-bold"
+                          : isExecutionSibling
+                            ? "text-emerald-600 dark:text-[#7EE787]/70"
+                            : "text-[#8C959F] dark:text-[#858585]"
+                    }`}
                 >
                   {index + 1}
                 </div>
@@ -414,14 +410,14 @@ export default function TranslationMapping({
                       isSelectedPrimary
                         ? "text-blue-800 dark:text-[#79C0FF] font-bold"
                         : isSelectedSibling
-                        ? "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
-                        : isCurrentSingleActive
-                        ? "text-emerald-800 dark:text-[#7EE787] font-bold"
-                        : isExecutionSibling
-                        ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
-                        : isCrt
-                        ? "text-[#6E7681] dark:text-[#858585] font-semibold"
-                        : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
+                          ? "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
+                          : isCurrentSingleActive
+                            ? "text-emerald-800 dark:text-[#7EE787] font-bold"
+                            : isExecutionSibling
+                              ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
+                              : isCrt
+                                ? "text-[#6E7681] dark:text-[#858585] font-semibold"
+                                : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
                     }
                   >
                     {opcode}
@@ -435,14 +431,14 @@ export default function TranslationMapping({
                       isSelectedPrimary
                         ? "text-slate-950 dark:text-white font-bold"
                         : isSelectedSibling
-                        ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                        : isCurrentSingleActive
-                        ? "text-slate-950 dark:text-white font-bold"
-                        : isExecutionSibling
-                        ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                        : isCrt
-                        ? "text-[#6E7681]/90 dark:text-[#858585]"
-                        : "text-[#24292F] dark:text-[#CCCCCC]"
+                          ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
+                          : isCurrentSingleActive
+                            ? "text-slate-950 dark:text-white font-bold"
+                            : isExecutionSibling
+                              ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
+                              : isCrt
+                                ? "text-[#6E7681]/90 dark:text-[#858585]"
+                                : "text-[#24292F] dark:text-[#CCCCCC]"
                     }
                   >
                     {operands}
@@ -456,9 +452,8 @@ export default function TranslationMapping({
                         return (
                           <span
                             key={stg}
-                            className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${
-                              cfg?.badgeBg || "bg-slate-700 text-white"
-                            }`}
+                            className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${cfg?.badgeBg || "bg-slate-700 text-white"
+                              }`}
                           >
                             {stg}
                           </span>
@@ -472,33 +467,31 @@ export default function TranslationMapping({
                 <div className="shrink-0 pr-4 flex items-center select-none">
                   {row.sourceLine !== null ? (
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${
-                        isSelectedPrimary
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
                           ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
                           : isCurrentSingleActive
-                          ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                          : isSelectedSibling
-                          ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                          : isExecutionSibling
-                          ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                          : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
-                      }`}
+                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                            : isSelectedSibling
+                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                              : isExecutionSibling
+                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
+                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
+                        }`}
                     >
                       C: L{row.sourceLine}
                     </span>
                   ) : (
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${
-                        isSelectedPrimary
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
                           ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
                           : isCurrentSingleActive
-                          ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                          : isSelectedSibling
-                          ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                          : isExecutionSibling
-                          ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                          : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
-                      }`}
+                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                            : isSelectedSibling
+                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                              : isExecutionSibling
+                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
+                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
+                        }`}
                       title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
                     >
                       CRT

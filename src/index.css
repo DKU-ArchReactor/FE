@@ -7,11 +7,11 @@
 /* ArchReactor IDE 테마 CSS 변수 & 계층화 팔레트              */
 /* ======================================================== */
 :root {
-  --ar-canvas-bg: #F1F3F5;
+  --ar-canvas-bg: #F8FAFC;
   --ar-panel-bg: #FFFFFF;
-  --ar-header-bg: #F8F9FA;
-  --ar-border: #D8DEE4;
-  --ar-border-subtle: #E8ECEF;
+  --ar-header-bg: #FAFBFC;
+  --ar-border: #E5E7EB;
+  --ar-border-subtle: #F1F5F9;
   --ar-text-primary: #1F2328;
   --ar-text-muted: #656D76;
   --ar-accent: #005FB8;
@@ -30,7 +30,7 @@ html.dark {
 
 /* Single Mode (정밀/시퀀셜) Ambient 틴트 */
 html.mode-single {
-  --ar-canvas-bg: #F1F3F5;
+  --ar-canvas-bg: #F8FAFC;
   --ar-accent: #0284C7;
 }
 html.dark.mode-single {
@@ -98,6 +98,14 @@ html.mode-single:not(.dark) main.is-playing-single-light {
   background-size: 100% 100%, 100% 100%, 200% 200%;
   animation: playPastelFogGlide 18s linear infinite;
   transition: background 0.8s ease-in-out;
+}
+
+/* 초경량 소프트 섀도우 통일 (패널 틈새가 칙칙해지지 않도록 투명하고 맑은 음영 처리) */
+.shadow-sm {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.035), 0 1px 2px -1px rgba(0, 0, 0, 0.02) !important;
+}
+html.dark .shadow-sm {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.2) !important;
 }
 
 /* ======================================================== */

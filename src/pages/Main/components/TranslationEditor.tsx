@@ -274,7 +274,7 @@ export default function TranslationEditor({
     <section
       className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border shadow-sm select-none transition-all duration-200 ${
         activeTarget !== "c"
-          ? "border-[var(--ar-border)] bg-[#EBECEF] dark:bg-[#141415]"
+          ? "border-[var(--ar-border)] bg-[#F8FAFC] dark:bg-[#141415]"
           : "border-[var(--ar-border)] bg-[var(--ar-panel-bg)]"
       }`}
       aria-label="Translation C 편집기"
@@ -283,7 +283,7 @@ export default function TranslationEditor({
       <header
         className={`shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 py-1.5 min-w-0 transition-colors border-l-2 border-l-blue-600 dark:border-l-blue-500 ${
           activeTarget !== "c"
-            ? "bg-[#E2E4E8] dark:bg-[#1A1A1C]"
+            ? "bg-[#F1F5F9] dark:bg-[#1A1A1C]"
             : "bg-[var(--ar-header-bg)]"
         }`}
       >
