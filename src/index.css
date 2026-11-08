@@ -67,6 +67,34 @@ html.dark body {
 }
 
 /* ======================================================== */
+/* PLAY 상태 시 메인 배경 우하단 이동 그라데이션 애니메이션   */
+/* (Single 모드 & Light 모드)                               */
+/* ======================================================== */
+@keyframes playGradientGlideBottomRight {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 500px 500px;
+  }
+}
+
+html.mode-single:not(.dark) main.is-playing-single-light {
+  background: repeating-linear-gradient(
+    135deg,
+    #e2e8f0 0px,
+    #bae6fd 80px,
+    #93c5fd 160px,
+    #7dd3fc 260px,
+    #cbd5e1 360px,
+    #bfdbfe 440px,
+    #e2e8f0 500px
+  );
+  background-size: 500px 500px;
+  animation: playGradientGlideBottomRight 12s linear infinite;
+}
+
+/* ======================================================== */
 /* 테마 전환 시 자연스럽고 부드러운 색상/배경 페이드 트랜지션 */
 /* ======================================================== */
 html.theme-transitioning,

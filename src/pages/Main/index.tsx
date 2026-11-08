@@ -391,7 +391,11 @@ const MainPage: React.FC = () => {
   );
 
   return (
-    <main className="flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative">
+    <main
+      className={`flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
+        playback.isPlaying && isSingleEngine ? "is-playing-single-light" : ""
+      }`}
+    >
       {/* 1. 최상단 제어 바 */}
       <div className="h-[42px] shrink-0 flex items-stretch gap-2 mb-2 min-h-0 w-full">
         <div className="flex-1 h-full min-w-0 flex">
