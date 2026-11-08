@@ -428,7 +428,7 @@ const MainPage: React.FC = () => {
           />
         </div>
 
-        {/* AI 어시스턴트 팝업 버튼 */}
+        {/* AI 어시스턴트 팝업 버튼 (플레이 버튼 #005FB8 / #007ACC 기반 정밀 그라데이션) */}
         <button
           ref={aiButtonRef}
           type="button"
@@ -436,8 +436,8 @@ const MainPage: React.FC = () => {
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
           className={`h-full aspect-square rounded-md border flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none shadow-sm group ${
             isAiPopupOpen
-              ? "bg-gradient-to-br from-blue-700 via-sky-600 to-cyan-500 border-sky-400/60 ring-2 ring-sky-400/50 scale-95"
-              : "bg-gradient-to-br from-blue-600 via-sky-500 to-cyan-400 border-sky-300/40 hover:from-blue-700 hover:via-sky-600 hover:to-cyan-500 hover:shadow-md hover:shadow-sky-500/30 active:scale-95"
+              ? "bg-gradient-to-b from-[#004C99] to-[#003B75] dark:from-[#0062A3] dark:to-[#004C80] border-[#004C99] text-white ring-2 ring-[#005FB8]/40 scale-95"
+              : "bg-gradient-to-b from-[#0F75D3] via-[#005FB8] to-[#004C99] hover:from-[#1A82E2] hover:via-[#0069CA] hover:to-[#0052A3] dark:from-[#1F8AD2] dark:via-[#007ACC] dark:to-[#0062A3] dark:hover:from-[#2B95DC] dark:hover:via-[#0E8CE6] dark:hover:to-[#006EBA] border-[#005FB8]/70 dark:border-[#007ACC]/60 text-white shadow-blue-500/20 hover:shadow-md hover:shadow-blue-500/30 active:scale-95"
           }`}
         >
           <div className="relative flex items-center justify-center">
@@ -610,7 +610,7 @@ const MainPage: React.FC = () => {
                 title="이전 뷰포트(왼쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   isSingleEngine
-                    ? "text-[#8C959F] dark:text-[#858585] hover:text-sky-600 dark:hover:text-sky-400 hover:bg-[#0284C7]/10 dark:hover:bg-[#0284C7]/20"
+                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
                     : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
               >
@@ -645,7 +645,7 @@ const MainPage: React.FC = () => {
                 title="다음 뷰포트(오른쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   isSingleEngine
-                    ? "text-[#8C959F] dark:text-[#858585] hover:text-sky-600 dark:hover:text-sky-400 hover:bg-[#0284C7]/10 dark:hover:bg-[#0284C7]/20"
+                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
                     : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
               >
