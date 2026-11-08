@@ -656,19 +656,19 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                               : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
                           }`}
                         >
-                          {/* 좌측 주소 (addr 태그 + 10진수 주소 + 호버 시 16진수) */}
+                          {/* 좌측 주소 그룹 (addr: 열 + 실제 주소 열) */}
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-[8.5px] px-1 py-0.2 rounded font-sans font-semibold bg-slate-100 dark:bg-[#2A2D2E] text-slate-500 dark:text-slate-400 shrink-0">
-                              addr
+                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                              addr:
                             </span>
                             <span
                               title={`Hex: ${normalizeHex(item.address)}`}
-                              className={`text-[11px] font-mono font-medium cursor-help ${
+                              className={`text-[11.5px] font-mono font-semibold cursor-help ${
                                 isPulsing
                                   ? isStack
                                     ? 'text-violet-950 dark:text-violet-200 font-bold'
                                     : 'text-amber-950 dark:text-amber-200 font-bold'
-                                  : 'text-[#57606A] dark:text-[#858585]'
+                                  : 'text-[#24292F] dark:text-[#CCCCCC]'
                               }`}
                             >
                               {formatAddressDecimal(item.address)}
@@ -680,20 +680,20 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                             )}
                           </div>
 
-                          {/* 우측 값 (val 태그 + 값) */}
+                          {/* 우측 값 그룹 (val: 열 + 실제 값 열) */}
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[8.5px] px-1 py-0.2 rounded font-sans font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
-                              val
+                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                              val:
                             </span>
                             <span
-                              className={`font-mono text-[11.5px] tracking-wide ${
+                              className={`font-mono text-[11.5px] font-bold tracking-wide ${
                                 isPulsing
                                   ? isStack
                                     ? 'text-violet-950 dark:text-violet-200 font-black'
                                     : 'text-amber-950 dark:text-amber-200 font-black'
                                   : isCode
-                                  ? 'text-indigo-950 dark:text-[#9CDCFE] font-semibold'
-                                  : 'text-[#1F2328] dark:text-[#CCCCCC] font-bold'
+                                  ? 'text-indigo-950 dark:text-[#9CDCFE]'
+                                  : 'text-[#005FB8] dark:text-[#79C0FF]'
                               }`}
                             >
                               {item.decText}
