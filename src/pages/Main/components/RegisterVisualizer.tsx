@@ -176,9 +176,9 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                   : 'hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E]/50 text-[#656D76] dark:text-[#6E7681]'
               }`}
             >
-              {/* 좌측: [ABI 이름] (레지스터 번호) - 그룹 고유 색상 적용 */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className={`w-7 font-bold ${
+              {/* 1열 (좌측): [ABI 이름] (레지스터 번호) - 고정 너비로 수직 정렬선 일치 */}
+              <div className="w-[72px] shrink-0 flex items-center gap-1 min-w-0">
+                <span className={`w-8 font-bold text-left ${
                   isPulsing 
                     ? 'text-[#9A6700] dark:text-[#E5B567]' 
                     : groupColor.name
@@ -186,7 +186,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                   {meta.abi}
                 </span>
 
-                <span className={`text-[10px] ${
+                <span className={`text-[10px] tabular-nums ${
                   isPulsing
                     ? 'text-[#9A6700]/70 dark:text-[#E5B567]/70'
                     : hasVal
@@ -197,8 +197,8 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                 </span>
               </div>
 
-              {/* 중앙: 레지스터 역할 간략 설명 (값이 있을 때 볼드체 + 진한 파란색으로 활성화 강조) */}
-              <div className="flex-1 min-w-0 px-2 text-left truncate">
+              {/* 2열 (중앙): 독립된 역할 설명 열 (왼쪽 시작선 완벽 일치 및 값 존재 시 볼드 파랑 강조) */}
+              <div className="flex-1 min-w-0 px-2.5 text-left truncate">
                 <span className={`text-[9.5px] font-sans tracking-tight ${
                   hasVal
                     ? 'font-bold text-[#005FB8] dark:text-[#79C0FF]'
@@ -208,13 +208,13 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                 </span>
               </div>
 
-              {/* 우측: 부호 있는 10진수 값 (그룹 고유 색상 및 값이 0이면 뮤트 색상) */}
+              {/* 3열 (우측): 부호 있는 10진수 값 (우측 끝 정렬) */}
               <div
                 title={`Hex: ${val}`}
-                className="shrink-0 tabular-nums font-mono select-text cursor-help"
+                className="w-24 shrink-0 text-right tabular-nums font-mono select-text cursor-help"
               >
                 <span
-                  className={`text-right text-[11px] ${
+                  className={`text-[11px] ${
                     isPulsing
                       ? 'text-[#CF222E] dark:text-[#F44747] font-black'
                       : hasVal

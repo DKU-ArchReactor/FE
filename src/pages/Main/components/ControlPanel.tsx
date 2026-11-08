@@ -109,10 +109,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
 
-        {/* [사이클/스텝 정보] */}
+        {/* [사이클 정보] */}
         <div className="flex items-baseline gap-1 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5">
           <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
-            {isSingle ? "Step" : "Cycle"}:
+            Cycle:
           </span>
           <span className="text-base font-bold text-[#005FB8] dark:text-[#DCDCAA]">
             {currentCycle}
