@@ -115,12 +115,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
 
       {/* 1. 상단 헤더 & 컨트롤러 */}
       <div className={`shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 ${isSingle ? "border-l-amber-500" : "border-l-blue-500"}`}>
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`w-2 h-2 rounded-full animate-pulse ${isSingle ? "bg-amber-500 dark:bg-amber-400" : "bg-[#005FB8] dark:bg-[#007ACC]"}`} />
-          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
-            {isSingle ? "Single-Cycle Datapath (1 Inst / Cycle)" : "Vertical 5-Stage Datapath"}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-[11px] font-bold ${isSingle ? "text-amber-500" : "text-blue-500"}`}>◆</span>
+          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
+            {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(Clock {clock ?? 0})</span>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(CLK:{clock ?? 0})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}

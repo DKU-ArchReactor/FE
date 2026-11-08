@@ -287,7 +287,7 @@ export default function TranslationEditor({
             : "bg-[var(--ar-header-bg)]"
         }`}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
               activeTarget === "c"
@@ -296,13 +296,13 @@ export default function TranslationEditor({
             }`}
           />
           <h3
-            className={`text-xs font-semibold truncate whitespace-nowrap transition-colors ${
+            className={`text-[11px] font-semibold uppercase tracking-wider truncate whitespace-nowrap transition-colors ${
               activeTarget !== "c"
                 ? "text-[var(--ar-text-muted)]"
                 : "text-[var(--ar-text-primary)]"
             }`}
           >
-            C 소스 코드
+            C SOURCE CODE
           </h3>
           <span
             className="text-[10px] font-mono truncate text-[var(--ar-text-muted)]"

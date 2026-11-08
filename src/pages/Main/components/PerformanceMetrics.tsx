@@ -99,10 +99,10 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
     <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 (지표 전용 에메랄드 액센트 바) */}
       <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-emerald-500">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs">📊</span>
-          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
-            Pipeline Performance & CPI
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-emerald-500 font-bold">◆</span>
+          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
+            PERFORMANCE & CPI
           </h3>
         </div>
         <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">

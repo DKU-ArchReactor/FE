@@ -203,15 +203,15 @@ export default function TranslationMapping({
     >
       {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수) */}
       <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-sky-500">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${activeTarget === "asm"
                 ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
                 : "bg-transparent scale-0"
               }`}
           />
-          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] truncate whitespace-nowrap">
-            RISC-V 어셈블리 {activeTarget === "asm" ? "에디터" : "매핑"}
+          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider truncate whitespace-nowrap">
+            RISC-V ASSEMBLY
           </h3>
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
             ({activeTarget === "asm" ? "main.s" : assembly ? `${rows.length} instrs` : "빈 코드"})

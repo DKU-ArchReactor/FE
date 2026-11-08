@@ -451,10 +451,10 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
       {/* 상단 통합 헤더 바 */}
       <div className="flex items-center justify-between gap-1.5 pb-2 mb-2 border-b border-slate-100 shrink-0 min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap truncate">
-            <span>🗄️</span>
-            <span className="hidden @[320px]:inline">레지스터 & 메모리 뷰</span>
-            <span className="@[320px]:hidden">State</span>
+          <span className="text-[11px] text-amber-500 font-bold">◆</span>
+          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap truncate">
+            <span className="hidden @[320px]:inline">STATE VISUALIZER</span>
+            <span className="@[320px]:hidden">STATE</span>
           </h3>
           {transferActivity && (
             <span
