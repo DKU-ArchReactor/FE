@@ -12,7 +12,27 @@ export type MappedAssemblyRow = {
 export function extractAssemblyFromSimulation(
   simulationResult: SimulationResult | null
 ): MappedAssemblyRow[] {
-  if (!simulationResult || !simulationResult.history || !simulationResult.history.length) return [];
+  if (!simulationResult) return [];
+
+  // 1순위: CORE가 제공하는 정적 코드 매핑 테이블(program.code_mapping) 직접 사용
+  // 실행되지 않은 분기문(if/else)까지 포함된 완전한 전체 어셈블리 목록 및 C 라인 매핑 제공
+  const codeMap = simulationResult.program?.code_mapping;
+  if (codeMap && Object.keys(codeMap).length > 0) {
+    return Object.entries(codeMap)
+      .sort((a, b) => parseInt(a[0], 16) - parseInt(b[0], 16))
+      .map(([pc, item]) => {
+        const sLine = item.source_line !== undefined && item.source_line !== null ? item.source_line : null;
+        return {
+          pc,
+          text: item.assembly || "",
+          sourceLine: sLine,
+          isRuntime: sLine === null,
+        };
+      });
+  }
+
+  // 2순위 (폴백): code_mapping이 없는 구버전 시뮬레이션 응답의 경우 사이클 히스토리 순회
+  if (!simulationResult.history || !simulationResult.history.length) return [];
   const rows: MappedAssemblyRow[] = [];
   const seenPc = new Set<string>();
 

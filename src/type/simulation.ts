@@ -110,6 +110,14 @@ export interface SimulationResult {
     entry_point: string;
     instruction_words: number;
     data_words: number;
+    code_mapping?: Record<
+      string,
+      {
+        assembly: string;
+        raw_instruction?: string;
+        source_line?: number | null;
+      }
+    >;
   };
   status: string;
   summary: {
