@@ -142,31 +142,28 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
       {/* 2. VS Code 디버그 액션 툴바 (Control Buttons) */}
       <div className="flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] dark:bg-[#333333] p-0.5 rounded border border-[#D0D7DE] dark:border-[#3E3E42]">
-        {/* 1) 초기화 버튼 (⏮ Skip to Start) */}
+        {/* 1) 초기화 버튼 (정사각형 정지/리셋 아이콘) */}
         <button
           onClick={onReset}
           disabled={!isReady || currentCycle === 0}
-          title="처음으로 초기화 (Reset / Skip to Start)"
+          title="처음으로 초기화 (Reset / Stop)"
           className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-            <rect x="4" y="5" width="2.5" height="14" rx="1" />
-            <path d="M13 12l6-4.5v9L13 12z" />
-            <path d="M7.5 12l6-4.5v9L7.5 12z" />
+            <rect x="5" y="5" width="14" height="14" rx="2" />
           </svg>
         </button>
 
-        {/* 2) 초기화 후 재생 버튼 (|▶ Play from Beginning) */}
+        {/* 2) 처음부터 다시시작 버튼 (회전 리로드 아이콘) */}
         <button
           type="button"
           onClick={onResetAndPlay}
           disabled={!isReady || totalCycles <= 1}
-          title="처음부터 재생 (Reset & Play)"
+          title="처음부터 다시시작 (Restart / Reset & Play)"
           className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-            <rect x="4.5" y="4.5" width="2.5" height="15" rx="1" />
-            <path d="M10 5l10 7-10 7V5z" />
+            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
           </svg>
         </button>
 

@@ -726,12 +726,10 @@ const MainPage: React.FC = () => {
             bgClass: "bg-slate-800/90",
             icon: (
               <svg
-                className="w-12 h-12 fill-white drop-shadow-md"
+                className="w-10 h-10 fill-white drop-shadow-md"
                 viewBox="0 0 24 24"
               >
-                <rect x="4" y="5" width="2.5" height="14" rx="1" />
-                <path d="M13 12l6-4.5v9L13 12z" />
-                <path d="M7.5 12l6-4.5v9L7.5 12z" />
+                <rect x="5" y="5" width="14" height="14" rx="2.5" />
               </svg>
             ),
           },

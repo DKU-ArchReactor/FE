@@ -102,9 +102,9 @@ const TutorArea: React.FC<TutorAreaProps> = ({
       aria-label="AI 튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}
-      <header className="shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-purple-500">
+      <header className="shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-emerald-500">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[11px] text-purple-500 font-bold">◆</span>
+          <span className="text-[11px] text-emerald-500 font-bold">◆</span>
           <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap">
             ARCHREACTOR TUTOR
           </h3>
