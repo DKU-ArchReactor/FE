@@ -40,10 +40,10 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
           return (
             <div
               key={section.id}
-              className="flex h-full min-h-0 shrink-0 w-full overflow-hidden px-0.5"
+              className="flex h-full min-h-0 shrink-0 w-full overflow-hidden"
             >
               {/* 구역 내부 세로 슬롯 렌더링 */}
-              <div className="flex-1 flex flex-col gap-1.5 min-w-0 h-full overflow-hidden">
+              <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {section.slots.map((slot, slotIdx) => {
                   const defaultRatio =
                     section.slots.length === 2 &&

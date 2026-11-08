@@ -465,7 +465,7 @@ const MainPage: React.FC = () => {
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}
       <div
         ref={splitter.mainWorkspaceRef}
-        className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch gap-1.5 ${
+        className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch ${
           splitter.resizingLeftPane ||
           resizingSplitterIndex !== null ||
           splitter.resizingLeftVertical ||
@@ -599,9 +599,9 @@ const MainPage: React.FC = () => {
         </div>
 
         {/* 우측 슬라이딩 뷰포트 영역 */}
-        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch gap-1">
+        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch">
           {canGoPrevViewport && (
-            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200">
+            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 mr-1">
               <button
                 type="button"
                 onClick={handleGoPrevViewport}
@@ -632,7 +632,7 @@ const MainPage: React.FC = () => {
           />
 
           {canGoNextViewport && (
-            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200">
+            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 ml-1">
               <button
                 type="button"
                 onClick={handleGoNextViewport}
