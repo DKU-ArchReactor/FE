@@ -118,6 +118,14 @@ export async function compileTranslation(
 
   const activeResult = preferredMode === "single" ? (singleResult ?? pipelineResult) : (pipelineResult ?? singleResult);
 
+  // S3 assembly_url이 없으면(단일 패스 컴파일), 상단 code_mapping에서 어셈블리 텍스트를 자동 생성
+  if (!assembly && activeResult) {
+    const rows = extractAssemblyFromSimulation(activeResult);
+    if (rows.length > 0) {
+      assembly = rows.map((r) => r.text).join("\n");
+    }
+  }
+
   return {
     assembly,
     simulationResult: activeResult,
