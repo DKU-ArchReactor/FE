@@ -98,7 +98,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-2xs select-none transition-colors duration-150"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-sm select-none transition-colors duration-150"
       aria-label="AI 튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}

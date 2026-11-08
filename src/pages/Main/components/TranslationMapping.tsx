@@ -198,7 +198,7 @@ export default function TranslationMapping({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-2xs select-none transition-colors duration-150"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-sm select-none transition-colors duration-150"
       aria-label="RISC-V 어셈블리 결과"
     >
       {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수) */}

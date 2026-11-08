@@ -272,7 +272,7 @@ export default function TranslationEditor({
 
   return (
     <section
-      className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border shadow-2xs select-none transition-all duration-200 ${
+      className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border shadow-sm select-none transition-all duration-200 ${
         activeTarget !== "c"
           ? "border-[#D0D7DE] dark:border-[#2C2C2E] bg-[#EBECEF] dark:bg-[#141415]"
           : "border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E]"

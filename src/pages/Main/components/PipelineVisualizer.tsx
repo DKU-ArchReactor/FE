@@ -16,7 +16,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
 
   if (loadingMessage) {
     return (
-      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150">
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150">
         <div className="w-9 h-9 border-3 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-semibold text-[var(--ar-accent)]">{loadingMessage}</p>
         <p className="text-xs text-[var(--ar-text-muted)]">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
@@ -26,7 +26,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
 
   if (!currentData) {
     return (
-      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] p-6 flex items-center justify-center text-[var(--ar-text-muted)] text-sm transition-colors duration-150">
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-6 flex items-center justify-center text-[var(--ar-text-muted)] text-sm transition-colors duration-150">
         C 소스 코드를 작성하고 [⚡ 컴파일]을 누르면 파이프라인 데이터패스가 활성화됩니다.
       </div>
     );
@@ -66,7 +66,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
   const handleZoomReset = () => setZoomLevel(1.0);
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
+    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-sm border border-[#E5E5E5] dark:border-[#333333] p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
       {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일 */}
       <style>{`
         @keyframes streamDown {

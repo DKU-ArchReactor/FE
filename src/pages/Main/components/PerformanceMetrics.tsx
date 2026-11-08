@@ -96,7 +96,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
   }, [history, currentCycle]);
 
   return (
-    <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col select-none transition-colors duration-150">
+    <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 (지표 전용 에메랄드 액센트 바) */}
       <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-emerald-500">
         <div className="flex items-center gap-2 min-w-0">

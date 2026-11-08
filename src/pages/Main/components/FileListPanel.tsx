@@ -27,7 +27,7 @@ export const FileListPanel: React.FC<FileListPanelProps> = ({
 
   return (
     <div
-      className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden relative transition-colors duration-150"
+      className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden relative transition-colors duration-150"
       onMouseLeave={() => setHoveredFileId(null)}
     >
       <div className="px-3.5 py-1.5 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] flex items-center justify-between shrink-0">
