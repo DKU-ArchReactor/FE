@@ -185,6 +185,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   const currentPc = currentData?.global_result.current_pc?.toLowerCase();
   const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(true);
   const userCodeScrollRef = React.useRef<HTMLDivElement>(null);
+  const stackScrollRef = React.useRef<HTMLDivElement>(null);
 
   // 어셈블리 및 코드 세그먼트 메타데이터 추출: CORE가 제공하는 memory_layout 및 code_mapping을 최우선 SSOT로 사용
   const {
@@ -401,6 +402,16 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     }
   }, [isUserCodeExpanded, userInstructions.length]);
 
+  // 스택에 새 데이터가 푸시되거나 스택 항목이 변경되었을 때, 스택의 최신 성장 방향(아래/낮은 주소)으로 자동 스크롤
+  React.useEffect(() => {
+    if (stackScrollRef.current) {
+      stackScrollRef.current.scrollTo({
+        top: stackScrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [segmentedMemory.stack.length, cycle]);
+
   // 동적 세그먼트 경계선 주소 계산 (High ➔ Low)
   // [0] Stack ➔ Heap: 현재 $sp (유효할 경우) 또는 기본 Heap 한계선 0x10008000
   // [1] Heap ➔ BSS: 기본 0x10004000
@@ -507,9 +518,12 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                 </div>
 
                 {/* 우측: 데이터 리스트 (Code 영역은 닫혔을 땐 하단(65,536) 정렬, 펼쳤을 땐 상단 경계선 바로 아래에 오도록 justify-start 적용) */}
-                <div className={`flex-1 flex flex-col divide-y divide-slate-100 min-w-0 pl-1.5 py-1 overflow-y-auto custom-scrollbar ${
-                  isCode ? (isUserCodeExpanded ? 'justify-start' : 'justify-end') : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
-                }`}>
+                <div
+                  ref={seg.key === 'stack' ? stackScrollRef : undefined}
+                  className={`flex-1 flex flex-col divide-y divide-slate-100 min-w-0 pl-1.5 py-1 overflow-y-auto custom-scrollbar ${
+                    isCode ? (isUserCodeExpanded ? 'justify-start' : 'justify-end') : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
+                  }`}
+                >
                   {isReserved ? (
                     <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 text-slate-500">
                       <div className="flex items-center justify-between">
