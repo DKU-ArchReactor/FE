@@ -53,43 +53,58 @@
   top: 12px;
 }
 .landing-header {
-  height: 82px;
+  height: 48px;
   position: sticky;
   top: 0;
   z-index: 50;
-  background: #ffffffed;
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid #edf0f5;
+  background: #fff;
+  border-bottom: 1px solid #d0d7de;
+  box-shadow: 0 1px 2px #0000000d;
 }
 .landing-nav-wrap {
-  max-width: 1192px;
+  width: 100%;
   height: 100%;
   margin: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 32px;
-  padding: 0 28px;
+  gap: 24px;
+  padding: 0 16px;
 }
 .landing-brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  letter-spacing: -0.8px;
-  font-size: 21px;
-  font-weight: 750;
+  gap: 8px;
+  color: #005fb8 !important;
+  letter-spacing: -0.45px;
+  font-size: 18px;
+  font-weight: 800;
   white-space: nowrap;
 }
-.landing-brand-dot {
-  color: var(--lp-blue);
-  margin-left: -8px;
+.landing-mark {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  transition: transform 0.2s;
+}
+.landing-brand:hover .landing-mark {
+  transform: scale(1.05);
 }
 .landing-nav {
   display: flex;
-  gap: 33px;
-  font-size: 13px;
-  font-weight: 550;
-  color: #566373;
+  margin-right: auto;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #57606a;
+}
+.landing-nav a {
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+.landing-nav a:hover {
+  background: #f6f8fa;
 }
 .landing-nav a:hover,
 .landing-login:hover {
@@ -98,11 +113,14 @@
 .landing-nav-actions {
   display: flex;
   align-items: center;
-  gap: 26px;
+  gap: 8px;
 }
 .landing-login {
-  font-size: 13px;
-  color: #566373 !important;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #57606a !important;
 }
 .landing-button {
   display: inline-flex;
@@ -123,14 +141,16 @@
   transform: translateY(-2px);
 }
 .landing-nav-start {
-  background: #2563eb;
+  background: #005fb8;
   color: #fff !important;
-  padding: 11px 18px;
+  padding: 5px 12px;
+  border-radius: 4px;
   font-size: 12px;
   gap: 15px;
 }
 .landing-nav-start:hover {
-  background: #1d4ed8;
+  background: #004c99;
+  transform: none;
 }
 .landing-menu-toggle {
   display: none;
@@ -1206,10 +1226,10 @@
 }
 @media (max-width: 1000px) {
   .landing-nav {
-    gap: 20px;
+    gap: 4px;
   }
   .landing-nav-wrap {
-    gap: 20px;
+    gap: 16px;
   }
   .landing-hero h1 {
     letter-spacing: -2.7px;
@@ -1253,27 +1273,27 @@
 }
 @media (max-width: 760px) {
   .landing-header {
-    height: 70px;
+    height: 48px;
   }
   .landing-nav-wrap {
-    padding: 0 20px;
+    padding: 0 16px;
   }
   .landing-brand {
-    font-size: 19px;
+    font-size: 18px;
   }
   .landing-mark {
-    width: 29px;
-    height: 29px;
+    width: 28px;
+    height: 28px;
   }
   .landing-nav-actions {
-    gap: 15px;
+    gap: 8px;
   }
   .landing-login {
     display: none;
   }
   .landing-nav-start {
-    font-size: 11px;
-    padding: 10px 13px;
+    font-size: 12px;
+    padding: 5px 10px;
   }
   .landing-nav-start svg {
     width: 14px;
@@ -1289,7 +1309,7 @@
   .landing-nav {
     display: none;
     position: absolute;
-    top: 69px;
+    top: 47px;
     left: 0;
     right: 0;
     background: white;

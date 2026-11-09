@@ -32,26 +32,16 @@ function Arrow({ diagonal = false }: { diagonal?: boolean }) {
   );
 }
 
-function ReactorMark() {
+function BrandMark() {
   return (
-    <svg
+    <img
       className="landing-mark"
-      width="32"
-      height="32"
-      viewBox="0 0 40 40"
-      fill="none"
+      src="/logo.png"
+      width="28"
+      height="28"
+      alt=""
       aria-hidden="true"
-    >
-      <rect x="1" y="1" width="38" height="38" rx="12" fill="#2563eb" />
-      <path
-        d="M11 25 20 10l9 15M15 20h10"
-        stroke="white"
-        strokeWidth="2.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="20" cy="29" r="2" fill="#b9d5ff" />
-    </svg>
+    />
   );
 }
 
@@ -93,7 +83,7 @@ function ProductPreview() {
           <i />
         </div>
         <div className="landing-product-name">
-          <ReactorMark />
+          <BrandMark />
           <span>
             ArchReactor <span className="landing-muted">/ workspace</span>
           </span>
@@ -460,8 +450,8 @@ export default function LandingPage() {
       <header className="landing-header">
         <div className="landing-nav-wrap">
           <Link to="/" className="landing-brand" aria-label="ArchReactor 홈">
-            <ReactorMark />
-            ArchReactor<span className="landing-brand-dot">.</span>
+            <BrandMark />
+            ArchReactor
           </Link>
           <nav
             className={`landing-nav ${menuOpen ? "is-open" : ""}`}
@@ -483,7 +473,7 @@ export default function LandingPage() {
               로그인
             </Link>
             <Link className="landing-button landing-nav-start" to="/simulator">
-              시작하기 <Arrow />
+              시작하기
             </Link>
             <button
               className="landing-menu-toggle"
@@ -872,8 +862,8 @@ export default function LandingPage() {
       <footer className="landing-footer">
         <div>
           <Link to="/" className="landing-brand">
-            <ReactorMark />
-            ArchReactor<span className="landing-brand-dot">.</span>
+            <BrandMark />
+            ArchReactor
           </Link>
           <p>코드와 컴퓨터구조를 연결하는 시뮬레이터</p>
         </div>
