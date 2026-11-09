@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
-import FlyoutPanel from "./components/FlyoutPanel";
 import PanelRenderer from "./components/PanelRenderer";
 import SlidingViewportTrack from "./components/SlidingViewportTrack";
 import AiAssistantPopup from "@/components/AiAssistantPopup";
+import PlaybackFeedbackOverlay from "./components/PlaybackFeedbackOverlay";
 
-import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
 import { getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
@@ -14,11 +13,6 @@ import { useSimulationPlayback } from "./hooks/useSimulationPlayback";
 import { useSimulationSession } from "./hooks/useSimulationSession";
 import { useFileManager } from "./hooks/useFileManager";
 import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
-import {
-  compileTranslation,
-  compileAssemblyDirectly,
-  mapAssembly,
-} from "./components/translationCompile";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
   "# RISC-V 32IM 어셈블리 직접 작성",
@@ -42,8 +36,7 @@ const MainPage: React.FC = () => {
     null;
 
   // 1. 라우트 및 뷰포트 상태
-  const isManagementPath =
-    location.pathname === "/management" || location.pathname === "/coming-soon";
+  const isManagementPath = location.pathname === "/management";
   const isPipelinePath = location.pathname === "/pipeline";
 
   const rightViewportIndex = useMemo(() => {
@@ -53,7 +46,10 @@ const MainPage: React.FC = () => {
   }, [isManagementPath, isPipelinePath]);
 
   // 2. 파일 및 소스 코드 상태 훅
-  const fileMgr = useFileManager(initialFileId);
+  const resetSimulationRef = useRef<(() => void) | null>(null);
+  const fileMgr = useFileManager(initialFileId, () => {
+    resetSimulationRef.current?.();
+  });
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
@@ -62,134 +58,74 @@ const MainPage: React.FC = () => {
 
   const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
   const [translationSelectedAsmIndex, setTranslationSelectedAsmIndex] = useState<number | null>(null);
-
   const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
 
-  // 4. 시뮬레이션 상태 및 엔진 모드 ("single" | "pipeline")
-  const [simulationEngineMode, setSimulationEngineMode] = useState<"single" | "pipeline">(
-    () => (location.pathname === "/" || location.pathname === "/c-to-asm" ? "single" : "pipeline")
-  );
-  const activeSource = editorTarget === "asm" ? customAssembly : fileMgr.translationSource;
-  const simulation = useSimulationSession(simulationEngineMode, activeSource);
-  const simulationData = simulation.data;
-  const loadingMessage = fileMgr.translationBusy
-    ? editorTarget === "asm"
-      ? "어셈블리 코드 빌드 중..."
-      : "C 소스 코드 컴파일 중..."
-    : simulation.busy
-    ? "시뮬레이션 실행 중..."
-    : null;
-  const compileRevision = useRef(0);
+  // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
+  const simSession = useSimulationSession({
+    translationSource: fileMgr.translationSource,
+    translationAssembly: fileMgr.translationAssembly,
+    translationBusy: fileMgr.translationBusy,
+    setTranslationBusy: fileMgr.setTranslationBusy,
+    setTranslationError: fileMgr.setTranslationError,
+    setTranslationAssembly: fileMgr.setTranslationAssembly,
+  });
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove("mode-single", "mode-pipeline");
-    root.classList.add(`mode-${simulationEngineMode}`);
-  }, [simulationEngineMode]);
-
-  const isSingleEngine = simulationEngineMode === "single";
-
-  // 어셈블리 행 파싱
-  const mappedAssemblyRows = useMemo(() => {
-    if (!fileMgr.translationAssembly) return [];
-    return mapAssembly(
-      fileMgr.translationAssembly,
-      fileMgr.translationSource.split(/\r?\n/).length
-    );
-  }, [fileMgr.translationAssembly, fileMgr.translationSource]);
+  const handleClearSelection = useCallback(() => {
+    setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
+  }, []);
 
   // 5. 시뮬레이션 재생 및 스텝 컨트롤 훅
   const playback = useSimulationPlayback({
-    simulationData,
-    mappedAssemblyRows,
-    isSingleEngine,
+    simulationData: simSession.simulationData,
+    mappedAssemblyRows: simSession.mappedAssemblyRows,
+    isSingleEngine: simSession.isSingleEngine,
     editorTarget,
     translationSelectedLine,
-    onClearSelection: () => {
-      setTranslationSelectedLine(null);
-      setTranslationSelectedAsmIndex(null);
-    },
+    onClearSelection: handleClearSelection,
   });
 
   const onResetSimulation = () => {
-    compileRevision.current += 1;
-    simulation.clear();
+    simSession.clearSimulationCache();
     playback.setCurrentCycle(0);
     playback.setIsPlaying(false);
+    playback.triggerPlaybackFeedback("reset");
   };
+
+  useEffect(() => {
+    resetSimulationRef.current = onResetSimulation;
+  });
 
   // 6. 분할 레이아웃 & 스플리터 훅
   const [sections, setSections] = useState<SectionConfig[]>(getDefaultSections);
-  const splitter = useWorkspaceSplitter();
+  const {
+    leftPaneWidth,
+    setLeftPaneWidth,
+    resizingLeftPane,
+    mainWorkspaceRef,
+    handleMainDividerResizeStart,
+    leftTopHeightPercent,
+    setLeftTopHeightPercent,
+    resizingLeftVertical,
+    setResizingLeftVertical,
+    leftPaneContainerRef,
+    leftCodeColRatio,
+    setLeftCodeColRatio,
+    resizingLeftCodeCol,
+    setResizingLeftCodeCol,
+    leftTopContainerRef,
+  } = useWorkspaceSplitter();
   const {
     containerRef,
-    resizingSplitterIndex,
     resizingRowSlot,
     resizingPair,
     handleSlotResizeStart,
     handlePairResizeStart,
+    handlePairReset,
+    handleSlotReset,
   } = useResizableLayout(sections, setSections);
 
-  // 7. 컴파일 및 시뮬레이션 실행 핸들러
-  const handleTranslationCompile = async () => {
-    if (!fileMgr.translationSource.trim() || fileMgr.translationBusy) return;
-    const revision = ++compileRevision.current;
-    simulation.clear();
-    playback.setIsPlaying(false);
-    playback.setCurrentCycle(0);
-    fileMgr.setTranslationBusy(true);
-    fileMgr.setTranslationError("");
-    fileMgr.setAsmContent("");
-    try {
-      const { assembly, artifact } = await compileTranslation(fileMgr.translationSource);
-      if (revision !== compileRevision.current) return;
-
-      fileMgr.setTranslationAssembly(assembly);
-      fileMgr.setAsmContent(assembly);
-      fileMgr.setAsmFileName("assembly.s");
-
-      simulation.load(artifact);
-    } catch (error) {
-      if (revision === compileRevision.current) {
-        fileMgr.setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
-      }
-    } finally {
-      fileMgr.setTranslationBusy(false);
-    }
-  };
-
-  const handleAssemblySimulation = async () => {
-    const codeToSimulate = customAssembly;
-    if (!codeToSimulate.trim() || fileMgr.translationBusy) return;
-
-    const revision = ++compileRevision.current;
-    simulation.clear();
-    playback.setIsPlaying(false);
-    playback.setCurrentCycle(0);
-    fileMgr.setTranslationBusy(true);
-    fileMgr.setTranslationError("");
-    fileMgr.setAsmContent(codeToSimulate);
-    fileMgr.setTranslationAssembly(codeToSimulate);
-
-    try {
-      const { assembly, artifact } = await compileAssemblyDirectly(codeToSimulate);
-      if (revision !== compileRevision.current) return;
-
-      fileMgr.setTranslationAssembly(assembly);
-      fileMgr.setAsmContent(assembly);
-
-      simulation.load(artifact);
-    } catch (err: unknown) {
-      if (revision === compileRevision.current) {
-        fileMgr.setTranslationError(
-          err instanceof Error ? err.message : "어셈블리 시뮬레이션 요청에 실패했습니다."
-        );
-      }
-    } finally {
-      fileMgr.setTranslationBusy(false);
-    }
-  };
-
+  // 7. 에디터 상호작용 및 시뮬레이션 연결 핸들러
   const handleSelectTranslationLine = (line: number | null, asmIndex: number | null = null) => {
     if (line !== null) {
       playback.setIsPlaying((prev) => {
@@ -223,10 +159,6 @@ const MainPage: React.FC = () => {
     }
   };
 
-  const handleSimulationModeChange = (m: "single" | "pipeline") => {
-    setSimulationEngineMode(m);
-  };
-
   // 8. 뷰포트 네비게이션
   const canGoPrevViewport = rightViewportIndex > 0;
   const canGoNextViewport = rightViewportIndex < 2;
@@ -241,92 +173,84 @@ const MainPage: React.FC = () => {
     else if (rightViewportIndex === 1) navigate("/management");
   };
 
-  // 9. 플라이아웃(말풍선) 패널 상태
-  const [activeFlyout, setActiveFlyout] = useState<PanelKey | null>(null);
-  const flyoutRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
-        const target = e.target as HTMLElement;
-        if (!target.closest("[data-bookmark-tab]")) {
-          setActiveFlyout(null);
-        }
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const [selectedCodeLine, setSelectedCodeLine] = useState<CodeLineSelectInfo | null>(null);
-
   const renderPanel = (panelKey: PanelKey) => (
     <PanelRenderer
       panelKey={panelKey}
-      simulationData={simulationData}
+      simulationData={simSession.simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
       currentCycle={playback.currentCycle}
-      activeCycleIndex={playback.activeCycleIndex}
-      stageActivity={playback.stageActivity}
-      currentActiveAsmIndex={playback.currentActiveAsmIndex}
       playSpeed={playback.playSpeed}
-      loadingMessage={loadingMessage}
-      simulationMode={simulationEngineMode}
-      isSingleEngine={isSingleEngine}
+      loadingMessage={simSession.loadingMessage}
+      simulationMode={simSession.simulationEngineMode}
+      isSingleEngine={simSession.isSingleEngine}
       currentActiveRow={playback.currentActiveRow}
-      mappedAssemblyRows={mappedAssemblyRows}
+      mappedAssemblyRows={simSession.mappedAssemblyRows}
       activeExecutionCLine={playback.activeExecutionCLine}
       effectiveSelectedLine={playback.effectiveSelectedLine}
-      isActuallyExecuting={playback.isActuallyExecuting}
       translationSource={fileMgr.translationSource}
       translationAssembly={fileMgr.translationAssembly}
-      cContent={fileMgr.cContent}
-      asmContent={fileMgr.asmContent}
       cFileName={fileMgr.cFileName}
       fileId={fileMgr.fileId}
       editorTarget={editorTarget}
       customAssembly={customAssembly}
-      translationBusy={fileMgr.translationBusy || simulation.busy}
-      translationError={fileMgr.translationError || simulation.error}
+      translationBusy={fileMgr.translationBusy}
+      translationError={fileMgr.translationError}
       translationSelectedLine={translationSelectedLine}
       translationSelectedAsmIndex={translationSelectedAsmIndex}
       onUpdateTranslationSource={(val) =>
         fileMgr.updateTranslationSource(val, "main.c", false, null, onResetSimulation)
       }
-      onResetTranslationSource={() =>
+      onResetTranslationSource={() => {
+        playback.triggerPlaybackFeedback("trash");
         fileMgr.updateTranslationSource(
           fileMgr.DEFAULT_TRANSLATION_SOURCE,
           "main.c",
           true,
           null,
-          onResetSimulation
-        )
+          () => {
+            simSession.clearSimulationCache();
+            playback.setCurrentCycle(0);
+            playback.setIsPlaying(false);
+          }
+        );
+      }}
+      onTranslationCompile={() =>
+        simSession.handleTranslationCompile({
+          onSimulationComplete: playback.handleSimulationComplete,
+          triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
+        })
       }
-      onTranslationCompile={handleTranslationCompile}
       onTranslationFile={handleTranslationFile}
       onSelectTranslationLine={handleSelectTranslationLine}
       onSaveTranslationFile={fileMgr.handleSaveTranslationFile}
       onOpenSavedFileInEditor={(id) => fileMgr.handleOpenSavedFileInEditor(id, onResetSimulation)}
       onCustomAssemblyChange={setCustomAssembly}
-      onSimulateAssembly={handleAssemblySimulation}
+      onSimulateAssembly={() =>
+        simSession.handleAssemblySimulation(customAssembly, {
+          onSimulationComplete: playback.handleSimulationComplete,
+          triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
+        })
+      }
       onResetCustomAssembly={() => {
-        onResetSimulation();
+        playback.triggerPlaybackFeedback("trash");
         setCustomAssembly(DEFAULT_CUSTOM_ASSEMBLY);
+        simSession.clearSimulationCache();
+        playback.setCurrentCycle(0);
+        playback.setIsPlaying(false);
       }}
       onJumpToCycle={playback.handleJumpToCycle}
       savedFiles={fileMgr.savedFiles}
       isLoggedIn={fileMgr.isLoggedIn}
-      ensureFileContent={fileMgr.ensureFileContent}
-      fileContentCache={fileMgr.fileContentCache}
-      loadingPreviewId={fileMgr.loadingPreviewId}
-      selectedCodeLine={selectedCodeLine}
-      onClearSelectedCodeLine={() => setSelectedCodeLine(null)}
     />
   );
 
   return (
-    <main className="flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative">
+    <main
+      className={`flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
+        playback.isPlaying && simSession.isSingleEngine ? "is-playing-single-light" : ""
+      }`}
+    >
       {/* 1. 최상단 제어 바 */}
       <div className="h-[42px] shrink-0 flex items-stretch gap-2 mb-2 min-h-0 w-full">
         <div className="flex-1 h-full min-w-0 flex">
@@ -339,19 +263,30 @@ const MainPage: React.FC = () => {
             onStepForward={playback.handleStepForward}
             onTogglePlay={playback.handleTogglePlay}
             onReset={playback.handleReset}
+            onResetAndPlay={playback.handleResetAndPlay}
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={playback.isSimulationReady}
-            mode={simulationEngineMode}
+            mode={simSession.simulationEngineMode}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
+              if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
+                playback.triggerPlaybackFeedback("reset");
+              }
               setEditorTarget(target);
               if (target === "asm") {
                 setTranslationSelectedLine(null);
                 setTranslationSelectedAsmIndex(null);
               }
             }}
-            onChangeSimulationMode={handleSimulationModeChange}
+            onChangeSimulationMode={(m) =>
+              simSession.handleSimulationModeChange(m, {
+                onSimulationComplete: playback.handleSimulationComplete,
+                triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
+                isPlaying: playback.isPlaying,
+                currentCycle: playback.currentCycle,
+              })
+            }
           />
         </div>
 
@@ -361,17 +296,15 @@ const MainPage: React.FC = () => {
           type="button"
           onClick={() => setIsAiPopupOpen((prev) => !prev)}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
-          className={`h-full aspect-square rounded-md border flex items-center justify-center cursor-pointer transition-all duration-150 shrink-0 select-none shadow-xs dark:shadow-md group ${
+          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 group active:scale-95 ${
             isAiPopupOpen
-              ? "bg-[#005FB8] dark:bg-[#007ACC] text-white border-[#005FB8] dark:border-[#007ACC] ring-2 ring-[#005FB8]/25 dark:ring-[#007ACC]/30"
-              : "border-[#E5E5E5] dark:border-[#333333] bg-[var(--ar-panel-bg)] text-[#005FB8] dark:text-[#007ACC] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:bg-[#F3F4F6] dark:hover:bg-[#2D2D2D]"
+              ? "bg-gradient-to-tr from-[#004C99] via-[#007ACC] to-[#0284C7] text-white ring-2 ring-[#38BDF8]/70 ring-offset-1 dark:ring-offset-[#18181B] shadow-inner"
+              : "bg-gradient-to-tr from-[#0066CC] via-[#0091FF] to-[#38BDF8] hover:from-[#0055B3] hover:via-[#0080FF] hover:to-[#7DD3FC] text-white shadow-[0_2px_12px_rgba(0,145,255,0.32)] hover:shadow-[0_4px_18px_rgba(0,145,255,0.48)] hover:scale-[1.03]"
           }`}
         >
           <div className="relative flex items-center justify-center">
             <svg
-              className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${
-                isAiPopupOpen ? "text-amber-300" : "text-[#005FB8] dark:text-[#007ACC]"
-              }`}
+              className="w-[19px] h-[19px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -395,34 +328,33 @@ const MainPage: React.FC = () => {
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}
       <div
-        ref={splitter.mainWorkspaceRef}
-        className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch gap-1.5 ${
-          splitter.resizingLeftPane ||
-          resizingSplitterIndex !== null ||
-          splitter.resizingLeftVertical ||
-          splitter.resizingLeftCodeCol
+        ref={mainWorkspaceRef}
+        className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch ${
+          resizingLeftPane ||
+          resizingLeftVertical ||
+          resizingLeftCodeCol
             ? "select-none"
             : ""
         }`}
       >
         {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) */}
         <div
-          ref={splitter.leftPaneContainerRef}
+          ref={leftPaneContainerRef}
           className="flex flex-col h-full min-h-0 overflow-hidden pr-1"
-          style={{ width: `${splitter.leftPaneWidth}%` }}
+          style={{ width: `${leftPaneWidth}%` }}
         >
           {/* 상단: C 소스 + ASM 가로 분할 */}
           <div
             className="flex flex-col w-full min-h-0 overflow-hidden"
-            style={{ height: `${splitter.leftTopHeightPercent}%` }}
+            style={{ height: `${leftTopHeightPercent}%` }}
           >
             <div
-              ref={splitter.leftTopContainerRef}
+              ref={leftTopContainerRef}
               className="flex-1 flex w-full min-h-0 overflow-hidden"
             >
               <div
-                className="flex flex-col h-full min-h-0 overflow-hidden"
-                style={{ width: `${splitter.leftCodeColRatio}%` }}
+                className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
+                style={{ width: `${leftCodeColRatio}%` }}
               >
                 {renderPanel("cSource")}
               </div>
@@ -433,22 +365,22 @@ const MainPage: React.FC = () => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (e.detail === 2) {
-                    splitter.setLeftCodeColRatio(50);
+                    setLeftCodeColRatio(50);
                     return;
                   }
-                  splitter.setResizingLeftCodeCol(true);
+                  setResizingLeftCodeCol(true);
                 }}
                 onDoubleClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  splitter.setLeftCodeColRatio(50);
+                  setLeftCodeColRatio(50);
                 }}
                 title="드래그하여 C 코드와 ASM 영역 너비 조절 (더블클릭: 50:50 리셋)"
                 className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
               >
                 <div
                   className={`w-[3px] rounded-full transition-all duration-200 ${
-                    splitter.resizingLeftCodeCol
+                    resizingLeftCodeCol
                       ? "h-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
                       : "h-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
                   }`}
@@ -456,8 +388,8 @@ const MainPage: React.FC = () => {
               </div>
 
               <div
-                className="flex flex-col h-full min-h-0 overflow-hidden"
-                style={{ width: `${100 - splitter.leftCodeColRatio}%` }}
+                className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
+                style={{ width: `${100 - leftCodeColRatio}%` }}
               >
                 {renderPanel("source")}
               </div>
@@ -470,22 +402,22 @@ const MainPage: React.FC = () => {
               e.preventDefault();
               e.stopPropagation();
               if (e.detail === 2) {
-                splitter.setLeftTopHeightPercent(50);
+                setLeftTopHeightPercent(56);
                 return;
               }
-              splitter.setResizingLeftVertical(true);
+              setResizingLeftVertical(true);
             }}
             onDoubleClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              splitter.setLeftTopHeightPercent(50);
+              setLeftTopHeightPercent(56);
             }}
-            title="위아래로 드래그하여 코드 영역과 튜터 높이 비율 조절 (더블클릭: 50:50 리셋)"
+            title="위아래로 드래그하여 코드 영역과 튜터 높이 비율 조절 (더블클릭: 56:44 기본 리셋)"
             className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
           >
             <div
               className={`h-[3px] rounded-full transition-all duration-200 ${
-                splitter.resizingLeftVertical
+                resizingLeftVertical
                   ? "w-28 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
                   : "w-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-24 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
               }`}
@@ -494,8 +426,8 @@ const MainPage: React.FC = () => {
 
           {/* 하단: 튜터 영역 */}
           <div
-            className="w-full min-h-0 overflow-hidden flex flex-col"
-            style={{ height: `${100 - splitter.leftTopHeightPercent}%` }}
+            className="w-full min-h-0 overflow-hidden flex flex-col p-[1.5px]"
+            style={{ height: `${100 - leftTopHeightPercent}%` }}
           >
             {renderPanel("tutor")}
           </div>
@@ -503,13 +435,26 @@ const MainPage: React.FC = () => {
 
         {/* 좌우 메인 분할선 스플리터 */}
         <div
-          onMouseDown={splitter.handleMainDividerResizeStart}
-          title="드래그하여 좌측 고정 영역과 우측 뷰포트 분할 비율 조절"
+          onMouseDown={(e) => {
+            if (e.detail === 2) {
+              e.preventDefault();
+              e.stopPropagation();
+              setLeftPaneWidth(50);
+              return;
+            }
+            handleMainDividerResizeStart(e);
+          }}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setLeftPaneWidth(50);
+          }}
+          title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 50:50 기본 리셋)"
           className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-md transition-colors"
         >
           <div
             className={`w-[4px] rounded-full transition-all duration-200 ${
-              splitter.resizingLeftPane
+              resizingLeftPane
                 ? "h-36 bg-[#005FB8] dark:bg-[#007ACC] shadow-md ring-2 ring-[#005FB8]/30 dark:ring-[#007ACC]/30"
                 : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
             }`}
@@ -517,14 +462,18 @@ const MainPage: React.FC = () => {
         </div>
 
         {/* 우측 슬라이딩 뷰포트 영역 */}
-        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch gap-1">
+        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch pl-1">
           {canGoPrevViewport && (
-            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200">
+            <div className="w-5 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 mr-1">
               <button
                 type="button"
                 onClick={handleGoPrevViewport}
                 title="이전 뷰포트(왼쪽 영역)로 이동"
-                className="w-full h-full rounded-md border border-transparent bg-transparent text-[#8C959F] dark:text-[#858585] hover:bg-[#E5E7EB] hover:border-[#E5E7EB] hover:text-[#1F2328] dark:hover:bg-[#383838] dark:hover:border-[#383838] dark:hover:text-[#F0F6FC] flex flex-col items-center justify-center gap-2.5 transition-colors duration-150 cursor-pointer group active:scale-[0.99]"
+                className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
+                  simSession.isSingleEngine
+                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
+                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
+                }`}
               >
                 <span className="text-base font-bold leading-none transition-transform group-hover:-translate-x-0.5">
                   ‹
@@ -545,15 +494,21 @@ const MainPage: React.FC = () => {
             resizingRowSlot={resizingRowSlot}
             onPairResizeStart={handlePairResizeStart}
             onSlotResizeStart={handleSlotResizeStart}
+            onPairReset={handlePairReset}
+            onSlotReset={handleSlotReset}
           />
 
           {canGoNextViewport && (
-            <div className="w-6 shrink-0 flex items-stretch select-none animate-in fade-in duration-200">
+            <div className="w-5 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 ml-1">
               <button
                 type="button"
                 onClick={handleGoNextViewport}
                 title="다음 뷰포트(오른쪽 영역)로 이동"
-                className="w-full h-full rounded-md border border-transparent bg-transparent text-[#8C959F] dark:text-[#858585] hover:bg-[#E5E7EB] hover:border-[#E5E7EB] hover:text-[#1F2328] dark:hover:bg-[#383838] dark:hover:border-[#383838] dark:hover:text-[#F0F6FC] flex flex-col items-center justify-center gap-2.5 transition-colors duration-150 cursor-pointer group active:scale-[0.99]"
+                className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
+                  simSession.isSingleEngine
+                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
+                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
+                }`}
               >
                 <span className="text-base font-bold leading-none transition-transform group-hover:translate-x-0.5">
                   ›
@@ -567,39 +522,8 @@ const MainPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 우측 플라이아웃 패널 */}
-      <FlyoutPanel
-        activeFlyout={activeFlyout}
-        flyoutRef={flyoutRef}
-        onClose={() => setActiveFlyout(null)}
-      >
-        {activeFlyout && renderPanel(activeFlyout)}
-      </FlyoutPanel>
-
-      {/* Play / Pause 화면 중앙 애니메이션 피드백 */}
-      {playback.playbackFeedback && (
-        <div
-          key={playback.playbackFeedback.id}
-          className="playback-indicator-overlay fixed inset-0 m-auto w-24 h-24 rounded-3xl bg-slate-900/80 backdrop-blur-md shadow-2xl flex items-center justify-center pointer-events-none z-50 text-white border border-white/20"
-        >
-          {playback.playbackFeedback.type === "play" ? (
-            <svg
-              className="w-12 h-12 fill-white translate-x-1 drop-shadow-md"
-              viewBox="0 0 24 24"
-            >
-              <path d="M6 4.5l14 7.5-14 7.5v-15z" />
-            </svg>
-          ) : (
-            <svg
-              className="w-12 h-12 fill-white drop-shadow-md"
-              viewBox="0 0 24 24"
-            >
-              <rect x="5.5" y="4.5" width="4" height="15" rx="1.5" />
-              <rect x="14.5" y="4.5" width="4" height="15" rx="1.5" />
-            </svg>
-          )}
-        </div>
-      )}
+      {/* Play / Pause / Reset / Trash / Check 화면 중앙 애니메이션 피드백 */}
+      <PlaybackFeedbackOverlay feedback={playback.playbackFeedback} />
     </main>
   );
 };

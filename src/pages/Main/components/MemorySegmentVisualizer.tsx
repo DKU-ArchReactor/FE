@@ -1,133 +1,22 @@
 import React, { useMemo } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
-import { getCodeMap } from '../simulationView';
+import {
+  SEGMENT_DEFS,
+  formatAddressDecimal,
+  normalizeHex,
+  extractCodeSegmentSummary,
+  buildSegmentedMemory,
+  computeBoundaryDividers,
+  type CodeSegmentSummary,
+} from '../utils/memoryLayout';
 
 interface MemorySegmentVisualizerProps {
   currentData: CycleHistoryItem | null;
   prevData: CycleHistoryItem | null;
   simulationData: SimulationResult | null;
-  translationAssembly?: string | null;
   playSpeed?: number;
   cycle?: number;
-  loadingMessage?: string | null;
 }
-
-export type MemorySegmentKey = 'stack' | 'heap' | 'bss' | 'data' | 'code' | 'reserved';
-
-// 16진수 문자열을 10진수 포맷(콤마 포함)으로 변환
-const formatAddressDecimal = (hexStr: string): string => {
-  const num = parseInt(hexStr, 16);
-  if (isNaN(num)) return hexStr;
-  return num.toLocaleString();
-};
-
-const formatSignedDecimal = (hexStr: string): string => {
-  const num = parseInt(hexStr, 16);
-  if (isNaN(num)) return '0';
-  const signed = num | 0;
-  return signed.toLocaleString();
-};
-
-// 16진수 언더바 제거 및 대문자 정규화 (예: 0x7FFFEFFC)
-const normalizeHex = (hexStr: string): string => {
-  const clean = hexStr.replace(/^0x/i, '').replace(/_/g, '').toUpperCase();
-  return `0x${clean.padStart(8, '0')}`;
-};
-
-// 주소 분류: 6대 세그먼트 (Stack, Heap, BSS, Data, Code, Reserved/NULL)
-const classifyAddress = (addrHex: string, _valHex: string, maxCodePcNum: number): MemorySegmentKey => {
-  const num = parseInt(addrHex, 16) >>> 0;
-  if (num >= 0x70000000) return 'stack';
-  if (num >= 0x10008000) return 'heap';
-  if (num >= 0x00010000 && num <= maxCodePcNum) return 'code';
-  if (num < 0x00010000) return 'reserved';
-  // 0x10000000 ~ 0x10007FFF 영역:
-  return 'data';
-};
-
-interface SegmentDefinition {
-  key: MemorySegmentKey;
-  name: string;
-  shape: 'down-arrow' | 'up-arrow' | 'rect';
-  flexRatio: number; // 컴포넌트 전체 세로 높이 기준 상대 비율
-  badgeAlignClass: string;
-  color: {
-    badgeBg: string;
-    badgeText: string;
-    arrowFill?: string;
-  };
-}
-
-const SEGMENT_DEFS: SegmentDefinition[] = [
-  {
-    key: 'stack',
-    name: 'Stack',
-    shape: 'down-arrow',
-    flexRatio: 2.0,
-    badgeAlignClass: 'justify-start pt-1',
-    color: {
-      badgeBg: 'bg-violet-600',
-      badgeText: 'text-white',
-      arrowFill: '#7C3AED',
-    },
-  },
-  {
-    key: 'heap',
-    name: 'Heap',
-    shape: 'up-arrow',
-    flexRatio: 1.2,
-    badgeAlignClass: 'justify-end pb-1',
-    color: {
-      badgeBg: 'bg-emerald-600',
-      badgeText: 'text-white',
-      arrowFill: '#059669',
-    },
-  },
-  {
-    key: 'bss',
-    name: 'BSS',
-    shape: 'rect',
-    flexRatio: 1.1,
-    badgeAlignClass: 'justify-center',
-    color: {
-      badgeBg: 'bg-sky-600',
-      badgeText: 'text-white',
-    },
-  },
-  {
-    key: 'data',
-    name: 'Data',
-    shape: 'rect',
-    flexRatio: 1.4,
-    badgeAlignClass: 'justify-center',
-    color: {
-      badgeBg: 'bg-blue-600',
-      badgeText: 'text-white',
-    },
-  },
-  {
-    key: 'code',
-    name: 'Code',
-    shape: 'rect',
-    flexRatio: 3.5,
-    badgeAlignClass: 'justify-center',
-    color: {
-      badgeBg: 'bg-amber-600',
-      badgeText: 'text-white',
-    },
-  },
-  {
-    key: 'reserved',
-    name: 'NULL',
-    shape: 'rect',
-    flexRatio: 0.9,
-    badgeAlignClass: 'justify-center',
-    color: {
-      badgeBg: 'bg-slate-600',
-      badgeText: 'text-white',
-    },
-  },
-];
 
 const EMPTY_MEMORY_SNAPSHOT: Record<string, string> = {};
 
@@ -137,12 +26,39 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   simulationData,
   playSpeed = 1000,
   cycle = 0,
-  loadingMessage,
 }) => {
   const memorySnapshot = currentData?.global_result.memory_snapshot ?? EMPTY_MEMORY_SNAPSHOT;
   const prevMemorySnapshot = prevData?.global_result.memory_snapshot;
   const currentPc = currentData?.global_result.current_pc?.toLowerCase();
-  const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(false);
+  const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(true);
+  const userCodeScrollRef = React.useRef<HTMLDivElement>(null);
+  const stackScrollRef = React.useRef<HTMLDivElement>(null);
+
+  // 어셈블리 및 코드 세그먼트 메타데이터 추출: CORE가 제공하는 memory_layout 및 code_mapping을 최우선 SSOT로 사용
+  const {
+    userInstructions,
+    runtimeInstructions,
+    userRange,
+    startupRange,
+    maxCodePcNum,
+  } = useMemo<CodeSegmentSummary>(
+    () => extractCodeSegmentSummary(simulationData, currentPc),
+    [simulationData, currentPc]
+  );
+
+  // 메모리 6대 세그먼트별 분류 및 정렬 (모든 섹션 High ➔ Low 일치)
+  const segmentedMemory = useMemo(
+    () =>
+      buildSegmentedMemory(
+        memorySnapshot,
+        prevMemorySnapshot,
+        simulationData?.program?.memory_layout,
+        maxCodePcNum,
+        userInstructions,
+        runtimeInstructions
+      ),
+    [memorySnapshot, prevMemorySnapshot, simulationData, maxCodePcNum, userInstructions, runtimeInstructions]
+  );
 
   // 새로 값이 쓰인 메모리 주소들에 대해 절반 주기(50%) 동안 점등 상태 유지
   const [pulsingAddresses, setPulsingAddresses] = React.useState<Set<string>>(() => new Set());
@@ -170,10 +86,11 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
 
     if (changed.size > 0) {
       setPulsingAddresses(changed);
-      const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
+      // 부드러운 페이드아웃 효과를 위해 유지 시간을 재생 속도에 맞춰 탄력적으로 설정 (최소 300ms ~ 재생 주기의 70%)
+      const flashDuration = Math.max(300, Math.round(playSpeed * 0.7));
       const timer = window.setTimeout(() => {
         setPulsingAddresses((prev) => (prev.size === 0 ? prev : new Set()));
-      }, halfDuration);
+      }, flashDuration);
 
       return () => clearTimeout(timer);
     } else {
@@ -181,113 +98,62 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     }
   }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
 
-  const { codeMap, maxCodePcNum, codeCount, minCodePc, maxCodePc } = useMemo(() => {
-    const map = getCodeMap(simulationData);
-    const addresses = Object.keys(map).map((pc) => Number(pc));
-    const min = addresses.length ? Math.min(...addresses) : 0;
-    const max = addresses.length ? Math.max(...addresses) : 0;
-    return { codeMap: map, maxCodePcNum: max, codeCount: addresses.length, minCodePc: min, maxCodePc: max };
-  }, [simulationData]);
+  // 사용자가 코드를 펼쳤거나 코드가 새로 로드되었을 때, 가장 낮은 주소(main 시작점)가 있는 맨 아래로 스크롤
+  React.useEffect(() => {
+    if (isUserCodeExpanded && userCodeScrollRef.current) {
+      userCodeScrollRef.current.scrollTop = userCodeScrollRef.current.scrollHeight;
+    }
+  }, [isUserCodeExpanded, userInstructions.length]);
 
-  // 메모리 6대 세그먼트별 분류 및 정렬 (모든 섹션 High ➔ Low 일치)
-  const segmentedMemory = useMemo(() => {
-    const result: Record<
-      MemorySegmentKey,
-      Array<{
-        address: string;
-        hexValue: string;
-        decText: string;
-        isChanged: boolean;
-        label?: string;
-      }>
-    > = {
-      stack: [],
-      heap: [],
-      bss: [],
-      data: [],
-      code: [],
-      reserved: [],
-    };
-
-    Object.entries(memorySnapshot).forEach(([addrHex, valHex]) => {
-      const address = Number(addrHex);
-      const region = simulationData?.program.memory_regions.find((item) => address >= Number(item.start) && address < Number(item.end_exclusive));
-      const segKey = region?.kind ?? classifyAddress(addrHex, valHex, maxCodePcNum);
-      const prevVal = prevMemorySnapshot ? prevMemorySnapshot[addrHex] : undefined;
-      const isChanged = prevVal !== undefined && prevVal !== valHex;
-
-      let label: string | undefined;
-      if (segKey === 'stack' && addrHex.toLowerCase() === '0x7fffeffc') {
-        label = 'Init SP';
-      }
-
-      result[segKey].push({
-        address: addrHex,
-        hexValue: valHex,
-        decText: formatSignedDecimal(valHex),
-        isChanged,
-        label,
+  // 스택에 새 데이터가 푸시되거나 스택 항목이 변경되었을 때, 스택의 최신 성장 방향(아래/낮은 주소)으로 자동 스크롤
+  React.useEffect(() => {
+    if (stackScrollRef.current) {
+      stackScrollRef.current.scrollTo({
+        top: stackScrollRef.current.scrollHeight,
+        behavior: 'smooth',
       });
-    });
+    }
+  }, [segmentedMemory.stack.length, cycle]);
 
-    // Code 영역 추출: High ➔ Low (내림차순 정렬) 적용
-    // 이렇게 하면 main() 시작점인 65,560이 맨 아래(NULL 경계선 바로 위)에 위치하고 위로 갈수록 주소가 증가함!
-    const codeAddresses = Object.keys(codeMap).sort(
-      (a, b) => (parseInt(b, 16) >>> 0) - (parseInt(a, 16) >>> 0)
-    );
-    codeAddresses.forEach((addrHex) => {
-      const info = codeMap[addrHex];
-      const isCurrentPc = currentPc === addrHex;
-      result.code.push({
-        address: addrHex,
-        hexValue: info.raw,
-        decText: info.asm,
-        isChanged: isCurrentPc,
-        label: isCurrentPc ? 'PC ▶' : undefined,
-      });
-    });
-
-    // 모든 세그먼트 일관되게 주소 내림차순(High ➔ Low) 정렬
-    result.stack.sort((a, b) => (parseInt(b.address, 16) >>> 0) - (parseInt(a.address, 16) >>> 0));
-    result.heap.sort((a, b) => (parseInt(b.address, 16) >>> 0) - (parseInt(a.address, 16) >>> 0));
-    result.bss.sort((a, b) => (parseInt(b.address, 16) >>> 0) - (parseInt(a.address, 16) >>> 0));
-    result.data.sort((a, b) => (parseInt(b.address, 16) >>> 0) - (parseInt(a.address, 16) >>> 0));
-
-    return result;
-  }, [memorySnapshot, prevMemorySnapshot, codeMap, maxCodePcNum, currentPc, simulationData]);
+  // 동적 세그먼트 경계선 주소 계산 (High ➔ Low)
+  const boundaryDividers = useMemo(
+    () => computeBoundaryDividers(currentData, simulationData, userRange.count),
+    [currentData, simulationData, userRange.count]
+  );
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150 relative">
-      {/* 1. 상단 미니멀 헤더 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs">💾</span>
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">Virtual Memory</h3>
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-sm transition-colors duration-150">
+      {/* 1. 상단 미니멀 헤더 (레지스터 뷰와 통일된 VS Code VARIABLES 스타일) */}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-yellow-500 font-sans">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-yellow-500 font-bold">◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            MEMORY LAYOUT
+          </h3>
         </div>
-        <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585] font-semibold">High ➔ Low</span>
+        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
+          HIGH ➔ LOW
+        </span>
       </div>
-
-      {loadingMessage && (
-        <div className="absolute inset-x-0 top-8 bottom-0 z-20 bg-white/80 dark:bg-[#1E1E1E]/85 backdrop-blur-[1px] flex flex-col items-center justify-center p-4 text-center gap-2">
-          <div className="w-6 h-6 border-2.5 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-[#005FB8] dark:text-[#79C0FF]">{loadingMessage}</span>
-        </div>
-      )}
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-3 py-2">
-        {/* 2. 최상단 시작 주소 헤더 바 */}
-        <div className="shrink-0 flex flex-col mb-1">
-          <div className="flex items-center justify-between text-[10px] text-[#57606A] dark:text-[#858585] font-mono pb-1 px-0.5">
-            <span
-              title="Hex: 0x7FFFEFFC"
-              className="font-semibold text-[#24292F] dark:text-[#CCCCCC] cursor-help"
-            >
-            {formatAddressDecimal('0x7FFFEFFC')}
+        {/* 2. 최상단 시작 주소 헤더 바 (일체형 꺾인 브래킷 ┌─── 주소 ───┐ 형태) */}
+        <div className="relative shrink-0 mt-2 mb-1 select-none border-t border-l border-r border-[#D0D7DE] dark:border-[#3E3E42] h-4 flex items-center justify-between px-1.5">
+          {/* 좌측 HIGH 라벨 (하단 baseline이 꺾인 선의 끝 y축과 일치) */}
+          <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] dark:text-[#6E7681] leading-none self-end pb-0.5">
+            HIGH
           </span>
-          <span className="text-[#8C959F] dark:text-[#6E7681]">High Address (Top)</span>
+
+          {/* 상단 가로선 정중앙에 얹히는 주소 텍스트 뱃지 */}
+          <div className="absolute left-1/2 -top-[7px] -translate-x-1/2 bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono leading-none z-10">
+            <span
+              title="Hex: 0x7FFFEFFC (High Address Top)"
+              className="font-semibold cursor-help hover:text-[#005FB8] dark:hover:text-[#79C0FF] transition-colors"
+            >
+              {formatAddressDecimal('0x7FFFEFFC')}
+            </span>
+          </div>
         </div>
-        <div className="w-full border-t border-[#E5E5E5] dark:border-[#333333]" />
-      </div>
 
       {/* 3. 전체 6대 가상 메모리 영역과 세그먼트 사이 독립 경계선 5개 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -295,7 +161,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
           const items = segmentedMemory[seg.key];
           const isCode = seg.key === 'code';
           const isReserved = seg.key === 'reserved';
-          const dividerHex = items.length ? `0x${Math.min(...items.map((item) => Number(item.address))).toString(16)}` : null;
+          const dividerHex = index < boundaryDividers.length ? boundaryDividers[index] : null;
 
           return (
             <React.Fragment key={seg.key}>
@@ -333,11 +199,14 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                   )}
                 </div>
 
-                {/* 우측: 데이터 리스트 */}
-                <div className={`flex-1 flex flex-col divide-y divide-slate-100 min-w-0 pl-1.5 py-1 overflow-y-auto custom-scrollbar ${
-                  items.length === 0 && !isCode && !isReserved ? 'justify-center' : 'justify-start'
-                }`}>
-                  {isReserved && items.length === 0 ? (
+                {/* 우측: 데이터 리스트 (Code 영역은 닫혔을 땐 하단(65,536) 정렬, 펼쳤을 땐 상단 경계선 바로 아래에 오도록 justify-start 적용) */}
+                <div
+                  ref={seg.key === 'stack' ? stackScrollRef : undefined}
+                  className={`flex-1 flex flex-col min-w-0 pl-1.5 py-0.5 overflow-y-auto custom-scrollbar ${
+                    isCode ? (isUserCodeExpanded ? 'justify-start' : 'justify-end') : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
+                  }`}
+                >
+                  {isReserved ? (
                     <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 text-slate-500">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-slate-500 font-semibold text-[10.5px]">
@@ -346,81 +215,106 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         <span className="text-[9px] font-mono text-slate-400">64KB</span>
                       </div>
                       <span className="font-sans text-[9.5px] text-slate-400 leading-tight">
-                        ELF 영역 외 낮은 주소 범위
+                        NULL Pointer Guard (접근 금지 보호 구역)
                       </span>
                     </div>
                   ) : isCode ? (
-                    <div className="flex flex-col gap-1.5 py-0.5">
-                      {/* 1. 사용자 프로그램 메인 코드 통합 블록 (세로 스택 최적화) */}
-                      <div className="rounded-lg border border-amber-300 bg-amber-50/70 p-1.5 shadow-2xs flex flex-col gap-1">
+                    <div className={`flex flex-col gap-1.5 py-0.5 ${isUserCodeExpanded ? 'flex-1 min-h-0' : ''}`}>
+                      {/* 1. 사용자 프로그램 메인 코드 통합 블록 (펼쳤을 때 세로 영역을 유연하게 차지하며 내부 스크롤 보장) */}
+                      <div className={`rounded-lg border border-amber-300 bg-amber-50/70 p-1.5 shadow-2xs flex flex-col gap-1 ${
+                        isUserCodeExpanded ? 'flex-1 min-h-0' : ''
+                      }`}>
                         {/* 1층: 주소 범위 & 뱃지 */}
-                        <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center justify-between gap-1 shrink-0">
                           <span
-                            title={`Hex: ${normalizeHex(`0x${minCodePc.toString(16)}`)} ~ ${normalizeHex(`0x${maxCodePc.toString(16)}`)}`}
+                            title={
+                              userRange.start && userRange.end
+                                ? `Hex: ${normalizeHex(userRange.start)} ~ ${normalizeHex(userRange.end)}`
+                                : undefined
+                            }
                             className="text-[11px] font-bold text-amber-950 font-mono tracking-tight cursor-help"
                           >
-                            {minCodePc.toLocaleString()} ~ {maxCodePc.toLocaleString()}
+                            {userRange.start && userRange.end
+                              ? `${formatAddressDecimal(userRange.start)} ~ ${formatAddressDecimal(userRange.end)}`
+                              : '— ~ —'}
                           </span>
                           <span className="text-[9px] px-1 py-0.2 rounded font-sans font-bold bg-amber-200 text-amber-800 shrink-0">
-                            {codeCount} instrs
+                            {userRange.count > 0 ? `${userRange.count} instrs` : '컴파일 대기'}
                           </span>
                         </div>
 
                         {/* 2층: 영역 라벨 & 명령어 토글 버튼 */}
-                        <div className="flex items-center justify-between gap-1 text-[10px]">
+                        <div className="flex items-center justify-between gap-1 text-[10px] shrink-0">
                           <span className="font-semibold text-amber-900 font-sans">
-                            Loaded ELF Code
+                            User Program (main)
                           </span>
                           <button
                             type="button"
                             onClick={() => setIsUserCodeExpanded(!isUserCodeExpanded)}
                             className="text-[9.5px] font-medium text-amber-700 hover:text-amber-900 bg-amber-100/90 hover:bg-amber-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0"
                           >
-                            {isUserCodeExpanded ? '닫기 ▲' : '명령어 ▼'}
+                            {isUserCodeExpanded ? '닫기 ▼' : '열기 ▲'}
                           </button>
                         </div>
 
-                        {/* 3층: 현재 실행 중인 PC 위치 (라벨 위, 값 아래 또는 좌우 콤팩트 배치) */}
-                        <div className="flex items-center justify-between text-[9.5px] border-t border-amber-200/60 pt-1">
+                        {/* 3층: 현재 실행 중인 PC 위치 */}
+                        <div className="flex items-center justify-between text-[9.5px] border-t border-amber-200/60 pt-1 shrink-0">
                           <span className="text-slate-500 font-sans">Current PC</span>
                           <span className="font-mono font-bold text-amber-950">
-                            {currentPc ? formatAddressDecimal(currentPc) : '-'}
+                            {currentPc ? formatAddressDecimal(currentPc) : '—'}
                           </span>
                         </div>
 
-                        {/* 펼쳤을 때: 명령어 리스트 */}
+                        {/* 펼쳤을 때: 명령어 리스트 (자체 스크롤 컨테이너로 동작) */}
                         {isUserCodeExpanded && (
-                          <div className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 max-h-32 overflow-y-auto custom-scrollbar">
-                            {items.map((item) => (
-                              <div
-                                key={item.address}
-                                className={`flex items-center justify-between px-1 py-0.5 rounded text-[10px] font-mono ${
-                                  item.isChanged
-                                    ? 'bg-amber-200/80 text-amber-950 font-bold'
-                                    : 'text-slate-700 hover:bg-amber-100/50'
-                                }`}
-                              >
-                                <span>{formatAddressDecimal(item.address)}</span>
-                                <span className="font-semibold text-indigo-950">{item.decText}</span>
+                          <div
+                            ref={userCodeScrollRef}
+                            className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 flex-1 min-h-[70px] max-h-48 overflow-y-auto custom-scrollbar"
+                          >
+                            {userInstructions.length === 0 ? (
+                              <div className="text-[10px] text-amber-800/60 font-sans italic py-2 text-center">
+                                컴파일 후 명령어가 로드됩니다.
                               </div>
-                            ))}
+                            ) : (
+                              userInstructions.map((item) => (
+                                <div
+                                  key={item.address}
+                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[10px] font-mono shrink-0 ${
+                                    item.isChanged
+                                      ? 'bg-amber-200/80 text-amber-950 font-bold'
+                                      : 'text-slate-700 hover:bg-amber-100/50'
+                                  }`}
+                                >
+                                  <span>{formatAddressDecimal(item.address)}</span>
+                                  <span className="font-semibold text-indigo-950">{item.decText}</span>
+                                </div>
+                              ))
+                            )}
                           </div>
                         )}
                       </div>
 
-                      {/* 2. C 런타임 스타트업 영역 (세로 스택 최적화) */}
-                      <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80">
+                      {/* 2. C 런타임 스타트업 영역 (최하위 코드 주소 0x00010000 영역이므로 메인 코드 아래, NULL 바로 위에 위치) */}
+                      <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 shrink-0">
                         <div className="flex items-center justify-between">
                           <span
-                            title={simulationData?.program.entry_point ?? "—"}
+                            title={
+                              startupRange.start && startupRange.end
+                                ? `Hex: ${normalizeHex(startupRange.start)} ~ ${normalizeHex(startupRange.end)} (${startupRange.bytes} Bytes)`
+                                : undefined
+                            }
                             className="font-mono text-slate-600 font-semibold text-[10.5px] cursor-help"
                           >
-                            {simulationData ? formatAddressDecimal(simulationData.program.entry_point) : "—"}
+                            {startupRange.start && startupRange.end
+                              ? `${formatAddressDecimal(startupRange.start)} ~ ${formatAddressDecimal(startupRange.end)}`
+                              : '— ~ —'}
                           </span>
-                          <span className="text-[9px] font-mono text-slate-400">Entry</span>
+                          <span className="text-[9px] font-mono text-slate-400">
+                            {startupRange.bytes > 0 ? `${startupRange.bytes}B` : '—B'}
+                          </span>
                         </div>
                         <span className="font-sans text-[9.5px] text-slate-400 leading-tight">
-                          ELF Entry Point
+                          System Runtime Startup (_start)
                         </span>
                       </div>
                     </div>
@@ -431,29 +325,39 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                   ) : (
                     items.map((item) => {
                       const isPulsing = pulsingAddresses.has(item.address.toLowerCase());
-                      const isStack = seg.key === 'stack';
+                      
+                      // 세그먼트별 시그니처 배경 점멸 색상 매핑
+                      let pulsingBgClass = 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold';
+                      if (seg.key === 'stack') {
+                        pulsingBgClass = 'bg-violet-100 dark:bg-violet-950/80 text-violet-950 dark:text-violet-100 font-bold';
+                      } else if (seg.key === 'heap') {
+                        pulsingBgClass = 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-950 dark:text-emerald-100 font-bold';
+                      } else if (seg.key === 'bss') {
+                        pulsingBgClass = 'bg-sky-100 dark:bg-sky-950/80 text-sky-950 dark:text-sky-100 font-bold';
+                      } else if (seg.key === 'data') {
+                        pulsingBgClass = 'bg-blue-100 dark:bg-blue-950/80 text-blue-950 dark:text-blue-100 font-bold';
+                      }
 
                       return (
                         <div
                           key={item.address}
-                          className={`flex items-center justify-between px-2 py-1 rounded transition-colors duration-150 shrink-0 ${
+                          className={`flex items-center px-2 py-1 border-b border-[#F0F2F5] dark:border-[#2D3139] last:border-b-0 transition-colors duration-300 ease-out shrink-0 ${
                             isPulsing
-                              ? isStack
-                                ? 'bg-violet-200 dark:bg-violet-950/70 text-violet-950 dark:text-violet-200 font-bold'
-                                : 'bg-amber-200/95 dark:bg-amber-950/70 text-amber-950 dark:text-amber-200 font-bold'
-                              : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
+                              ? pulsingBgClass
+                              : 'bg-transparent hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
                           }`}
                         >
-                          {/* 좌측 주소 (10진수 고정 + 호버 시 16진수) */}
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          {/* 1열 & 2열: addr: 라벨 + 주소 (탄력적 비율 너비 w-[65%] shrink-0) */}
+                          <div className="w-[65%] shrink-0 flex items-center gap-1 min-w-0 pr-1">
+                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                              addr:
+                            </span>
                             <span
                               title={`Hex: ${normalizeHex(item.address)}`}
-                              className={`text-[11px] font-mono font-medium cursor-help ${
+                              className={`text-[11.5px] font-mono font-semibold cursor-help whitespace-nowrap ${
                                 isPulsing
-                                  ? isStack
-                                    ? 'text-violet-950 dark:text-violet-200 font-bold'
-                                    : 'text-amber-950 dark:text-amber-200 font-bold'
-                                  : 'text-[#57606A] dark:text-[#858585]'
+                                  ? 'text-inherit font-bold'
+                                  : 'text-[#24292F] dark:text-[#CCCCCC]'
                               }`}
                             >
                               {formatAddressDecimal(item.address)}
@@ -465,17 +369,18 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                             )}
                           </div>
 
-                          {/* 우측 값 */}
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          {/* 3열 & 4열: val: 라벨 + 값 (탄력적 비율 너비 w-[35%] shrink-0) */}
+                          <div className="w-[35%] shrink-0 flex items-center gap-1 min-w-0">
+                            <span className="text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                              val:
+                            </span>
                             <span
                               className={`font-mono text-[11.5px] tracking-wide ${
                                 isPulsing
-                                  ? isStack
-                                    ? 'text-violet-950 dark:text-violet-200 font-black'
-                                    : 'text-amber-950 dark:text-amber-200 font-black'
+                                  ? 'text-inherit font-black'
                                   : isCode
-                                  ? 'text-indigo-950 dark:text-[#9CDCFE] font-semibold'
-                                  : 'text-[#1F2328] dark:text-[#CCCCCC] font-medium'
+                                  ? 'text-indigo-950 dark:text-[#9CDCFE] font-bold'
+                                  : 'text-[#1F2328] dark:text-[#CCCCCC] font-bold'
                               }`}
                             >
                               {item.decText}
@@ -488,18 +393,22 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                 </div>
               </div>
 
-              {/* 세그먼트 사이 독립 경계선 (세그먼트 내부에 종속되지 않고 사이사이에 위치) */}
-              {index < SEGMENT_DEFS.length - 1 && (
+              {/* 세그먼트 사이 독립 경계선 */}
+              {dividerHex && index < SEGMENT_DEFS.length - 1 && (
                 <div className="relative flex items-center justify-center my-1 shrink-0">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-dashed border-[#D0D7DE] dark:border-[#3E3E42]" />
                   </div>
                   <div className="relative flex items-center bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono z-10">
                     <span
-                      title={dividerHex ? `표시된 ${seg.name} 주소의 최솟값: ${normalizeHex(dividerHex)}` : '표시할 주소가 없습니다.'}
+                      title={
+                        dividerHex === '—'
+                          ? '컴파일 후 확정되는 경계 주소'
+                          : `Hex: ${normalizeHex(dividerHex)}`
+                      }
                       className="font-semibold text-[#57606A] dark:text-[#858585] cursor-help"
                     >
-                      {dividerHex ? formatAddressDecimal(dividerHex) : '—'}
+                      {dividerHex === '—' ? '—' : formatAddressDecimal(dividerHex)}
                     </span>
                   </div>
                 </div>
@@ -509,17 +418,21 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
         })}
       </div>
 
-      {/* 4. 최하단 메모리 끝 경계선 */}
-      <div className="shrink-0 flex flex-col pt-1 mt-1">
-        <div className="w-full border-t border-[#E5E5E5] dark:border-[#333333] mb-1" />
-        <div className="flex items-center justify-between text-[10px] text-[#57606A] dark:text-[#858585] font-mono px-0.5">
+      {/* 4. 최하단 메모리 끝 경계선 (일체형 꺾인 브래킷 └─── 주소 ───┘ 형태) */}
+      <div className="relative shrink-0 mt-1 mb-2 select-none border-b border-l border-r border-[#D0D7DE] dark:border-[#3E3E42] h-4 flex items-center justify-between px-1.5">
+        {/* 좌측 LOW 라벨 (상단이 꺾인 선의 시작 y축과 일치) */}
+        <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] dark:text-[#6E7681] leading-none self-start pt-0.5">
+          LOW
+        </span>
+
+        {/* 하단 가로선 정중앙에 얹히는 주소 텍스트 뱃지 */}
+        <div className="absolute left-1/2 -bottom-[7px] -translate-x-1/2 bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono leading-none z-10">
           <span
-            title="Hex: 0x00000000"
-            className="font-semibold text-[#24292F] dark:text-[#CCCCCC] cursor-help"
+            title="Hex: 0x00000000 (Low Address Origin)"
+            className="font-semibold cursor-help hover:text-[#005FB8] dark:hover:text-[#79C0FF] transition-colors"
           >
             0
           </span>
-          <span className="text-[#8C959F] dark:text-[#6E7681]">Low Address (Origin)</span>
         </div>
       </div>
       </div>

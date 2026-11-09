@@ -6,17 +6,34 @@ const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
     return raw;
   }
 
+  const isSingleCycle = raw.simulator?.mode === "single" || raw.simulator?.pipeline_model === "single-cycle";
+
   const normalizedHistory: CycleHistoryItem[] = raw.history.map((item) => {
-    const buffers = item.buffers ?? {
-      IF: item.if_stage ?? item.stage_activity?.IF ?? null,
-      ID: item.id_stage ?? item.stage_activity?.ID ?? null,
-      EX: item.ex_stage ?? item.stage_activity?.EX ?? null,
-      MEM: item.mem_stage ?? item.stage_activity?.MEM ?? null,
-      WB: item.wb_stage ?? item.stage_activity?.WB ?? null,
-    };
+    // Single 모드에서는 buffers의 모든 엔트리가 null이고, stage_activity 또는 if_stage~wb_stage에 현재 실행된 명령어가 들어있음
+    let buffers = item.buffers;
+    if (isSingleCycle || !buffers || (buffers.IF === null && buffers.ID === null && buffers.EX === null && buffers.MEM === null && buffers.WB === null)) {
+      if (item.stage_activity) {
+        buffers = {
+          IF: item.stage_activity.IF ?? null,
+          ID: item.stage_activity.ID ?? null,
+          EX: item.stage_activity.EX ?? null,
+          MEM: item.stage_activity.MEM ?? null,
+          WB: item.stage_activity.WB ?? null,
+        };
+      } else if (item.if_stage || item.id_stage || item.ex_stage || item.mem_stage || item.wb_stage) {
+        buffers = {
+          IF: item.if_stage ?? null,
+          ID: item.id_stage ?? null,
+          EX: item.ex_stage ?? null,
+          MEM: item.mem_stage ?? null,
+          WB: item.wb_stage ?? null,
+        };
+      }
+    }
+
     return {
       ...item,
-      buffers,
+      buffers: buffers ?? { IF: null, ID: null, EX: null, MEM: null, WB: null },
     };
   });
 
@@ -27,8 +44,7 @@ const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
 };
 
 export const runSimulation = async (
-  data: SimulationRunRequest,
-  signal?: AbortSignal,
+  data: SimulationRunRequest
 ): Promise<SimulationResult> => {
   const payload: SimulationRunRequest = {
     mode: data.mode ?? "pipeline",
@@ -38,7 +54,7 @@ export const runSimulation = async (
       : { simulation_token: data.simulation_token }),
   };
 
-  const response = await apiConfig.post("/api/v1/simulation/run", payload, { signal });
+  const response = await apiConfig.post("/api/v1/simulation/run", payload);
 
   let resultData = response.data;
 
@@ -47,11 +63,10 @@ export const runSimulation = async (
     if (import.meta.env.DEV && import.meta.env.VITE_S3_BUCKET_URL) {
       fetchUrl = fetchUrl.replace(import.meta.env.VITE_S3_BUCKET_URL, "/s3-proxy");
     }
-    let res = await fetch(fetchUrl, { signal });
+    let res = await fetch(fetchUrl);
     if (!res.ok && fetchUrl !== rawUrl) {
-      res = await fetch(rawUrl, { signal });
+      res = await fetch(rawUrl);
     }
-    if (!res.ok) throw new Error(`시뮬레이션 결과를 불러오지 못했습니다. (HTTP ${res.status})`);
     return res.json();
   };
 
@@ -83,10 +98,6 @@ export const runSimulation = async (
     }
   }
 
-  if (!resultData || resultData.simulator?.mode !== payload.mode ||
-      !Array.isArray(resultData.history) || !resultData.initial_state ||
-      resultData.summary?.total_cycles !== resultData.history.length) {
-    throw new Error('시뮬레이션 응답의 모드 또는 실행 기록이 올바르지 않습니다.');
-  }
   return normalizeSimulationResult(resultData as SimulationResult);
 };
+

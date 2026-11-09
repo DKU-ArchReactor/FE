@@ -1,14 +1,14 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "@/context/ThemeContext";
-import { mapAssembly, type MappedAssemblyRow } from "./translationCompile";
-import type { StageBuffer, SimulationResult } from "@/type/simulation";
-import { findAssemblyRow } from '../simulationView';
+import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
+import type { StageBuffer } from "@/type/simulation";
+import AsmFileUploadPopup from "./AsmFileUploadPopup";
 
 type Props = {
-  instructions?: SimulationResult['program']['instructions'];
   source: string;
   assembly: string;
+  mappedRows?: MappedAssemblyRow[];
   busy: boolean;
   error: string;
   selectedLine?: number | null;
@@ -35,12 +35,12 @@ const STAGES_CONFIG: {
   name: string;
   badgeBg: string;
 }[] = [
-  { key: "IF", name: "IF", badgeBg: "bg-indigo-600 text-white" },
-  { key: "ID", name: "ID", badgeBg: "bg-sky-600 text-white" },
-  { key: "EX", name: "EX", badgeBg: "bg-amber-600 text-white" },
-  { key: "MEM", name: "MEM", badgeBg: "bg-emerald-600 text-white" },
-  { key: "WB", name: "WB", badgeBg: "bg-rose-600 text-white" },
-];
+    { key: "IF", name: "IF", badgeBg: "bg-indigo-600 text-white" },
+    { key: "ID", name: "ID", badgeBg: "bg-sky-600 text-white" },
+    { key: "EX", name: "EX", badgeBg: "bg-amber-600 text-white" },
+    { key: "MEM", name: "MEM", badgeBg: "bg-emerald-600 text-white" },
+    { key: "WB", name: "WB", badgeBg: "bg-rose-600 text-white" },
+  ];
 
 // 명령어(Opcode)와 피연산자(Operands) 분리 헬퍼
 function splitInstruction(text: string): { opcode: string; operands: string } {
@@ -59,9 +59,9 @@ function splitInstruction(text: string): { opcode: string; operands: string } {
 }
 
 export default function TranslationMapping({
-  instructions,
   source,
   assembly,
+  mappedRows,
   busy,
   error,
   selectedLine,
@@ -78,13 +78,37 @@ export default function TranslationMapping({
 }: Props) {
   const { theme } = useTheme();
   const sourceLines = source.split(/\r?\n/);
-  const rows: MappedAssemblyRow[] = useMemo(
-    () => mapAssembly(assembly, sourceLines.length),
-    [assembly, sourceLines.length]
-  );
+  const rows: MappedAssemblyRow[] = useMemo(() => {
+    if (mappedRows && mappedRows.length > 0) return mappedRows;
+    return mapAssembly(assembly, sourceLines.length);
+  }, [mappedRows, assembly, sourceLines.length]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const rowElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const uploadButtonRef = useRef<HTMLButtonElement>(null);
+  const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
+  const [asmSaveSuccess, setAsmSaveSuccess] = useState(false);
+
+  // ASM 파일 다운로드 저장 핸들러
+  const handleSaveAsmClick = () => {
+    if (!assembly) return;
+    try {
+      const blob = new Blob([assembly], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "main.s";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setAsmSaveSuccess(true);
+      setTimeout(() => setAsmSaveSuccess(false), 2000);
+    } catch (err) {
+      console.error("ASM save error:", err);
+    }
+  };
 
   // 파이프라인 스테이지별 활성 명령어 매핑 (현재 클록 사이클 기준)
   const activeStagesByInst = useMemo(() => {
@@ -93,7 +117,7 @@ export default function TranslationMapping({
 
     STAGES_CONFIG.forEach(({ key, name }) => {
       const buf = stageBuffers[key];
-      if (buf && findAssemblyRow(rows, buf, instructions) !== null) {
+      if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
         const norm = buf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
         if (norm) {
           if (!map[norm]) map[norm] = [];
@@ -102,7 +126,7 @@ export default function TranslationMapping({
       }
     });
     return map;
-  }, [stageBuffers, mode, rows, instructions]);
+  }, [stageBuffers, mode]);
 
   // 헬퍼: 타겟 요소(그룹 마지막 행)가 컨테이너 뷰포트 하단에 완전히 드러나도록 스크롤
   const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
@@ -199,12 +223,12 @@ export default function TranslationMapping({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-2xs select-none transition-colors duration-150"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="RISC-V 어셈블리 결과"
     >
-      {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수) */}
-      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#252526] px-3.5 py-1.5 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
+      {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수, 우측 상태 문구) */}
+      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-sky-500">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
               activeTarget === "asm"
@@ -212,64 +236,155 @@ export default function TranslationMapping({
                 : "bg-transparent scale-0"
             }`}
           />
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] truncate whitespace-nowrap">
-            RISC-V 어셈블리 {activeTarget === "asm" ? "에디터" : "매핑"}
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
+            RISC-V ASSEMBLY
           </h3>
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
             ({activeTarget === "asm" ? "main.s" : assembly ? `${rows.length} instrs` : "빈 코드"})
+          </span>
+        </div>
+
+        {/* 현재 모드에 대한 ASM 에디터 상태 문구: 윗줄 오른쪽 정렬 */}
+        <div className="flex items-center shrink-0 ml-2">
+          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
+            {activeTarget === "asm"
+              ? "명령어 직접 작성"
+              : "C 컴파일 명령어 매핑"}
           </span>
         </div>
       </header>
 
-      {/* 2단: 헤더 밑 툴바 라인 (어셈블리 시뮬레이션 버튼 행) */}
+      {/* 2단: 헤더 밑 툴바 라인 (C 에디터와 100% 동일한 버튼 디자인 및 반응형 아이콘) */}
       <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] dark:bg-[#1E1E1E] border-b border-[#E5E5E5] dark:border-[#3E3E42] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {activeTarget === "asm" ? (
-            <>
-              <button
-                type="button"
-                onClick={onResetAssembly}
-                className="rounded border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] px-2 py-0.5 text-[11px] font-medium text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs"
-                title="기본 어셈블리 템플릿으로 초기화"
-              >
-                <span>🔄</span>
-                <span>초기화</span>
-              </button>
-              <span className="text-[10px] text-[#57606A] dark:text-[#858585] ml-1 font-mono hidden sm:inline">
-                명령어 직접 작성 모드
-              </span>
-            </>
-          ) : (
-            <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate">
-              C 컴파일 결과 매핑 및 파이프라인 단계 관찰 뷰
+          {/* 1. 불러오기 버튼 (드롭다운 화살표 및 팝업 연동) */}
+          <button
+            ref={uploadButtonRef}
+            type="button"
+            onClick={() => setIsUploadPopupOpen((prev) => !prev)}
+            disabled={busy || activeTarget !== "asm"}
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
+              activeTarget !== "asm"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+                : isUploadPopupOpen
+                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
+                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+            }`}
+            title="어셈블리 파일 불러오기 및 예제 템플릿 열기"
+          >
+            <svg
+              className="w-3 h-3 fill-none stroke-current inline @[380px]:hidden shrink-0"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+              <path d="M2 10h20" />
+            </svg>
+            <span className="hidden @[380px]:inline">불러오기</span>
+            <span
+              className={`text-[8.5px] opacity-75 transition-transform duration-150 ${
+                isUploadPopupOpen ? "rotate-180" : ""
+              }`}
+            >
+              ▼
             </span>
-          )}
+          </button>
+
+          {/* 2. 저장 버튼 */}
+          <button
+            type="button"
+            onClick={handleSaveAsmClick}
+            disabled={busy || activeTarget !== "asm" || !assembly?.trim()}
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
+              activeTarget !== "asm"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+                : asmSaveSuccess
+                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
+                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+            }`}
+            title="현재 어셈블리 코드를 main.s 파일로 다운로드"
+          >
+            {asmSaveSuccess ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">✓</span>
+            ) : (
+              <svg
+                className="w-3 h-3 fill-none stroke-current inline @[320px]:hidden shrink-0"
+                viewBox="0 0 24 24"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+            )}
+            <span className="hidden @[320px]:inline">
+              {asmSaveSuccess ? "저장됨" : "저장"}
+            </span>
+          </button>
+
+          {/* 3. 초기화 버튼 */}
+          <button
+            type="button"
+            onClick={onResetAssembly}
+            disabled={busy || activeTarget !== "asm"}
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
+              activeTarget !== "asm"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+            }`}
+            title="기본 어셈블리 템플릿으로 초기화"
+          >
+            <svg
+              className="w-3 h-3 fill-current inline @[260px]:hidden shrink-0"
+              viewBox="0 0 24 24"
+            >
+              <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            </svg>
+            <span className="hidden @[260px]:inline">초기화</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 어셈블리 시뮬레이션 버튼 */}
+          {/* 어셈블리 시뮬레이션 버튼 (C 에디터 컴파일 버튼과 동일한 h-[22px], 블루 솔리드, 반응형 쐐기 번개 도형) */}
           <button
             type="button"
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
-            className={`rounded border px-2.5 py-0.5 text-[11px] font-medium transition-colors shadow-2xs flex items-center gap-1 shrink-0 ${
+            className={`h-[22px] rounded px-2.5 text-[10.5px] font-semibold transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget === "asm"
-                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] cursor-pointer"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
+                ? "bg-[#005FB8] dark:bg-[#007ACC] text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] cursor-pointer"
+                : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
             }`}
-            title={activeTarget === "asm" ? "작성된 어셈블리로 시뮬레이션 실행" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
+            title={activeTarget === "asm" ? "작성된 어셈블리를 하드웨어에 로드하고 시뮬레이션 준비" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
           >
-            <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
-              {busy ? (
-                <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-              ) : (
-                <span className="text-[12px] leading-none">⚡</span>
-              )}
-            </span>
-            <span>시뮬레이션</span>
+            {busy ? (
+              <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                <span className="w-2.5 h-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              </span>
+            ) : (
+              /* 좁아졌을 때 나타나는 단색 번개 쐐기형 기하 도형 아이콘 */
+              <svg
+                className="w-3 h-3 fill-current inline @[200px]:hidden shrink-0"
+                viewBox="0 0 24 24"
+              >
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+            )}
+            <span className="hidden @[200px]:inline">어셈블</span>
           </button>
         </div>
       </div>
+
+      <AsmFileUploadPopup
+        isOpen={isUploadPopupOpen}
+        onClose={() => setIsUploadPopupOpen(false)}
+        anchorRef={uploadButtonRef}
+        onSelectAssembly={(code) => onAssemblyChange?.(code)}
+      />
 
       {/* 본문: ASM 직접 작성 모드일 때는 Monaco Editor, C 모드일 때는 매핑 뷰 */}
       {activeTarget === "asm" ? (
@@ -297,7 +412,7 @@ export default function TranslationMapping({
             }}
           />
         </div>
-      ) : !assembly ? (
+      ) : !assembly && rows.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E]">
           <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
             📜
@@ -306,8 +421,8 @@ export default function TranslationMapping({
             {busy
               ? "컴파일 및 어셈블리 매핑 중…"
               : error
-              ? "컴파일 오류로 어셈블리를 생성할 수 없습니다."
-              : "왼쪽 에디터에서 C 코드를 작성하고 [⚡ 컴파일]을 누르세요."}
+                ? "컴파일 오류로 어셈블리를 생성할 수 없습니다."
+                : "왼쪽 에디터에서 C 코드를 작성하고 [⚡ 컴파일]을 누르세요."}
           </p>
           <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
             컴파일 완료 후 C 코드의 줄을 클릭하면 매핑된 어셈블리 라인이 즉시 강조됩니다.
@@ -347,10 +462,11 @@ export default function TranslationMapping({
 
             // 실행 중인 라인이면서 동시에 사용자가 선택한 라인인 경우
             const isExecutingAndSelected = isCurrentSingleActive && isSelectedPrimary;
+            const isCrt = row.sourceLine === null;
 
             return (
               <div
-                key={`${row.sourceLine}-${index}`}
+                key={`${row.pc || index}-${row.sourceLine}-${index}`}
                 ref={(el) => {
                   if (el) rowElementsRef.current.set(index, el);
                   else rowElementsRef.current.delete(index);
@@ -362,19 +478,18 @@ export default function TranslationMapping({
                     onSelectLine?.(row.sourceLine, index);
                   }
                 }}
-                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${
-                  isCurrentSingleActive && !isSelectedPrimary
+                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${isCurrentSingleActive && !isSelectedPrimary
                     ? "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs"
                     : isSelectedPrimary
-                    ? "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs"
-                    : isSelectedSibling
-                    ? "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal"
-                    : isExecutionSibling
-                    ? "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal"
-                    : activeStages.length > 0
-                    ? "bg-amber-50/70 dark:bg-[#3D2E12]/50 border-transparent"
-                    : "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
-                }`}
+                      ? "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs"
+                      : isSelectedSibling
+                        ? "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal"
+                        : isExecutionSibling
+                          ? "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal"
+                          : activeStages.length > 0
+                            ? "bg-amber-50/70 dark:bg-[#3D2E12]/50 border-transparent"
+                            : "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
+                  }`}
               >
                 {/* 1. 화살표 / 인디케이터 */}
                 <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
@@ -392,34 +507,35 @@ export default function TranslationMapping({
 
                 {/* 2. 라인 번호 */}
                 <div
-                  className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${
-                    isSelectedPrimary
+                  className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${isSelectedPrimary
                       ? "text-[#005FB8] dark:text-[#79C0FF] font-bold"
                       : isSelectedSibling
-                      ? "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
-                      : isCurrentSingleActive
-                      ? "text-emerald-700 dark:text-[#7EE787] font-bold"
-                      : isExecutionSibling
-                      ? "text-emerald-600 dark:text-[#7EE787]/70"
-                      : "text-[#8C959F] dark:text-[#858585]"
-                  }`}
+                        ? "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
+                        : isCurrentSingleActive
+                          ? "text-emerald-700 dark:text-[#7EE787] font-bold"
+                          : isExecutionSibling
+                            ? "text-emerald-600 dark:text-[#7EE787]/70"
+                            : "text-[#8C959F] dark:text-[#858585]"
+                    }`}
                 >
                   {index + 1}
                 </div>
 
-                {/* 3. Opcode */}
+                {/* 3. Opcode (CRT 비매핑 코드는 회색, C 매핑 코드는 파란색) */}
                 <div className="w-[52px] shrink-0 font-bold select-text">
                   <span
                     className={
                       isSelectedPrimary
                         ? "text-blue-800 dark:text-[#79C0FF] font-bold"
                         : isSelectedSibling
-                        ? "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
-                        : isCurrentSingleActive
-                        ? "text-emerald-800 dark:text-[#7EE787] font-bold"
-                        : isExecutionSibling
-                        ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
-                        : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
+                          ? "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
+                          : isCurrentSingleActive
+                            ? "text-emerald-800 dark:text-[#7EE787] font-bold"
+                            : isExecutionSibling
+                              ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
+                              : isCrt
+                                ? "text-[#6E7681] dark:text-[#858585] font-semibold"
+                                : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
                     }
                   >
                     {opcode}
@@ -433,12 +549,14 @@ export default function TranslationMapping({
                       isSelectedPrimary
                         ? "text-slate-950 dark:text-white font-bold"
                         : isSelectedSibling
-                        ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                        : isCurrentSingleActive
-                        ? "text-slate-950 dark:text-white font-bold"
-                        : isExecutionSibling
-                        ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                        : "text-[#24292F] dark:text-[#CCCCCC]"
+                          ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
+                          : isCurrentSingleActive
+                            ? "text-slate-950 dark:text-white font-bold"
+                            : isExecutionSibling
+                              ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
+                              : isCrt
+                                ? "text-[#6E7681]/90 dark:text-[#858585]"
+                                : "text-[#24292F] dark:text-[#CCCCCC]"
                     }
                   >
                     {operands}
@@ -452,9 +570,8 @@ export default function TranslationMapping({
                         return (
                           <span
                             key={stg}
-                            className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${
-                              cfg?.badgeBg || "bg-slate-700 text-white"
-                            }`}
+                            className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${cfg?.badgeBg || "bg-slate-700 text-white"
+                              }`}
                           >
                             {stg}
                           </span>
@@ -464,23 +581,40 @@ export default function TranslationMapping({
                   )}
                 </div>
 
-                {/* 5. 우측 C 매핑 라인 태그 */}
+                {/* 5. 우측 C 매핑 라인 태그 (CRT와 C: L$ 규격/스타일 일원화) */}
                 <div className="shrink-0 pr-4 flex items-center select-none">
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${
-                      isSelectedPrimary
-                        ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                        : isCurrentSingleActive
-                        ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                        : isSelectedSibling
-                        ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                        : isExecutionSibling
-                        ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                        : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
-                    }`}
-                  >
-                    C: L{row.sourceLine}
-                  </span>
+                  {row.sourceLine !== null ? (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
+                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
+                          : isCurrentSingleActive
+                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                            : isSelectedSibling
+                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                              : isExecutionSibling
+                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
+                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
+                        }`}
+                    >
+                      C: L{row.sourceLine}
+                    </span>
+                  ) : (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
+                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
+                          : isCurrentSingleActive
+                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
+                            : isSelectedSibling
+                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                              : isExecutionSibling
+                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
+                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
+                        }`}
+                      title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
+                    >
+                      CRT
+                    </span>
+                  )}
                 </div>
               </div>
             );

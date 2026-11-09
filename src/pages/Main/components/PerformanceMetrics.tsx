@@ -1,63 +1,116 @@
-import React from 'react';
-import { getPerformanceStats } from '../simulationView';
-import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
+import React, { useMemo } from 'react';
+import type { SimulationResult } from '@/type/simulation';
 
 interface PerformanceMetricsProps {
   simulationData: SimulationResult | null;
-  currentCycleData?: CycleHistoryItem | null;
   currentCycle: number;
-  loadingMessage?: string | null;
 }
 
 export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
   simulationData,
   currentCycle,
-  loadingMessage,
 }) => {
-  const stats = getPerformanceStats(simulationData, currentCycle);
+  const history = simulationData?.history ?? [];
 
-  if (loadingMessage) {
-    return (
-      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
-        <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-emerald-500">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs">📊</span>
-            <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
-              Pipeline Performance & CPI
-            </h3>
-          </div>
-          <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
-            Ideal CPI: 1.00
-          </span>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2">
-          <div className="w-6 h-6 border-2.5 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-[#005FB8] dark:text-[#79C0FF]">{loadingMessage}</span>
-          <span className="text-[11px] text-[var(--ar-text-muted)]">
-            CPI 및 파이프라인 성능 지표를 계산하고 있습니다.
-          </span>
-        </div>
-      </div>
-    );
-  }
+  // 메트릭스 계산 (전체 시뮬레이션 기준 & 현재 사이클까지의 기준)
+  const stats = useMemo(() => {
+    if (!history.length) {
+      return {
+        completedInstructions: 0,
+        totalCycles: 0,
+        cpi: '1.00',
+        ipc: '1.00',
+        stalls: 0,
+        forwards: 0,
+        bubbleRatio: 0,
+      };
+    }
+
+    const isSingleMode =
+      simulationData?.simulator?.mode === 'single' ||
+      simulationData?.simulator?.pipeline_model === 'single-cycle';
+
+    if (isSingleMode) {
+      if (currentCycle === 0) {
+        return {
+          completedInstructions: 0,
+          totalCycles: 0,
+          cpi: '1.00',
+          ipc: '1.00',
+          stalls: 0,
+          forwards: 0,
+          bubbleRatio: 0,
+        };
+      }
+      return {
+        completedInstructions: currentCycle,
+        totalCycles: currentCycle,
+        cpi: '1.00',
+        ipc: '1.00',
+        stalls: 0,
+        forwards: 0,
+        bubbleRatio: 0,
+      };
+    }
+
+    // 현재 사이클까지 WB를 완료한 고유 명령어 개수 추적
+    const wbInstructions = new Set<string>();
+    let totalStalls = 0;
+    let totalForwards = 0;
+    let totalBubbles = 0;
+
+    for (let i = 0; i <= Math.min(currentCycle, history.length - 1); i++) {
+      const item = history[i];
+      if (item.buffers.WB?.assembly && item.buffers.WB?.status !== 'bubble') {
+        const key = `${item.buffers.WB.pc}_${item.buffers.WB.assembly}`;
+        wbInstructions.add(key);
+      }
+      if (item.cycle_events.stall?.has_stall) totalStalls++;
+      if (item.cycle_events.forwarding?.has_forwarded) totalForwards++;
+
+      // 5개 스테이지 중 버블 개수
+      Object.values(item.buffers).forEach((b) => {
+        if (!b || b.status === 'bubble' || b.assembly === 'bubble') {
+          totalBubbles++;
+        }
+      });
+    }
+
+    const completed = Math.max(1, wbInstructions.size);
+    const activeCycles = Math.max(1, currentCycle + 1);
+    const cpiVal = (activeCycles / completed).toFixed(2);
+    const ipcVal = (completed / activeCycles).toFixed(2);
+    const totalSlotCount = activeCycles * 5;
+    const bubbleRatio = Math.round((totalBubbles / totalSlotCount) * 100);
+
+    return {
+      completedInstructions: wbInstructions.size,
+      totalCycles: activeCycles,
+      cpi: cpiVal,
+      ipc: ipcVal,
+      stalls: totalStalls,
+      forwards: totalForwards,
+      bubbleRatio: Math.min(100, bubbleRatio),
+    };
+  }, [history, currentCycle]);
 
   return (
-    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
-      {/* 1. 상단 타이틀 바 (지표 전용 에메랄드 액센트 바) */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-emerald-500">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs">📊</span>
-          <h3 className="text-xs font-semibold text-[var(--ar-text-primary)] whitespace-nowrap">
-            Pipeline Performance & CPI
+    <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
+      {/* 1. 상단 타이틀 바 (지표 전용 퍼플 액센트 바) */}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-purple-500">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-purple-500 font-bold">◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            PERFORMANCE & CPI
           </h3>
         </div>
-        <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
+        <span className="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-semibold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800">
           Ideal CPI: 1.00
         </span>
       </div>
 
-      {/* 2. 지표 카드 본문 */}
-      <div className="flex-1 p-3 flex flex-col justify-between min-h-0 gap-2 overflow-y-auto">
+      {/* 2. 지표 카드 본문 (내부 요소가 절대 잘리지 않도록 자연스러운 높이 유지) */}
+      <div className="p-3 flex flex-col gap-2.5">
         {/* 상단 2단 KPI 요약 카드 */}
         <div className="grid grid-cols-2 gap-2 shrink-0">
           {/* CPI 카드 */}
@@ -75,9 +128,9 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
               <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">cycles</span>
             </div>
             <span className="text-[9px] text-[var(--ar-text-muted)] mt-0.5">
-              {stats.cpi === '—' ? '완료된 명령어가 없습니다.' : Number(stats.cpi) <= 1.2
+              {Number(stats.cpi) <= 1.2
                 ? '최적의 파이프라인 처리량'
-                : '파이프라인 채움·비움 또는 실행 지연 포함'}
+                : '스톨 발생으로 지연 증가'}
             </span>
           </div>
 

@@ -377,6 +377,26 @@ export function analyzeAsmInstruction(text: string): AsmInstructionExplanation {
         hardwareDetail: "조건이 만족되면 파이프라인의 다음 명령어들을 플러시하고 분기 목적지 주소로 인출(IF)을 시작합니다.",
       };
     }
+    case "auipc": {
+      const [rd, imm] = parts;
+      return {
+        opcode,
+        operands,
+        action: `PC 기준 주소 계산: ${rd || "rd"} = PC + (${imm || "imm"} << 12)`,
+        explanation: `현재 프로그램 카운터(PC)의 상위 20비트에 즉치값(${imm})을 더해 ${rd || "rd"} 레지스터에 저장합니다. main() 함수나 전역 변수의 위치 독립적(PIC) 주소를 계산할 때 사용됩니다.`,
+        hardwareDetail: "IF/ID 단계의 PC 값과 U-Type 즉치값을 ALU가 더해 목적지 레지스터(rd)에 저장합니다.",
+      };
+    }
+    case "jalr": {
+      const [rd, rs1, imm] = parts.length === 2 ? [parts[0], parts[1], "0"] : parts;
+      return {
+        opcode,
+        operands,
+        action: `간접 점프 & 링크: 점프 ➔ ${rs1 || "rs1"} + ${imm || "0"}, ${rd || "ra"} = PC + 4`,
+        explanation: `${rs1 || "rs1"} 레지스터 주소에 오프셋(${imm || "0"})을 더한 메모리 주소(예: main() 함수 시작점)로 점프하며, 복귀 주소를 ${rd || "ra"}에 백업합니다.`,
+        hardwareDetail: "EX 단계에서 계산된 점프 주소로 PC를 즉시 변경하고 파이프라인의 후속 명령어를 플러시(Flush)합니다.",
+      };
+    }
     case "j":
     case "jal": {
       const target = parts[parts.length - 1] || "target";
@@ -410,4 +430,46 @@ export function analyzeAsmInstruction(text: string): AsmInstructionExplanation {
         hardwareDetail: "프로세서의 해당 명령어 포맷(R/I/S/B/U/J-Type)에 맞추어 디코딩 및 실행됩니다.",
       };
   }
+}
+
+// --------------------------------------------------------
+// 3. CRT (C Runtime Bootstrap) 전용 교육용 해설 생성기
+// --------------------------------------------------------
+export interface CrtExplanation {
+  title: string;
+  badge: string;
+  summary: string;
+  detail: string;
+  role: string;
+  instructionDetail: AsmInstructionExplanation;
+}
+
+export function analyzeCrtInstruction(asmText: string, pc?: string): CrtExplanation {
+  const instDetail = analyzeAsmInstruction(asmText);
+  const norm = asmText.trim().toLowerCase();
+
+  let role = "C 런타임 초기화 / 부트스트랩";
+  let summary = "프로그램 시작 지점(_start)에서 C 실행 환경을 준비하는 부트스트랩 코드입니다.";
+  let detail = pc
+    ? `주소(${pc})에서 main() 함수가 호출되기 전, CPU 레지스터를 초기화하고 main() 함수의 실제 시작 주소를 계산하여 진입(Call)시키는 필수 런타임 코드입니다.`
+    : "C 언어로 작성된 main() 함수가 호출되기 전, CPU 레지스터를 초기화하고 main() 함수의 실제 시작 주소를 계산하여 진입(Call)시키는 필수 런타임 코드입니다.";
+
+  if (norm.startsWith("auipc")) {
+    role = "main() 함수 기준 주소 계산 (PC-Relative)";
+    summary = "현재 PC(프로그램 카운터)를 기준으로 main() 함수가 위치한 상위 주소 오프셋을 ra 레지스터에 로드합니다.";
+    detail = "RISC-V ABI의 위치 독립적(Position-Independent) 함수 호출 방식으로, 다음 jalr 명령어와 짝을 이루어 main() 함수의 정확한 메모리 주소로 분기합니다.";
+  } else if (norm.startsWith("jalr")) {
+    role = "main() 함수 호출 및 복귀 주소 링크";
+    summary = "계산된 주소(ra)로 점프하여 C 언어 main() 함수 실행을 시작하고, 복귀 주소를 설정합니다.";
+    detail = "하드웨어적으로 PC가 main() 함수의 시작 위치로 변경되며, main() 함수가 끝난 후 돌아올 주소를 ra(x1) 레지스터에 기록합니다.";
+  }
+
+  return {
+    title: "C Runtime (CRT) 부트스트랩 코드",
+    badge: "CRT 초기화",
+    summary,
+    detail,
+    role,
+    instructionDetail: instDetail,
+  };
 }

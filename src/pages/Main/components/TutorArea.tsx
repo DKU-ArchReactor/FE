@@ -1,26 +1,21 @@
 import React, { useMemo } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
-import type { CodeLineSelectInfo } from './Source/SourceViewer';
-import { mapAssembly, type MappedAssemblyRow } from './translationCompile';
-import { analyzeCLine, analyzeAsmInstruction } from './tutorAnalysis';
-import { getActivity } from '../simulationView';
+import { mapAssembly, type MappedAssemblyRow } from '../utils/translationCompile';
+import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction } from '../utils/tutorAnalysis';
 
 export interface TutorAreaProps {
   simulationData: SimulationResult | null;
   currentCycleData: CycleHistoryItem | null;
   loadingMessage?: string | null;
-  selectedCodeLine?: CodeLineSelectInfo | null;
-  onClearSelectedCodeLine?: () => void;
 
   // C ↔ 어셈블리 튜터 모드 Props
   translationSource?: string;
   translationAssembly?: string;
+  mappedRows?: MappedAssemblyRow[];
   selectedTranslationLine?: number | null;
   selectedAsmIndex?: number | null;
   currentActiveAsmIndex?: number | null;
-  executionLine?: number | null;
   isUserSelected?: boolean;
-  onSelectTranslationLine?: (line: number | null) => void;
   activeTarget?: "c" | "asm";
 }
 
@@ -30,11 +25,11 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   loadingMessage,
   translationSource,
   translationAssembly,
+  mappedRows: propMappedRows,
   selectedTranslationLine,
   selectedAsmIndex,
   currentActiveAsmIndex,
   isUserSelected = false,
-  onSelectTranslationLine: _onSelectTranslationLine,
   activeTarget = "c",
 }) => {
   // 1. C 소스 코드 라인별 배열
@@ -42,19 +37,32 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     return (translationSource || "").split(/\r?\n/);
   }, [translationSource]);
 
-  // 2. 어셈블리 파싱 및 C 라인 매핑 결과
-  const mappedRows: MappedAssemblyRow[] = useMemo(() => {
+  // 2. 어셈블리 파싱 및 C 라인 매핑 결과 (시뮬레이션에서 주입된 mappedRows 우선 사용)
+  const effectiveRows: MappedAssemblyRow[] = useMemo(() => {
+    if (propMappedRows && propMappedRows.length > 0) return propMappedRows;
     if (!translationAssembly) return [];
     return mapAssembly(translationAssembly, cLines.length);
-  }, [translationAssembly, cLines.length]);
+  }, [propMappedRows, translationAssembly, cLines.length]);
+
+  // 선택된 어셈블리 행 정보 (CRT 부트스트랩 판별용)
+  const selectedRow = useMemo(() => {
+    if (selectedAsmIndex !== null && selectedAsmIndex !== undefined && selectedAsmIndex >= 0) {
+      return effectiveRows[selectedAsmIndex] || null;
+    }
+    return null;
+  }, [selectedAsmIndex, effectiveRows]);
+
+  const isCrtSelected = Boolean(
+    selectedRow && (selectedRow.sourceLine === null || selectedRow.isRuntime)
+  );
 
   // 3. 선택된 C 라인에 매핑된 어셈블리 명령어 리스트 추출
   const mappedAsmForSelectedLine = useMemo(() => {
     if (!selectedTranslationLine || selectedTranslationLine <= 0) return [];
-    return mappedRows
+    return effectiveRows
       .map((row, originalIndex) => ({ ...row, asmIndex: originalIndex + 1 }))
       .filter((row) => row.sourceLine === selectedTranslationLine);
-  }, [mappedRows, selectedTranslationLine]);
+  }, [effectiveRows, selectedTranslationLine]);
 
   // 4. 선택된 C 라인 텍스트 및 분석
   const selectedCLineText = useMemo(() => {
@@ -81,26 +89,88 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
   return (
     <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-[#E5E5E5] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] shadow-2xs select-none transition-colors duration-150"
+      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="AI 튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}
-      <header className="shrink-0 flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#252526] px-3.5 py-1.5 min-w-0">
-        <div className="flex items-center gap-2 min-w-0 shrink">
-          <span className="text-sm shrink-0">🎓</span>
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap shrink-0">ArchReactor Tutor</h3>
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate">
-            {activeTarget === "asm" ? "어셈블리 파이프라인 분석" : "명령어 & 컴파일 해설"}
-          </span>
+      <header className="shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-emerald-500">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-emerald-500 font-bold">◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            ARCHREACTOR TUTOR
+          </h3>
         </div>
+        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
+          {activeTarget === "asm" ? "ASM PIPELINE" : "INSTRUCTION"}
+        </span>
       </header>
 
       {/* 튜터 메인 본문 영역 */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3.5 space-y-3.5 select-text [scrollbar-gutter:stable]">
         {/* ========================================================= */}
-        {/* 모드 1: C/어셈블리 특정 라인이 선택되었을 때 (C 모드 교육용 튜터) */}
+        {/* 모드 0: CRT (C Runtime 부트스트랩) 코드가 선택되었을 때 */}
         {/* ========================================================= */}
-        {activeTarget !== "asm" && selectedTranslationLine && cLineAnalysis ? (
+        {activeTarget !== "asm" && isCrtSelected && selectedRow ? (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-slate-300 dark:border-[#3E3E42] bg-slate-50/70 dark:bg-[#252526]/60 p-3.5 flex flex-col gap-3 shadow-2xs">
+              {/* 상단 뱃지 및 제목 */}
+              <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 dark:border-[#333333] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🚀</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
+                      CRT
+                    </span>
+                    <strong className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC]">
+                      C Runtime 부트스트랩 (진입 초기화)
+                    </strong>
+                  </div>
+                </div>
+                {selectedRow.pc && (
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-[#858585] bg-white dark:bg-[#1E1E1E] px-2 py-0.5 rounded border border-slate-200 dark:border-[#333333]">
+                    PC: {selectedRow.pc}
+                  </span>
+                )}
+              </div>
+
+              {/* 명령어 블록 */}
+              <div className="font-mono text-xs px-3 py-2 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-slate-900 dark:text-[#D4D4D4] font-semibold flex items-center justify-between shadow-2xs">
+                <span>{selectedRow.text}</span>
+                <span className="text-[10px] text-slate-400 dark:text-[#858585] font-normal">
+                  ASM L{(selectedAsmIndex ?? 0) + 1}
+                </span>
+              </div>
+
+              {/* CRT 역할 및 설명 */}
+              {(() => {
+                const crtInfo = analyzeCrtInstruction(selectedRow.text, selectedRow.pc);
+                return (
+                  <div className="space-y-2.5">
+                    <div className="flex items-start gap-1.5 text-xs text-slate-800 dark:text-[#CCCCCC]">
+                      <span className="text-amber-500 shrink-0">💡</span>
+                      <div>
+                        <strong className="text-slate-900 dark:text-white font-bold">{crtInfo.role}</strong>
+                        <p className="text-[11px] text-slate-600 dark:text-[#858585] mt-0.5 leading-relaxed">
+                          {crtInfo.summary}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-[11px] text-slate-600 dark:text-[#858585] leading-relaxed">
+                      <p>{crtInfo.detail}</p>
+                    </div>
+
+                    {/* 하드웨어 아키텍처 동작 */}
+                    <div className="p-2 rounded bg-slate-100/70 dark:bg-[#1E1E1E]/80 border border-slate-200/80 dark:border-[#333333] text-[10px] text-slate-500 dark:text-[#858585] flex items-start gap-1.5">
+                      <span className="font-bold text-slate-700 dark:text-[#CCCCCC] shrink-0">하드웨어 동작:</span>
+                      <span>{crtInfo.instructionDetail.hardwareDetail}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        ) : activeTarget !== "asm" && selectedTranslationLine && cLineAnalysis ? (
           <div className="@[720px]:grid @[720px]:grid-cols-2 @[720px]:gap-3 flex flex-col gap-2.5">
             {/* 1. 선택한 C 언어 라인 및 구문 역할 해설 */}
             <div className="rounded-xl border border-blue-200 dark:border-[#007ACC]/40 bg-blue-50/40 dark:bg-[#007ACC]/10 p-3 flex flex-col gap-2">
@@ -321,15 +391,44 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
                 {/* 현재 파이프라인 인출(IF) 명령어 */}
                 {(() => {
-                  const ifBuf = getActivity(currentCycleData).IF;
+                  const ifBuf = currentCycleData.buffers?.IF || currentCycleData.if_stage;
                   const ifInst = ifBuf?.assembly || "bubble";
+                  const isIdleStep0 = ifInst === "empty" && currentCycleData.clock === 0;
+
+                  if (isIdleStep0) {
+                    return (
+                      <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-[#252526] border border-slate-100 dark:border-[#333333]">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-[#005FB8] dark:text-[#79C0FF] font-sans">
+                            [Step 0] 시뮬레이션 준비 완료
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585]">
+                            Entry: {ifBuf?.pc || "0x00010000"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 dark:text-[#858585] leading-relaxed">
+                          아직 실행된 명령어가 없습니다. 상단의 [PLAY] 또는 [다음 스텝] 버튼을 누르면 첫 번째 명령어부터 실행됩니다.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const isCrtCycle = ifBuf?.source_line === null || (ifBuf && ifBuf.source_line === undefined && (ifInst.startsWith("auipc") || ifInst.startsWith("jalr")));
+                  const crtAnalysis = isCrtCycle ? analyzeCrtInstruction(ifInst, ifBuf?.pc) : null;
                   const ifAnalysis = analyzeAsmInstruction(ifInst);
                   return (
                     <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-[#252526] border border-slate-100 dark:border-[#333333]">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-indigo-700 dark:text-[#79C0FF] font-sans">
-                          [IF 인출 단계] {ifInst}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-indigo-700 dark:text-[#79C0FF] font-sans">
+                            [IF 인출 단계] {ifInst}
+                          </span>
+                          {isCrtCycle && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
+                              CRT
+                            </span>
+                          )}
+                        </div>
                         {ifBuf?.pc && (
                           <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585]">
                             PC: {ifBuf.pc}
@@ -337,7 +436,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                         )}
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-[#858585] leading-relaxed">
-                        {ifAnalysis.explanation}
+                        {crtAnalysis ? `${crtAnalysis.role}: ${crtAnalysis.summary}` : ifAnalysis.explanation}
                       </p>
                     </div>
                   );
@@ -345,14 +444,18 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
                 {/* 해저드 및 스톨 여부 카드 */}
                 {(() => {
+                  if (currentCycleData.clock === 0 && (currentCycleData.buffers?.IF?.assembly === 'empty' || currentCycleData.buffers?.IF?.status === 'empty')) {
+                    return (
+                      <div className="p-2.5 rounded-lg border text-[11px] leading-relaxed bg-slate-50 dark:bg-[#252526] border-slate-200 dark:border-[#333333] text-slate-700 dark:text-[#CCCCCC]">
+                        대기 상태: 하드웨어 파이프라인 및 레지스터가 초기화되었습니다.
+                      </div>
+                    );
+                  }
+
                   const { cycle_events } = currentCycleData;
                   const isStall = cycle_events.stall?.has_stall;
                   const isForward = cycle_events.forwarding?.has_forwarded;
                   const isFlush = cycle_events.control_hazard?.has_flush;
-                  const errorMessage = cycle_events.runtime_error?.has_error
-                    ? cycle_events.runtime_error.message
-                    : simulationData?.status === 'error' && currentCycleData.clock === simulationData.summary.total_cycles
-                    ? simulationData.console_output : null;
 
                   return (
                     <div
@@ -367,22 +470,22 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                       }`}
                     >
                       <strong className="font-bold block mb-0.5">
-                        {errorMessage ? '⚠️ 실행 오류 또는 사이클 제한' : currentCycleData.clock === 0 ? '실행 전 초기 상태' : isStall
+                        {isStall
                           ? "⚠️ 데이터 해저드 (Data Stall)"
                           : isFlush
                           ? "🔄 제어 해저드 (Branch Flush)"
                           : isForward
                           ? "⚡ 데이터 포워딩 (Forwarding 활성화)"
-                          : simulationData?.simulator.mode === 'single' ? "✅ 싱글 사이클 실행" : "✅ 정상 파이프라인 전진"}
+                          : "✅ 정상 파이프라인 전진"}
                       </strong>
                       <span className="opacity-90">
-                        {errorMessage || (currentCycleData.clock === 0 ? '아직 명령어를 실행하지 않았습니다.' : isStall
+                        {isStall
                           ? cycle_events.stall?.stall_desc || "필요한 피연산자가 준비되지 않아 파이프라인이 1사이클 정지되었습니다."
                           : isFlush
                           ? cycle_events.control_hazard?.flush_reason || "분기 예측 실패로 인해 파이프라인 버블이 플러시되었습니다."
                           : isForward
                           ? cycle_events.forwarding?.forwarding_desc || "ALU 결과를 후속 명령어에 직접 포워딩하여 지연 없이 실행합니다."
-                          : simulationData?.simulator.mode === 'single' ? "하나의 클록에서 한 명령어의 처리를 수행합니다." : "현재 클록의 각 스테이지 처리 기록입니다.")}
+                          : "현재 사이클에 해저드 없이 5개 스테이지가 순차적으로 실행되고 있습니다."}
                       </span>
                     </div>
                   );

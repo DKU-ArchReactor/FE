@@ -1,398 +1,123 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import type { SimulationResult, CycleHistoryItem, StageBuffer } from '@/type/simulation';
-import { getActivity } from '../simulationView';
+import type { SimulationResult } from '@/type/simulation';
+import {
+  STAGE_STYLES,
+  buildMultiCycleTraceRows,
+  type TraceRow,
+} from '../utils/multiCycleTrace';
 
 interface MultiCycleDiagramProps {
   simulationData: SimulationResult | null;
-  currentCycleData: CycleHistoryItem | null;
   currentCycle: number;
-  translationAssembly?: string;
   onJumpToCycle?: (cycle: number) => void;
-  loadingMessage?: string | null;
 }
-
-type CellType = 'IF' | 'ID' | 'EX' | 'MEM' | 'WB' | 'STALL_IF' | 'STALL_ID' | 'BUBBLE';
-
-interface CellInfo {
-  type: CellType;
-  stage: 'IF' | 'ID' | 'EX' | 'MEM' | 'WB';
-  label: string;
-  isStall?: boolean;
-  isBubble?: boolean;
-  isForwarded?: boolean;
-}
-
-interface TraceRow {
-  id: number;
-  pc: string;
-  assembly: string;
-  firstCycle: number;
-  cells: Record<number, CellInfo>;
-}
-
-const STAGE_STYLES: Record<
-  CellType,
-  { bg: string; text: string; border: string; activeRing: string }
-> = {
-  IF: {
-    bg: 'bg-indigo-500',
-    text: 'text-white',
-    border: 'border-indigo-600',
-    activeRing: 'ring-indigo-300',
-  },
-  ID: {
-    bg: 'bg-sky-500',
-    text: 'text-white',
-    border: 'border-sky-600',
-    activeRing: 'ring-sky-300',
-  },
-  EX: {
-    bg: 'bg-amber-500',
-    text: 'text-white',
-    border: 'border-amber-600',
-    activeRing: 'ring-amber-300',
-  },
-  MEM: {
-    bg: 'bg-emerald-500',
-    text: 'text-white',
-    border: 'border-emerald-600',
-    activeRing: 'ring-emerald-300',
-  },
-  WB: {
-    bg: 'bg-rose-500',
-    text: 'text-white',
-    border: 'border-rose-600',
-    activeRing: 'ring-rose-300',
-  },
-  STALL_IF: {
-    bg: 'bg-red-100',
-    text: 'text-red-700 font-extrabold',
-    border: 'border-red-400 border-dashed',
-    activeRing: 'ring-red-300',
-  },
-  STALL_ID: {
-    bg: 'bg-red-100',
-    text: 'text-red-700 font-extrabold',
-    border: 'border-red-400 border-dashed',
-    activeRing: 'ring-red-300',
-  },
-  BUBBLE: {
-    bg: 'bg-purple-100',
-    text: 'text-purple-700 font-extrabold',
-    border: 'border-purple-400 border-dashed',
-    activeRing: 'ring-purple-300',
-  },
-};
-
-const isValidStageInst = (buf?: StageBuffer | null): buf is StageBuffer => {
-  if (!buf || !buf.assembly) return false;
-  const norm = buf.assembly.trim().toLowerCase();
-  if (!norm || norm === 'bubble' || norm === 'empty' || norm === 'nop (bubble)') return false;
-  if (buf.status === 'bubble' || buf.status === 'empty') return false;
-  return true;
-};
-
-const isSameInstruction = (
-  row: TraceRow,
-  buf: StageBuffer
-): boolean => {
-  const bufPc = (buf.pc || '').toLowerCase();
-  const bufAsm = buf.assembly.replace(/\s+/g, ' ').trim().toLowerCase();
-  const rowAsm = row.assembly.replace(/\s+/g, ' ').trim().toLowerCase();
-  if (row.pc && bufPc) {
-    return row.pc.toLowerCase() === bufPc && rowAsm === bufAsm;
-  }
-  return rowAsm === bufAsm;
-};
 
 const COL_WIDTH = 40;
 const ROW_HEIGHT = 28;
-const LEFT_COL_WIDTH = 176;
+const LEFT_COL_WIDTH = 280;
 
 export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   simulationData,
   currentCycle,
   onJumpToCycle,
-  loadingMessage,
 }) => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingLeft = useRef(false);
+  const isSyncingRight = useRef(false);
 
-  const history = useMemo(() => simulationData?.history.map((item, index) => ({ ...item, clock: index + 1, buffers: getActivity(item) })) ?? [], [simulationData]);
+  const handleLeftScroll = () => {
+    if (isSyncingLeft.current) {
+      isSyncingLeft.current = false;
+      return;
+    }
+    if (rightScrollRef.current && leftScrollRef.current) {
+      isSyncingRight.current = true;
+      rightScrollRef.current.scrollTop = leftScrollRef.current.scrollTop;
+    }
+  };
+
+  const handleRightScroll = () => {
+    if (isSyncingRight.current) {
+      isSyncingRight.current = false;
+      return;
+    }
+    if (leftScrollRef.current && rightScrollRef.current) {
+      isSyncingLeft.current = true;
+      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
+    }
+  };
+
+  const history = simulationData?.history ?? [];
   const totalCycles = history.length;
 
   // 파이프라인/싱글사이클 히스토리를 추적하여 다이어그램 행 생성
   const isSingleMode = simulationData?.simulator?.mode === 'single' || simulationData?.simulator?.pipeline_model === 'single-cycle';
 
-  const traceRows = useMemo<TraceRow[]>(() => {
-    if (!history.length) return [];
+  const traceRows = useMemo<TraceRow[]>(
+    () => buildMultiCycleTraceRows(history, isSingleMode),
+    [history, isSingleMode]
+  );
 
-    // [Single-Cycle 모드 전용 다이어그램]: 매 클럭 1개 명령어가 IF-ID-EX-MEM-WB 전 과정을 1칸에 직렬 완료
-    if (isSingleMode) {
-      return history.flatMap((item, index) => {
-        const instruction = item.buffers.IF;
-        if (!instruction?.pc) return [];
-        return [{
-          id: index,
-          pc: instruction.pc,
-          assembly: instruction.assembly,
-          firstCycle: index,
-          cells: {
-            [index]: {
-              type: 'WB' as const,
-              stage: 'WB' as const,
-              label: item.cycle_events.runtime_error.has_error ? 'ERR' : '1CLK',
-            },
-          },
-        }];
+  // Single-Cycle 모드에서는 Step 0이 초기 대기 상태(activeCycleCol = -1)이며, Step 1~N이 각 C0~CN-1 열에 매핑
+  const activeCycleCol = isSingleMode
+    ? (currentCycle > 0 ? currentCycle - 1 : -1)
+    : currentCycle;
+
+  // 현재 사이클이 바뀔 때 해당 사이클 열(C0~CN)과 현재 실행 중인 명령어 행이 화면에 오도록 자동 스크롤
+  useEffect(() => {
+    const rightContainer = rightScrollRef.current;
+    if (!rightContainer || !traceRows.length) return;
+
+    if (activeCycleCol < 0) {
+      rightContainer.scrollTo({
+        left: 0,
+        top: 0,
+        behavior: 'smooth',
       });
+      return;
     }
 
-    // [5-Stage Pipeline 모드]: 계단식(Stair-step) 다이어그램 행 생성
-    const rows: TraceRow[] = [];
-    let prevStageRow: Partial<Record<'IF' | 'ID' | 'EX' | 'MEM' | 'WB', number>> = {};
-
-    const createRow = (buf: StageBuffer, cIdx: number): number => {
-      const id = rows.length;
-      rows.push({
-        id,
-        pc: buf.pc || '',
-        assembly: buf.assembly.trim(),
-        firstCycle: cIdx,
-        cells: {},
-      });
-      return id;
-    };
-
-    history.forEach((item, cIdx) => {
-      const nextStageRow: Partial<Record<'IF' | 'ID' | 'EX' | 'MEM' | 'WB', number>> = {};
-      const usedPrevStages = new Set<'IF' | 'ID' | 'EX' | 'MEM' | 'WB'>();
-
-      const hasStallEvent = Boolean(item.cycle_events?.stall?.has_stall);
-      const hasForwardEvent = Boolean(item.cycle_events?.forwarding?.has_forwarded);
-
-      // 1. WB 단계 매칭 (이전 사이클 MEM -> 현재 WB)
-      const wbBuf = item.buffers?.WB;
-      if (isValidStageInst(wbBuf)) {
-        let rowId: number | undefined;
-        if (
-          prevStageRow.MEM !== undefined &&
-          isSameInstruction(rows[prevStageRow.MEM], wbBuf)
-        ) {
-          rowId = prevStageRow.MEM;
-          usedPrevStages.add('MEM');
-        } else if (
-          prevStageRow.WB !== undefined &&
-          isSameInstruction(rows[prevStageRow.WB], wbBuf)
-        ) {
-          rowId = prevStageRow.WB;
-          usedPrevStages.add('WB');
-        } else {
-          rowId = createRow(wbBuf, cIdx);
-        }
-        rows[rowId].cells[cIdx] = {
-          type: 'WB',
-          stage: 'WB',
-          label: 'WB',
-        };
-        nextStageRow.WB = rowId;
-      }
-
-      // 2. MEM 단계 매칭 (이전 사이클 EX -> 현재 MEM)
-      const memBuf = item.buffers?.MEM;
-      if (isValidStageInst(memBuf)) {
-        let rowId: number | undefined;
-        if (
-          prevStageRow.EX !== undefined &&
-          isSameInstruction(rows[prevStageRow.EX], memBuf)
-        ) {
-          rowId = prevStageRow.EX;
-          usedPrevStages.add('EX');
-        } else if (
-          prevStageRow.MEM !== undefined &&
-          !usedPrevStages.has('MEM') &&
-          isSameInstruction(rows[prevStageRow.MEM], memBuf)
-        ) {
-          rowId = prevStageRow.MEM;
-          usedPrevStages.add('MEM');
-        } else {
-          rowId = createRow(memBuf, cIdx);
-        }
-        rows[rowId].cells[cIdx] = {
-          type: 'MEM',
-          stage: 'MEM',
-          label: 'MEM',
-        };
-        nextStageRow.MEM = rowId;
-      }
-
-      // 3. EX 단계 매칭 (이전 사이클 ID -> 현재 EX)
-      const exBuf = item.buffers?.EX;
-      if (isValidStageInst(exBuf)) {
-        let rowId: number | undefined;
-        if (
-          prevStageRow.ID !== undefined &&
-          isSameInstruction(rows[prevStageRow.ID], exBuf)
-        ) {
-          rowId = prevStageRow.ID;
-          usedPrevStages.add('ID');
-        } else if (
-          prevStageRow.EX !== undefined &&
-          !usedPrevStages.has('EX') &&
-          isSameInstruction(rows[prevStageRow.EX], exBuf)
-        ) {
-          rowId = prevStageRow.EX;
-          usedPrevStages.add('EX');
-        } else {
-          rowId = createRow(exBuf, cIdx);
-        }
-        rows[rowId].cells[cIdx] = {
-          type: 'EX',
-          stage: 'EX',
-          label: 'EX',
-          isForwarded: hasForwardEvent,
-        };
-        nextStageRow.EX = rowId;
-      }
-
-      // 4. ID 단계 매칭 (스톨로 인해 이전 ID 유지 or 이전 IF -> 현재 ID)
-      const idBuf = item.buffers?.ID;
-      if (isValidStageInst(idBuf)) {
-        let rowId: number | undefined;
-        let isStalledInId = false;
-
-        if (
-          prevStageRow.ID !== undefined &&
-          !usedPrevStages.has('ID') &&
-          isSameInstruction(rows[prevStageRow.ID], idBuf)
-        ) {
-          // 이전 사이클 ID에 있던 명령어가 EX로 가지 못하고 ID에 그대로 머문 경우 (Stall / Bubble 발생!)
-          rowId = prevStageRow.ID;
-          usedPrevStages.add('ID');
-          isStalledInId = true;
-        } else if (
-          prevStageRow.IF !== undefined &&
-          isSameInstruction(rows[prevStageRow.IF], idBuf)
-        ) {
-          rowId = prevStageRow.IF;
-          usedPrevStages.add('IF');
-        } else {
-          rowId = createRow(idBuf, cIdx);
-        }
-
-        const markStall = isStalledInId || (hasStallEvent && !isValidStageInst(exBuf));
-        rows[rowId].cells[cIdx] = {
-          type: markStall ? 'STALL_ID' : 'ID',
-          stage: 'ID',
-          label: markStall ? 'STL' : 'ID',
-          isStall: markStall,
-        };
-        nextStageRow.ID = rowId;
-      }
-
-      // 5. IF 단계 매칭 (스톨로 인해 이전 IF 유지 or 새로운 명령어 인출)
-      const ifBuf = item.buffers?.IF;
-      if (isValidStageInst(ifBuf)) {
-        let rowId: number | undefined;
-        let isStalledInIf = false;
-
-        if (
-          prevStageRow.IF !== undefined &&
-          !usedPrevStages.has('IF') &&
-          isSameInstruction(rows[prevStageRow.IF], ifBuf)
-        ) {
-          // 이전 사이클 IF에 있던 명령어가 ID로 가지 못하고 IF에 그대로 머문 경우 (Stall)
-          rowId = prevStageRow.IF;
-          usedPrevStages.add('IF');
-          isStalledInIf = true;
-        } else {
-          rowId = createRow(ifBuf, cIdx);
-        }
-
-        rows[rowId].cells[cIdx] = {
-          type: isStalledInIf ? 'STALL_IF' : 'IF',
-          stage: 'IF',
-          label: isStalledInIf ? 'STL' : 'IF',
-          isStall: isStalledInIf,
-        };
-        nextStageRow.IF = rowId;
-      }
-
-      // 6. 분기/점프 플러시(Flush) 또는 버블(Bubble)로 인해 파이프라인에서 도중 취소된 명령어 표시
-      // 이전 사이클에 IF나 ID에 있었는데 다음 단계로 진전하지 못하고 사라진 경우 -> 해당 자리에 BBL(버블/플러시) 표시
-      if (prevStageRow.ID !== undefined && !usedPrevStages.has('ID')) {
-        const flushedRow = rows[prevStageRow.ID];
-        if (flushedRow && !flushedRow.cells[cIdx]) {
-          flushedRow.cells[cIdx] = {
-            type: 'BUBBLE',
-            stage: 'EX',
-            label: 'BBL',
-            isBubble: true,
-          };
-        }
-      }
-      if (prevStageRow.IF !== undefined && !usedPrevStages.has('IF')) {
-        const flushedRow = rows[prevStageRow.IF];
-        if (flushedRow && !flushedRow.cells[cIdx]) {
-          flushedRow.cells[cIdx] = {
-            type: 'BUBBLE',
-            stage: 'ID',
-            label: 'BBL',
-            isBubble: true,
-          };
-        }
-      }
-
-      prevStageRow = nextStageRow;
-    });
-
-    return rows;
-  }, [history, isSingleMode]);
-
-  // 현재 사이클이 바뀔 때 해당 사이클 열과 현재 실행 중인 명령어 행이 화면 중앙에 오도록 가로·세로 자동 스크롤
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !traceRows.length) return;
-
+    // 수평 스크롤 (우측 35% 지점에 현재 사이클 열 배치 -> 다음 진행될 사이클들 시야 확보)
     const targetLeft = Math.max(
       0,
-      currentCycle * COL_WIDTH - (container.clientWidth - LEFT_COL_WIDTH) / 2 + COL_WIDTH / 2
+      activeCycleCol * COL_WIDTH - rightContainer.clientWidth * 0.35 + COL_WIDTH / 2
     );
 
-    // 현재 사이클에 활성화된 첫 번째/중간 행 찾기
+    // 수직 스크롤 (상단 35% 지점에 현재 실행 중인 명령어 행 배치 -> 다음 실행될 명령어들 시야 확보)
     const activeRowIndices: number[] = [];
     traceRows.forEach((row, idx) => {
-      if (row.cells[currentCycle]) {
+      if (row.cells[activeCycleCol]) {
         activeRowIndices.push(idx);
       }
     });
 
-    if (activeRowIndices.length > 0) {
-      const midRowIdx = activeRowIndices[Math.floor(activeRowIndices.length / 2)];
-      const targetTop = Math.max(
-        0,
-        midRowIdx * ROW_HEIGHT - (container.clientHeight - 30) / 2 + ROW_HEIGHT / 2
-      );
-      container.scrollTo({
-        left: targetLeft,
-        top: targetTop,
-        behavior: 'smooth',
-      });
-    } else {
-      container.scrollTo({
-        left: targetLeft,
-        behavior: 'smooth',
-      });
-    }
-  }, [currentCycle, traceRows]);
+    const midRowIdx =
+      activeRowIndices.length > 0
+        ? activeRowIndices[Math.floor(activeRowIndices.length / 2)]
+        : activeCycleCol;
+
+    const targetTop = Math.max(
+      0,
+      midRowIdx * ROW_HEIGHT - (rightContainer.clientHeight - 30) * 0.35 + ROW_HEIGHT / 2
+    );
+
+    // rightContainer를 부드럽게 스크롤하면 handleRightScroll이 좌측 컨테이너의 scrollTop을 프레임 단위로 완벽 동기화
+    rightContainer.scrollTo({
+      left: targetLeft,
+      top: targetTop,
+      behavior: 'smooth',
+    });
+  }, [activeCycleCol, traceRows]);
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 & 범례 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#F3F3F3] dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#333333] min-w-0 gap-2 border-l-2 border-l-indigo-500">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs">📈</span>
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC] whitespace-nowrap">
-            {isSingleMode ? 'Single-Cycle Execution Diagram (1 Inst / 1 Cycle)' : 'Pipeline Timing Diagram (Stair-step)'}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 gap-2 border-l-2 border-l-indigo-500">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-indigo-500 font-bold">◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            {isSingleMode ? 'SINGLE-CYCLE EXECUTION' : 'PIPELINE TIMING DIAGRAM'}
           </h3>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -430,16 +155,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
         </div>
       </div>
 
-      {/* 2. 계단식 타이밍 매트릭스 테이블 (가로·세로 통합 스크롤) */}
-      {loadingMessage ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center gap-2.5 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
-          <div className="w-7 h-7 border-3 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-[#005FB8] dark:text-[#79C0FF]">{loadingMessage}</span>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585]">
-            사이클별 명령어 타이밍 및 버블/스톨 데이터를 생성하고 있습니다.
-          </span>
-        </div>
-      ) : !simulationData || traceRows.length === 0 ? (
+      {/* 2. 계단식 타이밍 매트릭스 테이블 */}
+      {!simulationData || traceRows.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-[#57606A] dark:text-[#858585] gap-1.5 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
           <span className="text-xl">📊</span>
           <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
@@ -450,166 +167,195 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
           </span>
         </div>
       ) : (
-        <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-auto min-h-0 relative select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
-        >
+        <div className="flex-1 min-h-0 flex relative select-none bg-white dark:bg-[#1E1E1E]">
+          {/* 좌측 고정 명령어 열 (가로 휠 스크롤 대상에서 완전히 제외된 독립 컨테이너) */}
           <div
-            className="relative min-w-max"
-            style={{
-              width: `${LEFT_COL_WIDTH + history.length * COL_WIDTH}px`,
-            }}
+            ref={leftScrollRef}
+            onScroll={handleLeftScroll}
+            className="shrink-0 flex flex-col border-r border-[#E5E5E5] dark:border-[#333333] z-10 bg-white dark:bg-[#1E1E1E] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ width: `${LEFT_COL_WIDTH}px` }}
           >
-            {/* 상단 고정 헤더 행 (Sticky Top) */}
-            <div className="h-7 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-20 shadow-2xs">
-              {/* 좌상단 고정 코너 셀 (Sticky Top & Left) */}
-              <div
-                className="shrink-0 px-2.5 flex items-center justify-between border-r border-[#E5E5E5] dark:border-[#333333] bg-[#EAEAEA] dark:bg-[#2D2D2D] sticky left-0 z-30 text-[10px] font-bold text-[#57606A] dark:text-[#858585]"
-                style={{ width: `${LEFT_COL_WIDTH}px` }}
-              >
-                <span>Instruction</span>
-                <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] font-mono">Now</span>
-              </div>
-
-              {/* 각 사이클 번호 헤더 (클릭 시 해당 사이클로 이동) */}
-              {history.map((item, cIdx) => {
-                const isCurrent = cIdx === currentCycle;
-                const hasStall = item.cycle_events?.stall?.has_stall;
-                const hasFlush = item.cycle_events?.control_hazard?.has_flush;
-
-                return (
-                  <button
-                    key={cIdx}
-                    type="button"
-                    onClick={() => onJumpToCycle?.(cIdx)}
-                    className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${isCurrent
-                        ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
-                        : hasStall
-                          ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
-                          : hasFlush
-                            ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
-                            : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
-                      }`}
-                    style={{ width: `${COL_WIDTH}px` }}
-                    title={`Clock ${item.clock ?? cIdx}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
-                      }`}
-                  >
-                    <span>C{item.clock ?? cIdx}</span>
-                    {(hasStall || hasFlush) && !isCurrent && (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-red-500' : 'bg-purple-500'
-                          }`}
-                      />
-                    )}
-                  </button>
-                );
-              })}
+            {/* 좌상단 고정 코너 셀 (Sticky Top) */}
+            <div className="h-7 shrink-0 px-2.5 flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#333333] bg-[#EAEAEA] dark:bg-[#2D2D2D] sticky top-0 z-20 text-[10px] font-bold text-[#57606A] dark:text-[#858585]">
+              <span>Instruction</span>
+              <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] font-mono">Now</span>
             </div>
 
-            {/* 본문 행 영역 */}
-            <div className="relative">
-              {/* 현재 선택된 사이클 수직 하이라이트 기둥 */}
-              <div
-                className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8]/80 dark:border-[#007ACC]/80 bg-[#005FB8]/10 dark:bg-[#007ACC]/10 transition-all duration-150"
-                style={{
-                  left: `${LEFT_COL_WIDTH + currentCycle * COL_WIDTH}px`,
-                  width: `${COL_WIDTH}px`,
-                }}
-              />
+            {/* 좌측 명령어 행 목록 */}
+            {traceRows.map((row, rIdx) => {
+              const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
+              const isRowActiveNow = Boolean(activeCellNow);
+              const activeStyle = activeCellNow ? STAGE_STYLES[activeCellNow.type] : null;
 
-              {traceRows.map((row, rIdx) => {
-                const activeCellNow = row.cells[currentCycle];
-                const isRowActiveNow = Boolean(activeCellNow);
-                const activeStyle = activeCellNow ? STAGE_STYLES[activeCellNow.type] : null;
+              return (
+                <div
+                  key={row.id}
+                  onClick={() => onJumpToCycle?.(isSingleMode ? row.firstCycle + 1 : row.firstCycle)}
+                  className={`h-[28px] shrink-0 px-2 flex items-center justify-between gap-1.5 border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 text-[10px] font-mono cursor-pointer transition-colors ${
+                    isRowActiveNow
+                      ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
+                      : rIdx % 2 === 1
+                      ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30 hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
+                      : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
+                  }`}
+                  title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
+                >
+                  <div className="flex items-center gap-1 min-w-0 flex-1">
+                    <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
+                      {rIdx + 1}.
+                    </span>
+                    <span className="truncate">{row.assembly}</span>
+                  </div>
 
-                return (
+                  {/* 현재 선택된 사이클에서 이 명령어가 어느 단계에 있는지 즉시 표시 */}
+                  {activeCellNow && activeStyle ? (
+                    <span
+                      key={`badge-${activeCycleCol}`}
+                      className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border shadow-2xs animate-in zoom-in-75 duration-200 ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
+                    >
+                      {activeCellNow.label}
+                    </span>
+                  ) : row.pc ? (
+                    <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
+                      {row.pc.slice(-4)}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 우측 사이클 그리드 영역 (C0 ~ CN 가로·세로 스크롤 전용 컨테이너) */}
+          <div
+            ref={rightScrollRef}
+            onScroll={handleRightScroll}
+            className="flex-1 min-w-0 overflow-auto select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
+          >
+            <div
+              className="relative min-w-max flex flex-col"
+              style={{
+                width: `${history.length * COL_WIDTH}px`,
+              }}
+            >
+              {/* 상단 사이클 번호 헤더 행 (Sticky Top) */}
+              <div className="h-7 shrink-0 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-10 shadow-2xs">
+                {history.map((item, cIdx) => {
+                  const isCurrent = cIdx === activeCycleCol;
+                  const hasStall = item.cycle_events?.stall?.has_stall;
+                  const hasFlush = item.cycle_events?.control_hazard?.has_flush;
+
+                  return (
+                    <button
+                      key={cIdx}
+                      type="button"
+                      onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
+                      className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${
+                        isCurrent
+                          ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
+                          : hasStall
+                          ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
+                          : hasFlush
+                          ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                          : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
+                      style={{ width: `${COL_WIDTH}px` }}
+                      title={`Clock ${item.clock ?? cIdx}${
+                        hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
+                      }`}
+                    >
+                      <span>C{item.clock ?? cIdx}</span>
+                      {(hasStall || hasFlush) && !isCurrent && (
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${
+                            hasStall ? 'bg-red-500' : 'bg-purple-500'
+                          }`}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 본문 행 영역 */}
+              <div className="relative">
+                {/* 현재 선택된 사이클 수직 하이라이트 기둥 (스텝 이동 시 부드러운 슬라이딩 글라이드 트랜지션) */}
+                {activeCycleCol >= 0 && (
                   <div
-                    key={row.id}
-                    className={`flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${isRowActiveNow
-                        ? 'bg-blue-50/50 dark:bg-[#04395E]/30'
-                        : rIdx % 2 === 1
+                    className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8]/15 dark:bg-[#007ACC]/15 shadow-sm transition-[left] duration-250 ease-out"
+                    style={{
+                      left: `${activeCycleCol * COL_WIDTH}px`,
+                      width: `${COL_WIDTH}px`,
+                    }}
+                  />
+                )}
+
+                {traceRows.map((row, rIdx) => {
+                  const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
+                  const isRowActiveNow = Boolean(activeCellNow);
+
+                  return (
+                    <div
+                      key={row.id}
+                      className={`h-[28px] shrink-0 flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${
+                        isRowActiveNow
+                          ? 'bg-blue-50/50 dark:bg-[#04395E]/30'
+                          : rIdx % 2 === 1
                           ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30'
                           : ''
                       }`}
-                    style={{ height: `${ROW_HEIGHT}px` }}
-                  >
-                    {/* 좌측 고정 명령어 열 (Sticky Left) */}
-                    <div
-                      onClick={() => onJumpToCycle?.(row.firstCycle)}
-                      className={`shrink-0 px-2 flex items-center justify-between gap-1.5 border-r border-[#E5E5E5] dark:border-[#333333] sticky left-0 z-10 text-[10px] font-mono cursor-pointer transition-colors ${isRowActiveNow
-                          ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
-                          : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
-                        }`}
-                      style={{ width: `${LEFT_COL_WIDTH}px` }}
-                      title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
                     >
-                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
-                          {rIdx + 1}.
-                        </span>
-                        <span className="truncate">{row.assembly}</span>
-                      </div>
+                      {history.map((_, cIdx) => {
+                        const cell = row.cells[cIdx];
+                        const isCurrentCol = cIdx === activeCycleCol;
+                        const isCurrentActiveCell = isCurrentCol && isRowActiveNow;
 
-                      {/* 현재 선택된 사이클에서 이 명령어가 어느 단계에 있는지 즉시 표시 */}
-                      {activeCellNow && activeStyle ? (
-                        <span
-                          className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
-                        >
-                          {activeCellNow.label}
-                        </span>
-                      ) : row.pc ? (
-                        <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
-                          {row.pc.slice(-4)}
-                        </span>
-                      ) : null}
-                    </div>
+                        if (!cell) {
+                          return (
+                            <div
+                              key={cIdx}
+                              onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
+                              className="shrink-0 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer hover:bg-slate-100/40 dark:hover:bg-[#2A2D2E]/40"
+                              style={{ width: `${COL_WIDTH}px` }}
+                            />
+                          );
+                        }
 
-                    {/* 우측 각 사이클 셀 */}
-                    {history.map((_, cIdx) => {
-                      const cell = row.cells[cIdx];
-                      const isCurrentCol = cIdx === currentCycle;
+                        const style = STAGE_STYLES[cell.type];
 
-                      if (!cell) {
                         return (
                           <div
                             key={cIdx}
-                            onClick={() => onJumpToCycle?.(cIdx)}
-                            className="shrink-0 border-r border-slate-100/60 cursor-pointer hover:bg-slate-100/40"
+                            onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
+                            className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer relative z-1"
                             style={{ width: `${COL_WIDTH}px` }}
-                          />
-                        );
-                      }
-
-                      const style = STAGE_STYLES[cell.type];
-
-                      return (
-                        <div
-                          key={cIdx}
-                          onClick={() => onJumpToCycle?.(cIdx)}
-                          className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 cursor-pointer relative z-1"
-                          style={{ width: `${COL_WIDTH}px` }}
-                          title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${cell.isStall
-                              ? `${cell.stage} 단계 지연 (Stall / EX에 Bubble 삽입)`
-                              : cell.isBubble
+                            title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${
+                              cell.isStall
+                                ? `${cell.stage} 단계 지연 (Stall / EX에 Bubble 삽입)`
+                                : cell.isBubble
                                 ? '분기 플러시로 인해 버블(Bubble) 처리됨'
                                 : `${cell.stage} 단계 실행 중`
                             }`}
-                        >
-                          <span
-                            className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-transform ${style.bg
-                              } ${style.text} ${style.border} ${isCurrentCol
-                                ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
-                                : 'hover:scale-105'
-                              }`}
                           >
-                            {cell.label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                            <span
+                              className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-all duration-200 ${
+                                style.bg
+                              } ${style.text} ${style.border} ${
+                                isCurrentActiveCell
+                                  ? `scale-110 ring-2 ${style.activeRing} shadow-md font-extrabold z-10 animate-in zoom-in-90 duration-150`
+                                  : isCurrentCol
+                                  ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
+                                  : 'hover:scale-105'
+                              }`}
+                            >
+                              {cell.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

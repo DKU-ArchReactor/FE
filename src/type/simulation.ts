@@ -4,10 +4,7 @@ export interface StageBuffer {
   assembly: string;
   status: string; // "normal" | "empty" | "bubble" | "stall" | "flush"
   stage?: string;
-  memory_operation?: 'load' | 'store' | 'none';
-  target_address?: string | null;
-  read_data?: string | null;
-  write_data?: string | null;
+  source_line?: number | null;
   flush_info?: {
     is_flushed: boolean;
     reason: string | null;
@@ -63,11 +60,128 @@ export interface GlobalResult {
   registers: Record<string, string>;
   memory_snapshot: Record<string, string>;
   console_output: string;
+  active_stack_pointer?: string;
   metrics: {
     accumulated_instructions: number;
     accumulated_stalls: number;
     accumulated_forwards: number;
   };
+}
+
+export interface SingleCycleControlSignals {
+  reg_write: boolean;
+  alu_src: "reg" | "imm";
+  alu_op: string;
+  mem_read: boolean;
+  mem_write: boolean;
+  mem_to_reg: "mem" | "alu" | "pc+4";
+  branch: boolean;
+  jump: boolean;
+  pc_src: "pc+4" | "branch/jump";
+}
+
+export interface SingleCycleRegisterSignal {
+  index: number;
+  name: string;
+  value: string;
+}
+
+export interface SingleCycleDatapath {
+  pc: string;
+  next_pc: string;
+  pc_plus_4: string;
+  instruction: {
+    raw: string;
+    assembly: string;
+    opcode: string;
+    funct3: string | null;
+    funct7: string | null;
+  };
+  control_signals: SingleCycleControlSignals;
+  registers: {
+    rs1: SingleCycleRegisterSignal | null;
+    rs2: SingleCycleRegisterSignal | null;
+    rd: SingleCycleRegisterSignal | null;
+  };
+  immediate: {
+    raw: number;
+    hex: string;
+    decimal: number;
+  } | null;
+  alu: {
+    input_1: string;
+    input_2: string;
+    result: string;
+    zero: boolean;
+  };
+  data_memory: {
+    read_address: string | null;
+    read_data: string | null;
+    write_address: string | null;
+    write_data: string | null;
+  };
+}
+
+export interface RuntimeStartupLayout {
+  name: string;
+  start: string;
+  end: string;
+  end_exclusive: string;
+  instruction_count: number;
+}
+
+export interface UserProgramLayout {
+  name: string;
+  start: string;
+  end: string;
+  end_exclusive: string;
+  instruction_count: number;
+  entry_point: string;
+}
+
+export interface CodeSegmentLayout {
+  name: string;
+  start: string;
+  end_exclusive: string;
+  size_bytes: number;
+  runtime_startup: RuntimeStartupLayout;
+  user_program: UserProgramLayout;
+}
+
+export interface ProgramMemoryLayout {
+  stack: {
+    name: string;
+    base: string;
+    limit: string;
+    growth: "down";
+  };
+  heap: {
+    name: string;
+    base: string;
+    limit: string;
+    growth: "up";
+  };
+  bss: {
+    name: string;
+    start: string;
+    end_exclusive: string;
+    size_bytes: number;
+  };
+  data: {
+    name: string;
+    start: string;
+    end_exclusive: string;
+    size_bytes: number;
+  };
+  code: CodeSegmentLayout;
+  reserved: {
+    name: string;
+    start: string;
+    end_exclusive: string;
+    size_bytes: number;
+    desc?: string;
+  };
+  boundary_dividers: string[];
 }
 
 export interface CycleHistoryItem {
@@ -91,6 +205,7 @@ export interface CycleHistoryItem {
     MEM: StageBuffer;
     WB: StageBuffer;
   };
+  datapath?: SingleCycleDatapath;
   cycle_events: CycleEvents;
   global_result: GlobalResult;
 }
@@ -98,28 +213,37 @@ export interface CycleHistoryItem {
 export interface SimulationRunRequest {
   build_id?: string;
   simulation_token?: string;
-  mode?: SimulationMode;
+  mode?: string;
   max_cycles?: number;
 }
 
-export type SimulationMode = 'single' | 'pipeline';
-export type SimulationArtifact = { build_id: string; simulation_token?: never } | { simulation_token: string; build_id?: never };
-
 export interface SimulationResult {
-  initial_state: GlobalResult;
-  console_output: string;
   schema_version: string;
   simulator: {
-    mode: SimulationMode;
+    mode: string;
     max_cycles: number;
     pipeline_model: string;
   };
   program: {
-    instructions: { pc: string; raw_instruction: string; assembly: string }[];
-    memory_regions: { name: string; start: string; end_exclusive: string; kind: 'code' | 'bss' | 'data' }[];
     entry_point: string;
     instruction_words: number;
     data_words: number;
+    code_mapping?: Record<
+      string,
+      {
+        assembly: string;
+        raw_instruction?: string;
+        source_line?: number | null;
+      }
+    >;
+    initial_stack_pointer?: string;
+    memory_regions?: Array<{
+      name: string;
+      start: string;
+      end_exclusive: string;
+      kind: string;
+    }>;
+    memory_layout?: ProgramMemoryLayout;
   };
   status: string;
   summary: {

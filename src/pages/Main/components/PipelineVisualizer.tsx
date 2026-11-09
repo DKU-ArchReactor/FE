@@ -1,4 +1,3 @@
-import { getActivity } from '../simulationView';
 import React, { useState } from 'react';
 import type { CycleHistoryItem } from '@/type/simulation';
 
@@ -15,9 +14,28 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const isSingle = mode === "single";
 
+  // Single-Cycle 모드에서는 파이프라인 5단계 분할 회로도가 맞지 않으므로 싱글모드 전용 다이어그램 개발 전까지 숨김/안내 처리
+  if (isSingle) {
+    return (
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-8 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150 select-none">
+        <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-2xl shadow-xs">
+          📐
+        </div>
+        <div className="flex flex-col gap-1 max-w-md">
+          <h3 className="text-sm font-bold text-[var(--ar-text-primary)]">
+            Single-Cycle 전용 데이터패스 다이어그램 준비 중
+          </h3>
+          <p className="text-xs text-[var(--ar-text-muted)] leading-relaxed">
+            단일 사이클 모드에서는 5단계 파이프라인 레지스터가 없는 전용 단일 사이클 하드웨어 다이어그램이 적용될 예정입니다.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loadingMessage) {
     return (
-      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150">
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150">
         <div className="w-9 h-9 border-3 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-semibold text-[var(--ar-accent)]">{loadingMessage}</p>
         <p className="text-xs text-[var(--ar-text-muted)]">컴파일 및 파이프라인 시뮬레이션 결과를 준비하고 있습니다.</p>
@@ -27,14 +45,13 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
 
   if (!currentData) {
     return (
-      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] p-6 flex items-center justify-center text-[var(--ar-text-muted)] text-sm transition-colors duration-150">
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-6 flex items-center justify-center text-[var(--ar-text-muted)] text-sm transition-colors duration-150">
         C 소스 코드를 작성하고 [⚡ 컴파일]을 누르면 파이프라인 데이터패스가 활성화됩니다.
       </div>
     );
   }
 
-  const { cycle_events, clock } = currentData;
-  const buffers = getActivity(currentData);
+  const { buffers, cycle_events, clock } = currentData;
   const isStall = !isSingle && cycle_events.stall?.has_stall;
   const isForward = !isSingle && cycle_events.forwarding?.has_forwarded;
   const isBranchFlush = !isSingle && cycle_events.control_hazard?.has_flush;
@@ -68,7 +85,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
   const handleZoomReset = () => setZoomLevel(1.0);
 
   return (
-    <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] p-3 flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
       {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일 */}
       <style>{`
         @keyframes streamDown {
@@ -97,17 +114,27 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
       `}</style>
 
       {/* 1. 상단 헤더 & 컨트롤러 */}
-      <div className="flex items-center justify-between pb-1.5 mb-1 border-b border-[#E5E5E5] dark:border-[#333333] shrink-0">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full animate-pulse ${isSingle ? "bg-amber-500 dark:bg-amber-400" : "bg-[#005FB8] dark:bg-[#007ACC]"}`} />
-          <h3 className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-            {isSingle ? "Single-Cycle Datapath (1 Inst / Cycle)" : "Vertical 5-Stage Datapath"}
+      <div className={`shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 ${isSingle ? "border-l-amber-500" : "border-l-blue-500"}`}>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-[11px] font-bold ${isSingle ? "text-amber-500" : "text-blue-500"}`}>◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">(Clock {clock ?? 0})</span>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(CLK:{clock ?? 0})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
         <div className="flex items-center gap-1.5">
+          {/* CRT 런타임 진입/초기화 식별 뱃지 */}
+          {((ifInst && (ifInst.startsWith("auipc") || ifInst.startsWith("jal") || ifInst.startsWith("li") || ifInst.startsWith("csrw"))) ||
+            (clock !== undefined && clock < 10 && !cycle_events.stall?.has_stall && !cycle_events.forwarding?.has_forwarded)) && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/30"
+              title="C main() 진입 전 또는 종료 후 런타임 시스템 코드"
+            >
+              Runtime/CRT
+            </span>
+          )}
           {isSingle ? (
             <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
               Single-Cycle (No Hazard)
