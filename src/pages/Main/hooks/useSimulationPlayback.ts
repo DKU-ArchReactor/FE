@@ -174,18 +174,26 @@ export function useSimulationPlayback({
         if (pcMatch) return pcMatch;
       }
 
-      // 2순위: 활성 명령어 텍스트 매칭
-      const activeAsm = (
-        stepData.buffers?.IF?.assembly ||
-        stepData.if_stage?.assembly ||
-        stepData.stage_activity?.IF?.assembly ||
-        ""
-      )
+      // 2순위: 활성 명령어 텍스트 매칭 (source_line 일치 우선)
+      const stepIfBuf =
+        stepData.buffers?.IF ||
+        stepData.if_stage ||
+        stepData.stage_activity?.IF;
+      const activeAsm = (stepIfBuf?.assembly || "")
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
 
       if (!activeAsm || activeAsm === "bubble" || activeAsm === "empty") return null;
+
+      const stepSourceLine = stepIfBuf?.source_line;
+      if (stepSourceLine !== undefined && stepSourceLine !== null) {
+        const lineAndTextMatch = mappedAssemblyRows.find((r) => {
+          const rowNorm = r.text.replace(/\s+/g, " ").trim().toLowerCase();
+          return r.sourceLine === stepSourceLine && rowNorm === activeAsm;
+        });
+        if (lineAndTextMatch) return lineAndTextMatch;
+      }
 
       const matched = mappedAssemblyRows.find((r) => {
         const rowNorm = r.text.replace(/\s+/g, " ").trim().toLowerCase();
@@ -206,6 +214,14 @@ export function useSimulationPlayback({
       const activeAsm = (activeBuf.assembly || "").replace(/\s+/g, " ").trim().toLowerCase();
       if (!activeAsm || activeAsm === "bubble" || activeAsm === "empty") return null;
 
+      if (activeBuf.source_line !== undefined && activeBuf.source_line !== null) {
+        const lineAndTextMatch = mappedAssemblyRows.find((r) => {
+          const rowNorm = r.text.replace(/\s+/g, " ").trim().toLowerCase();
+          return r.sourceLine === activeBuf.source_line && rowNorm === activeAsm;
+        });
+        if (lineAndTextMatch) return lineAndTextMatch;
+      }
+
       const matched = mappedAssemblyRows.find((r) => {
         const rowNorm = r.text.replace(/\s+/g, " ").trim().toLowerCase();
         return rowNorm === activeAsm;
@@ -218,7 +234,7 @@ export function useSimulationPlayback({
   const effectiveSelectedLine =
     editorTarget === "asm" ? null : (translationSelectedLine ?? activeExecutionCLine);
 
-  const handleSimulationComplete = (_data: SimulationResult) => {
+  const handleSimulationComplete = () => {
     setIsPlaying(false);
     setCurrentCycle(0);
     setPlaySpeed(1000);

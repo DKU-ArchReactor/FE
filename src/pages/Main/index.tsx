@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
 import PanelRenderer from "./components/PanelRenderer";
@@ -46,7 +46,10 @@ const MainPage: React.FC = () => {
   }, [isManagementPath, isPipelinePath]);
 
   // 2. 파일 및 소스 코드 상태 훅
-  const fileMgr = useFileManager(initialFileId);
+  const resetSimulationRef = useRef<(() => void) | null>(null);
+  const fileMgr = useFileManager(initialFileId, () => {
+    resetSimulationRef.current?.();
+  });
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
@@ -65,8 +68,12 @@ const MainPage: React.FC = () => {
     setTranslationBusy: fileMgr.setTranslationBusy,
     setTranslationError: fileMgr.setTranslationError,
     setTranslationAssembly: fileMgr.setTranslationAssembly,
-    setCFileName: fileMgr.setCFileName,
   });
+
+  const handleClearSelection = useCallback(() => {
+    setTranslationSelectedLine(null);
+    setTranslationSelectedAsmIndex(null);
+  }, []);
 
   // 5. 시뮬레이션 재생 및 스텝 컨트롤 훅
   const playback = useSimulationPlayback({
@@ -75,10 +82,7 @@ const MainPage: React.FC = () => {
     isSingleEngine: simSession.isSingleEngine,
     editorTarget,
     translationSelectedLine,
-    onClearSelection: () => {
-      setTranslationSelectedLine(null);
-      setTranslationSelectedAsmIndex(null);
-    },
+    onClearSelection: handleClearSelection,
   });
 
   const onResetSimulation = () => {
@@ -88,9 +92,29 @@ const MainPage: React.FC = () => {
     playback.triggerPlaybackFeedback("reset");
   };
 
+  useEffect(() => {
+    resetSimulationRef.current = onResetSimulation;
+  });
+
   // 6. 분할 레이아웃 & 스플리터 훅
   const [sections, setSections] = useState<SectionConfig[]>(getDefaultSections);
-  const splitter = useWorkspaceSplitter();
+  const {
+    leftPaneWidth,
+    setLeftPaneWidth,
+    resizingLeftPane,
+    mainWorkspaceRef,
+    handleMainDividerResizeStart,
+    leftTopHeightPercent,
+    setLeftTopHeightPercent,
+    resizingLeftVertical,
+    setResizingLeftVertical,
+    leftPaneContainerRef,
+    leftCodeColRatio,
+    setLeftCodeColRatio,
+    resizingLeftCodeCol,
+    setResizingLeftCodeCol,
+    leftTopContainerRef,
+  } = useWorkspaceSplitter();
   const {
     containerRef,
     resizingRowSlot,
@@ -304,33 +328,33 @@ const MainPage: React.FC = () => {
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}
       <div
-        ref={splitter.mainWorkspaceRef}
+        ref={mainWorkspaceRef}
         className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch ${
-          splitter.resizingLeftPane ||
-          splitter.resizingLeftVertical ||
-          splitter.resizingLeftCodeCol
+          resizingLeftPane ||
+          resizingLeftVertical ||
+          resizingLeftCodeCol
             ? "select-none"
             : ""
         }`}
       >
         {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) */}
         <div
-          ref={splitter.leftPaneContainerRef}
+          ref={leftPaneContainerRef}
           className="flex flex-col h-full min-h-0 overflow-hidden pr-1"
-          style={{ width: `${splitter.leftPaneWidth}%` }}
+          style={{ width: `${leftPaneWidth}%` }}
         >
           {/* 상단: C 소스 + ASM 가로 분할 */}
           <div
             className="flex flex-col w-full min-h-0 overflow-hidden"
-            style={{ height: `${splitter.leftTopHeightPercent}%` }}
+            style={{ height: `${leftTopHeightPercent}%` }}
           >
             <div
-              ref={splitter.leftTopContainerRef}
+              ref={leftTopContainerRef}
               className="flex-1 flex w-full min-h-0 overflow-hidden"
             >
               <div
                 className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
-                style={{ width: `${splitter.leftCodeColRatio}%` }}
+                style={{ width: `${leftCodeColRatio}%` }}
               >
                 {renderPanel("cSource")}
               </div>
@@ -341,22 +365,22 @@ const MainPage: React.FC = () => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (e.detail === 2) {
-                    splitter.setLeftCodeColRatio(50);
+                    setLeftCodeColRatio(50);
                     return;
                   }
-                  splitter.setResizingLeftCodeCol(true);
+                  setResizingLeftCodeCol(true);
                 }}
                 onDoubleClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  splitter.setLeftCodeColRatio(50);
+                  setLeftCodeColRatio(50);
                 }}
                 title="드래그하여 C 코드와 ASM 영역 너비 조절 (더블클릭: 50:50 리셋)"
                 className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
               >
                 <div
                   className={`w-[3px] rounded-full transition-all duration-200 ${
-                    splitter.resizingLeftCodeCol
+                    resizingLeftCodeCol
                       ? "h-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
                       : "h-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
                   }`}
@@ -365,7 +389,7 @@ const MainPage: React.FC = () => {
 
               <div
                 className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
-                style={{ width: `${100 - splitter.leftCodeColRatio}%` }}
+                style={{ width: `${100 - leftCodeColRatio}%` }}
               >
                 {renderPanel("source")}
               </div>
@@ -378,22 +402,22 @@ const MainPage: React.FC = () => {
               e.preventDefault();
               e.stopPropagation();
               if (e.detail === 2) {
-                splitter.setLeftTopHeightPercent(56);
+                setLeftTopHeightPercent(56);
                 return;
               }
-              splitter.setResizingLeftVertical(true);
+              setResizingLeftVertical(true);
             }}
             onDoubleClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              splitter.setLeftTopHeightPercent(56);
+              setLeftTopHeightPercent(56);
             }}
             title="위아래로 드래그하여 코드 영역과 튜터 높이 비율 조절 (더블클릭: 56:44 기본 리셋)"
             className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
           >
             <div
               className={`h-[3px] rounded-full transition-all duration-200 ${
-                splitter.resizingLeftVertical
+                resizingLeftVertical
                   ? "w-28 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
                   : "w-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-24 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
               }`}
@@ -403,7 +427,7 @@ const MainPage: React.FC = () => {
           {/* 하단: 튜터 영역 */}
           <div
             className="w-full min-h-0 overflow-hidden flex flex-col p-[1.5px]"
-            style={{ height: `${100 - splitter.leftTopHeightPercent}%` }}
+            style={{ height: `${100 - leftTopHeightPercent}%` }}
           >
             {renderPanel("tutor")}
           </div>
@@ -415,22 +439,22 @@ const MainPage: React.FC = () => {
             if (e.detail === 2) {
               e.preventDefault();
               e.stopPropagation();
-              splitter.setLeftPaneWidth(50);
+              setLeftPaneWidth(50);
               return;
             }
-            splitter.handleMainDividerResizeStart(e);
+            handleMainDividerResizeStart(e);
           }}
           onDoubleClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            splitter.setLeftPaneWidth(50);
+            setLeftPaneWidth(50);
           }}
           title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 50:50 기본 리셋)"
           className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-md transition-colors"
         >
           <div
             className={`w-[4px] rounded-full transition-all duration-200 ${
-              splitter.resizingLeftPane
+              resizingLeftPane
                 ? "h-36 bg-[#005FB8] dark:bg-[#007ACC] shadow-md ring-2 ring-[#005FB8]/30 dark:ring-[#007ACC]/30"
                 : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
             }`}

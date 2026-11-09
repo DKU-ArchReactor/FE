@@ -16,7 +16,6 @@ type UseSimulationSessionParams = {
   setTranslationBusy: (busy: boolean) => void;
   setTranslationError: (err: string) => void;
   setTranslationAssembly: (asm: string) => void;
-  setCFileName: (name: string) => void;
 };
 
 type SimulationCallbacks = {
@@ -33,7 +32,6 @@ export function useSimulationSession({
   setTranslationBusy,
   setTranslationError,
   setTranslationAssembly,
-  setCFileName,
 }: UseSimulationSessionParams) {
   const [simulationCache, setSimulationCache] = useState<{
     single: SimulationResult | null;
@@ -81,7 +79,6 @@ export function useSimulationSession({
       } = await compileTranslation(translationSource, simulationEngineMode);
 
       setTranslationAssembly(assembly);
-      setCFileName("main.c");
       setActiveBuildId(buildId ?? null);
       setActiveSimulationToken(simulationToken ?? null);
 
