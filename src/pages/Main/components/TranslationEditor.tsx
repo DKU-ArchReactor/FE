@@ -184,7 +184,7 @@ export default function TranslationEditor({
     >
       {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명) */}
       <header
-        className={`shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 py-1.5 min-w-0 transition-colors border-l-2 border-l-blue-600 dark:border-l-blue-500 ${
+        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors border-l-2 border-l-blue-600 dark:border-l-blue-500 ${
           activeTarget !== "c"
             ? "bg-[#F1F5F9] dark:bg-[#1A1A1C]"
             : "bg-[var(--ar-header-bg)]"

@@ -97,7 +97,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
   return (
     <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 (지표 전용 퍼플 액센트 바) */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-purple-500">
+      <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-purple-500">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[11px] text-purple-500 font-bold">◆</span>
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
