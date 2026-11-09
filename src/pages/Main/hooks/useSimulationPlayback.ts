@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
-import type { MappedAssemblyRow } from "../components/translationCompile";
+import type { MappedAssemblyRow } from "../utils/translationCompile";
 
 interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;

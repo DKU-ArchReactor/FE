@@ -34,9 +34,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
           transform: `translate3d(-${rightViewportIndex * 100}%, 0, 0)`,
         }}
       >
-        {sections.slice(2).map((section, rightOffsetIdx) => {
-          const secIdx = rightOffsetIdx + 2;
-
+        {sections.map((section, secIdx) => {
           return (
             <div
               key={section.id}

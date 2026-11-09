@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
-import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
+import type { SimulationResult } from '@/type/simulation';
 
 interface PerformanceMetricsProps {
   simulationData: SimulationResult | null;
-  currentCycleData?: CycleHistoryItem | null;
   currentCycle: number;
 }
 

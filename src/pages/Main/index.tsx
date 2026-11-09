@@ -1,26 +1,30 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
-import FlyoutPanel from "./components/FlyoutPanel";
 import PanelRenderer from "./components/PanelRenderer";
 import SlidingViewportTrack from "./components/SlidingViewportTrack";
 import AiAssistantPopup from "@/components/AiAssistantPopup";
+import PlaybackFeedbackOverlay from "./components/PlaybackFeedbackOverlay";
 
-import type { SimulationResult } from "@/type/simulation";
-import type { CodeLineSelectInfo } from "./components/Source/SourceViewer";
 import type { PanelKey, SectionConfig } from "./types";
 import { getDefaultSections } from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 import { useSimulationPlayback } from "./hooks/useSimulationPlayback";
+import { useSimulationSession } from "./hooks/useSimulationSession";
 import { useFileManager } from "./hooks/useFileManager";
 import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
-import {
-  compileTranslation,
-  compileAssemblyDirectly,
-  mapAssembly,
-  extractAssemblyFromSimulation,
-} from "./components/translationCompile";
-import { runSimulation } from "@/api/simulation";
+
+const DEFAULT_CUSTOM_ASSEMBLY = [
+  "# RISC-V 32IM 어셈블리 직접 작성",
+  ".globl main",
+  "main:",
+  "    addi x1, x0, 5",
+  "    addi x2, x0, 10",
+  "    add  x3, x1, x2",
+  "    slli x4, x3, 2",
+  "    ret",
+  "",
+].join("\n");
 
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -32,8 +36,7 @@ const MainPage: React.FC = () => {
     null;
 
   // 1. 라우트 및 뷰포트 상태
-  const isManagementPath =
-    location.pathname === "/management" || location.pathname === "/coming-soon";
+  const isManagementPath = location.pathname === "/management";
   const isPipelinePath = location.pathname === "/pipeline";
 
   const rightViewportIndex = useMemo(() => {
@@ -52,54 +55,24 @@ const MainPage: React.FC = () => {
 
   const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
   const [translationSelectedAsmIndex, setTranslationSelectedAsmIndex] = useState<number | null>(null);
+  const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
 
-  const [customAssembly, setCustomAssembly] = useState<string>(() => {
-    return [
-      "# RISC-V 32IM 어셈블리 직접 작성",
-      ".globl main",
-      "main:",
-      "    addi x1, x0, 5",
-      "    addi x2, x0, 10",
-      "    add  x3, x1, x2",
-      "    slli x4, x3, 2",
-      "    ret",
-      "",
-    ].join("\n");
+  // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
+  const simSession = useSimulationSession({
+    translationSource: fileMgr.translationSource,
+    translationAssembly: fileMgr.translationAssembly,
+    translationBusy: fileMgr.translationBusy,
+    setTranslationBusy: fileMgr.setTranslationBusy,
+    setTranslationError: fileMgr.setTranslationError,
+    setTranslationAssembly: fileMgr.setTranslationAssembly,
+    setCFileName: fileMgr.setCFileName,
   });
-
-  // 4. 시뮬레이션 상태 및 엔진 모드 ("single" | "pipeline")
-  const [simulationCache, setSimulationCache] = useState<{
-    single: SimulationResult | null;
-    pipeline: SimulationResult | null;
-  }>({ single: null, pipeline: null });
-
-  const [simulationEngineMode, setSimulationEngineMode] = useState<"single" | "pipeline">("single");
-  const simulationData = simulationCache[simulationEngineMode];
-  const loadingMessage = null;
-  const [activeBuildId, setActiveBuildId] = useState<string | null>(null);
-  const [activeSimulationToken, setActiveSimulationToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove("mode-single", "mode-pipeline");
-    root.classList.add(`mode-${simulationEngineMode}`);
-  }, [simulationEngineMode]);
-
-  const isSingleEngine = simulationEngineMode === "single";
-
-  // 어셈블리 행 파싱: 백엔드가 시뮬레이션 로그에 직접 주입한 source_line 매핑을 단일 진실 원천으로 사용
-  const mappedAssemblyRows = useMemo(() => {
-    const fromSim = extractAssemblyFromSimulation(simulationData);
-    if (fromSim.length > 0) return fromSim;
-    if (!fileMgr.translationAssembly) return [];
-    return mapAssembly(fileMgr.translationAssembly, 1000);
-  }, [simulationData, fileMgr.translationAssembly]);
 
   // 5. 시뮬레이션 재생 및 스텝 컨트롤 훅
   const playback = useSimulationPlayback({
-    simulationData,
-    mappedAssemblyRows,
-    isSingleEngine,
+    simulationData: simSession.simulationData,
+    mappedAssemblyRows: simSession.mappedAssemblyRows,
+    isSingleEngine: simSession.isSingleEngine,
     editorTarget,
     translationSelectedLine,
     onClearSelection: () => {
@@ -109,7 +82,7 @@ const MainPage: React.FC = () => {
   });
 
   const onResetSimulation = () => {
-    setSimulationCache({ single: null, pipeline: null });
+    simSession.clearSimulationCache();
     playback.setCurrentCycle(0);
     playback.setIsPlaying(false);
     playback.triggerPlaybackFeedback("reset");
@@ -120,7 +93,6 @@ const MainPage: React.FC = () => {
   const splitter = useWorkspaceSplitter();
   const {
     containerRef,
-    resizingSplitterIndex,
     resizingRowSlot,
     resizingPair,
     handleSlotResizeStart,
@@ -129,85 +101,7 @@ const MainPage: React.FC = () => {
     handleSlotReset,
   } = useResizableLayout(sections, setSections);
 
-  // 7. 컴파일 및 시뮬레이션 실행 핸들러
-  const handleTranslationCompile = async () => {
-    if (!fileMgr.translationSource.trim() || fileMgr.translationBusy) return;
-    fileMgr.setTranslationBusy(true);
-    fileMgr.setTranslationError("");
-    fileMgr.setAsmContent("");
-    try {
-      const {
-        assembly,
-        simulationResult,
-        singleSimulationResult,
-        pipelineSimulationResult,
-        buildId,
-        simulationToken,
-      } = await compileTranslation(fileMgr.translationSource, simulationEngineMode);
-
-      fileMgr.setTranslationAssembly(assembly);
-      fileMgr.setAsmContent(assembly);
-      fileMgr.setAsmFileName("assembly.s");
-      setActiveBuildId(buildId ?? null);
-      setActiveSimulationToken(simulationToken ?? null);
-
-      setSimulationCache({
-        single: singleSimulationResult ?? (simulationEngineMode === "single" ? simulationResult : null),
-        pipeline: pipelineSimulationResult ?? (simulationEngineMode === "pipeline" ? simulationResult : null),
-      });
-
-      if (simulationResult) {
-        playback.handleSimulationComplete(simulationResult);
-        playback.triggerPlaybackFeedback("check");
-      }
-    } catch (error) {
-      fileMgr.setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
-    } finally {
-      fileMgr.setTranslationBusy(false);
-    }
-  };
-
-  const handleAssemblySimulation = async () => {
-    const codeToSimulate = customAssembly;
-    if (!codeToSimulate.trim() || fileMgr.translationBusy) return;
-
-    fileMgr.setTranslationBusy(true);
-    fileMgr.setTranslationError("");
-    fileMgr.setAsmContent(codeToSimulate);
-    fileMgr.setTranslationAssembly(codeToSimulate);
-
-    try {
-      const {
-        assembly,
-        simulationResult,
-        singleSimulationResult,
-        pipelineSimulationResult,
-        buildId,
-        simulationToken,
-      } = await compileAssemblyDirectly(codeToSimulate, simulationEngineMode);
-
-      fileMgr.setTranslationAssembly(assembly);
-      fileMgr.setAsmContent(assembly);
-      setActiveBuildId(buildId ?? null);
-      setActiveSimulationToken(simulationToken ?? null);
-
-      setSimulationCache({
-        single: singleSimulationResult ?? (simulationEngineMode === "single" ? simulationResult : null),
-        pipeline: pipelineSimulationResult ?? (simulationEngineMode === "pipeline" ? simulationResult : null),
-      });
-
-      if (simulationResult) {
-        playback.handleSimulationComplete(simulationResult);
-        playback.triggerPlaybackFeedback("check");
-      }
-    } catch (err: any) {
-      console.error("Assembly simulation error:", err);
-      fileMgr.setTranslationError(err?.message || "어셈블리 시뮬레이션 요청에 실패했습니다.");
-    } finally {
-      fileMgr.setTranslationBusy(false);
-    }
-  };
-
+  // 7. 에디터 상호작용 및 시뮬레이션 연결 핸들러
   const handleSelectTranslationLine = (line: number | null, asmIndex: number | null = null) => {
     if (line !== null) {
       playback.setIsPlaying((prev) => {
@@ -241,39 +135,6 @@ const MainPage: React.FC = () => {
     }
   };
 
-  // 모드 전환 시 즉시 캐시 스위칭 (0ms 딜레이)
-  const handleSimulationModeChange = async (m: "single" | "pipeline") => {
-    if (playback.isPlaying || playback.currentCycle > 0) {
-      playback.triggerPlaybackFeedback("reset");
-    }
-    setSimulationEngineMode(m);
-    const cachedResult = simulationCache[m];
-    if (cachedResult) {
-      playback.handleSimulationComplete(cachedResult);
-      return;
-    }
-
-    // 캐시가 아직 비어있을 때만 폴백 네트워크 호출
-    if (activeBuildId || activeSimulationToken) {
-      try {
-        const targetToken = activeBuildId
-          ? { build_id: activeBuildId }
-          : { simulation_token: activeSimulationToken! };
-        const simResult = await runSimulation({
-          ...targetToken,
-          mode: m,
-          max_cycles: 2000,
-        });
-        if (simResult) {
-          setSimulationCache((prev) => ({ ...prev, [m]: simResult }));
-          playback.handleSimulationComplete(simResult);
-        }
-      } catch (simErr) {
-        console.warn("시뮬레이션 모드 전환 재실행 오류:", simErr);
-      }
-    }
-  };
-
   // 8. 뷰포트 네비게이션
   const canGoPrevViewport = rightViewportIndex > 0;
   const canGoNextViewport = rightViewportIndex < 2;
@@ -288,46 +149,23 @@ const MainPage: React.FC = () => {
     else if (rightViewportIndex === 1) navigate("/management");
   };
 
-  // 9. 플라이아웃(말풍선) 패널 상태
-  const [activeFlyout, setActiveFlyout] = useState<PanelKey | null>(null);
-  const flyoutRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
-        const target = e.target as HTMLElement;
-        if (!target.closest("[data-bookmark-tab]")) {
-          setActiveFlyout(null);
-        }
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const [selectedCodeLine, setSelectedCodeLine] = useState<CodeLineSelectInfo | null>(null);
-
   const renderPanel = (panelKey: PanelKey) => (
     <PanelRenderer
       panelKey={panelKey}
-      simulationData={simulationData}
+      simulationData={simSession.simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
       currentCycle={playback.currentCycle}
-      activeCycleIndex={playback.activeCycleIndex}
       playSpeed={playback.playSpeed}
-      loadingMessage={loadingMessage}
-      simulationMode={simulationEngineMode}
-      isSingleEngine={isSingleEngine}
+      loadingMessage={simSession.loadingMessage}
+      simulationMode={simSession.simulationEngineMode}
+      isSingleEngine={simSession.isSingleEngine}
       currentActiveRow={playback.currentActiveRow}
-      mappedAssemblyRows={mappedAssemblyRows}
+      mappedAssemblyRows={simSession.mappedAssemblyRows}
       activeExecutionCLine={playback.activeExecutionCLine}
       effectiveSelectedLine={playback.effectiveSelectedLine}
-      isActuallyExecuting={true}
       translationSource={fileMgr.translationSource}
       translationAssembly={fileMgr.translationAssembly}
-      cContent={fileMgr.cContent}
-      asmContent={fileMgr.asmContent}
       cFileName={fileMgr.cFileName}
       fileId={fileMgr.fileId}
       editorTarget={editorTarget}
@@ -347,53 +185,46 @@ const MainPage: React.FC = () => {
           true,
           null,
           () => {
-            setSimulationCache({ single: null, pipeline: null });
+            simSession.clearSimulationCache();
             playback.setCurrentCycle(0);
             playback.setIsPlaying(false);
           }
         );
       }}
-      onTranslationCompile={handleTranslationCompile}
+      onTranslationCompile={() =>
+        simSession.handleTranslationCompile({
+          onSimulationComplete: playback.handleSimulationComplete,
+          triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
+        })
+      }
       onTranslationFile={handleTranslationFile}
       onSelectTranslationLine={handleSelectTranslationLine}
       onSaveTranslationFile={fileMgr.handleSaveTranslationFile}
       onOpenSavedFileInEditor={(id) => fileMgr.handleOpenSavedFileInEditor(id, onResetSimulation)}
       onCustomAssemblyChange={setCustomAssembly}
-      onSimulateAssembly={handleAssemblySimulation}
+      onSimulateAssembly={() =>
+        simSession.handleAssemblySimulation(customAssembly, {
+          onSimulationComplete: playback.handleSimulationComplete,
+          triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
+        })
+      }
       onResetCustomAssembly={() => {
         playback.triggerPlaybackFeedback("trash");
-        setCustomAssembly(
-          [
-            "# RISC-V 32IM 어셈블리 직접 작성",
-            ".globl main",
-            "main:",
-            "    addi x1, x0, 5",
-            "    addi x2, x0, 10",
-            "    add  x3, x1, x2",
-            "    slli x4, x3, 2",
-            "    ret",
-            "",
-          ].join("\n")
-        );
-        setSimulationCache({ single: null, pipeline: null });
+        setCustomAssembly(DEFAULT_CUSTOM_ASSEMBLY);
+        simSession.clearSimulationCache();
         playback.setCurrentCycle(0);
         playback.setIsPlaying(false);
       }}
       onJumpToCycle={playback.handleJumpToCycle}
       savedFiles={fileMgr.savedFiles}
       isLoggedIn={fileMgr.isLoggedIn}
-      ensureFileContent={fileMgr.ensureFileContent}
-      fileContentCache={fileMgr.fileContentCache}
-      loadingPreviewId={fileMgr.loadingPreviewId}
-      selectedCodeLine={selectedCodeLine}
-      onClearSelectedCodeLine={() => setSelectedCodeLine(null)}
     />
   );
 
   return (
     <main
       className={`flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
-        playback.isPlaying && isSingleEngine ? "is-playing-single-light" : ""
+        playback.isPlaying && simSession.isSingleEngine ? "is-playing-single-light" : ""
       }`}
     >
       {/* 1. 최상단 제어 바 */}
@@ -412,7 +243,7 @@ const MainPage: React.FC = () => {
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={playback.isSimulationReady}
-            mode={simulationEngineMode}
+            mode={simSession.simulationEngineMode}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
               if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
@@ -424,11 +255,18 @@ const MainPage: React.FC = () => {
                 setTranslationSelectedAsmIndex(null);
               }
             }}
-            onChangeSimulationMode={handleSimulationModeChange}
+            onChangeSimulationMode={(m) =>
+              simSession.handleSimulationModeChange(m, {
+                onSimulationComplete: playback.handleSimulationComplete,
+                triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
+                isPlaying: playback.isPlaying,
+                currentCycle: playback.currentCycle,
+              })
+            }
           />
         </div>
 
-        {/* AI 어시스턴트 팝업 버튼 (테두리 없는 비비드 일렉트릭 아주르 그라데이션) */}
+        {/* AI 어시스턴트 팝업 버튼 */}
         <button
           ref={aiButtonRef}
           type="button"
@@ -469,7 +307,6 @@ const MainPage: React.FC = () => {
         ref={splitter.mainWorkspaceRef}
         className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch ${
           splitter.resizingLeftPane ||
-          resizingSplitterIndex !== null ||
           splitter.resizingLeftVertical ||
           splitter.resizingLeftCodeCol
             ? "select-none"
@@ -609,7 +446,7 @@ const MainPage: React.FC = () => {
                 onClick={handleGoPrevViewport}
                 title="이전 뷰포트(왼쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
-                  isSingleEngine
+                  simSession.isSingleEngine
                     ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
                     : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
@@ -644,7 +481,7 @@ const MainPage: React.FC = () => {
                 onClick={handleGoNextViewport}
                 title="다음 뷰포트(오른쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
-                  isSingleEngine
+                  simSession.isSingleEngine
                     ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
                     : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
@@ -661,89 +498,8 @@ const MainPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 우측 플라이아웃 패널 */}
-      <FlyoutPanel
-        activeFlyout={activeFlyout}
-        flyoutRef={flyoutRef}
-        onClose={() => setActiveFlyout(null)}
-      >
-        {activeFlyout && renderPanel(activeFlyout)}
-      </FlyoutPanel>
-
-      {/* Play / Pause / Reset / Trash / Check 화면 중앙 애니메이션 피드백 (담백한 딥 톤 배경 & 순백색 아이콘) */}
-      {playback.playbackFeedback && (() => {
-        const type = playback.playbackFeedback.type;
-        const feedbackConfigs = {
-          check: {
-            bgClass: "bg-emerald-700/85",
-            icon: (
-              <svg
-                className="w-12 h-12 stroke-white fill-none drop-shadow-md"
-                viewBox="0 0 24 24"
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 13l4 4L19 7" />
-              </svg>
-            ),
-          },
-          play: {
-            bgClass: "bg-blue-700/85",
-            icon: (
-              <svg
-                className="w-12 h-12 fill-white translate-x-1 drop-shadow-md"
-                viewBox="0 0 24 24"
-              >
-                <path d="M6 4.5l14 7.5-14 7.5v-15z" />
-              </svg>
-            ),
-          },
-          pause: {
-            bgClass: "bg-amber-700/85",
-            icon: (
-              <svg
-                className="w-12 h-12 fill-white drop-shadow-md"
-                viewBox="0 0 24 24"
-              >
-                <rect x="5.5" y="4.5" width="4" height="15" rx="1.5" />
-                <rect x="14.5" y="4.5" width="4" height="15" rx="1.5" />
-              </svg>
-            ),
-          },
-          trash: {
-            bgClass: "bg-rose-700/85",
-            icon: (
-              <svg
-                className="w-12 h-12 fill-white drop-shadow-md"
-                viewBox="0 0 24 24"
-              >
-                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-              </svg>
-            ),
-          },
-          reset: {
-            bgClass: "bg-slate-800/90",
-            icon: (
-              <svg
-                className="w-10 h-10 fill-white drop-shadow-md"
-                viewBox="0 0 24 24"
-              >
-                <rect x="5" y="5" width="14" height="14" rx="2.5" />
-              </svg>
-            ),
-          },
-        }[type];
-
-        return (
-          <div
-            key={playback.playbackFeedback.id}
-            className={`playback-indicator-overlay fixed inset-0 m-auto w-24 h-24 rounded-3xl ${feedbackConfigs.bgClass} backdrop-blur-md shadow-2xl flex items-center justify-center pointer-events-none z-50 text-white border border-white/20 transition-colors`}
-          >
-            {feedbackConfigs.icon}
-          </div>
-        );
-      })()}
+      {/* Play / Pause / Reset / Trash / Check 화면 중앙 애니메이션 피드백 */}
+      <PlaybackFeedbackOverlay feedback={playback.playbackFeedback} />
     </main>
   );
 };

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import MainPage from "./pages/Main";
 import LoginPage from "./pages/Auth/Login";
 import SignUpPage from "./pages/Auth/SignUp";
@@ -12,14 +12,12 @@ function App() {
         <Route path="/" element={<MainPage />} />
         <Route path="/pipeline" element={<MainPage />} />
         <Route path="/management" element={<MainPage />} />
-        <Route path="/c-to-asm" element={<Navigate to="/" replace />} />
-        <Route path="/coming-soon" element={<Navigate to="/management" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/my" element={<MyPage />} />
       </Route>
     </Routes>
-  )
+  );
 }
 
-export default App
+export default App;

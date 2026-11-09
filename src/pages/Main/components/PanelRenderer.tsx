@@ -3,9 +3,7 @@ import type { PanelKey } from "../types";
 
 // 컴포넌트 임포트
 import TutorArea from "./TutorArea";
-import AIAgentArea from "./AIAgentArea";
 import PipelineVisualizer from "./PipelineVisualizer";
-import StateVisualizer from "./StateVisualizer";
 import RegisterVisualizer from "./RegisterVisualizer";
 import MemorySegmentVisualizer from "./MemorySegmentVisualizer";
 import MultiCycleDiagram from "./MultiCycleDiagram";
@@ -13,12 +11,10 @@ import PerformanceMetrics from "./PerformanceMetrics";
 import HazardDiagnostics from "./HazardDiagnostics";
 import TranslationEditor from "./TranslationEditor";
 import TranslationMapping from "./TranslationMapping";
-import FileListPanel from "./FileListPanel";
 
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
-import type { CodeLineSelectInfo } from "./Source/SourceViewer";
-import type { MappedAssemblyRow } from "./translationCompile";
+import type { MappedAssemblyRow } from "../utils/translationCompile";
 
 const EMPTY_REGISTERS: Record<string, string> = {};
 
@@ -28,7 +24,6 @@ interface PanelRendererProps {
   currentData: CycleHistoryItem | null;
   prevData: CycleHistoryItem | null;
   currentCycle: number;
-  activeCycleIndex: number;
   playSpeed: number;
   loadingMessage: string | null;
   simulationMode: "single" | "pipeline";
@@ -37,13 +32,10 @@ interface PanelRendererProps {
   mappedAssemblyRows: MappedAssemblyRow[];
   activeExecutionCLine: number | null;
   effectiveSelectedLine: number | null;
-  isActuallyExecuting: boolean;
 
   // C & ASM 편집 및 매핑
   translationSource: string;
   translationAssembly: string;
-  cContent: string;
-  asmContent: string;
   cFileName: string;
   fileId: string | null;
   editorTarget: "c" | "asm";
@@ -66,15 +58,9 @@ interface PanelRendererProps {
   onResetCustomAssembly: () => void;
   onJumpToCycle: (cycle: number) => void;
 
-  // File List 상태
+  // 저장된 파일 목록 상태
   savedFiles: FileSummary[];
   isLoggedIn: boolean;
-  ensureFileContent: (fileId: string) => Promise<{ title: string; content: string } | null>;
-  fileContentCache: Record<string, string>;
-  loadingPreviewId: string | null;
-
-  selectedCodeLine: CodeLineSelectInfo | null;
-  onClearSelectedCodeLine: () => void;
 }
 
 export const PanelRenderer: React.FC<PanelRendererProps> = ({
@@ -83,7 +69,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   currentData,
   prevData,
   currentCycle,
-  activeCycleIndex: _activeCycleIndex,
   playSpeed,
   loadingMessage,
   simulationMode,
@@ -92,12 +77,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   mappedAssemblyRows,
   activeExecutionCLine,
   effectiveSelectedLine,
-  isActuallyExecuting,
 
   translationSource,
   translationAssembly,
-  cContent,
-  asmContent,
   cFileName,
   fileId,
   editorTarget,
@@ -121,21 +103,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
 
   savedFiles,
   isLoggedIn,
-  ensureFileContent,
-  fileContentCache,
-  loadingPreviewId,
-
-  selectedCodeLine,
-  onClearSelectedCodeLine,
 }) => {
-  const renderPlaceholderBox = (title: string) => (
-    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-xs border border-[var(--ar-border)] flex items-center justify-center p-4 min-h-0 overflow-hidden select-none transition-colors duration-150">
-      <span className="text-base font-bold text-[var(--ar-text-primary)] tracking-wide">
-        {title}
-      </span>
-    </div>
-  );
-
   switch (panelKey) {
     case "cSource":
       return (
@@ -149,7 +117,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           busy={translationBusy}
           error={translationError}
           selectedLine={translationSelectedLine}
-          executionLine={isActuallyExecuting ? activeExecutionCLine : null}
+          executionLine={activeExecutionCLine}
           onSelectLine={onSelectTranslationLine}
           savedFiles={savedFiles}
           isLoggedIn={isLoggedIn}
@@ -160,24 +128,11 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
         />
       );
 
-    case "fileList":
-      return (
-        <FileListPanel
-          savedFiles={savedFiles}
-          isLoggedIn={isLoggedIn}
-          selectedFileId={fileId}
-          onOpenFileInEditor={onOpenSavedFileInEditor}
-          ensureFileContent={ensureFileContent}
-          fileContentCache={fileContentCache}
-          loadingPreviewId={loadingPreviewId}
-        />
-      );
-
     case "source":
       return (
         <TranslationMapping
-          source={translationSource || cContent}
-          assembly={editorTarget === "asm" ? customAssembly : (translationAssembly || asmContent)}
+          source={translationSource}
+          assembly={editorTarget === "asm" ? customAssembly : translationAssembly}
           mappedRows={editorTarget === "asm" ? undefined : mappedAssemblyRows}
           busy={translationBusy}
           error={translationError}
@@ -207,10 +162,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           simulationData={simulationData}
           currentCycleData={currentData}
           loadingMessage={loadingMessage}
-          selectedCodeLine={selectedCodeLine}
-          onClearSelectedCodeLine={onClearSelectedCodeLine}
-          translationSource={translationSource || cContent}
-          translationAssembly={translationAssembly || asmContent}
+          translationSource={translationSource}
+          translationAssembly={translationAssembly}
           mappedRows={mappedAssemblyRows}
           selectedTranslationLine={effectiveSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
@@ -221,9 +174,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
                 : null
               : null
           }
-          executionLine={isActuallyExecuting && editorTarget === "c" ? activeExecutionCLine : null}
           isUserSelected={editorTarget === "c" && translationSelectedLine !== null}
-          onSelectTranslationLine={onSelectTranslationLine}
           activeTarget={editorTarget}
         />
       );
@@ -234,16 +185,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           currentData={currentData}
           loadingMessage={loadingMessage}
           mode={simulationMode}
-        />
-      );
-
-    case "state":
-      return (
-        <StateVisualizer
-          currentData={currentData}
-          prevData={prevData}
-          simulationData={simulationData}
-          defaultLayout="vertical"
         />
       );
 
@@ -263,7 +204,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           currentData={currentData}
           prevData={prevData}
           simulationData={simulationData}
-          translationAssembly={translationAssembly || asmContent}
           playSpeed={playSpeed}
           cycle={currentCycle}
         />
@@ -273,9 +213,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       return (
         <MultiCycleDiagram
           simulationData={simulationData}
-          currentCycleData={currentData}
           currentCycle={currentCycle}
-          translationAssembly={translationAssembly || asmContent}
           onJumpToCycle={onJumpToCycle}
         />
       );
@@ -284,7 +222,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       return (
         <PerformanceMetrics
           simulationData={simulationData}
-          currentCycleData={currentData}
           currentCycle={currentCycle}
         />
       );
@@ -297,15 +234,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           currentCycle={currentCycle}
         />
       );
-
-    case "queues":
-      return renderPlaceholderBox("Queues");
-
-    case "ioDevice":
-      return renderPlaceholderBox("IO Device");
-
-    case "aiPanel":
-      return <AIAgentArea />;
 
     default:
       return null;

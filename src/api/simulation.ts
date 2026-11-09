@@ -56,7 +56,6 @@ export const runSimulation = async (
 
   const response = await apiConfig.post("/api/v1/simulation/run", payload);
 
-  console.log("Raw Simulation API Response:", response.data);
   let resultData = response.data;
 
   const fetchJsonFromUrl = async (rawUrl: string) => {
