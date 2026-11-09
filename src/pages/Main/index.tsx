@@ -21,6 +21,7 @@ import {
   extractAssemblyFromSimulation,
 } from "./components/translationCompile";
 import { runSimulation } from "@/api/simulation";
+import { getLearningExample } from '@/data/learningExamples';
 
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -43,7 +44,7 @@ const MainPage: React.FC = () => {
   }, [isManagementPath, isPipelinePath]);
 
   // 2. 파일 및 소스 코드 상태 훅
-  const fileMgr = useFileManager(initialFileId);
+  const fileMgr = useFileManager(initialFileId, initialFileId ? undefined : getLearningExample(searchParams.get('example')));
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
@@ -280,7 +281,7 @@ const MainPage: React.FC = () => {
 
   const handleGoPrevViewport = () => {
     if (rightViewportIndex === 2) navigate("/pipeline");
-    else if (rightViewportIndex === 1) navigate("/");
+    else if (rightViewportIndex === 1) navigate("/simulator");
   };
 
   const handleGoNextViewport = () => {

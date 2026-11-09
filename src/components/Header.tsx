@@ -65,8 +65,8 @@ const Header = () => {
       ? [
           {
             label: "State ➔ Timing",
-            path: "/",
-            active: location.pathname === "/" || location.pathname === "/pipeline" || location.pathname === "/c-to-asm",
+            path: "/simulator",
+            active: location.pathname === "/simulator" || location.pathname === "/pipeline" || location.pathname === "/c-to-asm",
           },
           {
             label: "Timing ➔ Pipeline",
@@ -77,8 +77,8 @@ const Header = () => {
       : [
           {
             label: "State",
-            path: "/",
-            active: isActive("/") || isActive("/c-to-asm"),
+            path: "/simulator",
+            active: isActive("/simulator") || isActive("/c-to-asm"),
           },
           {
             label: "Timing",

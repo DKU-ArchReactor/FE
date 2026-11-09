@@ -6,11 +6,11 @@ const DEFAULT_TRANSLATION_SOURCE =
   "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
 export const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
 
-export function useFileManager(initialFileId: string | null) {
+export function useFileManager(initialFileId: string | null, example?: { source: string; fileName: string }) {
   const [fileId, setFileId] = useState<string | null>(initialFileId);
-  const [cFileName, setCFileName] = useState<string>("");
+  const [cFileName, setCFileName] = useState<string>(example?.fileName ?? "");
   const [cContent, setCContent] = useState<string>(
-    () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || ""
+    () => example?.source ?? sessionStorage.getItem(TRANSLATION_SOURCE_KEY) ?? ""
   );
   const [asmFileName, setAsmFileName] = useState<string>("");
   const [asmContent, setAsmContent] = useState<string>("");
@@ -23,7 +23,7 @@ export function useFileManager(initialFileId: string | null) {
   const loadedInitialFileIdRef = useRef<string | null>(null);
 
   const [translationSource, setTranslationSource] = useState(
-    () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE
+    () => example?.source ?? (sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE)
   );
   const [translationAssembly, setTranslationAssembly] = useState("");
   const [translationError, setTranslationError] = useState("");
