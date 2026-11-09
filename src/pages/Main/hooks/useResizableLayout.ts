@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { SectionConfig } from '../types';
+import { getDefaultSections } from '../types';
 
 interface ResizingCol {
   idx: number;
@@ -105,8 +106,13 @@ export function useResizableLayout(
         const { secIdx, slotIdx, startY, initialTopRatio, initialBtmRatio, containerHeight } = resizingRowSlot;
         if (containerHeight <= 0) return;
         const deltaY = e.clientY - startY;
+
+        // sec-4(다이어그램-CPI-해저드)인 경우, CPI의 자연스러운 높이(~230px)를 제외한 가용 높이 기준 연산
+        const isSec4 = sections[secIdx]?.id === 'sec-4';
+        const effectiveContainerHeight = isSec4 ? Math.max(100, containerHeight - 240) : containerHeight;
+
         const combinedRatio = initialTopRatio + initialBtmRatio;
-        const deltaRatio = (deltaY / containerHeight) * combinedRatio;
+        const deltaRatio = (deltaY / effectiveContainerHeight) * combinedRatio;
 
         const newTop = Math.max(0.35, Math.min(initialTopRatio + deltaRatio, combinedRatio - 0.35));
         const newBtm = combinedRatio - newTop;
@@ -114,9 +120,12 @@ export function useResizableLayout(
         setSections((prev) =>
           prev.map((sec, sIdx) => {
             if (sIdx !== secIdx) return sec;
+            const topIdx = isSec4 ? 0 : slotIdx;
+            const btmIdx = isSec4 ? 2 : slotIdx + 1;
+
             const updatedSlots = sec.slots.map((sl, slIdx) => {
-              if (slIdx === slotIdx) return { ...sl, flexRatio: Math.round(newTop * 100) / 100 };
-              if (slIdx === slotIdx + 1) return { ...sl, flexRatio: Math.round(newBtm * 100) / 100 };
+              if (slIdx === topIdx) return { ...sl, flexRatio: Math.round(newTop * 100) / 100 };
+              if (slIdx === btmIdx) return { ...sl, flexRatio: Math.round(newBtm * 100) / 100 };
               return sl;
             });
             return { ...sec, slots: updatedSlots };
@@ -230,6 +239,40 @@ export function useResizableLayout(
     });
   };
 
+  const handlePairReset = (secIdx: number, slotIdx: number) => {
+    setSections((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const targetSlot = next[secIdx]?.slots[slotIdx];
+      if (targetSlot) {
+        targetSlot.pairRatio = 50;
+      }
+      return next;
+    });
+  };
+
+  const handleSlotReset = (secIdx: number, slotIdx: number) => {
+    const defaults = getDefaultSections();
+    setSections((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const sec = next[secIdx];
+      const defaultSec = defaults[secIdx];
+      if (!sec || !defaultSec) return next;
+
+      if (sec.id === 'sec-4') {
+        sec.slots[0].flexRatio = defaultSec.slots[0]?.flexRatio ?? 1.8;
+        sec.slots[1].flexRatio = defaultSec.slots[1]?.flexRatio ?? 0.7;
+        sec.slots[2].flexRatio = defaultSec.slots[2]?.flexRatio ?? 1.0;
+      } else {
+        const slots = sec.slots;
+        if (slots && slots[slotIdx] && slots[slotIdx + 1]) {
+          slots[slotIdx].flexRatio = defaultSec.slots[slotIdx]?.flexRatio ?? 1;
+          slots[slotIdx + 1].flexRatio = defaultSec.slots[slotIdx + 1]?.flexRatio ?? 1;
+        }
+      }
+      return next;
+    });
+  };
+
   return {
     containerRef,
     resizingSplitterIndex: resizingCol?.idx ?? null,
@@ -238,5 +281,7 @@ export function useResizableLayout(
     handleColResizeStart,
     handleSlotResizeStart,
     handlePairResizeStart,
+    handlePairReset,
+    handleSlotReset,
   };
 }

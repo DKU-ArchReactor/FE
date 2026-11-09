@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
+import type { CycleHistoryItem, SimulationResult, ProgramMemoryLayout } from '@/type/simulation';
 
 interface StateVisualizerProps {
   currentData: CycleHistoryItem | null;
@@ -109,11 +109,26 @@ const extractPrintableAscii = (hexStr: string): string | undefined => {
   return chars.length >= 2 ? `"${chars.join('')}"` : undefined;
 };
 
-const classifyAddress = (addrHex: string, maxCodePcNum: number): MemorySegmentKey => {
+const classifyAddress = (
+  addrHex: string,
+  layout?: ProgramMemoryLayout | null,
+  maxCodePcNum?: number
+): MemorySegmentKey => {
   const num = parseInt(addrHex, 16) >>> 0;
   if (num >= 0x70000000) return 'stack';
-  if (num >= 0x10000000) return 'heap';
-  if (num <= maxCodePcNum) return 'code';
+  if (num >= 0x10004000 && num < 0x10008000) return 'heap';
+  if (num >= 0x10008000) return 'stack';
+
+  if (layout) {
+    const codeStart = parseInt(layout.code.start, 16) >>> 0;
+    const codeEnd = parseInt(layout.code.end_exclusive, 16) >>> 0;
+    if (num >= codeStart && num < codeEnd) return 'code';
+    if (num >= 0x10000000 && num < 0x10004000) return 'data';
+  } else {
+    if (maxCodePcNum && num <= maxCodePcNum) return 'code';
+    if (num >= 0x10000000) return 'heap';
+  }
+
   return 'data';
 };
 
@@ -254,6 +269,42 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
 
   // 현재 사이클 Load / Store 이동 활동 감지
   const transferActivity: TransferActivity | null = useMemo(() => {
+    const layout = simulationData?.program?.memory_layout;
+
+    // 1순위: Single-Cycle datapath가 제공하는 실제 하드웨어 메모리 액세스 로그 사용 (단일 진실 공급원)
+    if (currentData?.datapath?.data_memory) {
+      const dm = currentData.datapath.data_memory;
+      const dp = currentData.datapath;
+      if (dm.read_address) {
+        const rd = dp.registers?.rd;
+        const targetAddress = dm.read_address.toLowerCase();
+        return {
+          type: 'load',
+          stage: 'MEM',
+          instruction: dp.instruction?.assembly || '',
+          regKey: rd ? `x${rd.index}` : 'x0',
+          abiName: rd?.name || 'rd',
+          targetAddress,
+          segment: classifyAddress(targetAddress, layout, maxCodePcNum),
+          valueHex: dm.read_data || '0x00000000',
+        };
+      } else if (dm.write_address) {
+        const rs2 = dp.registers?.rs2;
+        const targetAddress = dm.write_address.toLowerCase();
+        return {
+          type: 'store',
+          stage: 'MEM',
+          instruction: dp.instruction?.assembly || '',
+          regKey: rs2 ? `x${rs2.index}` : 'x0',
+          abiName: rs2?.name || 'rs2',
+          targetAddress,
+          segment: classifyAddress(targetAddress, layout, maxCodePcNum),
+          valueHex: dm.write_data || '0x00000000',
+        };
+      }
+    }
+
+    // 2순위: 파이프라인 버퍼 기반 폴백
     if (!currentData?.buffers) return null;
 
     const candidates: { stage: 'MEM' | 'WB' | 'EX'; inst?: string }[] = [
@@ -284,7 +335,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
         const baseValNum = parseInt(baseValHex, 16) >>> 0;
         const effectiveAddrNum = (baseValNum + offset) >>> 0;
         const targetAddress = `0x${effectiveAddrNum.toString(16).padStart(8, '0')}`;
-        const segment = classifyAddress(targetAddress, maxCodePcNum);
+        const segment = classifyAddress(targetAddress, layout, maxCodePcNum);
 
         const valueHex = isLoad
           ? memorySnapshot[targetAddress] || registers[regKey] || '0x00000000'
@@ -303,10 +354,11 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
       }
     }
     return null;
-  }, [currentData, registers, memorySnapshot, maxCodePcNum]);
+  }, [currentData, registers, memorySnapshot, simulationData, maxCodePcNum]);
 
   // 메모리 4개 영역별 데이터 분류
   const segmentedMemory = useMemo(() => {
+    const layout = simulationData?.program?.memory_layout;
     const result: Record<MemorySegmentKey, MemoryEntryItem[]> = {
       stack: [],
       heap: [],
@@ -314,12 +366,15 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
       code: [],
     };
 
-    const spValNum = parseInt(registers['x2'] || '0x7fffeffc', 16) >>> 0;
+    const spValNum = parseInt(
+      currentData?.global_result?.active_stack_pointer || registers['x2'] || '0x7fffeffc',
+      16
+    ) >>> 0;
 
     // 1. memorySnapshot 엔트리 분류
     Object.entries(memorySnapshot).forEach(([addr, val]) => {
       const addrLower = addr.toLowerCase();
-      const seg = classifyAddress(addrLower, maxCodePcNum);
+      const seg = classifyAddress(addrLower, layout, maxCodePcNum);
       const prevVal = prevMemorySnapshot ? prevMemorySnapshot[addr] : undefined;
       const isChanged = prevVal !== undefined && prevVal !== val;
       const isAccessed = transferActivity?.targetAddress.toLowerCase() === addrLower;
@@ -382,7 +437,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
     result.code.sort((a, b) => (parseInt(a.address, 16) >>> 0) - (parseInt(b.address, 16) >>> 0));
 
     return result;
-  }, [memorySnapshot, prevMemorySnapshot, registers, codeMap, maxCodePcNum, transferActivity, currentPc]);
+  }, [memorySnapshot, prevMemorySnapshot, registers, codeMap, maxCodePcNum, transferActivity, currentPc, simulationData]);
 
   // 기존 RegisterVisualizer와 동일한 레지스터 키 및 스마트 정렬
   const regKeys = useMemo(() => Array.from({ length: 32 }, (_, i) => `x${i}`), []);
@@ -418,7 +473,7 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="@container flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 p-3.5 flex flex-col min-h-0 overflow-hidden relative select-none"
+      className="@container flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-3.5 flex flex-col min-h-0 overflow-hidden relative select-none"
     >
       {/* 애니메이션 키프레임 */}
       <style>{`
@@ -451,10 +506,10 @@ const StateVisualizer: React.FC<StateVisualizerProps> = ({
       {/* 상단 통합 헤더 바 */}
       <div className="flex items-center justify-between gap-1.5 pb-2 mb-2 border-b border-slate-100 shrink-0 min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap truncate">
-            <span>🗄️</span>
-            <span className="hidden @[320px]:inline">레지스터 & 메모리 뷰</span>
-            <span className="@[320px]:hidden">State</span>
+          <span className="text-[11px] text-amber-500 font-bold">◆</span>
+          <h3 className="text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wider whitespace-nowrap truncate">
+            <span className="hidden @[320px]:inline">STATE VISUALIZER</span>
+            <span className="@[320px]:hidden">STATE</span>
           </h3>
           {transferActivity && (
             <span

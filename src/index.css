@@ -1,9 +1,133 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ======================================================== */
+/* ArchReactor IDE 테마 CSS 변수 & 계층화 팔레트              */
+/* ======================================================== */
+:root {
+  --ar-canvas-bg: #F8FAFC;
+  --ar-panel-bg: #FFFFFF;
+  --ar-header-bg: #FAFBFC;
+  --ar-border: #E5E7EB;
+  --ar-border-subtle: #F1F5F9;
+  --ar-text-primary: #1F2328;
+  --ar-text-muted: #656D76;
+  --ar-accent: #005FB8;
+}
+
+html.dark {
+  --ar-canvas-bg: #141416;
+  --ar-panel-bg: #1E1E22;
+  --ar-header-bg: #26262B;
+  --ar-border: #33353F;
+  --ar-border-subtle: #2A2C35;
+  --ar-text-primary: #D4D4D8;
+  --ar-text-muted: #8E8EA0;
+  --ar-accent: #007ACC;
+}
+
+/* Single Mode (정밀/시퀀셜) Ambient 틴트 */
+html.mode-single {
+  --ar-canvas-bg: #F8FAFC;
+  --ar-accent: #0284C7;
+}
+html.dark.mode-single {
+  --ar-canvas-bg: #12151B;
+  --ar-panel-bg: #1A1E26;
+  --ar-header-bg: #222733;
+  --ar-border: #2C3545;
+  --ar-accent: #38BDF8;
+}
+
+/* Pipeline Mode (병렬/파이프라인) Ambient 틴트 */
+html.mode-pipeline {
+  --ar-canvas-bg: #F2EEF8;
+  --ar-accent: #7C3AED;
+}
+html.dark.mode-pipeline {
+  --ar-canvas-bg: #15131C;
+  --ar-panel-bg: #1D1A27;
+  --ar-header-bg: #262234;
+  --ar-border: #36304A;
+  --ar-accent: #A855F7;
+}
+
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--ar-canvas-bg);
+  color: var(--ar-text-primary);
+  transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.dark body {
+  background-color: var(--ar-canvas-bg);
+  color: var(--ar-text-primary);
+}
+
+/* ======================================================== */
+/* PLAY 상태 시 메인 배경 우하단 이동 밀키 파스텔 스카이 안개 */
+/* (Single 모드 & Light 모드: 뽀얗고 여리여리한 초극세사 파스텔 톤) */
+/* ======================================================== */
+@keyframes playPastelFogGlide {
+  0% {
+    background-position: 0 0, 0 0, 100% 100%;
+  }
+  100% {
+    background-position: 0 0, 0 0, 0% 0%;
+  }
+}
+
+html.mode-single:not(.dark) main.is-playing-single-light {
+  background:
+    radial-gradient(ellipse 90% 70% at 20% 20%, rgba(224, 242, 254, 0.35) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 80% 60% at 80% 80%, rgba(232, 244, 252, 0.3) 0%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #f0f8ff 12.5%,
+      #e8f4fc 25%,
+      #e0f2fe 37.5%,
+      #ffffff 50%,
+      #f0f8ff 62.5%,
+      #e8f4fc 75%,
+      #e0f2fe 87.5%,
+      #ffffff 100%
+    );
+  background-size: 100% 100%, 100% 100%, 200% 200%;
+  animation: playPastelFogGlide 18s linear infinite;
+  transition: background 0.8s ease-in-out;
+}
+
+/* 패널 외곽 소프트 섀도우 통일 (밝은 캔버스 위에서 깔끔한 입체감 유지) */
+.shadow-sm {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
+  transition: box-shadow 0.6s ease-in-out;
+}
+html.dark .shadow-sm {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Single Light 재생(PLAY) 시 각 컴포넌트 그림자만 파스텔톤 하늘색으로 변환 (테두리는 기존 테두리 유지) */
+html.mode-single:not(.dark) main.is-playing-single-light .rounded-lg.shadow-sm {
+  box-shadow: 0 4px 16px 0 rgba(56, 189, 248, 0.16), 0 1px 3px 0 rgba(14, 165, 233, 0.1) !important;
+}
+
+/* ======================================================== */
+/* 테마 전환 시 자연스럽고 부드러운 색상/배경 페이드 트랜지션 */
+/* ======================================================== */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              fill 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              stroke 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 350ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 0s !important;
 }
 
 /* Monaco Editor 선택 라인 하이라이트 스타일 */
@@ -58,30 +182,152 @@ body {
   background-color: #ffffff !important;
 }
 
-/* Play/Pause 화면 중앙 팝업 & 블러 페이드아웃 애니메이션 */
+html.dark .monaco-editor .margin {
+  background-color: #1e1e1e !important;
+}
+
+/* Dark mode Monaco Line Highlights */
+html.dark .monaco-selected-c-line {
+  background-color: #04395e !important;
+}
+
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-selected-c-linenumber) {
+  background-color: #04395e !important;
+  box-shadow: inset 4px 0 0 0 #007acc !important;
+}
+
+html.dark .monaco-editor .line-numbers.monaco-selected-c-linenumber {
+  color: #9cdcfe !important;
+  font-weight: 700 !important;
+}
+
+html.dark .monaco-executing-c-line {
+  background-color: #133a27 !important;
+}
+
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-c-linenumber) {
+  background-color: #133a27 !important;
+  box-shadow: inset 4px 0 0 0 #23d18b !important;
+}
+
+html.dark .monaco-editor .line-numbers.monaco-executing-c-linenumber {
+  color: #7ee787 !important;
+  font-weight: 700 !important;
+}
+
+html.dark .monaco-executing-selected-c-line {
+  background-color: #0e3a47 !important;
+}
+
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-c-linenumber) {
+  background-color: #0e3a47 !important;
+  box-shadow: inset 4px 0 0 0 #007acc !important;
+}
+
+html.dark .monaco-editor .line-numbers.monaco-executing-selected-c-linenumber {
+  color: #4fc1ff !important;
+  font-weight: 700 !important;
+}
+
+/* VS Code 스타일 얇은 스크롤바 */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.25);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.45);
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Play/Pause/Reset/Trash 화면 중앙 팝업 & 블러 페이드아웃 애니메이션 (1.15초 프리미엄 트랜지션) */
 @keyframes playbackIndicatorAnim {
   0% {
     opacity: 0;
-    transform: scale(0.65);
-    filter: blur(8px);
+    transform: scale(0.75);
+    filter: blur(6px);
   }
-  20% {
-    opacity: 0.95;
-    transform: scale(1.05);
+  15% {
+    opacity: 0.98;
+    transform: scale(1.02);
     filter: blur(0px);
   }
-  35% {
-    opacity: 0.9;
+  25% {
+    opacity: 0.95;
+    transform: scale(1);
+    filter: blur(0px);
+  }
+  65% {
+    opacity: 0.95;
     transform: scale(1);
     filter: blur(0px);
   }
   100% {
     opacity: 0;
-    transform: scale(1.2);
-    filter: blur(12px);
+    transform: scale(1.08);
+    filter: blur(10px);
   }
 }
 
 .playback-indicator-overlay {
-  animation: playbackIndicatorAnim 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: playbackIndicatorAnim 1150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* AI 어시스턴트 팝업이 버튼 바로 아래에서 부드럽게 스르륵 펼쳐지며 내려오는 애니메이션 */
+@keyframes aiPopupDropFromButton {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scaleY(0.88) scaleX(0.94);
+    filter: blur(4px);
+  }
+  65% {
+    opacity: 0.98;
+    transform: translateY(2px) scale(1.005);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.ai-popup-drop-anim {
+  transform-origin: top right;
+  animation: aiPopupDropFromButton 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 소스코드 업로드 팝업이 버튼 바로 아래에서 우하단으로 부드럽게 펼쳐지며 내려오는 애니메이션 */
+@keyframes uploadPopupDropFromButton {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scaleY(0.88) scaleX(0.94);
+    filter: blur(4px);
+  }
+  65% {
+    opacity: 0.98;
+    transform: translateY(2px) scale(1.005);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.upload-popup-drop-anim {
+  transform-origin: top left;
+  animation: uploadPopupDropFromButton 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

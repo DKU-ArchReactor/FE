@@ -6,17 +6,34 @@ const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
     return raw;
   }
 
+  const isSingleCycle = raw.simulator?.mode === "single" || raw.simulator?.pipeline_model === "single-cycle";
+
   const normalizedHistory: CycleHistoryItem[] = raw.history.map((item) => {
-    const buffers = item.buffers ?? {
-      IF: item.if_stage ?? item.stage_activity?.IF ?? null,
-      ID: item.id_stage ?? item.stage_activity?.ID ?? null,
-      EX: item.ex_stage ?? item.stage_activity?.EX ?? null,
-      MEM: item.mem_stage ?? item.stage_activity?.MEM ?? null,
-      WB: item.wb_stage ?? item.stage_activity?.WB ?? null,
-    };
+    // Single 모드에서는 buffers의 모든 엔트리가 null이고, stage_activity 또는 if_stage~wb_stage에 현재 실행된 명령어가 들어있음
+    let buffers = item.buffers;
+    if (isSingleCycle || !buffers || (buffers.IF === null && buffers.ID === null && buffers.EX === null && buffers.MEM === null && buffers.WB === null)) {
+      if (item.stage_activity) {
+        buffers = {
+          IF: item.stage_activity.IF ?? null,
+          ID: item.stage_activity.ID ?? null,
+          EX: item.stage_activity.EX ?? null,
+          MEM: item.stage_activity.MEM ?? null,
+          WB: item.stage_activity.WB ?? null,
+        };
+      } else if (item.if_stage || item.id_stage || item.ex_stage || item.mem_stage || item.wb_stage) {
+        buffers = {
+          IF: item.if_stage ?? null,
+          ID: item.id_stage ?? null,
+          EX: item.ex_stage ?? null,
+          MEM: item.mem_stage ?? null,
+          WB: item.wb_stage ?? null,
+        };
+      }
+    }
+
     return {
       ...item,
-      buffers,
+      buffers: buffers ?? { IF: null, ID: null, EX: null, MEM: null, WB: null },
     };
   });
 

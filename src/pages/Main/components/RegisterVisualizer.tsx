@@ -15,95 +15,73 @@ const formatSignedDec = (hexStr: string): string => {
   return signed.toLocaleString();
 };
 
-// 레지스터 역할별 그룹 스타일 정의: 기본은 깨끗한 흰색(bg-white), 값이 들어있는 곳만 구역별 연한 파스텔 배경
 type RegisterGroup = 'zero' | 'special' | 'args' | 'saved' | 'temp';
 
-interface RegisterGroupStyle {
-  label: string;
-  textColor: string;
-  activeBg: string; // 기본 상태에서 값이 들어있을 때의 구역별 연한 파스텔톤 배경
-  pulseBg: string;  // 값이 새로 쓰이는 전반부(50% 주기) 동안 반짝 점등되는 하이라이트 배경
-}
-
-const REGISTER_GROUP_STYLES: Record<RegisterGroup, RegisterGroupStyle> = {
+// 레지스터 그룹별 고유 시그니처 색상 (이름 & 데이터값 매핑)
+const GROUP_COLORS: Record<RegisterGroup, { name: string; data: string }> = {
   zero: {
-    label: 'Zero',
-    textColor: 'text-slate-600 font-bold',
-    activeBg: 'bg-slate-100 hover:bg-slate-200/80',
-    pulseBg: 'bg-slate-200 text-slate-900 font-bold',
+    name: 'text-slate-500 dark:text-slate-400',
+    data: 'text-slate-500 dark:text-slate-400',
   },
   special: {
-    // ra, sp, gp, tp: 세련된 파스텔 로즈
-    label: 'Special',
-    textColor: 'text-rose-600 font-bold',
-    activeBg: 'bg-rose-50/80 hover:bg-rose-100/70',
-    pulseBg: 'bg-rose-200/90 text-rose-950 font-bold',
+    name: 'text-purple-600 dark:text-purple-400',
+    data: 'text-purple-700 dark:text-purple-300',
   },
   args: {
-    // a0 ~ a7 (함수 인자): 맑고 청량한 파스텔 블루
-    label: 'Args',
-    textColor: 'text-blue-600 font-bold',
-    activeBg: 'bg-blue-50/80 hover:bg-blue-100/70',
-    pulseBg: 'bg-blue-200/90 text-blue-950 font-bold',
+    name: 'text-emerald-600 dark:text-emerald-400',
+    data: 'text-emerald-700 dark:text-emerald-300',
   },
   saved: {
-    // s0 ~ s11 (보존 레지스터): 편안한 파스텔 틸/민트
-    label: 'Saved',
-    textColor: 'text-teal-700 font-bold',
-    activeBg: 'bg-teal-50/80 hover:bg-teal-100/70',
-    pulseBg: 'bg-teal-200/90 text-teal-950 font-bold',
+    name: 'text-amber-600 dark:text-amber-400',
+    data: 'text-amber-700 dark:text-amber-300',
   },
   temp: {
-    // t0 ~ t6 (임시 레지스터): 부드러운 파스텔 앰버/피치
-    label: 'Temp',
-    textColor: 'text-amber-700 font-bold',
-    activeBg: 'bg-amber-50/80 hover:bg-amber-100/70',
-    pulseBg: 'bg-amber-200/90 text-amber-950 font-bold',
+    name: 'text-sky-600 dark:text-sky-400',
+    data: 'text-sky-700 dark:text-sky-300',
   },
 };
 
-// 레지스터 메타데이터: ABI 이름, 특수 목적 및 사전 배정 여부
+// 레지스터 메타데이터: ABI 이름, 그룹, 역할 설명
 interface RegisterMeta {
   abi: string;
   group: RegisterGroup;
+  role: string;
   desc?: string;
-  isPreset?: boolean;
-  presetTag?: string;
 }
 
 const REGISTER_METAS: Record<string, RegisterMeta> = {
-  x0: { abi: 'zero', group: 'zero', desc: 'Hardwired 0 (항상 0 고정)', isPreset: true, presetTag: 'Fixed 0' },
-  x1: { abi: 'ra', group: 'special', desc: 'Return Address (함수 반환 주소)' },
-  x2: { abi: 'sp', group: 'special', desc: 'Stack Pointer (초기 스택 포인터: 0x7FFFEFFC)', isPreset: true, presetTag: 'Init SP' },
-  x3: { abi: 'gp', group: 'special', desc: 'Global Pointer (전역 포인터)' },
-  x4: { abi: 'tp', group: 'special', desc: 'Thread Pointer (스레드 포인터)' },
-  x5: { abi: 't0', group: 'temp', desc: 'Temporary (임시)' },
-  x6: { abi: 't1', group: 'temp', desc: 'Temporary (임시)' },
-  x7: { abi: 't2', group: 'temp', desc: 'Temporary (임시)' },
-  x8: { abi: 's0', group: 'saved', desc: 'Saved / Frame Pointer' },
-  x9: { abi: 's1', group: 'saved', desc: 'Saved register' },
-  x10: { abi: 'a0', group: 'args', desc: 'Function argument / Return value' },
-  x11: { abi: 'a1', group: 'args', desc: 'Function argument / Return value' },
-  x12: { abi: 'a2', group: 'args', desc: 'Function argument' },
-  x13: { abi: 'a3', group: 'args', desc: 'Function argument' },
-  x14: { abi: 'a4', group: 'args', desc: 'Function argument' },
-  x15: { abi: 'a5', group: 'args', desc: 'Function argument' },
-  x16: { abi: 'a6', group: 'args', desc: 'Function argument' },
-  x17: { abi: 'a7', group: 'args', desc: 'Function argument' },
-  x18: { abi: 's2', group: 'saved', desc: 'Saved register' },
-  x19: { abi: 's3', group: 'saved', desc: 'Saved register' },
-  x20: { abi: 's4', group: 'saved', desc: 'Saved register' },
-  x21: { abi: 's5', group: 'saved', desc: 'Saved register' },
-  x22: { abi: 's6', group: 'saved', desc: 'Saved register' },
-  x23: { abi: 's7', group: 'saved', desc: 'Saved register' },
-  x24: { abi: 's8', group: 'saved', desc: 'Saved register' },
-  x25: { abi: 's9', group: 'saved', desc: 'Saved register' },
-  x26: { abi: 's10', group: 'saved', desc: 'Saved register' },
-  x27: { abi: 's11', group: 'saved', desc: 'Saved register' },
-  x28: { abi: 't3', group: 'temp', desc: 'Temporary' },
-  x29: { abi: 't4', group: 'temp', desc: 'Temporary' },
-  x30: { abi: 't5', group: 'temp', desc: 'Temporary' },
-  x31: { abi: 't6', group: 'temp', desc: 'Temporary' },
+  x0: { abi: 'zero', group: 'zero', role: '항상 0 고정', desc: 'Hardwired 0 (항상 0 고정)' },
+  x1: { abi: 'ra', group: 'special', role: '함수 반환 주소', desc: 'Return Address (함수 반환 주소)' },
+  x2: { abi: 'sp', group: 'special', role: '스택 포인터', desc: 'Stack Pointer (스택 포인터: 0x7FFFEFFC)' },
+  x3: { abi: 'gp', group: 'special', role: '전역 포인터', desc: 'Global Pointer (전역 포인터)' },
+  x4: { abi: 'tp', group: 'special', role: '스레드 포인터', desc: 'Thread Pointer (스레드 포인터)' },
+  x5: { abi: 't0', group: 'temp', role: '임시 레지스터', desc: 'Temporary 0 (임시 저장)' },
+  x6: { abi: 't1', group: 'temp', role: '임시 레지스터', desc: 'Temporary 1 (임시 저장)' },
+  x7: { abi: 't2', group: 'temp', role: '임시 레지스터', desc: 'Temporary 2 (임시 저장)' },
+  x8: { abi: 's0', group: 'saved', role: '저장 / 프레임 포인터', desc: 'Saved register 0 / Frame Pointer' },
+  x9: { abi: 's1', group: 'saved', role: '저장 레지스터', desc: 'Saved register 1' },
+  x10: { abi: 'a0', group: 'args', role: '함수 인자 / 반환값', desc: 'Function argument 0 / Return value 0' },
+  x11: { abi: 'a1', group: 'args', role: '함수 인자 / 반환값', desc: 'Function argument 1 / Return value 1' },
+  x12: { abi: 'a2', group: 'args', role: '함수 인자', desc: 'Function argument 2' },
+  x13: { abi: 'a3', group: 'args', role: '함수 인자', desc: 'Function argument 3' },
+  x14: { abi: 'a4', group: 'args', role: '함수 인자', desc: 'Function argument 4' },
+  x15: { abi: 'a5', group: 'args', role: '함수 인자', desc: 'Function argument 5' },
+  x16: { abi: 'a6', group: 'args', role: '함수 인자', desc: 'Function argument 6' },
+  x17: { abi: 'a7', group: 'args', role: '함수 인자', desc: 'Function argument 7' },
+  x18: { abi: 's2', group: 'saved', role: '저장 레지스터', desc: 'Saved register 2' },
+  x19: { abi: 's3', group: 'saved', role: '저장 레지스터', desc: 'Saved register 3' },
+  x20: { abi: 's4', group: 'saved', role: '저장 레지스터', desc: 'Saved register 4' },
+  x21: { abi: 's5', group: 'saved', role: '저장 레지스터', desc: 'Saved register 5' },
+  x22: { abi: 's6', group: 'saved', role: '저장 레지스터', desc: 'Saved register 6' },
+  x23: { abi: 's7', group: 'saved', role: '저장 레지스터', desc: 'Saved register 7' },
+  x24: { abi: 's8', group: 'saved', role: '저장 레지스터', desc: 'Saved register 8' },
+  x25: { abi: 's9', group: 'saved', role: '저장 레지스터', desc: 'Saved register 9' },
+  x26: { abi: 's10', group: 'saved', role: '저장 레지스터', desc: 'Saved register 10' },
+  x27: { abi: 's11', group: 'saved', role: '저장 레지스터', desc: 'Saved register 11' },
+  x28: { abi: 't3', group: 'temp', role: '임시 레지스터', desc: 'Temporary 3' },
+  x29: { abi: 't4', group: 'temp', role: '임시 레지스터', desc: 'Temporary 4' },
+  x30: { abi: 't5', group: 'temp', role: '임시 레지스터', desc: 'Temporary 5' },
+  x31: { abi: 't6', group: 'temp', role: '임시 레지스터', desc: 'Temporary 6' },
 };
 
 const REG_KEYS = Array.from({ length: 32 }, (_, i) => `x${i}`);
@@ -157,26 +135,30 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
-    <div className="flex-1 bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col min-h-0 overflow-hidden select-none">
-      {/* 통일된 상단 헤더 바 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs">📋</span>
-          <h3 className="text-xs font-bold text-slate-800 whitespace-nowrap">Registers</h3>
+    <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-sm transition-colors duration-150">
+      {/* VS Code VARIABLES / WATCH 스타일 헤더 (레지스터 전용 앰버 액센트 바) */}
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-amber-500 font-sans">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-amber-500 font-bold">◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            REGISTERS (x0 ~ x31)
+          </h3>
         </div>
-        <span className="text-[10px] font-mono text-slate-400 font-semibold">x0 ~ x31</span>
+        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
+          CLK:{cycle ?? 0}
+        </span>
       </div>
 
-      {/* 32개 레지스터: 전체 가용 높이를 1/32로 균등 분할(flex-1 min-h-0)하여 스크롤 없이 100% 핏 */}
-      <div className="flex-1 flex flex-col font-mono min-h-0 overflow-hidden px-1.5 py-1">
+      {/* 32개 레지스터 그리드: VS Code 디버거 변수 인스펙터 룩앤필 */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1.5 py-0.5 divide-y divide-[var(--ar-border-subtle)]">
         {regKeys.map((regKey, idx) => {
           const val = registers[regKey] || '0x00000000';
           const isPulsing = pulsingKeys.has(regKey);
           const hasVal = val !== '0x00000000';
           const meta = REGISTER_METAS[regKey] || { abi: regKey, group: 'temp' as RegisterGroup };
-          const groupStyle = REGISTER_GROUP_STYLES[meta.group];
+          const groupColor = GROUP_COLORS[meta.group] || GROUP_COLORS.temp;
 
-          // 그룹이 바뀌는 경계선(Chunk Divider): 상단 1px 구분선 (일반 행은 1px 경계선)
+          // 그룹 경계선
           const prevMeta = idx > 0 ? REGISTER_METAS[regKeys[idx - 1]] : undefined;
           const isGroupStart = prevMeta && prevMeta.group !== meta.group;
 
@@ -184,52 +166,62 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
             <div
               key={regKey}
               title={`${meta.desc || regKey} (Hex: ${val})`}
-              className={`flex-1 min-h-0 flex items-center justify-between px-2.5 transition-colors duration-200 border-b border-slate-100 ${
-                isGroupStart ? 'border-t border-t-slate-300' : ''
+              className={`flex-1 min-h-0 flex items-center justify-between px-2 text-[11px] transition-colors duration-100 ${
+                isGroupStart ? 'border-t border-t-[#D0D7DE] dark:border-t-[#3E3E42]' : ''
               } ${
                 isPulsing
-                  ? groupStyle.pulseBg
+                  ? 'bg-[#FFF8C5] dark:bg-[#37373D] text-[#9A6700] dark:text-[#E5B567] font-bold'
                   : hasVal
-                  ? `${groupStyle.activeBg} text-slate-900 font-medium`
-                  : 'bg-white hover:bg-slate-50/70 text-slate-400'
+                  ? 'bg-white dark:bg-[#252526]/50 hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#1F2328] dark:text-[#D4D4D4]'
+                  : 'hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E]/50 text-[#656D76] dark:text-[#6E7681]'
               }`}
             >
-              {/* 좌측: [ABI 이름 크게] + [레지스터 번호] + [태그] */}
-              <div className="flex items-center gap-1.5 min-w-0">
-                {/* 1. ABI 이름 (a0, s0, t0, sp 등) - 동그라미 제거 & 폰트 크기 12.5px로 시원하게 확대 */}
-                <span className={`w-8 text-[12.5px] font-mono tracking-tight ${
-                  isPulsing ? 'font-black' : groupStyle.textColor
+              {/* 1열 (좌측): [ABI 이름] (레지스터 번호) - 고정 너비로 수직 정렬선 일치 */}
+              <div className="w-[72px] shrink-0 flex items-center gap-1 min-w-0">
+                <span className={`w-8 font-bold text-left ${
+                  isPulsing 
+                    ? 'text-[#9A6700] dark:text-[#E5B567]' 
+                    : groupColor.name
                 }`}>
                   {meta.abi}
                 </span>
 
-                {/* 2. 하드웨어 레지스터 번호 (x0 ~ x31) - 서브 라벨 */}
-                <span className={`w-6 text-[10px] font-mono ${
-                  isPulsing ? 'font-bold' : hasVal ? 'text-slate-500 font-semibold' : 'text-slate-400'
+                <span className={`text-[10px] tabular-nums ${
+                  isPulsing
+                    ? 'text-[#9A6700]/70 dark:text-[#E5B567]/70'
+                    : hasVal
+                    ? 'text-[#57606A] dark:text-[#CCCCCC] font-medium'
+                    : 'text-[#8C959F] dark:text-[#6E7681]'
                 }`}>
-                  {regKey}
+                  ({regKey})
                 </span>
-
-                {/* 3. 사전 설정 태그 (Init SP, Fixed 0 등) */}
-                {meta.presetTag && (
-                  <span className="text-[7.5px] px-1 py-0.2 rounded font-sans font-bold bg-white/80 text-purple-700 shadow-2xs border border-purple-200 shrink-0 leading-none">
-                    {meta.presetTag}
-                  </span>
-                )}
               </div>
 
-              {/* 우측: 10진수 값 (폰트 크기 12px) */}
-              <div
-                title={`Hex: ${val} (Unsigned: ${parseInt(val, 16) || 0})`}
-                className="flex items-center gap-2 shrink-0 cursor-help"
-              >
-                <span className={`font-mono text-[12px] tracking-wide ${
-                  isPulsing
-                    ? 'font-black'
-                    : hasVal
-                    ? 'text-slate-950 font-bold'
-                    : 'text-slate-400'
+              {/* 2열 (중앙): 독립된 역할 설명 열 (왼쪽 시작선 완벽 일치 및 값 존재 시 볼드 파랑 강조) */}
+              <div className="flex-1 min-w-0 px-2.5 text-left truncate">
+                <span className={`text-[9.5px] font-sans tracking-tight ${
+                  hasVal
+                    ? 'font-bold text-[#005FB8] dark:text-[#79C0FF]'
+                    : 'text-[#8C959F] dark:text-[#858585]'
                 }`}>
+                  {meta.role}
+                </span>
+              </div>
+
+              {/* 3열 (우측): 부호 있는 10진수 값 (우측 끝 정렬) */}
+              <div
+                title={`Hex: ${val}`}
+                className="w-24 shrink-0 text-right tabular-nums font-mono select-text cursor-help"
+              >
+                <span
+                  className={`text-[11px] ${
+                    isPulsing
+                      ? 'text-[#CF222E] dark:text-[#F44747] font-black'
+                      : hasVal
+                      ? `${groupColor.data} font-bold`
+                      : 'text-[#8C959F] dark:text-[#6E7681] font-normal'
+                  }`}
+                >
                   {formatSignedDec(val)}
                 </span>
               </div>

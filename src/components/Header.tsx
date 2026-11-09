@@ -1,14 +1,13 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getMe } from "@/api/auth";
 import type { UserMeResponse } from "@/type/auth";
+import ThemeSwitch from "@/components/ThemeSwitch";
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<UserMeResponse | null>(null);
-  const [isAiDropdownOpen, setIsAiDropdownOpen] = useState(false);
-  const aiDropdownRef = useRef<HTMLDivElement>(null);
 
   const [aspectTier, setAspectTier] = useState<"normal" | "ultrawide" | "superwide">(() => {
     if (typeof window === "undefined") return "normal";
@@ -28,17 +27,6 @@ const Header = () => {
     checkAspectRatio();
     window.addEventListener("resize", checkAspectRatio);
     return () => window.removeEventListener("resize", checkAspectRatio);
-  }, []);
-
-  // 외부 클릭 시 AI 드롭다운 닫기
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (aiDropdownRef.current && !aiDropdownRef.current.contains(e.target as Node)) {
-        setIsAiDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const isActive = (path: string) => location.pathname === path;
@@ -105,24 +93,32 @@ const Header = () => {
         ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-sky-100 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
-        <div className="flex items-center gap-8">
+    <header className="sticky top-0 z-50 w-full bg-[var(--ar-panel-bg)] border-b border-[var(--ar-border)] select-none transition-colors duration-150 shadow-xs">
+      <div className="w-full px-4 h-12 flex justify-between items-center">
+        {/* 좌측: 로고 및 뷰포트 내비게이션 탭 */}
+        <div className="flex items-center gap-6">
           <div 
-            className="text-sky-600 font-bold text-2xl cursor-pointer tracking-tight flex items-center gap-2" 
+            className="text-[#005FB8] dark:text-[#007ACC] font-bold text-lg cursor-pointer tracking-tight flex items-center gap-2 group" 
             onClick={() => navigate("/")}
+            title="ArchReactor - RISC-V Pipeline Visualizer"
           >
-            ArchReactor
+            <img 
+              src="/logo.png" 
+              alt="ArchReactor Logo" 
+              className="w-7 h-7 object-contain transition-transform duration-200 group-hover:scale-105" 
+            />
+            <span className="font-extrabold tracking-tight">ArchReactor</span>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1">
             {navItems.map((item) => (
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                className={`px-3 py-1 rounded text-xs font-semibold border transition-all cursor-pointer ${
                   item.active
-                    ? "bg-sky-50 text-sky-600 font-semibold"
-                    : "text-slate-600 hover:text-sky-600 hover:bg-slate-50"
+                    ? "bg-[var(--ar-header-bg)] text-[var(--ar-accent)] border-[var(--ar-border)] shadow-xs"
+                    : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
                 {item.label}
@@ -131,78 +127,29 @@ const Header = () => {
           </div>
         </div>
 
-        <nav className="flex items-center gap-3">
-          {/* AI 튜터 & 연동 드롭다운 버튼 (로그인 버튼 바로 왼쪽에 위치) */}
-          <div className="relative" ref={aiDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsAiDropdownOpen((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 cursor-pointer border ${
-                isAiDropdownOpen
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200"
-                  : "bg-indigo-50/70 hover:bg-indigo-100/80 text-indigo-700 border-indigo-200/80"
-              }`}
-            >
-              <span className="text-sm">✨</span>
-              <span>AI 어시스턴트</span>
-              <span className={`text-[10px] transition-transform duration-200 ${isAiDropdownOpen ? "rotate-180" : ""}`}>
-                ▼
-              </span>
-            </button>
+        {/* 우측: 테마 토글 스위치 + 유저 메뉴 */}
+        <nav className="flex items-center gap-2">
+          {/* 테마 토글 스위치 (VS Code Light / Dark 슬라이딩 스위치) */}
+          <ThemeSwitch />
 
-            {/* 상단에서 자연스럽게 아래로 드롭다운되는 AI 팝업창 */}
-            {isAiDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200">
-                <div className="px-4 py-3 bg-gradient-to-r from-indigo-50 to-sky-50 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
-                    <h3 className="text-xs font-bold text-slate-800">ArchReactor AI 도우미</h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsAiDropdownOpen(false)}
-                    className="text-slate-400 hover:text-slate-600 text-xs p-1 rounded-md"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="p-4 flex flex-col items-center text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-xs">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-                    </svg>
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">생성형 AI 질의응답</h4>
-                  <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-[260px]">
-                    작성 중인 C 코드와 RISC-V 파이프라인에서 발생하는 데이터 해저드나 스톨 현상에 대해 AI에게 실시간으로 질문할 수 있습니다.
-                  </p>
-                  <div className="mt-4 w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-500 font-mono text-left">
-                    💡 연동 안내: 현재 AI 백엔드 인터페이스 준비 중입니다.
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="h-4 w-px bg-slate-200 mx-1" />
+          <div className="h-3.5 w-px bg-[#D0D7DE] dark:border-[#3E3E42] mx-0.5" />
 
           {user ? (
             <>
-              <span className="text-sm font-medium text-slate-700">
-                <strong className="text-sky-600 font-semibold">{user.name}</strong>님
+              <span className="text-xs font-medium text-[#24292F] dark:text-[#CCCCCC]">
+                <strong className="text-[#005FB8] dark:text-[#007ACC] font-semibold">{user.name}</strong>님
               </span>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="text-sm font-medium text-slate-500 hover:text-rose-500 transition-colors cursor-pointer"
+                className="text-xs font-medium text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] transition-colors cursor-pointer"
               >
                 로그아웃
               </button>
               <button 
                 type="button"
                 onClick={() => navigate("/my")}
-                className="text-sm font-medium text-white bg-sky-500 hover:bg-sky-600 px-4 py-1.5 rounded-full shadow-md shadow-sky-200 transition-all active:scale-95 cursor-pointer"
+                className="text-xs font-semibold text-white bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] px-3 py-1 rounded transition-colors cursor-pointer"
               >
                 마이페이지
               </button>
@@ -212,14 +159,18 @@ const Header = () => {
               <button 
                 type="button"
                 onClick={() => navigate("/login")}
-                className={`text-sm font-medium transition-colors hover:text-sky-600 cursor-pointer ${isActive('/login') ? 'text-sky-600' : 'text-slate-600'}`}
+                className={`text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer ${
+                  isActive('/login')
+                    ? 'text-[#005FB8] dark:text-[#007ACC] font-bold'
+                    : 'text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC]'
+                }`}
               >
                 로그인
               </button>
               <button 
                 type="button"
                 onClick={() => navigate("/signup")}
-                className={`text-sm font-medium transition-colors hover:text-sky-600 cursor-pointer ${isActive('/signup') ? 'text-sky-600' : 'text-slate-600'}`}
+                className="text-xs font-semibold px-2.5 py-1 rounded bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white transition-colors cursor-pointer"
               >
                 회원가입
               </button>
