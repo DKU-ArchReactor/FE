@@ -8,10 +8,11 @@ export const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
 
 export function useFileManager(
   initialFileId: string | null,
+  example?: { source: string; fileName: string },
   onInitialResetSimulation?: () => void
 ) {
   const [fileId, setFileId] = useState<string | null>(initialFileId);
-  const [cFileName, setCFileName] = useState<string>("main.c");
+  const [cFileName, setCFileName] = useState<string>(example?.fileName ?? "main.c");
   const [savedFiles, setSavedFiles] = useState<FileSummary[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(
     () => !!localStorage.getItem("access_token")
@@ -25,7 +26,7 @@ export function useFileManager(
   }, [onInitialResetSimulation]);
 
   const [translationSource, setTranslationSource] = useState(
-    () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE
+    () => example?.source ?? (sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE)
   );
   const [translationAssembly, setTranslationAssembly] = useState("");
   const [translationError, setTranslationError] = useState("");
@@ -138,6 +139,7 @@ export function useFileManager(
     setFileId,
     cFileName,
     setCFileName,
+    cContent: translationSource,
     savedFiles,
     setSavedFiles,
     isLoggedIn,

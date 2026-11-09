@@ -13,6 +13,7 @@ import { useSimulationPlayback } from "./hooks/useSimulationPlayback";
 import { useSimulationSession } from "./hooks/useSimulationSession";
 import { useFileManager } from "./hooks/useFileManager";
 import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
+import { getLearningExample } from "@/data/learningExamples";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
   "# RISC-V 32IM 어셈블리 직접 작성",
@@ -47,9 +48,13 @@ const MainPage: React.FC = () => {
 
   // 2. 파일 및 소스 코드 상태 훅
   const resetSimulationRef = useRef<(() => void) | null>(null);
-  const fileMgr = useFileManager(initialFileId, () => {
-    resetSimulationRef.current?.();
-  });
+  const fileMgr = useFileManager(
+    initialFileId,
+    initialFileId ? undefined : getLearningExample(searchParams.get("example")),
+    () => {
+      resetSimulationRef.current?.();
+    }
+  );
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
@@ -165,7 +170,7 @@ const MainPage: React.FC = () => {
 
   const handleGoPrevViewport = () => {
     if (rightViewportIndex === 2) navigate("/pipeline");
-    else if (rightViewportIndex === 1) navigate("/");
+    else if (rightViewportIndex === 1) navigate("/simulator");
   };
 
   const handleGoNextViewport = () => {

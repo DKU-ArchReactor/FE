@@ -184,7 +184,7 @@ const TaskList = () => {
 
   // 시뮬레이터로 이동
   const handleMoveToSimulator = (fileId: string) => {
-    navigate(`/?fileId=${encodeURIComponent(fileId)}`, {
+    navigate(`/simulator?fileId=${encodeURIComponent(fileId)}`, {
       state: { fileId },
     });
   };
