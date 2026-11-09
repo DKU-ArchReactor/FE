@@ -1,10 +1,10 @@
-import { useMemo, useEffect, useRef, useState, useCallback } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "@/context/ThemeContext";
-import { mapAssembly, type MappedAssemblyRow } from "./translationCompile";
+import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
 import type { StageBuffer } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
-import { getFileById } from "@/api/file";
+import AsmFileUploadPopup from "./AsmFileUploadPopup";
 
 type Props = {
   source: string;
@@ -71,7 +71,7 @@ export default function TranslationMapping({
   error,
   selectedLine,
   selectedAsmIndex,
-  executionLine,
+  executionLine: _executionLine,
   onSelectLine,
   stageBuffers,
   mode = "pipeline",
@@ -95,157 +95,10 @@ export default function TranslationMapping({
   const containerRef = useRef<HTMLDivElement>(null);
   const rowElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
-  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
-  const [isDragOver, setIsDragOver] = useState(false);
   const [asmSaveSuccess, setAsmSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const isLoggedIn = !!localStorage.getItem("access_token");
-
-  // 저장된 파일 중 어셈블리(.s, .asm, lang=asm) 필터링
-  const savedAsmFiles = useMemo(() => {
-    return savedFiles.filter(
-      (f) =>
-        f.lang === "asm" ||
-        f.title.toLowerCase().endsWith(".s") ||
-        f.title.toLowerCase().endsWith(".asm")
-    );
-  }, [savedFiles]);
-
-  // 어셈블리 예제 템플릿 목록
-  const ASM_TEMPLATES = [
-    {
-      title: "기본 산술 연산 (Basic ALU)",
-      desc: "addi, add, sub 명령어를 사용한 기초 레지스터 연산",
-      code: `# RISC-V 32IM 기본 산술 연산 예제
-.globl main
-main:
-    addi x1, x0, 10      # x1 = 10
-    addi x2, x0, 20      # x2 = 20
-    add  x3, x1, x2      # x3 = x1 + x2 (30)
-    sub  x4, x3, x1      # x4 = x3 - x1 (20)
-    ret
-`,
-    },
-    {
-      title: "반복문 카운터 (Loop Counter)",
-      desc: "조건 분기(bne)를 이용한 1부터 5까지의 합 계산 루프",
-      code: `# RISC-V 32IM 루프 카운터 예제
-.globl main
-main:
-    addi x1, x0, 0       # x1 (sum) = 0
-    addi x2, x0, 1       # x2 (i) = 1
-    addi x3, x0, 6       # x3 (limit) = 6
-loop:
-    add  x1, x1, x2      # sum += i
-    addi x2, x2, 1       # i++
-    bne  x2, x3, loop    # if i != 6 goto loop
-    ret
-`,
-    },
-    {
-      title: "메모리 로드 및 스토어 (Load & Store)",
-      desc: "스택 포인터(sp)를 활용한 lw, sw 메모리 데이터 전송",
-      code: `# RISC-V 32IM 메모리 접근 예제
-.globl main
-main:
-    addi sp, sp, -16     # 스택 프레임 16바이트 할당
-    addi x5, x0, 42      # x5 = 42
-    sw   x5, 8(sp)       # sp + 8 주소에 x5 저장
-    lw   x6, 8(sp)       # sp + 8 주소에서 x6로 로드
-    addi sp, sp, 16      # 스택 복원
-    ret
-`,
-    },
-  ];
-
-  // 팝업 위치 계산 (업로드 버튼 바로 아래)
-  const updatePopupPos = useCallback(() => {
-    if (uploadButtonRef.current) {
-      const rect = uploadButtonRef.current.getBoundingClientRect();
-      const popupWidth = 340;
-      const left = Math.max(12, Math.min(window.innerWidth - popupWidth - 12, rect.left));
-      const top = rect.bottom + 6;
-      setPopupPos({ top, left });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isUploadPopupOpen) {
-      updatePopupPos();
-      window.addEventListener("resize", updatePopupPos);
-      window.addEventListener("scroll", updatePopupPos, true);
-      return () => {
-        window.removeEventListener("resize", updatePopupPos);
-        window.removeEventListener("scroll", updatePopupPos, true);
-      };
-    }
-  }, [isUploadPopupOpen, updatePopupPos]);
-
-  // 외부 클릭 시 팝업 닫기
-  useEffect(() => {
-    if (!isUploadPopupOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(target) &&
-        uploadButtonRef.current &&
-        !uploadButtonRef.current.contains(target)
-      ) {
-        setIsUploadPopupOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isUploadPopupOpen]);
-
-  // 드래그 앤 드롭 핸들러
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      readAsmFile(file);
-      setIsUploadPopupOpen(false);
-    }
-  };
-
-  const readAsmFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result;
-      if (typeof content === "string") {
-        onAssemblyChange?.(content);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      readAsmFile(file);
-      setIsUploadPopupOpen(false);
-    }
-    e.target.value = "";
-  };
 
   // ASM 서버 저장 핸들러 (C 에디터와 1:1 동일)
   const handleSaveAsmClick = async () => {
@@ -277,26 +130,6 @@ main:
     }
   };
 
-  // 저장된 파일 목록에서 개별 어셈블리 파일 로컬 다운로드 핸들러
-  const handleDownloadSavedFile = async (e: React.MouseEvent, file: FileSummary) => {
-    e.stopPropagation();
-    try {
-      const detail = await getFileById(file.file_id);
-      const blob = new Blob([detail.content], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = detail.title || `${file.title || "source"}.s`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("File download error:", err);
-      alert("파일을 다운로드하지 못했습니다.");
-    }
-  };
-
   // 파이프라인 스테이지별 활성 명령어 매핑 (현재 클록 사이클 기준)
   const activeStagesByInst = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -308,121 +141,65 @@ main:
         const norm = buf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
         if (norm) {
           if (!map[norm]) map[norm] = [];
-          if (!map[norm].includes(name)) map[norm].push(name);
+          map[norm].push(name);
         }
       }
     });
+
     return map;
   }, [stageBuffers, mode]);
 
-  // 헬퍼: 타겟 요소(그룹 마지막 행)가 컨테이너 뷰포트 하단에 완전히 드러나도록 스크롤
-  const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const cRect = container.getBoundingClientRect();
-    const lastRect = lastEl.getBoundingClientRect();
-
-    // 그룹 마지막 행의 바닥이 컨테이너 바닥보다 아래에 있다면 -> 끝까지 확실하게 아래로 스크롤 (여백 28px)
-    if (lastRect.bottom > cRect.bottom - 28) {
-      const scrollDiff = lastRect.bottom - (cRect.bottom - 28);
-      container.scrollTo({
-        top: container.scrollTop + scrollDiff,
-        behavior: "smooth",
-      });
-      return;
-    }
-
-    // 그룹 첫 번째 행이 컨테이너 천장보다 위에 있다면 -> 위로 스크롤
-    if (firstEl) {
-      const firstRect = firstEl.getBoundingClientRect();
-      if (firstRect.top < cRect.top + 12) {
-        const scrollDiff = (cRect.top + 12) - firstRect.top;
-        container.scrollTo({
-          top: Math.max(0, container.scrollTop - scrollDiff),
-          behavior: "smooth",
-        });
-      }
-    }
-  };
-
-  // Single 모드에서 실행 라인이 바뀔 때: 해당 C 구문에 속한 연관 라인 그룹 전체(맨 마지막 행까지)를 한눈에 볼 수 있도록 자동 스크롤
+  // C 코드 라인 선택 시 해당 어셈블리 행으로 자동 스크롤
   useEffect(() => {
-    if (mode !== "single" || currentActiveStep === null || currentActiveStep === undefined) return;
-    if (!containerRef.current) return;
+    if (selectedLine === null || !containerRef.current) return;
+    const targetIdx = rows.findIndex((r) => r.sourceLine === selectedLine);
+    if (targetIdx === -1) return;
 
-    const activeRow = rows[currentActiveStep];
-    if (!activeRow) return;
-
-    // 현재 실행 라인과 동일한 C 라인 번호를 갖는 마지막 어셈블리 행 인덱스 찾기
-    let lastSiblingIndex = currentActiveStep;
-    for (let i = currentActiveStep; i < rows.length; i++) {
-      if (rows[i].sourceLine === activeRow.sourceLine) {
-        lastSiblingIndex = i;
-      } else {
-        break;
-      }
-    }
-
-    // 그룹의 마지막 행 및 현재 실행 행 요소
-    const lastEl = rowElementsRef.current.get(lastSiblingIndex);
-    const activeEl = rowElementsRef.current.get(currentActiveStep);
-
-    if (lastEl) {
-      scrollGroupIntoView(lastEl, activeEl);
-    }
-  }, [mode, currentActiveStep, rows]);
-
-  const matchingIndices = useMemo(() => {
-    if (!selectedLine) return new Set<number>();
-    const indices = new Set<number>();
-    rows.forEach((row, idx) => {
-      if (row.sourceLine === selectedLine) {
-        indices.add(idx);
-      }
-    });
-    return indices;
-  }, [rows, selectedLine]);
-
-  // 선택된 라인이 바뀔 때: 해당 그룹의 마지막 행까지 한눈에 보이도록 스크롤 이동
-  useEffect(() => {
-    if (!selectedLine || !containerRef.current) return;
-
-    // 선택된 C 라인에 매핑된 어셈블리 행들 중 마지막 행과 첫 행 찾기
-    let firstIdx = -1;
-    let lastIdx = -1;
-    rows.forEach((row, idx) => {
-      if (row.sourceLine === selectedLine) {
-        if (firstIdx === -1) firstIdx = idx;
-        lastIdx = idx;
-      }
-    });
-
-    if (lastIdx !== -1) {
-      const lastEl = rowElementsRef.current.get(lastIdx);
-      const firstEl = rowElementsRef.current.get(firstIdx);
-
-      if (lastEl) {
-        scrollGroupIntoView(lastEl, firstEl);
-      }
+    const el = rowElementsRef.current.get(targetIdx);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [selectedLine, rows]);
 
+  // 파이프라인/싱글 사이클 실행 중 현재 실행 명령어 위치로 자동 추적 스크롤
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Single 모드: currentActiveStep (0~17)
+    if (mode === "single" && currentActiveStep !== null && currentActiveStep !== undefined) {
+      const el = rowElementsRef.current.get(currentActiveStep);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      return;
+    }
+
+    // Pipeline 모드: IF 단계 버퍼 명령어 위치 추적
+    if (mode === "pipeline" && stageBuffers?.IF?.assembly) {
+      const ifInst = stageBuffers.IF.assembly.replace(/\s+/g, " ").trim().toLowerCase();
+      if (ifInst && ifInst !== "bubble" && ifInst !== "empty") {
+        const targetIdx = rows.findIndex(
+          (r) => r.text.replace(/\s+/g, " ").trim().toLowerCase() === ifInst
+        );
+        if (targetIdx !== -1) {
+          const el = rowElementsRef.current.get(targetIdx);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+      }
+    }
+  }, [mode, currentActiveStep, stageBuffers?.IF?.assembly, rows]);
+
   return (
-    <section
-      className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
-      aria-label="RISC-V 어셈블리 결과"
+    <div
+      ref={containerRef}
+      className="h-full flex flex-col min-h-0 bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC] select-none text-xs"
     >
-      {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수, 우측 상태 문구) */}
-      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-sky-500">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
-              activeTarget === "asm"
-                ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
-                : "bg-transparent scale-0"
-            }`}
-          />
+      {/* 1단: 패널 메인 헤더 */}
+      <header className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F6F8FA] dark:bg-[#252526] min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm shrink-0">⚙️</span>
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
             RISC-V ASSEMBLY
           </h3>
@@ -454,11 +231,12 @@ main:
               activeTarget !== "asm"
                 ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
                 : isUploadPopupOpen
-                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
+                ? "border-[#005FB8] dark:border-[#007ACC] bg-blue-50 dark:bg-[#007ACC]/20 text-[#005FB8] dark:text-[#79C0FF] font-semibold cursor-pointer"
                 : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
             }`}
-            title="어셈블리 파일 불러오기 및 예제 템플릿 열기"
+            title="어셈블리 파일 업로드 및 예제 템플릿 불러오기"
           >
+            {/* 좁아졌을 때 나타나는 단색 폴더 기하 도형 아이콘 */}
             <svg
               className="w-3 h-3 fill-none stroke-current inline @[380px]:hidden shrink-0"
               viewBox="0 0 24 24"
@@ -478,13 +256,6 @@ main:
               ▼
             </span>
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".s,.asm,.txt"
-            className="hidden"
-            onChange={handleFileChange}
-          />
 
           {/* 2. 저장 버튼 */}
           <button
@@ -498,7 +269,7 @@ main:
                 ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
                 : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
             }`}
-            title="현재 어셈블리 코드를 main.s 파일로 다운로드"
+            title="현재 어셈블리 코드를 서버 및 로컬에 저장"
           >
             {asmSaveSuccess ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">✓</span>
@@ -573,225 +344,16 @@ main:
         </div>
       </div>
 
-      {/* ======================================================== */}
-      {/* 어셈블리 불러오기 드롭다운 팝업창                          */}
-      {/* ======================================================== */}
-      {isUploadPopupOpen && (
-        <div
-          ref={popupRef}
-          style={{
-            top: `${popupPos.top}px`,
-            left: `${popupPos.left}px`,
-            width: "340px",
-          }}
-          className="fixed z-50 rounded-xl overflow-hidden shadow-2xl border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC] upload-popup-drop-anim flex flex-col max-h-[470px] select-none"
-        >
-          {/* 팝업 헤더 */}
-          <div className="px-3.5 py-2 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F6F8FA] dark:bg-[#252526] flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs">📂</span>
-              <span className="text-xs font-bold text-[#1F2328] dark:text-[#CCCCCC]">
-                어셈블리 불러오기 및 예제
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsUploadPopupOpen(false)}
-              className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold"
-              title="창 닫기"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* 1. 상단 섹션: 로컬 어셈블리 파일 업로드 드롭존 */}
-          <div className="p-3 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#FAFBFD] dark:bg-[#1E1E1E] shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-[#1F2328] dark:text-[#CCCCCC] flex items-center gap-1">
-                <span>📤</span> 로컬 어셈블리 파일 불러오기
-              </span>
-              <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">
-                .s, .asm 지원
-              </span>
-            </div>
-
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`rounded-lg border-2 border-dashed p-3.5 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all duration-150 ${
-                isDragOver
-                  ? "border-[#005FB8] dark:border-[#007ACC] bg-blue-50/70 dark:bg-[#007ACC]/10 text-[#005FB8] dark:text-[#79C0FF] scale-[1.01]"
-                  : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] text-[#57606A] dark:text-[#858585] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-slate-50 dark:hover:bg-[#2D2D2D]"
-              }`}
-            >
-              <svg
-                className="w-6 h-6 stroke-current transition-transform group-hover:-translate-y-0.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.8}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                />
-              </svg>
-              <div className="text-center">
-                <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-                  클릭하여 파일 선택 <span className="font-normal text-[#57606A] dark:text-[#858585]">또는 드래그 앤 드롭</span>
-                </p>
-                <p className="text-[10px] text-[#8C959F] dark:text-[#6E7681] mt-0.5">
-                  선택 시 즉시 어셈블리 에디터에 로드됩니다.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. 중간 섹션: 저장된 어셈블리 파일 목록 */}
-          <div className="flex flex-col min-h-0 bg-white dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#3E3E42]">
-            <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#1E1E1E] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs">💾</span>
-                <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-                  저장된 어셈블리 파일
-                </span>
-                <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585]">
-                  ({isLoggedIn ? savedAsmFiles.length : 0})
-                </span>
-              </div>
-              {isLoggedIn && savedAsmFiles.length > 0 && (
-                <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
-                  클릭하여 열기
-                </span>
-              )}
-            </div>
-
-            <div className="overflow-y-auto p-1.5 space-y-1 max-h-36 divide-y divide-[#F0F0F0] dark:divide-[#333333]/50 [scrollbar-width:thin]">
-              {!isLoggedIn ? (
-                <div className="py-4 px-3 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col gap-0.5 items-center justify-center">
-                  <span className="font-medium text-[#1F2328] dark:text-[#CCCCCC]">로그인이 필요합니다</span>
-                  <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
-                    로그인 후 저장한 어셈블리 파일을 불러올 수 있습니다.
-                  </span>
-                </div>
-              ) : savedAsmFiles.length === 0 ? (
-                <div className="py-4 px-3 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col items-center justify-center">
-                  저장된 어셈블리 파일이 없습니다
-                </div>
-              ) : (
-                savedAsmFiles.map((f) => {
-                  const isSelected = currentFileId === f.file_id;
-                  const dateStr = f.updated_at
-                    ? new Date(f.updated_at).toLocaleDateString("ko-KR", {
-                        month: "2-digit",
-                        day: "2-digit",
-                      })
-                    : "";
-
-                  return (
-                    <div
-                      key={f.file_id}
-                      onClick={() => {
-                        onOpenSavedFile?.(f.file_id);
-                        setIsUploadPopupOpen(false);
-                      }}
-                      title="클릭하여 어셈블리 에디터에 열기"
-                      className={`w-full px-2.5 py-1.5 rounded text-left transition-colors flex items-center justify-between gap-2 cursor-pointer group/row ${
-                        isSelected
-                          ? "bg-blue-50/80 dark:bg-[#007ACC]/15 text-[#005FB8] dark:text-[#79C0FF]"
-                          : "hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span className="text-[11px] text-[#57606A] dark:text-[#858585] font-mono shrink-0">
-                          ⚙️
-                        </span>
-                        <span
-                          className={`text-xs font-mono truncate ${
-                            isSelected
-                              ? "font-bold text-[#005FB8] dark:text-[#79C0FF]"
-                              : "text-[#1F2328] dark:text-[#CCCCCC] group-hover/row:text-[#005FB8] dark:group-hover/row:text-[#79C0FF]"
-                          }`}
-                        >
-                          {f.title}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {dateStr && (
-                          <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">
-                            {dateStr}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => handleDownloadSavedFile(e, f)}
-                          title="로컬 파일로 다운로드"
-                          className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                        >
-                          <svg
-                            className="w-3.5 h-3.5 stroke-current"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* 3. 하단 섹션: ArchReactor RISC-V 템플릿 목록 */}
-          <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#252526]">
-            <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#1E1E1E] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs">📜</span>
-                <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-                  RISC-V 어셈블리 예제 템플릿
-                </span>
-              </div>
-              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
-                클릭하여 열기
-              </span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-1.5 space-y-1 min-h-[120px] max-h-56 divide-y divide-[#F0F0F0] dark:divide-[#333333]/50 [scrollbar-width:thin]">
-              {ASM_TEMPLATES.map((tmpl, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    onAssemblyChange?.(tmpl.code);
-                    setIsUploadPopupOpen(false);
-                  }}
-                  title="클릭하여 어셈블리 에디터에 예제 코드 로드"
-                  className="w-full px-2.5 py-2 rounded text-left transition-colors flex flex-col gap-0.5 cursor-pointer hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E] group/row"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#005FB8] dark:text-[#79C0FF] group-hover/row:underline">
-                      {tmpl.title}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">로드 ➔</span>
-                  </div>
-                  <span className="text-[10.5px] text-[#57606A] dark:text-[#858585] leading-snug">
-                    {tmpl.desc}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 분리된 ASM 팝업창 컴포넌트 연동 (3단 구조: 로컬 파일, 저장된 파일, 예제 템플릿) */}
+      <AsmFileUploadPopup
+        isOpen={isUploadPopupOpen}
+        onClose={() => setIsUploadPopupOpen(false)}
+        anchorRef={uploadButtonRef}
+        onSelectAssembly={(code) => onAssemblyChange?.(code)}
+        savedFiles={savedFiles}
+        currentFileId={currentFileId}
+        onOpenSavedFile={onOpenSavedFile}
+      />
 
       {/* 본문: ASM 직접 작성 모드일 때는 Monaco Editor, C 모드일 때는 매핑 뷰 */}
       {activeTarget === "asm" ? (
@@ -812,228 +374,132 @@ main:
               tabSize: 4,
               insertSpaces: true,
               lineNumbers: "on",
-              lineNumbersMinChars: 3,
+              renderWhitespace: "none",
               padding: { top: 8, bottom: 8 },
-              readOnly: busy,
-              stickyScroll: { enabled: false },
+              scrollbar: {
+                vertical: "auto",
+                horizontal: "auto",
+                verticalScrollbarSize: 8,
+                horizontalScrollbarSize: 8,
+              },
             }}
           />
         </div>
-      ) : !assembly && rows.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E]">
-          <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
-            📜
-          </div>
-          <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-            {busy
-              ? "컴파일 및 어셈블리 매핑 중…"
-              : error
-                ? "컴파일 오류로 어셈블리를 생성할 수 없습니다."
-                : "왼쪽 에디터에서 C 코드를 작성하고 [⚡ 컴파일]을 누르세요."}
-          </p>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
-            컴파일 완료 후 C 코드의 줄을 클릭하면 매핑된 어셈블리 라인이 즉시 강조됩니다.
-          </span>
-        </div>
       ) : (
-        <div
-          ref={containerRef}
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto text-[13px] leading-snug [scrollbar-gutter:stable] bg-white dark:bg-[#1E1E1E] text-[#24292F] dark:text-[#CCCCCC] select-text py-1"
-          style={{ fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace" }}
-          role="region"
-          aria-label="어셈블리 명령어 목록"
-        >
-          {rows.map((row, index) => {
-            const isMatched = matchingIndices.has(index);
-            const isFirstOfMatch =
-              isMatched && !matchingIndices.has(index - 1);
-            const { opcode, operands } = splitInstruction(row.text);
+        <div className="flex-1 overflow-y-auto divide-y divide-[#E5E5E5] dark:divide-[#2D2D2D] font-mono [scrollbar-width:thin]">
+          {error && (
+            <div className="p-2 text-rose-600 bg-rose-50 dark:bg-rose-950/30 border-b border-rose-200 dark:border-rose-900/50">
+              {error}
+            </div>
+          )}
 
-            const normRowText = row.text.replace(/\s+/g, " ").trim().toLowerCase();
-            const activeStages = activeStagesByInst[normRowText] || [];
-            const isCurrentSingleActive =
-              mode === "single" && currentActiveStep === index;
-            // 같은 C 실행 라인에 속해 있는 형제 어셈블리 라인인지 확인
-            const isExecutionSibling =
-              executionLine !== null &&
-              executionLine !== undefined &&
-              row.sourceLine === executionLine &&
-              !isCurrentSingleActive;
+          {rows.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center text-[var(--ar-text-muted)] gap-1">
+              <span className="text-2xl">⚡</span>
+              <span className="font-semibold text-xs">
+                어셈블리 코드가 비어 있습니다
+              </span>
+              <span className="text-[10px] text-slate-400">
+                C 코드를 작성하고 [컴파일] 버튼을 누르거나, 상단 모드를 [어셈블리]로 전환해 보세요.
+              </span>
+            </div>
+          ) : (
+            rows.map((row, idx) => {
+              const isSelected =
+                (selectedLine !== null && row.sourceLine === selectedLine) ||
+                (selectedAsmIndex !== null && idx === selectedAsmIndex);
 
-            // 선택 라인(파란색) 그룹
-            const isSelectedPrimary =
-              selectedAsmIndex !== null && selectedAsmIndex !== undefined
-                ? selectedAsmIndex === index
-                : isFirstOfMatch;
-            const isSelectedSibling = isMatched && !isSelectedPrimary;
+              // Single 모드: 현재 실행 스텝인지 판별 (PC 일치)
+              const isSingleStep =
+                mode === "single" &&
+                currentActiveStep !== null &&
+                currentActiveStep !== undefined &&
+                idx === currentActiveStep;
 
-            // 실행 중인 라인이면서 동시에 사용자가 선택한 라인인 경우
-            const isExecutingAndSelected = isCurrentSingleActive && isSelectedPrimary;
-            const isCrt = row.sourceLine === null;
+              // Pipeline 모드: 파이프라인 스테이지 태그들
+              const normText = row.text.replace(/\s+/g, " ").trim().toLowerCase();
+              const stageTags = activeStagesByInst[normText] || [];
+              const isPipelineActive = mode === "pipeline" && stageTags.length > 0;
 
-            return (
-              <div
-                key={`${row.pc || index}-${row.sourceLine}-${index}`}
-                ref={(el) => {
-                  if (el) rowElementsRef.current.set(index, el);
-                  else rowElementsRef.current.delete(index);
-                }}
-                onClick={() => {
-                  if (selectedLine === row.sourceLine && selectedAsmIndex === index) {
-                    onSelectLine?.(null, null);
-                  } else {
-                    onSelectLine?.(row.sourceLine, index);
-                  }
-                }}
-                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${isCurrentSingleActive && !isSelectedPrimary
-                    ? "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs"
-                    : isSelectedPrimary
-                      ? "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs"
-                      : isSelectedSibling
-                        ? "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal"
-                        : isExecutionSibling
-                          ? "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal"
-                          : activeStages.length > 0
-                            ? "bg-amber-50/70 dark:bg-[#3D2E12]/50 border-transparent"
-                            : "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
-                  }`}
-              >
-                {/* 1. 화살표 / 인디케이터 */}
-                <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
-                  {isExecutingAndSelected ? (
-                    <div className="flex items-center gap-0.5">
-                      <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
-                      <span className="text-[#005FB8] dark:text-[#007ACC] text-[9px] leading-none">●</span>
-                    </div>
-                  ) : isCurrentSingleActive ? (
-                    <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
-                  ) : isSelectedPrimary ? (
-                    <span className="text-[#005FB8] dark:text-[#007ACC] text-[10px] leading-none">●</span>
-                  ) : null}
-                </div>
+              // C 라인 번호 표시 (중복 라인은 빈칸으로 두어 가독성 증대)
+              const showCLine = idx === 0 || rows[idx - 1]?.sourceLine !== row.sourceLine;
 
-                {/* 2. 라인 번호 */}
+              // 명령어 분리 (Opcode / Operands)
+              const { opcode, operands } = splitInstruction(row.text);
+
+              return (
                 <div
-                  className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${isSelectedPrimary
-                      ? "text-[#005FB8] dark:text-[#79C0FF] font-bold"
-                      : isSelectedSibling
-                        ? "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
-                        : isCurrentSingleActive
-                          ? "text-emerald-700 dark:text-[#7EE787] font-bold"
-                          : isExecutionSibling
-                            ? "text-emerald-600 dark:text-[#7EE787]/70"
-                            : "text-[#8C959F] dark:text-[#858585]"
-                    }`}
+                  key={idx}
+                  ref={(el) => {
+                    if (el) rowElementsRef.current.set(idx, el);
+                    else rowElementsRef.current.delete(idx);
+                  }}
+                  onClick={() => onSelectLine?.(row.sourceLine ?? null, idx)}
+                  className={`flex items-center px-2 py-0.5 transition-colors cursor-pointer text-[11px] leading-snug group ${
+                    isSingleStep
+                      ? "bg-amber-100/80 dark:bg-amber-950/40 border-l-2 border-amber-500 font-semibold"
+                      : isPipelineActive
+                      ? "bg-sky-50 dark:bg-sky-950/30 border-l-2 border-sky-500"
+                      : isSelected
+                      ? "bg-blue-50/80 dark:bg-[#007ACC]/20 border-l-2 border-[#005FB8] dark:border-[#007ACC]"
+                      : "hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E] border-l-2 border-transparent"
+                  }`}
                 >
-                  {index + 1}
-                </div>
-
-                {/* 3. Opcode (CRT 비매핑 코드는 회색, C 매핑 코드는 파란색) */}
-                <div className="w-[52px] shrink-0 font-bold select-text">
+                  {/* 1열: 매핑된 C 코드 라인 번호 */}
                   <span
-                    className={
-                      isSelectedPrimary
-                        ? "text-blue-800 dark:text-[#79C0FF] font-bold"
-                        : isSelectedSibling
-                          ? "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
-                          : isCurrentSingleActive
-                            ? "text-emerald-800 dark:text-[#7EE787] font-bold"
-                            : isExecutionSibling
-                              ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
-                              : isCrt
-                                ? "text-[#6E7681] dark:text-[#858585] font-semibold"
-                                : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
-                    }
+                    className={`w-7 shrink-0 text-right pr-2 select-none text-[10px] ${
+                      isSelected
+                        ? "text-[#005FB8] dark:text-[#79C0FF] font-bold"
+                        : "text-[#8C959F] dark:text-[#6E7681]"
+                    }`}
                   >
+                    {showCLine && row.sourceLine ? `L${row.sourceLine}` : ""}
+                  </span>
+
+                  {/* 2열: 어셈블리 행 인덱스 */}
+                  <span className="w-5 shrink-0 text-right pr-2 select-none text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+                    {idx}
+                  </span>
+
+                  {/* 3열: Opcode (연산자 - 보라/파랑 계열 강조) */}
+                  <span className="w-14 shrink-0 font-bold text-[#8250DF] dark:text-[#D2A8FF]">
                     {opcode}
                   </span>
-                </div>
 
-                {/* 4. Operands */}
-                <div className="flex-1 pr-2 whitespace-pre-wrap break-words select-text flex items-center gap-2">
-                  <span
-                    className={
-                      isSelectedPrimary
-                        ? "text-slate-950 dark:text-white font-bold"
-                        : isSelectedSibling
-                          ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                          : isCurrentSingleActive
-                            ? "text-slate-950 dark:text-white font-bold"
-                            : isExecutionSibling
-                              ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                              : isCrt
-                                ? "text-[#6E7681]/90 dark:text-[#858585]"
-                                : "text-[#24292F] dark:text-[#CCCCCC]"
-                    }
-                  >
+                  {/* 4열: Operands (피연산자) */}
+                  <span className="flex-1 font-mono text-[#1F2328] dark:text-[#CCCCCC] truncate">
                     {operands}
                   </span>
 
-                  {/* 파이프라인 스테이지 뱃지 */}
-                  {activeStages.length > 0 && (
-                    <div className="flex items-center gap-1 shrink-0 select-none">
-                      {activeStages.map((stg) => {
-                        const cfg = STAGES_CONFIG.find((s) => s.name === stg);
+                  {/* 5열: 활성 파이프라인 스테이지 뱃지 or Single Step 마커 */}
+                  <div className="shrink-0 flex items-center gap-1 ml-2">
+                    {isSingleStep && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500 text-white animate-pulse">
+                        EXEC
+                      </span>
+                    )}
+
+                    {mode === "pipeline" &&
+                      stageTags.map((tag) => {
+                        const cfg = STAGES_CONFIG.find((s) => s.name === tag);
                         return (
                           <span
-                            key={stg}
-                            className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${cfg?.badgeBg || "bg-slate-700 text-white"
-                              }`}
+                            key={tag}
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              cfg?.badgeBg || "bg-slate-500 text-white"
+                            }`}
                           >
-                            {stg}
+                            {tag}
                           </span>
                         );
                       })}
-                    </div>
-                  )}
+                  </div>
                 </div>
-
-                {/* 5. 우측 C 매핑 라인 태그 (CRT와 C: L$ 규격/스타일 일원화) */}
-                <div className="shrink-0 pr-4 flex items-center select-none">
-                  {row.sourceLine !== null ? (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
-                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                          : isCurrentSingleActive
-                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                            : isSelectedSibling
-                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                              : isExecutionSibling
-                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
-                        }`}
-                    >
-                      C: L{row.sourceLine}
-                    </span>
-                  ) : (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
-                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                          : isCurrentSingleActive
-                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                            : isSelectedSibling
-                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                              : isExecutionSibling
-                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
-                        }`}
-                      title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
-                    >
-                      CRT
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {rows.length === 0 && (
-            <p className="p-4 text-xs text-[#8C959F] dark:text-[#858585] font-sans">
-              줄 정보가 포함된 어셈블리 명령어를 추출하지 못했습니다.
-            </p>
+              );
+            })
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }

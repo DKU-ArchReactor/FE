@@ -65,20 +65,20 @@ const Header = () => {
       ? [
           {
             label: "State ➔ Timing",
-            path: "/",
-            active: location.pathname === "/" || location.pathname === "/pipeline" || location.pathname === "/c-to-asm",
+            path: "/simulator",
+            active: location.pathname === "/simulator" || location.pathname === "/pipeline" || location.pathname === "/c-to-asm",
           },
           {
             label: "Timing ➔ Pipeline",
             path: "/management",
-            active: location.pathname === "/management" || location.pathname === "/coming-soon",
+            active: location.pathname === "/management",
           },
         ]
       : [
           {
             label: "State",
-            path: "/",
-            active: isActive("/") || isActive("/c-to-asm"),
+            path: "/simulator",
+            active: isActive("/simulator") || isActive("/c-to-asm"),
           },
           {
             label: "Timing",
@@ -88,7 +88,7 @@ const Header = () => {
           {
             label: "Pipeline",
             path: "/management",
-            active: isActive("/management") || isActive("/coming-soon"),
+            active: isActive("/management"),
           },
         ];
 

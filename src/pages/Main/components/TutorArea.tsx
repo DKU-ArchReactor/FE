@@ -1,15 +1,12 @@
 import React, { useMemo } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
-import type { CodeLineSelectInfo } from './Source/SourceViewer';
-import { mapAssembly, type MappedAssemblyRow } from './translationCompile';
-import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction } from './tutorAnalysis';
+import { mapAssembly, type MappedAssemblyRow } from '../utils/translationCompile';
+import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction } from '../utils/tutorAnalysis';
 
 export interface TutorAreaProps {
   simulationData: SimulationResult | null;
   currentCycleData: CycleHistoryItem | null;
   loadingMessage?: string | null;
-  selectedCodeLine?: CodeLineSelectInfo | null;
-  onClearSelectedCodeLine?: () => void;
 
   // C ↔ 어셈블리 튜터 모드 Props
   translationSource?: string;
@@ -18,9 +15,7 @@ export interface TutorAreaProps {
   selectedTranslationLine?: number | null;
   selectedAsmIndex?: number | null;
   currentActiveAsmIndex?: number | null;
-  executionLine?: number | null;
   isUserSelected?: boolean;
-  onSelectTranslationLine?: (line: number | null) => void;
   activeTarget?: "c" | "asm";
 }
 
@@ -28,17 +23,13 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   simulationData,
   currentCycleData,
   loadingMessage,
-  selectedCodeLine: _selectedCodeLine,
-  onClearSelectedCodeLine: _onClearSelectedCodeLine,
   translationSource,
   translationAssembly,
   mappedRows: propMappedRows,
   selectedTranslationLine,
   selectedAsmIndex,
   currentActiveAsmIndex,
-  executionLine: _executionLine,
   isUserSelected = false,
-  onSelectTranslationLine: _onSelectTranslationLine,
   activeTarget = "c",
 }) => {
   // 1. C 소스 코드 라인별 배열

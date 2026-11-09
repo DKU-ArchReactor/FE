@@ -1,29 +1,33 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { FileSummary } from "@/type/file";
 import { getFiles, getFileById, saveFile } from "@/api/file";
 
-const DEFAULT_TRANSLATION_SOURCE =
+export const DEFAULT_TRANSLATION_SOURCE =
   "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
 export const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
 
-export function useFileManager(initialFileId: string | null) {
+export function useFileManager(
+  initialFileId: string | null,
+  example?: { source: string; fileName: string },
+  onInitialResetSimulation?: () => void
+) {
   const [fileId, setFileId] = useState<string | null>(initialFileId);
-  const [cFileName, setCFileName] = useState<string>("");
-  const [cContent, setCContent] = useState<string>(
-    () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || ""
-  );
-  const [asmFileName, setAsmFileName] = useState<string>("");
-  const [asmContent, setAsmContent] = useState<string>("");
+  const [cFileName, setCFileName] = useState<string>(example?.fileName ?? "main.c");
+  const [asmFileName, setAsmFileName] = useState<string>("main.s");
   const [savedFiles, setSavedFiles] = useState<FileSummary[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => !!localStorage.getItem("access_token"));
-  const [externalLoadFileId, setExternalLoadFileId] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(
+    () => !!localStorage.getItem("access_token")
+  );
 
-  const [fileContentCache, setFileContentCache] = useState<Record<string, string>>({});
-  const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
   const loadedInitialFileIdRef = useRef<string | null>(null);
+  const onInitialResetRef = useRef(onInitialResetSimulation);
+
+  useEffect(() => {
+    onInitialResetRef.current = onInitialResetSimulation;
+  }, [onInitialResetSimulation]);
 
   const [translationSource, setTranslationSource] = useState(
-    () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE
+    () => example?.source ?? (sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE)
   );
   const [translationAssembly, setTranslationAssembly] = useState("");
   const [translationError, setTranslationError] = useState("");
@@ -32,9 +36,7 @@ export function useFileManager(initialFileId: string | null) {
   // 로그인 상태 및 파일 목록 불러오기
   useEffect(() => {
     const token = localStorage.getItem("access_token");
-    setIsLoggedIn(!!token);
     if (!token) {
-      setSavedFiles([]);
       return;
     }
     getFiles()
@@ -42,59 +44,46 @@ export function useFileManager(initialFileId: string | null) {
       .catch((err) => console.error("Saved file list fetch error:", err));
   }, []);
 
-  const updateTranslationSource = (
-    source: string,
-    fileName = "main.c",
-    resetSimulation = false,
-    keepFileId: string | null = null,
-    onResetSimulation?: () => void
-  ) => {
-    setTranslationSource(source);
-    setCContent(source);
-    setCFileName(fileName);
-    setFileId(keepFileId);
-    sessionStorage.setItem(TRANSLATION_SOURCE_KEY, source);
-    setAsmContent("");
-    setTranslationAssembly("");
-    setTranslationError("");
+  const updateTranslationSource = useCallback(
+    (
+      source: string,
+      fileName = "main.c",
+      resetSimulation = false,
+      keepFileId: string | null = null,
+      onResetSimulation?: () => void
+    ) => {
+      setTranslationSource(source);
+      setCFileName(fileName);
+      setFileId(keepFileId);
+      sessionStorage.setItem(TRANSLATION_SOURCE_KEY, source);
+      setTranslationAssembly("");
+      setTranslationError("");
 
-    if (resetSimulation && onResetSimulation) {
-      onResetSimulation();
-    }
-  };
+      if (resetSimulation && onResetSimulation) {
+        onResetSimulation();
+      }
+    },
+    []
+  );
 
-  const ensureFileContent = async (targetId: string): Promise<{ title: string; content: string } | null> => {
-    const summary = savedFiles.find((f) => f.file_id === targetId);
-    if (fileContentCache[targetId] !== undefined) {
-      return {
-        title: summary?.title || "main.c",
-        content: fileContentCache[targetId],
-      };
-    }
-    try {
-      setLoadingPreviewId(targetId);
-      const detail = await getFileById(targetId);
-      setFileContentCache((prev) => ({ ...prev, [targetId]: detail.content }));
-      return { title: detail.title, content: detail.content };
-    } catch (err) {
-      console.error("File detail fetch error:", err);
-      return null;
-    } finally {
-      setLoadingPreviewId((prev) => (prev === targetId ? null : prev));
-    }
-  };
-
-  const handleOpenSavedFileInEditor = async (
-    targetId: string,
-    onResetSimulation?: () => void
-  ) => {
-    const detail = await ensureFileContent(targetId);
-    if (!detail) {
-      setTranslationError("선택한 소스 코드 파일을 불러오지 못했습니다.");
-      return;
-    }
-    updateTranslationSource(detail.content, detail.title, true, targetId, onResetSimulation);
-  };
+  const handleOpenSavedFileInEditor = useCallback(
+    async (targetId: string, onResetSimulation?: () => void) => {
+      try {
+        const detail = await getFileById(targetId);
+        updateTranslationSource(
+          detail.content,
+          detail.title || "main.c",
+          true,
+          targetId,
+          onResetSimulation
+        );
+      } catch (err) {
+        console.error("File detail fetch error:", err);
+        setTranslationError("선택한 소스 코드 파일을 불러오지 못했습니다.");
+      }
+    },
+    [updateTranslationSource]
+  );
 
   const handleSaveTranslationFile = async (nameToSave?: string): Promise<boolean> => {
     const token = localStorage.getItem("access_token");
@@ -156,28 +145,49 @@ export function useFileManager(initialFileId: string | null) {
   useEffect(() => {
     if (!initialFileId || loadedInitialFileIdRef.current === initialFileId) return;
     loadedInitialFileIdRef.current = initialFileId;
-    void handleOpenSavedFileInEditor(initialFileId);
-  }, [initialFileId]);
+    getFileById(initialFileId)
+      .then((detail) => {
+        updateTranslationSource(
+          detail.content,
+          detail.title || "main.c",
+          true,
+          initialFileId,
+          () => {
+            onInitialResetRef.current?.();
+          }
+        );
+      })
+      .catch((err) => {
+        console.error("File detail fetch error:", err);
+        setTranslationError("선택한 소스 코드 파일을 불러오지 못했습니다.");
+      });
+  }, [initialFileId, updateTranslationSource]);
+
+  const ensureFileContent = useCallback(
+    async (targetId: string): Promise<{ title: string; content: string } | null> => {
+      try {
+        const detail = await getFileById(targetId);
+        return { title: detail.title, content: detail.content };
+      } catch (err) {
+        console.error("File detail fetch error:", err);
+        return null;
+      }
+    },
+    []
+  );
 
   return {
     fileId,
     setFileId,
     cFileName,
     setCFileName,
-    cContent,
-    setCContent,
     asmFileName,
     setAsmFileName,
-    asmContent,
-    setAsmContent,
+    cContent: translationSource,
     savedFiles,
     setSavedFiles,
     isLoggedIn,
     setIsLoggedIn,
-    externalLoadFileId,
-    setExternalLoadFileId,
-    fileContentCache,
-    loadingPreviewId,
     translationSource,
     setTranslationSource,
     translationAssembly,
@@ -194,4 +204,3 @@ export function useFileManager(initialFileId: string | null) {
     DEFAULT_TRANSLATION_SOURCE,
   };
 }
-
