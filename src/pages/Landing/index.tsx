@@ -522,7 +522,7 @@ export default function LandingPage() {
                 to="/simulator?example=addition"
                 className="landing-button landing-button-primary"
               >
-                덧셈 예제로 바로 시작하기 <Arrow />
+                예제로 바로 시작하기 <Arrow />
               </Link>
               <a
                 className="landing-button landing-button-secondary"
