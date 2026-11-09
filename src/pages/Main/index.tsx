@@ -311,10 +311,14 @@ const MainPage: React.FC = () => {
           type="button"
           onClick={() => setIsAiPopupOpen((prev) => !prev)}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
-          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 group active:scale-95 ${
+          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 outline-none group active:scale-95 ${
             isAiPopupOpen
-              ? "bg-gradient-to-tr from-[#004C99] via-[#007ACC] to-[#0284C7] text-white ring-2 ring-[#38BDF8]/70 ring-offset-1 dark:ring-offset-[#18181B] shadow-inner"
-              : "bg-gradient-to-tr from-[#0066CC] via-[#0091FF] to-[#38BDF8] hover:from-[#0055B3] hover:via-[#0080FF] hover:to-[#7DD3FC] text-white shadow-[0_2px_12px_rgba(0,145,255,0.32)] hover:shadow-[0_4px_18px_rgba(0,145,255,0.48)] hover:scale-[1.03]"
+              ? simSession.isSingleEngine
+                ? "bg-gradient-to-tr from-[#0055B3] via-[#0080FF] to-[#7DD3FC] text-white shadow-[0_4px_18px_rgba(0,145,255,0.48)] scale-[1.03]"
+                : "bg-gradient-to-tr from-[#5B21B6] via-[#7C3AED] to-[#DDD6FE] text-white shadow-[0_4px_18px_rgba(139,92,246,0.48)] scale-[1.03]"
+              : simSession.isSingleEngine
+              ? "bg-gradient-to-tr from-[#0066CC] via-[#0091FF] to-[#38BDF8] hover:from-[#0055B3] hover:via-[#0080FF] hover:to-[#7DD3FC] text-white shadow-[0_2px_12px_rgba(0,145,255,0.32)] hover:shadow-[0_4px_18px_rgba(0,145,255,0.48)] hover:scale-[1.03]"
+              : "bg-gradient-to-tr from-[#6D28D9] via-[#8B5CF6] to-[#C084FC] hover:from-[#5B21B6] hover:via-[#7C3AED] hover:to-[#DDD6FE] text-white shadow-[0_2px_12px_rgba(139,92,246,0.32)] hover:shadow-[0_4px_18px_rgba(139,92,246,0.48)] hover:scale-[1.03]"
           }`}
         >
           <div className="relative flex items-center justify-center">
@@ -339,6 +343,7 @@ const MainPage: React.FC = () => {
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
+        mode={simSession.simulationEngineMode}
       />
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}

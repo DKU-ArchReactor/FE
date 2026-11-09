@@ -41,16 +41,16 @@ html.dark.mode-single {
   --ar-accent: #38BDF8;
 }
 
-/* Pipeline Mode (병렬/파이프라인) Ambient 틴트 */
+/* Pipeline Mode (병렬/파이프라인) Ambient 틴트 (배경은 그레이 유지, 보라색 포인트 액센트) */
 html.mode-pipeline {
-  --ar-canvas-bg: #F2EEF8;
+  --ar-canvas-bg: #F8FAFC;
   --ar-accent: #7C3AED;
 }
 html.dark.mode-pipeline {
-  --ar-canvas-bg: #15131C;
-  --ar-panel-bg: #1D1A27;
-  --ar-header-bg: #262234;
-  --ar-border: #36304A;
+  --ar-canvas-bg: #141416;
+  --ar-panel-bg: #1E1E22;
+  --ar-header-bg: #26262B;
+  --ar-border: #33353F;
   --ar-accent: #A855F7;
 }
 
