@@ -357,7 +357,17 @@ const MainPage: React.FC = () => {
       onTranslationFile={handleTranslationFile}
       onSelectTranslationLine={handleSelectTranslationLine}
       onSaveTranslationFile={fileMgr.handleSaveTranslationFile}
+      onSaveAssemblyFile={(name) => fileMgr.handleSaveAssemblyFile(customAssembly, name)}
       onOpenSavedFileInEditor={(id) => fileMgr.handleOpenSavedFileInEditor(id, onResetSimulation)}
+      onOpenSavedAssemblyFile={async (id) => {
+        const detail = await fileMgr.ensureFileContent(id);
+        if (detail) {
+          setCustomAssembly(detail.content);
+          fileMgr.setFileId(id);
+          fileMgr.setAsmFileName(detail.title);
+          onResetSimulation();
+        }
+      }}
       onCustomAssemblyChange={setCustomAssembly}
       onSimulateAssembly={handleAssemblySimulation}
       onResetCustomAssembly={() => {

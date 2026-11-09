@@ -60,7 +60,9 @@ interface PanelRendererProps {
   onTranslationFile: (file: File) => void;
   onSelectTranslationLine: (line: number | null, asmIndex?: number | null) => void;
   onSaveTranslationFile: (name?: string) => Promise<boolean>;
+  onSaveAssemblyFile?: (name?: string) => Promise<boolean>;
   onOpenSavedFileInEditor: (fileId: string) => void;
+  onOpenSavedAssemblyFile?: (fileId: string) => void;
   onCustomAssemblyChange: (val: string) => void;
   onSimulateAssembly: () => void;
   onResetCustomAssembly: () => void;
@@ -113,7 +115,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   onTranslationFile,
   onSelectTranslationLine,
   onSaveTranslationFile,
+  onSaveAssemblyFile,
   onOpenSavedFileInEditor,
+  onOpenSavedAssemblyFile,
   onCustomAssemblyChange,
   onSimulateAssembly,
   onResetCustomAssembly,
@@ -198,6 +202,10 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           onAssemblyChange={onCustomAssemblyChange}
           onSimulateAssembly={onSimulateAssembly}
           onResetAssembly={onResetCustomAssembly}
+          onSave={onSaveAssemblyFile}
+          onOpenSavedFile={onOpenSavedAssemblyFile}
+          savedFiles={savedFiles}
+          currentFileId={fileId}
         />
       );
 

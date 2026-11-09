@@ -124,6 +124,34 @@ export function useFileManager(initialFileId: string | null) {
     }
   };
 
+  const handleSaveAssemblyFile = async (content: string, nameToSave?: string): Promise<boolean> => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      alert("파일 저장은 로그인 후 이용할 수 있습니다.");
+      return false;
+    }
+
+    const title = (nameToSave || asmFileName || "main.s").trim();
+    if (!title) return false;
+
+    try {
+      const saved = await saveFile({
+        title,
+        content,
+        lang: "asm",
+      });
+      setFileId(saved.file_id);
+      setAsmFileName(saved.title);
+      const updatedList = await getFiles();
+      setSavedFiles(updatedList);
+      return true;
+    } catch (err) {
+      console.error("Save assembly file error:", err);
+      alert("어셈블리 파일 저장 중 오류가 발생했습니다.");
+      return false;
+    }
+  };
+
   // initialFileId 변경 시 로드
   useEffect(() => {
     if (!initialFileId || loadedInitialFileIdRef.current === initialFileId) return;
@@ -162,6 +190,7 @@ export function useFileManager(initialFileId: string | null) {
     ensureFileContent,
     handleOpenSavedFileInEditor,
     handleSaveTranslationFile,
+    handleSaveAssemblyFile,
     DEFAULT_TRANSLATION_SOURCE,
   };
 }
