@@ -460,19 +460,23 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-3 py-2">
-        {/* 2. 최상단 시작 주소 헤더 바 */}
-        <div className="shrink-0 flex flex-col mb-1">
-          <div className="flex items-center justify-between text-[10px] text-[#57606A] dark:text-[#858585] font-mono pb-1 px-0.5">
-            <span
-              title="Hex: 0x7FFFEFFC"
-              className="font-semibold text-[#24292F] dark:text-[#CCCCCC] cursor-help"
-            >
-            {formatAddressDecimal('0x7FFFEFFC')}
+        {/* 2. 최상단 시작 주소 헤더 바 (일체형 꺾인 브래킷 ┌─── 주소 ───┐ 형태) */}
+        <div className="relative shrink-0 mt-2 mb-1 select-none border-t border-l border-r border-[#D0D7DE] dark:border-[#3E3E42] h-4 flex items-center justify-between px-1.5">
+          {/* 좌측 HIGH 라벨 (하단 baseline이 꺾인 선의 끝 y축과 일치) */}
+          <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] dark:text-[#6E7681] leading-none self-end pb-0.5">
+            HIGH
           </span>
-          <span className="text-[#8C959F] dark:text-[#6E7681]">High Address (Top)</span>
+
+          {/* 상단 가로선 정중앙에 얹히는 주소 텍스트 뱃지 */}
+          <div className="absolute left-1/2 -top-[7px] -translate-x-1/2 bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono leading-none z-10">
+            <span
+              title="Hex: 0x7FFFEFFC (High Address Top)"
+              className="font-semibold cursor-help hover:text-[#005FB8] dark:hover:text-[#79C0FF] transition-colors"
+            >
+              {formatAddressDecimal('0x7FFFEFFC')}
+            </span>
+          </div>
         </div>
-        <div className="w-full border-t border-[#E5E5E5] dark:border-[#333333]" />
-      </div>
 
       {/* 3. 전체 6대 가상 메모리 영역과 세그먼트 사이 독립 경계선 5개 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -737,17 +741,21 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
         })}
       </div>
 
-      {/* 4. 최하단 메모리 끝 경계선 */}
-      <div className="shrink-0 flex flex-col pt-1 mt-1">
-        <div className="w-full border-t border-[#E5E5E5] dark:border-[#333333] mb-1" />
-        <div className="flex items-center justify-between text-[10px] text-[#57606A] dark:text-[#858585] font-mono px-0.5">
+      {/* 4. 최하단 메모리 끝 경계선 (일체형 꺾인 브래킷 └─── 주소 ───┘ 형태) */}
+      <div className="relative shrink-0 mt-1 mb-2 select-none border-b border-l border-r border-[#D0D7DE] dark:border-[#3E3E42] h-4 flex items-center justify-between px-1.5">
+        {/* 좌측 LOW 라벨 (상단이 꺾인 선의 시작 y축과 일치) */}
+        <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] dark:text-[#6E7681] leading-none self-start pt-0.5">
+          LOW
+        </span>
+
+        {/* 하단 가로선 정중앙에 얹히는 주소 텍스트 뱃지 */}
+        <div className="absolute left-1/2 -bottom-[7px] -translate-x-1/2 bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono leading-none z-10">
           <span
-            title="Hex: 0x00000000"
-            className="font-semibold text-[#24292F] dark:text-[#CCCCCC] cursor-help"
+            title="Hex: 0x00000000 (Low Address Origin)"
+            className="font-semibold cursor-help hover:text-[#005FB8] dark:hover:text-[#79C0FF] transition-colors"
           >
             0
           </span>
-          <span className="text-[#8C959F] dark:text-[#6E7681]">Low Address (Origin)</span>
         </div>
       </div>
       </div>

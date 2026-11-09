@@ -321,25 +321,35 @@ export default function TranslationEditor({
         }`}
       >
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 1. 업로드 버튼 */}
+          {/* 1. 불러오기 버튼 */}
           <button
             ref={uploadButtonRef}
             type="button"
             onClick={() => setIsUploadPopupOpen((prev) => !prev)}
             disabled={busy || activeTarget !== "c"}
-            className={`rounded border px-2 py-0.5 text-[11px] font-medium transition-colors flex items-center gap-1 shrink-0 shadow-2xs ${
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget !== "c"
                 ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
                 : isUploadPopupOpen
-                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer"
+                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
                 : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
             }`}
-            title="파일 업로드 및 불러오기"
+            title="파일 불러오기 및 예제 열기"
           >
-            <span>📁</span>
-            <span className="hidden @[420px]:inline">업로드</span>
+            {/* 좁아졌을 때 나타나는 단색 폴더/인박스 도형 아이콘 */}
+            <svg
+              className="w-3 h-3 fill-none stroke-current inline @[380px]:hidden shrink-0"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+              <path d="M2 10h20" />
+            </svg>
+            <span className="hidden @[380px]:inline">불러오기</span>
             <span
-              className={`text-[9px] opacity-75 transition-transform duration-150 ${
+              className={`text-[8.5px] opacity-75 transition-transform duration-150 ${
                 isUploadPopupOpen ? "rotate-180" : ""
               }`}
             >
@@ -352,7 +362,7 @@ export default function TranslationEditor({
             type="button"
             onClick={handleSaveClick}
             disabled={busy || isSaving || activeTarget !== "c"}
-            className={`rounded border px-2 py-0.5 text-[11px] font-medium transition-colors flex items-center gap-1 shrink-0 shadow-2xs ${
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget !== "c"
                 ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
                 : saveSuccess
@@ -362,13 +372,24 @@ export default function TranslationEditor({
             title="현재 소스 코드를 서버에 저장"
           >
             {isSaving ? (
-              <span className="w-3 h-3 rounded-full border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent animate-spin" />
+              <span className="w-3 h-3 rounded-full border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent animate-spin shrink-0" />
             ) : saveSuccess ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">✓</span>
             ) : (
-              <span>💾</span>
+              /* 좁아졌을 때 나타나는 단색 플로피 디스크 윤곽 도형 아이콘 */
+              <svg
+                className="w-3 h-3 fill-none stroke-current inline @[320px]:hidden shrink-0"
+                viewBox="0 0 24 24"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
             )}
-            <span className="hidden @[360px]:inline">
+            <span className="hidden @[320px]:inline">
               {saveSuccess ? "저장됨" : "저장"}
             </span>
           </button>
@@ -377,7 +398,7 @@ export default function TranslationEditor({
           <button
             type="button"
             disabled={busy || activeTarget !== "c"}
-            className={`rounded border px-2 py-0.5 text-[11px] font-medium transition-colors flex items-center gap-1 shrink-0 shadow-2xs ${
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget !== "c"
                 ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
                 : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
@@ -385,28 +406,40 @@ export default function TranslationEditor({
             onClick={onReset}
             title="초기화"
           >
-            <span>🔄</span>
-            <span className="hidden @[290px]:inline">초기화</span>
+            {/* 좁아졌을 때 나타나는 단색 원형 회전 리로드 화살표 도형 아이콘 */}
+            <svg
+              className="w-3 h-3 fill-current inline @[260px]:hidden shrink-0"
+              viewBox="0 0 24 24"
+            >
+              <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            </svg>
+            <span className="hidden @[260px]:inline">초기화</span>
           </button>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 4. 컴파일 버튼 */}
+          {/* 4. 컴파일 버튼 (높이 h-[22px]로 4개 버튼 완전 일치 및 콤팩트화) */}
           <button
             type="button"
-            className="rounded border border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] disabled:opacity-50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1 shrink-0"
+            className="h-[22px] rounded bg-[#005FB8] dark:bg-[#007ACC] px-2.5 text-[10.5px] font-semibold text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0"
             onClick={onCompile}
             disabled={busy || !source.trim()}
             title="C 코드 컴파일 및 어셈블리 변환"
           >
-            <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
-              {busy ? (
-                <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-              ) : (
-                <span className="text-[12px] leading-none">⚡</span>
-              )}
-            </span>
-            <span className="hidden @[230px]:inline">컴파일</span>
+            {busy ? (
+              <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                <span className="w-2.5 h-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              </span>
+            ) : (
+              /* 좁아졌을 때 나타나는 단색 번개 쐐기형 기하 도형 아이콘 */
+              <svg
+                className="w-3 h-3 fill-current inline @[200px]:hidden shrink-0"
+                viewBox="0 0 24 24"
+              >
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+            )}
+            <span className="hidden @[200px]:inline">컴파일</span>
           </button>
         </div>
       </div>
