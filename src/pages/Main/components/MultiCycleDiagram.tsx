@@ -59,6 +59,26 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     [history, isSingleMode]
   );
 
+  // 가로 스크롤바 유무에 따라 좌측 명령어 목록 하단 패딩 동기화 (우측 가로 스크롤바로 인한 라인 어긋남 완벽 방지)
+  const [hScrollbarHeight, setHScrollbarHeight] = React.useState<number>(0);
+
+  useEffect(() => {
+    const el = rightScrollRef.current;
+    if (!el) return;
+
+    const updateScrollbarHeight = () => {
+      // clientHeight와 scrollWidth/clientWidth 비교로 가로 스크롤바 높이 계산
+      const hasHorizontalScroll = el.scrollWidth > el.clientWidth;
+      const scrollHeightDiff = el.offsetHeight - el.clientHeight;
+      setHScrollbarHeight(hasHorizontalScroll && scrollHeightDiff > 0 ? scrollHeightDiff : 0);
+    };
+
+    updateScrollbarHeight();
+    const ro = new ResizeObserver(updateScrollbarHeight);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [history.length, traceRows.length]);
+
   // Single-Cycle 모드에서는 Step 0이 초기 대기 상태(activeCycleCol = -1)이며, Step 1~N이 각 C0~CN-1 열에 매핑
   const activeCycleCol = isSingleMode
     ? (currentCycle > 0 ? currentCycle - 1 : -1)
@@ -182,54 +202,59 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
             </div>
 
             {/* 좌측 명령어 행 목록 */}
-            {traceRows.map((row, rIdx) => {
-              const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
-              const isRowActiveNow = Boolean(activeCellNow);
-              const activeStyle = activeCellNow ? STAGE_STYLES[activeCellNow.type] : null;
+            <div
+              className="flex flex-col"
+              style={{
+                paddingBottom: hScrollbarHeight > 0 ? `${hScrollbarHeight}px` : undefined,
+              }}
+            >
+              {traceRows.map((row, rIdx) => {
+                const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
+                const isRowActiveNow = Boolean(activeCellNow);
+                const activeStyle = activeCellNow ? STAGE_STYLES[activeCellNow.type] : null;
 
-              return (
-                <div
-                  key={row.id}
-                  onClick={() => onJumpToCycle?.(isSingleMode ? row.firstCycle + 1 : row.firstCycle)}
-                  className={`h-[28px] shrink-0 px-2 flex items-center justify-between gap-1.5 border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 text-[10px] font-mono cursor-pointer transition-colors ${
-                    isRowActiveNow
-                      ? 'bg-blue-50 dark:bg-[#04395E] border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
-                      : rIdx % 2 === 1
-                      ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30 hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
-                      : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
-                  }`}
-                  title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
-                >
-                  <div className="flex items-center gap-1 min-w-0 flex-1">
-                    <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
-                      {rIdx + 1}.
-                    </span>
-                    <span className="truncate">{row.assembly}</span>
+                return (
+                  <div
+                    key={row.id}
+                    onClick={() => onJumpToCycle?.(isSingleMode ? row.firstCycle + 1 : row.firstCycle)}
+                    className={`h-[28px] shrink-0 px-2 flex items-center justify-between gap-1.5 border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 text-[10px] font-mono cursor-pointer transition-colors ${
+                      isRowActiveNow
+                        ? 'bg-blue-50/80 dark:bg-[#04395E]/60 border-l-3 border-l-[#005FB8] dark:border-l-[#007ACC] font-bold text-[#1F2328] dark:text-[#CCCCCC] shadow-2xs'
+                        : 'bg-white dark:bg-[#1E1E1E] hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
+                    }`}
+                    title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
+                  >
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      <span className="text-[9px] text-[#8C959F] dark:text-[#6E7681] shrink-0 w-4 text-right">
+                        {rIdx + 1}.
+                      </span>
+                      <span className="truncate">{row.assembly}</span>
+                    </div>
+
+                    {/* 현재 선택된 사이클에서 이 명령어가 어느 단계에 있는지 즉시 표시 */}
+                    {activeCellNow && activeStyle ? (
+                      <span
+                        key={`badge-${activeCycleCol}`}
+                        className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border shadow-2xs animate-in zoom-in-75 duration-200 ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
+                      >
+                        {activeCellNow.label}
+                      </span>
+                    ) : row.pc ? (
+                      <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
+                        {row.pc.slice(-4)}
+                      </span>
+                    ) : null}
                   </div>
-
-                  {/* 현재 선택된 사이클에서 이 명령어가 어느 단계에 있는지 즉시 표시 */}
-                  {activeCellNow && activeStyle ? (
-                    <span
-                      key={`badge-${activeCycleCol}`}
-                      className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-extrabold shrink-0 border shadow-2xs animate-in zoom-in-75 duration-200 ${activeStyle.bg} ${activeStyle.text} ${activeStyle.border}`}
-                    >
-                      {activeCellNow.label}
-                    </span>
-                  ) : row.pc ? (
-                    <span className="text-[8.5px] text-[#8C959F] dark:text-[#6E7681] shrink-0">
-                      {row.pc.slice(-4)}
-                    </span>
-                  ) : null}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          {/* 우측 사이클 그리드 영역 (C0 ~ CN 가로·세로 스크롤 전용 컨테이너) */}
+          {/* 우측 사이클 그리드 영역 (C0 ~ CN 가로·세로 스크롤 전용 컨테이너, overflow-overlay 지원) */}
           <div
             ref={rightScrollRef}
             onScroll={handleRightScroll}
-            className="flex-1 min-w-0 overflow-auto select-none scrollbar-thin bg-white dark:bg-[#1E1E1E]"
+            className="flex-1 min-w-0 overflow-auto select-none scrollbar-thin bg-white dark:bg-[#1E1E1E] [overflow:overlay]"
           >
             <div
               className="relative min-w-max flex flex-col"
@@ -249,7 +274,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                       key={cIdx}
                       type="button"
                       onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
-                      className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5]/70 dark:border-[#333333]/70 cursor-pointer transition-colors relative ${
+                      className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5] dark:border-[#333333] cursor-pointer transition-colors relative ${
                         isCurrent
                           ? 'bg-[#005FB8] dark:bg-[#007ACC] text-white shadow-inner font-extrabold'
                           : hasStall
@@ -278,10 +303,10 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
 
               {/* 본문 행 영역 */}
               <div className="relative">
-                {/* 현재 선택된 사이클 수직 하이라이트 기둥 (스텝 이동 시 부드러운 슬라이딩 글라이드 트랜지션) */}
+                {/* 현재 선택된 사이클 수직 하이라이트 기둥 (테두리 없이 은은한 배경 단일화로 세로선 왜곡 제거) */}
                 {activeCycleCol >= 0 && (
                   <div
-                    className="absolute top-0 bottom-0 pointer-events-none z-0 border-x-2 border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8]/15 dark:bg-[#007ACC]/15 shadow-sm transition-[left] duration-250 ease-out"
+                    className="absolute top-0 bottom-0 pointer-events-none z-0 bg-[#005FB8]/10 dark:bg-[#007ACC]/15 transition-[left] duration-250 ease-out"
                     style={{
                       left: `${activeCycleCol * COL_WIDTH}px`,
                       width: `${COL_WIDTH}px`,
@@ -289,19 +314,17 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                   />
                 )}
 
-                {traceRows.map((row, rIdx) => {
+                {traceRows.map((row) => {
                   const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
                   const isRowActiveNow = Boolean(activeCellNow);
 
                   return (
                     <div
                       key={row.id}
-                      className={`h-[28px] shrink-0 flex items-stretch border-b border-[#E5E5E5]/60 dark:border-[#333333]/60 relative transition-colors ${
+                      className={`h-[28px] shrink-0 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] relative transition-colors ${
                         isRowActiveNow
-                          ? 'bg-blue-50/50 dark:bg-[#04395E]/30'
-                          : rIdx % 2 === 1
-                          ? 'bg-[#F8F8F8]/60 dark:bg-[#252526]/30'
-                          : ''
+                          ? 'bg-blue-50/40 dark:bg-[#04395E]/20'
+                          : 'bg-white dark:bg-[#1E1E1E]'
                       }`}
                     >
                       {history.map((_, cIdx) => {
@@ -314,7 +337,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                             <div
                               key={cIdx}
                               onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
-                              className="shrink-0 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer hover:bg-slate-100/40 dark:hover:bg-[#2A2D2E]/40"
+                              className="shrink-0 border-r border-[#E5E5E5]/60 dark:border-[#333333]/60 cursor-pointer hover:bg-slate-100/40 dark:hover:bg-[#2A2D2E]/40"
                               style={{ width: `${COL_WIDTH}px` }}
                             />
                           );
@@ -326,7 +349,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                           <div
                             key={cIdx}
                             onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
-                            className="shrink-0 flex items-center justify-center p-0.5 border-r border-slate-100/60 dark:border-[#333333]/30 cursor-pointer relative z-1"
+                            className="shrink-0 flex items-center justify-center p-0.5 border-r border-[#E5E5E5]/60 dark:border-[#333333]/60 cursor-pointer relative z-1"
                             style={{ width: `${COL_WIDTH}px` }}
                             title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${
                               cell.isStall
@@ -337,14 +360,14 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                             }`}
                           >
                             <span
-                              className={`w-full h-full rounded-md text-[9.5px] font-mono font-bold flex items-center justify-center shadow-2xs border transition-all duration-200 ${
+                              className={`w-full h-full rounded-[4px] text-[9.5px] font-mono tracking-tight flex items-center justify-center transition-all duration-150 select-none ${
                                 style.bg
-                              } ${style.text} ${style.border} ${
+                              } ${style.text} ${
                                 isCurrentActiveCell
-                                  ? `scale-110 ring-2 ${style.activeRing} shadow-md font-extrabold z-10 animate-in zoom-in-90 duration-150`
+                                  ? 'font-black shadow-md z-10'
                                   : isCurrentCol
-                                  ? `scale-105 ring-2 ${style.activeRing} shadow-sm font-extrabold`
-                                  : 'hover:scale-105'
+                                  ? 'font-extrabold shadow-2xs'
+                                  : 'font-bold'
                               }`}
                             >
                               {cell.label}

@@ -30,61 +30,78 @@ export interface TraceRow {
 
 export const STAGE_STYLES: Record<
   CellType,
-  { bg: string; text: string; border: string; activeRing: string }
+  {
+    bg: string;
+    text: string;
+    border: string;
+    activeRing: string;
+    activeGlow: string;
+  }
 > = {
+  // 무지개 스펙트럼 (Red -> Orange -> Green -> Blue -> Purple)
   IF: {
-    bg: "bg-indigo-500",
+    bg: "bg-[#F87171] dark:bg-[#EF4444]",
     text: "text-white",
-    border: "border-indigo-600",
-    activeRing: "ring-indigo-300",
+    border: "border-0",
+    activeRing: "ring-[#FCA5A5]",
+    activeGlow: "shadow-[0_0_10px_rgba(239,68,68,0.45)]",
   },
   ID: {
-    bg: "bg-sky-500",
+    bg: "bg-[#FB923C] dark:bg-[#F97316]",
     text: "text-white",
-    border: "border-sky-600",
-    activeRing: "ring-sky-300",
+    border: "border-0",
+    activeRing: "ring-[#FDBA74]",
+    activeGlow: "shadow-[0_0_10px_rgba(249,115,22,0.45)]",
   },
   EX: {
-    bg: "bg-amber-500",
+    bg: "bg-[#34D399] dark:bg-[#10B981]",
     text: "text-white",
-    border: "border-amber-600",
-    activeRing: "ring-amber-300",
+    border: "border-0",
+    activeRing: "ring-[#6EE7B7]",
+    activeGlow: "shadow-[0_0_10px_rgba(16,185,129,0.45)]",
   },
   MEM: {
-    bg: "bg-emerald-500",
+    bg: "bg-[#38BDF8] dark:bg-[#0EA5E9]",
     text: "text-white",
-    border: "border-emerald-600",
-    activeRing: "ring-emerald-300",
+    border: "border-0",
+    activeRing: "ring-[#7DD3FC]",
+    activeGlow: "shadow-[0_0_10px_rgba(14,165,233,0.45)]",
   },
   WB: {
-    bg: "bg-rose-500",
+    bg: "bg-[#A78BFA] dark:bg-[#8B5CF6]",
     text: "text-white",
-    border: "border-rose-600",
-    activeRing: "ring-rose-300",
+    border: "border-0",
+    activeRing: "ring-[#C4B5FD]",
+    activeGlow: "shadow-[0_0_10px_rgba(139,92,246,0.45)]",
   },
   DONE: {
-    bg: "bg-emerald-600",
+    bg: "bg-[#2DD4BF] dark:bg-[#14B8A6]",
     text: "text-white",
-    border: "border-emerald-700",
-    activeRing: "ring-emerald-300",
+    border: "border-0",
+    activeRing: "ring-[#5EEAD4]",
+    activeGlow: "shadow-[0_0_10px_rgba(20,184,166,0.45)]",
   },
+  // 장애 / 스톨 / 버블은 무지개 흐름을 방해하지 않는 차분한 톤다운 그레이/슬레이트
   STALL_IF: {
-    bg: "bg-red-100",
-    text: "text-red-700 font-extrabold",
-    border: "border-red-400 border-dashed",
-    activeRing: "ring-red-300",
+    bg: "bg-[#94A3B8] dark:bg-[#64748B]",
+    text: "text-white",
+    border: "border-0",
+    activeRing: "ring-[#CBD5E1]",
+    activeGlow: "shadow-[0_0_10px_rgba(100,116,139,0.45)]",
   },
   STALL_ID: {
-    bg: "bg-red-100",
-    text: "text-red-700 font-extrabold",
-    border: "border-red-400 border-dashed",
-    activeRing: "ring-red-300",
+    bg: "bg-[#94A3B8] dark:bg-[#64748B]",
+    text: "text-white",
+    border: "border-0",
+    activeRing: "ring-[#CBD5E1]",
+    activeGlow: "shadow-[0_0_10px_rgba(100,116,139,0.45)]",
   },
   BUBBLE: {
-    bg: "bg-purple-100",
-    text: "text-purple-700 font-extrabold",
-    border: "border-purple-400 border-dashed",
-    activeRing: "ring-purple-300",
+    bg: "bg-[#A1A1AA] dark:bg-[#71717A]",
+    text: "text-white",
+    border: "border-0",
+    activeRing: "ring-[#D4D4D8]",
+    activeGlow: "shadow-[0_0_10px_rgba(113,113,122,0.45)]",
   },
 };
 
