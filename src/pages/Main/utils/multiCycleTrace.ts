@@ -83,17 +83,17 @@ export const STAGE_STYLES: Record<
   },
   // 장애 / 스톨 / 버블
   STALL_IF: {
-    bg: "bg-[#CBD5E1] dark:bg-[#334155]",
-    activeBg: "bg-[#64748B] dark:bg-[#475569]",
-    hoverBg: "hover:bg-[#64748B] dark:hover:bg-[#475569]",
-    text: "text-white",
+    bg: "bg-[#FDE68A] dark:bg-[#78350F]", // Amber 200 / Amber 900
+    activeBg: "bg-[#F59E0B] dark:bg-[#B45309]", // Amber 500 / Amber 700
+    hoverBg: "hover:bg-[#F59E0B] dark:hover:bg-[#B45309]",
+    text: "text-amber-900 dark:text-amber-100",
     border: "border-0",
   },
   STALL_ID: {
-    bg: "bg-[#CBD5E1] dark:bg-[#334155]",
-    activeBg: "bg-[#64748B] dark:bg-[#475569]",
-    hoverBg: "hover:bg-[#64748B] dark:hover:bg-[#475569]",
-    text: "text-white",
+    bg: "bg-[#FDE68A] dark:bg-[#78350F]",
+    activeBg: "bg-[#F59E0B] dark:bg-[#B45309]",
+    hoverBg: "hover:bg-[#F59E0B] dark:hover:bg-[#B45309]",
+    text: "text-amber-900 dark:text-amber-100",
     border: "border-0",
   },
   BUBBLE: {
