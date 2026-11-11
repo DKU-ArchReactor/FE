@@ -32,84 +32,94 @@ export const STAGE_STYLES: Record<
   CellType,
   {
     bg: string;
+    activeBg: string;
+    hoverBg: string;
     text: string;
     border: string;
-    activeRing: string;
-    activeGlow: string;
   }
 > = {
   // 무지개 스펙트럼 (Red -> Orange -> Green -> Blue -> Purple)
   IF: {
-    bg: "bg-[#F87171] dark:bg-[#EF4444]",
+    bg: "bg-[#FCA5A5] dark:bg-[#7F1D1D]", // 평소: 부드러운 파스텔 코랄 레드
+    activeBg: "bg-[#EF4444] dark:bg-[#DC2626]", // 포커스: 짙고 선명한 레드
+    hoverBg: "hover:bg-[#EF4444] dark:hover:bg-[#DC2626]", // 호버 시 진해짐
     text: "text-white",
     border: "border-0",
-    activeRing: "ring-[#FCA5A5]",
-    activeGlow: "shadow-[0_0_10px_rgba(239,68,68,0.45)]",
   },
   ID: {
-    bg: "bg-[#FB923C] dark:bg-[#F97316]",
+    bg: "bg-[#FDBA74] dark:bg-[#7C2D12]", // 평소: 파스텔 오렌지
+    activeBg: "bg-[#F97316] dark:bg-[#EA580C]", // 포커스: 짙은 딥 오렌지
+    hoverBg: "hover:bg-[#F97316] dark:hover:bg-[#EA580C]",
     text: "text-white",
     border: "border-0",
-    activeRing: "ring-[#FDBA74]",
-    activeGlow: "shadow-[0_0_10px_rgba(249,115,22,0.45)]",
   },
   EX: {
-    bg: "bg-[#34D399] dark:bg-[#10B981]",
-    text: "text-white",
+    bg: "bg-[#A3E635] dark:bg-[#365314]", // 평소: 파스텔 연두 (Lime 400)
+    activeBg: "bg-[#22C55E] dark:bg-[#15803D]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
+    hoverBg: "hover:bg-[#22C55E] dark:hover:bg-[#15803D]",
+    text: "text-white font-bold",
     border: "border-0",
-    activeRing: "ring-[#6EE7B7]",
-    activeGlow: "shadow-[0_0_10px_rgba(16,185,129,0.45)]",
   },
   MEM: {
-    bg: "bg-[#38BDF8] dark:bg-[#0EA5E9]",
+    bg: "bg-[#93C5FD] dark:bg-[#1E3A8A]", // 평소: 파스텔 스카이블루
+    activeBg: "bg-[#0EA5E9] dark:bg-[#0284C7]", // 포커스: 짙은 블루
+    hoverBg: "hover:bg-[#0EA5E9] dark:hover:bg-[#0284C7]",
     text: "text-white",
     border: "border-0",
-    activeRing: "ring-[#7DD3FC]",
-    activeGlow: "shadow-[0_0_10px_rgba(14,165,233,0.45)]",
   },
   WB: {
-    bg: "bg-[#A78BFA] dark:bg-[#8B5CF6]",
+    bg: "bg-[#C4B5FD] dark:bg-[#4C1D95]", // 평소: 파스텔 바이올렛
+    activeBg: "bg-[#8B5CF6] dark:bg-[#7C3AED]", // 포커스: 짙은 바이올렛 퍼플
+    hoverBg: "hover:bg-[#8B5CF6] dark:hover:bg-[#7C3AED]",
     text: "text-white",
     border: "border-0",
-    activeRing: "ring-[#C4B5FD]",
-    activeGlow: "shadow-[0_0_10px_rgba(139,92,246,0.45)]",
   },
   DONE: {
-    bg: "bg-[#2DD4BF] dark:bg-[#14B8A6]",
-    text: "text-white",
+    bg: "bg-[#A3E635] dark:bg-[#365314]", // 평소: 파스텔 연두 (Lime 400)
+    activeBg: "bg-[#22C55E] dark:bg-[#15803D]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
+    hoverBg: "hover:bg-[#22C55E] dark:hover:bg-[#15803D]",
+    text: "text-white font-bold",
     border: "border-0",
-    activeRing: "ring-[#5EEAD4]",
-    activeGlow: "shadow-[0_0_10px_rgba(20,184,166,0.45)]",
   },
-  // 장애 / 스톨 / 버블은 무지개 흐름을 방해하지 않는 차분한 톤다운 그레이/슬레이트
+  // 장애 / 스톨 / 버블
   STALL_IF: {
-    bg: "bg-[#94A3B8] dark:bg-[#64748B]",
+    bg: "bg-[#CBD5E1] dark:bg-[#334155]",
+    activeBg: "bg-[#64748B] dark:bg-[#475569]",
+    hoverBg: "hover:bg-[#64748B] dark:hover:bg-[#475569]",
     text: "text-white",
     border: "border-0",
-    activeRing: "ring-[#CBD5E1]",
-    activeGlow: "shadow-[0_0_10px_rgba(100,116,139,0.45)]",
   },
   STALL_ID: {
-    bg: "bg-[#94A3B8] dark:bg-[#64748B]",
+    bg: "bg-[#CBD5E1] dark:bg-[#334155]",
+    activeBg: "bg-[#64748B] dark:bg-[#475569]",
+    hoverBg: "hover:bg-[#64748B] dark:hover:bg-[#475569]",
     text: "text-white",
     border: "border-0",
-    activeRing: "ring-[#CBD5E1]",
-    activeGlow: "shadow-[0_0_10px_rgba(100,116,139,0.45)]",
   },
   BUBBLE: {
-    bg: "bg-[#A1A1AA] dark:bg-[#71717A]",
+    bg: "bg-[#BAE6FD] dark:bg-[#164E63]",
+    activeBg: "bg-[#38BDF8] dark:bg-[#0284C7]",
+    hoverBg: "hover:bg-[#38BDF8] dark:hover:bg-[#0284C7]",
     text: "text-white",
     border: "border-0",
-    activeRing: "ring-[#D4D4D8]",
-    activeGlow: "shadow-[0_0_10px_rgba(113,113,122,0.45)]",
   },
 };
 
 export const isValidStageInst = (buf?: StageBuffer | null): buf is StageBuffer => {
   if (!buf || !buf.assembly) return false;
   const norm = buf.assembly.trim().toLowerCase();
-  if (!norm || norm === "bubble" || norm === "empty" || norm === "nop (bubble)") return false;
-  if (buf.status === "bubble" || buf.status === "empty") return false;
+  if (
+    !norm ||
+    norm === "bubble" ||
+    norm === "empty" ||
+    norm === "nop (bubble)" ||
+    norm === "nop"
+  ) {
+    return false;
+  }
+  if (buf.status === "bubble" || buf.status === "empty" || buf.status === "flushed") {
+    return false;
+  }
   return true;
 };
 
@@ -322,7 +332,7 @@ export function buildMultiCycleTraceRows(
       nextStageRow.IF = rowId;
     }
 
-    // 6. 분기/점프 플러시(Flush) 또는 버블(Bubble)로 인해 파이프라인에서 도중 취소된 명령어 표시
+    // 6. 분기/점프 플러시(Flush) 또는 버블(Bubble)로 인해 파이프라인에서 도중 취소된 명령어 표시 (방식 B: WB까지 버블 전파)
     if (prevStageRow.ID !== undefined && !usedPrevStages.has("ID")) {
       const flushedRow = rows[prevStageRow.ID];
       if (flushedRow && !flushedRow.cells[cIdx]) {
@@ -332,6 +342,7 @@ export function buildMultiCycleTraceRows(
           label: "BBL",
           isBubble: true,
         };
+        nextStageRow.EX = prevStageRow.ID;
       }
     }
     if (prevStageRow.IF !== undefined && !usedPrevStages.has("IF")) {
@@ -343,6 +354,31 @@ export function buildMultiCycleTraceRows(
           label: "BBL",
           isBubble: true,
         };
+        nextStageRow.ID = prevStageRow.IF;
+      }
+    }
+    if (prevStageRow.EX !== undefined && !usedPrevStages.has("EX")) {
+      const flushedRow = rows[prevStageRow.EX];
+      if (flushedRow && !flushedRow.cells[cIdx]) {
+        flushedRow.cells[cIdx] = {
+          type: "BUBBLE",
+          stage: "MEM",
+          label: "BBL",
+          isBubble: true,
+        };
+        nextStageRow.MEM = prevStageRow.EX;
+      }
+    }
+    if (prevStageRow.MEM !== undefined && !usedPrevStages.has("MEM")) {
+      const flushedRow = rows[prevStageRow.MEM];
+      if (flushedRow && !flushedRow.cells[cIdx]) {
+        flushedRow.cells[cIdx] = {
+          type: "BUBBLE",
+          stage: "WB",
+          label: "BBL",
+          isBubble: true,
+        };
+        nextStageRow.WB = prevStageRow.MEM;
       }
     }
 

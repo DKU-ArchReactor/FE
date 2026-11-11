@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { getMe } from "@/api/auth";
 import type { UserMeResponse } from "@/type/auth";
 import ThemeSwitch from "@/components/ThemeSwitch";
+import { ArchLogo } from "@/components/ArchLogo";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -37,19 +38,28 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full bg-[var(--ar-panel-bg)] border-b border-[var(--ar-border)] select-none transition-colors duration-150 shadow-xs">
       <div className="w-full px-4 h-12 flex justify-between items-center">
-        {/* 좌측: 브랜드 로고 */}
+        {/* 좌측: 브랜드 로고 및 플랫폼명 (우상단 첨자 RV32I) */}
         <div className="flex items-center gap-6">
           <div 
-            className="text-[var(--ar-accent)] font-bold text-lg cursor-pointer tracking-tight flex items-center gap-2 group transition-colors" 
+            className="text-[var(--ar-accent)] hover:text-[var(--ar-accent-hover)] font-bold cursor-pointer tracking-tight flex items-center gap-2 group transition-colors duration-150" 
             onClick={() => navigate("/")}
             title="ArchReactor - RISC-V Pipeline Visualizer"
           >
-            <img 
-              src="/logo.png" 
-              alt="ArchReactor Logo" 
-              className="w-7 h-7 object-contain transition-transform duration-200 group-hover:scale-105" 
-            />
-            <span className="font-extrabold tracking-tight">ArchReactor</span>
+            <ArchLogo className="w-[27px] h-[27px] text-current transition-colors duration-150 drop-shadow-xs" />
+            
+            <div className="relative inline-flex items-center select-none">
+              <span 
+                className="text-[20px] font-[900] tracking-tight leading-none"
+                style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
+              >
+                ArchReactor
+              </span>
+              
+              {/* 우상단 첨자 RV32I */}
+              <span className="text-[10px] font-bold font-mono text-gray-400 dark:text-gray-500 tracking-wider -top-1.5 -right-1 translate-x-1.5 -translate-y-1">
+                RV32I
+              </span>
+            </div>
           </div>
         </div>
 

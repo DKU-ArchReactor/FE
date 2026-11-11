@@ -223,6 +223,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           simulationData={simulationData}
           currentCycle={currentCycle}
           onJumpToCycle={onJumpToCycle}
+          mappedRows={mappedAssemblyRows}
+          mode={simulationMode}
         />
       );
 

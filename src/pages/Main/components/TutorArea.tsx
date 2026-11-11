@@ -171,17 +171,21 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             </div>
           </div>
         ) : activeTarget !== "asm" && selectedTranslationLine && cLineAnalysis ? (
-          <div className="@[720px]:grid @[720px]:grid-cols-2 @[720px]:gap-3 flex flex-col gap-2.5">
-            {/* 1. 선택한 C 언어 라인 및 구문 역할 해설 */}
-            <div className="rounded-xl border border-blue-200 dark:border-[#007ACC]/40 bg-blue-50/40 dark:bg-[#007ACC]/10 p-3 flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
+            {/* 1. 선택한 C 언어 라인 및 구문 역할 해설 (상단 헤더형 카드) */}
+            <div className="rounded-xl border border-blue-200 dark:border-[#007ACC]/40 bg-blue-50/40 dark:bg-[#007ACC]/10 p-3 flex flex-col gap-2 shadow-2xs">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs">📄</span>
                   <span className="text-[11px] font-mono font-bold text-blue-700 dark:text-[#388BFD] bg-blue-100/80 dark:bg-[#007ACC]/25 px-2 py-0.5 rounded border border-blue-200 dark:border-[#007ACC]/40 shadow-2xs">
                     C: L{selectedTranslationLine}
                   </span>
+                  <div className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC] flex items-center gap-1">
+                    <span>💡</span>
+                    <span>{cLineAnalysis.summary}</span>
+                  </div>
                 </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${cLineAnalysis.badgeColor}`}>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-medium shrink-0 ${cLineAnalysis.badgeColor}`}>
                   {cLineAnalysis.type}
                 </span>
               </div>
@@ -195,38 +199,29 @@ const TutorArea: React.FC<TutorAreaProps> = ({
               </div>
 
               {/* C 구문 자연어 해설 */}
-              <div className="space-y-1 mt-0.5">
-                <div className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC] flex items-center gap-1">
-                  <span>💡</span>
-                  <span>{cLineAnalysis.summary}</span>
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-[#858585] leading-relaxed pl-4">
-                  {cLineAnalysis.detail}
-                </p>
-              </div>
+              <p className="text-[11px] text-slate-600 dark:text-[#858585] leading-relaxed pl-1">
+                {cLineAnalysis.detail}
+              </p>
             </div>
 
-            {/* 2. 연관된 RISC-V 어셈블리 명령어 블록 & 세부 하드웨어 동작 해설 */}
-            <div className="rounded-xl border border-slate-200 dark:border-[#333333] bg-slate-50/50 dark:bg-[#252526]/50 p-3 flex flex-col gap-2.5">
-              <div className="flex flex-col gap-1 border-b border-slate-200/60 dark:border-[#333333] pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs">⚡</span>
-                    <span className="text-[11px] font-bold text-slate-800 dark:text-[#CCCCCC]">
-                      매핑된 ASM:
-                    </span>
-                    <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-[#CCCCCC] bg-white dark:bg-[#1E1E1E] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#333333]">
-                      {mappedAsmForSelectedLine.length > 0
-                        ? mappedAsmForSelectedLine.map((r) => `L${r.asmIndex}`).join(", ")
-                        : "없음"}
-                    </span>
-                  </div>
+            {/* 2. 연관된 RISC-V 어셈블리 명령어 블록 & 세부 하드웨어 동작 해설 (하단 전폭 카드) */}
+            <div className="rounded-xl border border-slate-200 dark:border-[#333333] bg-slate-50/50 dark:bg-[#252526]/50 p-3 flex flex-col gap-2.5 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-[#333333] pb-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs">⚡</span>
+                  <span className="text-[11px] font-bold text-slate-800 dark:text-[#CCCCCC]">
+                    매핑된 ASM:
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-[#CCCCCC] bg-white dark:bg-[#1E1E1E] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#333333]">
+                    {mappedAsmForSelectedLine.length > 0
+                      ? mappedAsmForSelectedLine.map((r) => `L${r.asmIndex}`).join(", ")
+                      : "없음"}
+                  </span>
                   <span className="text-[10px] text-slate-400 dark:text-[#858585] font-mono">
-                    ({mappedAsmForSelectedLine.length}개)
+                    ({mappedAsmForSelectedLine.length}개 명령어)
                   </span>
                 </div>
-                {/* RV32IM, GCC 아랫줄 배치 */}
-                <div className="text-[10px] text-slate-400 dark:text-[#858585] font-mono pl-4">
+                <div className="text-[10px] text-slate-400 dark:text-[#858585] font-mono">
                   RV32IM / GCC -O0
                 </div>
               </div>

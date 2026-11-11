@@ -321,7 +321,7 @@ export default function TranslationEditor({
           {/* 4. 컴파일 버튼 */}
           <button
             type="button"
-            className="h-[22px] rounded bg-[#005FB8] dark:bg-[#007ACC] px-2.5 text-[10.5px] font-semibold text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0"
+            className="h-[22px] rounded bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold"
             onClick={onCompile}
             disabled={busy || !source.trim()}
             title="C 코드 컴파일 및 어셈블리 변환"
