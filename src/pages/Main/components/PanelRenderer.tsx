@@ -191,6 +191,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       return (
         <PipelineVisualizer
           currentData={currentData}
+          prevData={prevData}
+          simulationData={simulationData}
           loadingMessage={loadingMessage}
           mode={simulationMode}
         />
