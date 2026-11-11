@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import type { FileSummary } from "@/type/file";
+import { getFileById } from "@/api/file";
 
 const ASM_TEMPLATES = [
   {
@@ -51,6 +53,9 @@ type Props = {
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onSelectAssembly?: (code: string) => void;
+  savedFiles?: FileSummary[];
+  currentFileId?: string | null;
+  onOpenSavedFile?: (fileId: string) => void;
 };
 
 export default function AsmFileUploadPopup({
@@ -58,11 +63,25 @@ export default function AsmFileUploadPopup({
   onClose,
   anchorRef,
   onSelectAssembly,
+  savedFiles = [],
+  currentFileId,
+  onOpenSavedFile,
 }: Props) {
   const popupRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
+  const isLoggedIn = !!localStorage.getItem("access_token");
+
+  // 저장된 파일 중 어셈블리(.s, .asm, lang=asm) 필터링
+  const savedAsmFiles = useMemo(() => {
+    return savedFiles.filter(
+      (f) =>
+        f.lang === "asm" ||
+        f.title.toLowerCase().endsWith(".s") ||
+        f.title.toLowerCase().endsWith(".asm")
+    );
+  }, [savedFiles]);
 
   const updatePopupPos = useCallback(() => {
     if (anchorRef.current) {
@@ -144,6 +163,26 @@ export default function AsmFileUploadPopup({
       const file = files[0];
       readAsmFile(file);
       onClose();
+    }
+  };
+
+  // 저장된 파일 목록에서 개별 파일 로컬 다운로드 핸들러
+  const handleDownloadSavedFile = async (e: React.MouseEvent, file: FileSummary) => {
+    e.stopPropagation();
+    try {
+      const detail = await getFileById(file.file_id);
+      const blob = new Blob([detail.content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = detail.title || `${file.title || "source"}.s`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("File download error:", err);
+      alert("파일을 다운로드하지 못했습니다.");
     }
   };
 
@@ -230,7 +269,110 @@ export default function AsmFileUploadPopup({
             </div>
           </div>
 
-          {/* 2. 하단 섹션: ArchReactor RISC-V 템플릿 목록 */}
+          {/* 2. 중간 섹션: 저장된 어셈블리 파일 목록 */}
+          <div className="flex flex-col min-h-0 bg-white dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#3E3E42]">
+            <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#1E1E1E] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs">💾</span>
+                <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+                  저장된 어셈블리 파일
+                </span>
+                <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585]">
+                  ({isLoggedIn ? savedAsmFiles.length : 0})
+                </span>
+              </div>
+              {isLoggedIn && savedAsmFiles.length > 0 && (
+                <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+                  클릭하여 열기
+                </span>
+              )}
+            </div>
+
+            <div className="overflow-y-auto p-1.5 space-y-1 max-h-36 divide-y divide-[#F0F0F0] dark:divide-[#333333]/50 [scrollbar-width:thin]">
+              {!isLoggedIn ? (
+                <div className="py-4 px-3 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col gap-0.5 items-center justify-center">
+                  <span className="font-medium text-[#1F2328] dark:text-[#CCCCCC]">로그인이 필요합니다</span>
+                  <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+                    로그인 후 저장한 어셈블리 파일을 불러올 수 있습니다.
+                  </span>
+                </div>
+              ) : savedAsmFiles.length === 0 ? (
+                <div className="py-4 px-3 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col items-center justify-center">
+                  저장된 어셈블리 파일이 없습니다
+                </div>
+              ) : (
+                savedAsmFiles.map((f) => {
+                  const isSelected = currentFileId === f.file_id;
+                  const dateStr = f.updated_at
+                    ? new Date(f.updated_at).toLocaleDateString("ko-KR", {
+                        month: "2-digit",
+                        day: "2-digit",
+                      })
+                    : "";
+
+                  return (
+                    <div
+                      key={f.file_id}
+                      onClick={() => {
+                        onOpenSavedFile?.(f.file_id);
+                        onClose();
+                      }}
+                      title="클릭하여 어셈블리 에디터에 열기"
+                      className={`w-full px-2.5 py-1.5 rounded text-left transition-colors flex items-center justify-between gap-2 cursor-pointer group/row ${
+                        isSelected
+                          ? "bg-blue-50/80 dark:bg-[#007ACC]/15 text-[#005FB8] dark:text-[#79C0FF]"
+                          : "hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-[11px] text-[#57606A] dark:text-[#858585] font-mono shrink-0">
+                          ⚙️
+                        </span>
+                        <span
+                          className={`text-xs font-mono truncate ${
+                            isSelected
+                              ? "font-bold text-[#005FB8] dark:text-[#79C0FF]"
+                              : "text-[#1F2328] dark:text-[#CCCCCC] group-hover/row:text-[#005FB8] dark:group-hover/row:text-[#79C0FF]"
+                          }`}
+                        >
+                          {f.title}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {dateStr && (
+                          <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">
+                            {dateStr}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownloadSavedFile(e, f)}
+                          title="로컬 파일로 다운로드"
+                          className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                        >
+                          <svg
+                            className="w-3.5 h-3.5 stroke-current"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* 3. 하단 섹션: ArchReactor RISC-V 템플릿 목록 */}
           <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#252526]">
             <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#1E1E1E] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-1.5">
@@ -273,4 +415,3 @@ export default function AsmFileUploadPopup({
     </>
   );
 }
-

@@ -3,31 +3,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { getMe } from "@/api/auth";
 import type { UserMeResponse } from "@/type/auth";
 import ThemeSwitch from "@/components/ThemeSwitch";
+import { ArchLogo } from "@/components/ArchLogo";
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<UserMeResponse | null>(null);
-
-  const [aspectTier, setAspectTier] = useState<"normal" | "ultrawide" | "superwide">(() => {
-    if (typeof window === "undefined") return "normal";
-    const ratio = window.innerWidth / Math.max(1, window.innerHeight);
-    if (ratio >= 32 / 9) return "superwide";
-    if (ratio >= 21 / 9) return "ultrawide";
-    return "normal";
-  });
-
-  useEffect(() => {
-    const checkAspectRatio = () => {
-      const ratio = window.innerWidth / Math.max(1, window.innerHeight);
-      if (ratio >= 32 / 9) setAspectTier("superwide");
-      else if (ratio >= 21 / 9) setAspectTier("ultrawide");
-      else setAspectTier("normal");
-    };
-    checkAspectRatio();
-    window.addEventListener("resize", checkAspectRatio);
-    return () => window.removeEventListener("resize", checkAspectRatio);
-  }, []);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -54,76 +35,31 @@ const Header = () => {
     navigate("/login");
   };
 
-  // 우측 3단계 뷰포트 내비게이션 아이템:
-  // 1: State -> /
-  // 2: Timing -> /pipeline
-  // 3: Pipeline -> /management
-  const navItems =
-    aspectTier === "superwide"
-      ? []
-      : aspectTier === "ultrawide"
-      ? [
-          {
-            label: "State ➔ Timing",
-            path: "/simulator",
-            active: location.pathname === "/simulator" || location.pathname === "/pipeline" || location.pathname === "/c-to-asm",
-          },
-          {
-            label: "Timing ➔ Pipeline",
-            path: "/management",
-            active: location.pathname === "/management",
-          },
-        ]
-      : [
-          {
-            label: "State",
-            path: "/simulator",
-            active: isActive("/simulator") || isActive("/c-to-asm"),
-          },
-          {
-            label: "Timing",
-            path: "/pipeline",
-            active: isActive("/pipeline"),
-          },
-          {
-            label: "Pipeline",
-            path: "/management",
-            active: isActive("/management"),
-          },
-        ];
-
   return (
     <header className="sticky top-0 z-50 w-full bg-[var(--ar-panel-bg)] border-b border-[var(--ar-border)] select-none transition-colors duration-150 shadow-xs">
       <div className="w-full px-4 h-12 flex justify-between items-center">
-        {/* 좌측: 로고 및 뷰포트 내비게이션 탭 */}
+        {/* 좌측: 브랜드 로고 및 플랫폼명 (우상단 첨자 RV32I) */}
         <div className="flex items-center gap-6">
           <div 
-            className="text-[#005FB8] dark:text-[#007ACC] font-bold text-lg cursor-pointer tracking-tight flex items-center gap-2 group" 
+            className="text-[var(--ar-accent)] hover:text-[var(--ar-accent-hover)] font-bold cursor-pointer tracking-tight flex items-center gap-2 group transition-colors duration-150" 
             onClick={() => navigate("/")}
             title="ArchReactor - RISC-V Pipeline Visualizer"
           >
-            <img 
-              src="/logo.png" 
-              alt="ArchReactor Logo" 
-              className="w-7 h-7 object-contain transition-transform duration-200 group-hover:scale-105" 
-            />
-            <span className="font-extrabold tracking-tight">ArchReactor</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className={`px-3 py-1 rounded text-xs font-semibold border transition-all cursor-pointer ${
-                  item.active
-                    ? "bg-[var(--ar-header-bg)] text-[var(--ar-accent)] border-[var(--ar-border)] shadow-xs"
-                    : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
-                }`}
+            <ArchLogo className="w-[27px] h-[27px] text-current transition-colors duration-150 drop-shadow-xs" />
+            
+            <div className="relative inline-flex items-center select-none">
+              <span 
+                className="text-[20px] font-[900] tracking-tight leading-none"
+                style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
               >
-                {item.label}
-              </button>
-            ))}
+                ArchReactor
+              </span>
+              
+              {/* 우상단 첨자 RV32I */}
+              <span className="text-[10px] font-bold font-mono text-gray-400 dark:text-gray-500 tracking-wider -top-1.5 -right-1 translate-x-1.5 -translate-y-1">
+                RV32I
+              </span>
+            </div>
           </div>
         </div>
 
@@ -137,7 +73,7 @@ const Header = () => {
           {user ? (
             <>
               <span className="text-xs font-medium text-[#24292F] dark:text-[#CCCCCC]">
-                <strong className="text-[#005FB8] dark:text-[#007ACC] font-semibold">{user.name}</strong>님
+                <strong className="text-[var(--ar-accent)] font-semibold">{user.name}</strong>님
               </span>
               <button
                 type="button"
@@ -149,7 +85,7 @@ const Header = () => {
               <button 
                 type="button"
                 onClick={() => navigate("/my")}
-                className="text-xs font-semibold text-white bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] px-3 py-1 rounded transition-colors cursor-pointer"
+                className="text-xs font-semibold text-white bg-[var(--ar-accent)] hover:opacity-90 px-3 py-1 rounded transition-all cursor-pointer shadow-xs"
               >
                 마이페이지
               </button>
@@ -161,7 +97,7 @@ const Header = () => {
                 onClick={() => navigate("/login")}
                 className={`text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer ${
                   isActive('/login')
-                    ? 'text-[#005FB8] dark:text-[#007ACC] font-bold'
+                    ? 'text-[var(--ar-accent)] font-bold'
                     : 'text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC]'
                 }`}
               >
@@ -170,7 +106,7 @@ const Header = () => {
               <button 
                 type="button"
                 onClick={() => navigate("/signup")}
-                className="text-xs font-semibold px-2.5 py-1 rounded bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white transition-colors cursor-pointer"
+                className="text-xs font-semibold px-2.5 py-1 rounded bg-[var(--ar-accent)] hover:opacity-90 text-white transition-all cursor-pointer shadow-xs"
               >
                 회원가입
               </button>

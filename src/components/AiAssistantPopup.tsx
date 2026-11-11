@@ -11,12 +11,14 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   anchorRef?: React.RefObject<HTMLElement | null>;
+  mode?: "single" | "pipeline";
 }
 
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 500;
 
-export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }) => {
+export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, mode = "single" }) => {
+  const isSingle = mode === "single";
   // 1. 위치 및 드래그 상태 관리
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -237,9 +239,15 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
           setHasAnimated(true);
         }
       }}
-      className={`fixed z-50 flex flex-col rounded-xl overflow-hidden select-none border-2 border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)] ${
+      className={`fixed z-50 flex flex-col rounded-xl overflow-hidden select-none border-2 ${
+        isSingle
+          ? "border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
+          : "border-[#7C3AED]/40 dark:border-[#A855F7]/50 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(168,85,247,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
+      } ${
         isDragging
-          ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
+          ? isSingle
+            ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
+            : "ring-2 ring-[#7C3AED] dark:ring-[#A855F7] shadow-[0_24px_56px_-4px_rgba(124,58,237,0.3)]"
           : ""
       } ${
         !hasAnimated ? "ai-popup-drop-anim" : ""
@@ -248,7 +256,11 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
       {/* 팝업 헤더 (드래그 핸들 역할 - 4면 균일 2px 테두리) */}
       <header
         onMouseDown={startDrag}
-        className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b border-[#005FB8]/15 dark:border-[#007ACC]/25 cursor-grab active:cursor-grabbing transition-colors ${
+        className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b ${
+          isSingle
+            ? "border-[#005FB8]/15 dark:border-[#007ACC]/25"
+            : "border-[#7C3AED]/15 dark:border-[#A855F7]/25"
+        } cursor-grab active:cursor-grabbing transition-colors ${
           isDragging ? "bg-[#EAEAEA] dark:bg-[#2D2D2D]" : ""
         }`}
         title="드래그하여 원하는 위치로 이동할 수 있습니다."
@@ -260,7 +272,9 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
               <h3 className="text-xs font-bold text-[#1F2328] dark:text-[#CCCCCC] truncate">
                 ArchReactor AI 어시스턴트
               </h3>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#005FB8] dark:bg-[#007ACC] animate-pulse" />
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                isSingle ? "bg-[#005FB8] dark:bg-[#007ACC]" : "bg-[#7C3AED] dark:bg-[#A855F7]"
+              } animate-pulse`} />
             </div>
             <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate font-mono">
               헤더를 잡고 드래그하여 이동
@@ -278,7 +292,11 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
               setPosition(getAnchorPosition());
             }}
             title="버튼 바로 아래 기본 위치로 복귀"
-            className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs"
+            className={`p-1 rounded text-[#57606A] dark:text-[#858585] ${
+              isSingle
+                ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+            } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
           >
             ↺
           </button>
@@ -305,28 +323,44 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
           <button
             type="button"
             onClick={() => handleSendMessage("현재 파이프라인 해저드 분석해줘")}
-            className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
+            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
+              isSingle
+                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
           >
             ⚡ 해저드 분석
           </button>
           <button
             type="button"
             onClick={() => handleSendMessage("C 코드와 어셈블리 매핑 원리 알려줘")}
-            className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
+            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
+              isSingle
+                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
           >
             📄 C·ASM 매핑
           </button>
           <button
             type="button"
             onClick={() => handleSendMessage("스택 프레임(sp/s0) 구조 설명해줘")}
-            className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
+            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
+              isSingle
+                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
           >
             💾 스택 구조
           </button>
           <button
             type="button"
             onClick={() => handleSendMessage("CPI 성능 개선 팁 알려줘")}
-            className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
+            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
+              isSingle
+                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
           >
             📊 CPI 최적화
           </button>
@@ -347,7 +381,9 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
               <div
                 className={`rounded-2xl px-3.5 py-2.5 max-w-[85%] whitespace-pre-wrap break-words shadow-2xs ${
                   msg.sender === "user"
-                    ? "bg-[#005FB8] dark:bg-[#007ACC] text-white rounded-tr-none font-medium"
+                    ? isSingle
+                      ? "bg-[#005FB8] dark:bg-[#007ACC] text-white rounded-tr-none font-medium"
+                      : "bg-[#7C3AED] dark:bg-[#8B5CF6] text-white rounded-tr-none font-medium"
                     : "bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] text-[#1F2328] dark:text-[#CCCCCC] rounded-tl-none font-normal"
                 }`}
               >
@@ -359,7 +395,9 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
           {/* AI 응답 대기 로딩 */}
           {isThinking && (
             <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] max-w-[140px]">
-              <div className="w-4 h-4 border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
+              <div className={`w-4 h-4 border-2 ${
+                isSingle ? "border-[#005FB8] dark:border-[#007ACC]" : "border-[#7C3AED] dark:border-[#8B5CF6]"
+              } border-t-transparent rounded-full animate-spin`} />
               <span className="text-[11px] text-[#57606A] dark:text-[#858585] font-medium animate-pulse">
                 답변 분석 중...
               </span>
@@ -383,12 +421,20 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="C 코드나 파이프라인에 대해 질문하세요..."
               disabled={isThinking}
-              className="flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-xs text-[#1F2328] dark:text-[#CCCCCC] placeholder:text-[#8C959F] dark:placeholder:text-[#6E7681] focus:outline-none focus:border-[#005FB8] dark:focus:border-[#007ACC] focus:ring-1 focus:ring-[#005FB8] dark:focus:ring-[#007ACC] transition-colors"
+              className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-xs text-[#1F2328] dark:text-[#CCCCCC] placeholder:text-[#8C959F] dark:placeholder:text-[#6E7681] focus:outline-none ${
+                isSingle
+                  ? "focus:border-[#005FB8] dark:focus:border-[#007ACC] focus:ring-1 focus:ring-[#005FB8] dark:focus:ring-[#007ACC]"
+                  : "focus:border-[#7C3AED] dark:focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#7C3AED] dark:focus:ring-[#8B5CF6]"
+              } transition-colors`}
             />
             <button
               type="submit"
               disabled={!inputMessage.trim() || isThinking}
-              className="px-3 py-1.5 rounded-lg bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0"
+              className={`px-3 py-1.5 rounded-lg ${
+                isSingle
+                  ? "bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3]"
+                  : "bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED]"
+              } text-white text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
             >
               <span>전송</span>
               <span className="text-[10px]">➤</span>

@@ -229,7 +229,17 @@ const MainPage: React.FC = () => {
       onTranslationFile={handleTranslationFile}
       onSelectTranslationLine={handleSelectTranslationLine}
       onSaveTranslationFile={fileMgr.handleSaveTranslationFile}
+      onSaveAssemblyFile={(name) => fileMgr.handleSaveAssemblyFile(customAssembly, name)}
       onOpenSavedFileInEditor={(id) => fileMgr.handleOpenSavedFileInEditor(id, onResetSimulation)}
+      onOpenSavedAssemblyFile={async (id) => {
+        const detail = await fileMgr.ensureFileContent(id);
+        if (detail) {
+          setCustomAssembly(detail.content);
+          fileMgr.setFileId(id);
+          fileMgr.setAsmFileName(detail.title);
+          onResetSimulation();
+        }
+      }}
       onCustomAssemblyChange={setCustomAssembly}
       onSimulateAssembly={() =>
         simSession.handleAssemblySimulation(customAssembly, {
@@ -253,7 +263,11 @@ const MainPage: React.FC = () => {
   return (
     <main
       className={`flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
-        playback.isPlaying && simSession.isSingleEngine ? "is-playing-single-light" : ""
+        playback.isPlaying
+          ? simSession.isSingleEngine
+            ? "is-playing-single-light"
+            : "is-playing-pipeline-light"
+          : ""
       }`}
     >
       {/* 1. 최상단 제어 바 */}
@@ -301,19 +315,23 @@ const MainPage: React.FC = () => {
           type="button"
           onClick={() => setIsAiPopupOpen((prev) => !prev)}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
-          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 group active:scale-95 ${
+          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 outline-none group active:scale-95 ${
             isAiPopupOpen
-              ? "bg-gradient-to-tr from-[#004C99] via-[#007ACC] to-[#0284C7] text-white ring-2 ring-[#38BDF8]/70 ring-offset-1 dark:ring-offset-[#18181B] shadow-inner"
-              : "bg-gradient-to-tr from-[#0066CC] via-[#0091FF] to-[#38BDF8] hover:from-[#0055B3] hover:via-[#0080FF] hover:to-[#7DD3FC] text-white shadow-[0_2px_12px_rgba(0,145,255,0.32)] hover:shadow-[0_4px_18px_rgba(0,145,255,0.48)] hover:scale-[1.03]"
+              ? simSession.isSingleEngine
+                ? "bg-gradient-to-tr from-[#003870] via-[#005FB8] to-[#1E70BF] text-white shadow-[0_4px_18px_rgba(0,95,184,0.45)] scale-[1.03]"
+                : "bg-gradient-to-tr from-[#581C87] via-[#7C3AED] to-[#9D4EDD] text-white shadow-[0_4px_18px_rgba(124,58,237,0.45)] scale-[1.03]"
+              : simSession.isSingleEngine
+              ? "bg-gradient-to-tr from-[#005FB8] via-[#0D6EFD] to-[#2B7FFF] hover:from-[#004C99] hover:via-[#005FB8] hover:to-[#1E70BF] text-white shadow-[0_2px_12px_rgba(0,95,184,0.35)] hover:shadow-[0_4px_18px_rgba(0,95,184,0.5)] hover:scale-[1.03]"
+              : "bg-gradient-to-tr from-[#7C3AED] via-[#8B5CF6] to-[#A855F7] hover:from-[#6D28D9] hover:via-[#7C3AED] hover:to-[#9333EA] text-white shadow-[0_2px_12px_rgba(124,58,237,0.35)] hover:shadow-[0_4px_18px_rgba(124,58,237,0.5)] hover:scale-[1.03]"
           }`}
         >
           <div className="relative flex items-center justify-center">
             <svg
-              className="w-[19px] h-[19px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+              className="w-[23px] h-[23px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={2.2}
             >
               <path
                 strokeLinecap="round"
@@ -329,6 +347,7 @@ const MainPage: React.FC = () => {
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
+        mode={simSession.simulationEngineMode}
       />
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}
@@ -381,13 +400,13 @@ const MainPage: React.FC = () => {
                   setLeftCodeColRatio(50);
                 }}
                 title="드래그하여 C 코드와 ASM 영역 너비 조절 (더블클릭: 50:50 리셋)"
-                className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+                className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
               >
                 <div
                   className={`w-[3px] rounded-full transition-all duration-200 ${
                     resizingLeftCodeCol
-                      ? "h-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                      : "h-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                      ? "h-24 bg-[var(--ar-accent)] shadow-sm"
+                      : "h-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[var(--ar-accent)]"
                   }`}
                 />
               </div>
@@ -418,13 +437,13 @@ const MainPage: React.FC = () => {
               setLeftTopHeightPercent(56);
             }}
             title="위아래로 드래그하여 코드 영역과 튜터 높이 비율 조절 (더블클릭: 56:44 기본 리셋)"
-            className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+            className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
           >
             <div
               className={`h-[3px] rounded-full transition-all duration-200 ${
                 resizingLeftVertical
-                  ? "w-28 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                  : "w-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-24 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                  ? "w-28 bg-[var(--ar-accent)] shadow-sm"
+                  : "w-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-24 group-hover:bg-[var(--ar-accent)]"
               }`}
             />
           </div>
@@ -455,13 +474,13 @@ const MainPage: React.FC = () => {
             setLeftPaneWidth(50);
           }}
           title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 50:50 기본 리셋)"
-          className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-md transition-colors"
+          className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[var(--ar-accent)]/10 rounded-md transition-colors"
         >
           <div
             className={`w-[4px] rounded-full transition-all duration-200 ${
               resizingLeftPane
-                ? "h-36 bg-[#005FB8] dark:bg-[#007ACC] shadow-md ring-2 ring-[#005FB8]/30 dark:ring-[#007ACC]/30"
-                : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                ? "h-36 bg-[var(--ar-accent)] shadow-md ring-2 ring-[var(--ar-accent)]/30"
+                : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[var(--ar-accent)]"
             }`}
           />
         </div>
@@ -480,10 +499,13 @@ const MainPage: React.FC = () => {
                     : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
               >
-                <span className="text-base font-bold leading-none transition-transform group-hover:-translate-x-0.5">
-                  ‹
-                </span>
-                <span className="text-[9px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
+                <svg
+                  className="w-3.5 h-3.5 fill-current transition-transform duration-150 group-hover:-translate-x-0.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M16 4L6 12l10 8V4z" />
+                </svg>
+                <span className="text-[11px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
                   PREV
                 </span>
               </button>
@@ -515,10 +537,13 @@ const MainPage: React.FC = () => {
                     : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
                 }`}
               >
-                <span className="text-base font-bold leading-none transition-transform group-hover:translate-x-0.5">
-                  ›
-                </span>
-                <span className="text-[9px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
+                <svg
+                  className="w-3.5 h-3.5 fill-current transition-transform duration-150 group-hover:translate-x-0.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M8 4l10 8-10 8V4z" />
+                </svg>
+                <span className="text-[11px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
                   NEXT
                 </span>
               </button>
