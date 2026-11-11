@@ -269,15 +269,23 @@ export function useSimulationPlayback({
   }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection]);
 
   const handleStepBack = () => {
-    setIsPlaying(false);
-    triggerPlaybackFeedback("pause");
+    setIsPlaying((prev) => {
+      if (prev) {
+        triggerPlaybackFeedback("pause");
+      }
+      return false;
+    });
     onClearSelection();
     setCurrentCycle((prev) => Math.max(0, prev - 1));
   };
 
   const handleStepForward = () => {
-    setIsPlaying(false);
-    triggerPlaybackFeedback("pause");
+    setIsPlaying((prev) => {
+      if (prev) {
+        triggerPlaybackFeedback("pause");
+      }
+      return false;
+    });
     onClearSelection();
     const maxLimit = isSingleEngine ? totalCycles : Math.max(0, totalCycles - 1);
     setCurrentCycle((prev) => Math.min(maxLimit, prev + 1));
