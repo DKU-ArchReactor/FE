@@ -219,7 +219,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                 <span className="inline-block translate-y-[1px]">WB</span>
               </span>
               <span
-                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#252830] text-slate-600 dark:text-slate-300 border border-slate-400 dark:border-slate-500 text-[8.5px] font-black"
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-[#451A03] text-amber-600 dark:text-amber-300 border border-amber-400 dark:border-amber-500 text-[8.5px] font-black"
                 title="데이터 해저드로 인한 파이프라인 대기 (Stall)"
               >
                 <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
@@ -408,7 +408,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                       className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5] dark:border-[#333333] cursor-pointer transition-colors relative ${isCurrent
                           ? `${highlightTint.activeHeader} shadow-inner font-extrabold`
                           : hasStall
-                            ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50'
+                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50'
                             : hasFlush
                               ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50'
                               : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
@@ -420,7 +420,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                       <span>C{item.clock ?? cIdx}</span>
                       {(hasStall || hasFlush) && !isCurrent && (
                         <span
-                          className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-red-500' : 'bg-purple-500'
+                          className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-amber-500' : 'bg-purple-500'
                             }`}
                         />
                       )}
@@ -502,7 +502,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                           );
                         }
 
-                        // 스톨(Stall): 버블과 동일한 디자인 언어(배경 틴트 + 테두리 + 테두리색 텍스트)의 표지판 형태 화살표 뱃지
+                        // 스톨(Stall): 버블과 동일한 디자인 언어(배경 틴트 + 테두리 + 테두리색 텍스트)의 표지판 형태 화살표 뱃지 (노란색/Amber 계열)
                         if (cell.isStall || cell.type === 'STALL_IF' || cell.type === 'STALL_ID') {
                           return (
                             <div
@@ -513,11 +513,11 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                               title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ 데이터 대기(Hazard)로 인해 1클럭 지연(Stall)되어 다음 사이클로 연기됨`}
                             >
                               <div className="relative w-[92%] h-[96%] flex items-center justify-center">
-                                {/* 표지판 형태의 오른쪽 화살표 SVG - 슬레이트 그레이 톤온톤 스타일 */}
+                                {/* 표지판 형태의 오른쪽 화살표 SVG - 웜 옐로우/앰버 톤 스타일 */}
                                 <svg
                                   className={`w-full h-full fill-current transition-colors ${isCurrentCol
-                                      ? 'text-slate-200 dark:text-[#334155] stroke-slate-600 dark:stroke-slate-300'
-                                      : 'text-slate-100 group-hover:text-slate-200 dark:text-[#1E293B] dark:group-hover:text-[#334155] stroke-slate-400 group-hover:stroke-slate-600 dark:stroke-slate-500 dark:group-hover:stroke-slate-300'
+                                      ? 'text-amber-200 dark:text-[#78350F] stroke-amber-500 dark:stroke-amber-300'
+                                      : 'text-amber-100 group-hover:text-amber-200 dark:text-[#451A03] dark:group-hover:text-[#78350F] stroke-amber-400 group-hover:stroke-amber-500 dark:stroke-amber-400 dark:group-hover:stroke-amber-300'
                                     }`}
                                   viewBox="0 0 100 68"
                                   preserveAspectRatio="none"
@@ -542,8 +542,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                                 </svg>
                                 {/* 화살표 몸통 및 전체 기준 중앙 배치 (텍스트 Y는 1px 내려서 0px 복원, X는 1px 우측 유지) */}
                                 <span className={`absolute inset-0 flex items-center justify-center pt-[2px] pr-[3px] text-[9.5px] font-mono font-black tracking-tight select-none translate-x-[1px] transition-colors ${isCurrentCol
-                                    ? 'text-slate-700 dark:text-slate-100'
-                                    : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-100'
+                                    ? 'text-amber-700 dark:text-amber-200'
+                                    : 'text-amber-600 group-hover:text-amber-700 dark:text-amber-300 dark:group-hover:text-amber-100'
                                   }`}>
                                   STL
                                 </span>
