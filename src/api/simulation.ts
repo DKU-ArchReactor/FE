@@ -1,3 +1,4 @@
+import { seedTutor } from "@/pages/Main/utils/tutorAnalysis";
 import apiConfig from "@/api/config";
 import type { SimulationRunRequest, SimulationResult, CycleHistoryItem } from "@/type/simulation";
 
@@ -56,6 +57,8 @@ export const runSimulation = async (
 
   const response = await apiConfig.post("/api/v1/simulation/run", payload);
 
+  const tutor = response.data?.tutor;
+  seedTutor(tutor);
   let resultData = response.data;
 
   const fetchJsonFromUrl = async (rawUrl: string) => {
@@ -98,6 +101,7 @@ export const runSimulation = async (
     }
   }
 
-  return normalizeSimulationResult(resultData as SimulationResult);
+  const normalized = normalizeSimulationResult(resultData as SimulationResult);
+  return { ...normalized, tutor };
 };
 

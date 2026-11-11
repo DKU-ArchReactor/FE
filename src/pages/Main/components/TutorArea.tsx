@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import { mapAssembly, type MappedAssemblyRow } from '../utils/translationCompile';
-import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction } from '../utils/tutorAnalysis';
+import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction, fetchTutor, instructionAt } from '../utils/tutorAnalysis';
+import { TutorCycleEvidence, TutorInstructionEvidence } from './TutorEvidence';
 
 export interface TutorAreaProps {
   simulationData: SimulationResult | null;
@@ -70,10 +71,26 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     return cLines[selectedTranslationLine - 1] ?? "";
   }, [cLines, selectedTranslationLine]);
 
-  const cLineAnalysis = useMemo(() => {
-    if (!selectedTranslationLine || selectedCLineText === null) return null;
-    return analyzeCLine(selectedCLineText, selectedTranslationLine);
-  }, [selectedTranslationLine, selectedCLineText]);
+  const [, setExplanationVersion] = useState(0);
+  const [explanationError, setExplanationError] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      const items: Parameters<typeof fetchTutor>[0] = effectiveRows.flatMap(row => [
+        {kind: 'asm' as const, text: row.text},
+        ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
+      ]);
+      if (selectedCLineText !== null && selectedTranslationLine) items.push({kind: 'c', text: selectedCLineText, line: selectedTranslationLine});
+      fetchTutor(items, controller.signal).then(() => {
+        if (!controller.signal.aborted) { setExplanationError(false); setExplanationVersion(x => x + 1); }
+      }).catch(() => { if (!controller.signal.aborted) setExplanationError(true); });
+    }, 150);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [effectiveRows, selectedCLineText, selectedTranslationLine, retryVersion]);
+
+  const cLineAnalysis = selectedTranslationLine && selectedCLineText !== null
+    ? analyzeCLine(selectedCLineText, selectedTranslationLine) : null;
 
   // ----------------------------------------------------
   // 로딩 상태 화면
@@ -90,7 +107,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   return (
     <section
       className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
-      aria-label="AI 튜터 해설 패널"
+      aria-label="튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}
       <header className="h-8 shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 border-l-emerald-500">
@@ -107,6 +124,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
       {/* 튜터 메인 본문 영역 */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3.5 space-y-3.5 select-text [scrollbar-gutter:stable]">
+        {explanationError && <div role="alert">해설을 불러오지 못했습니다. <button onClick={() => setRetryVersion(x => x + 1)}>다시 시도</button></div>}
         {/* ========================================================= */}
         {/* 모드 0: CRT (C Runtime 부트스트랩) 코드가 선택되었을 때 */}
         {/* ========================================================= */}
@@ -119,10 +137,10 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   <span className="text-base">🚀</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
-                      CRT
+                      소스 위치 미확인
                     </span>
                     <strong className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC]">
-                      C Runtime 부트스트랩 (진입 초기화)
+                      {analyzeCrtInstruction(selectedRow.text, selectedRow.pc).title}
                     </strong>
                   </div>
                 </div>
@@ -141,6 +159,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                 </span>
               </div>
 
+              <TutorInstructionEvidence item={instructionAt(simulationData?.tutor, selectedRow.pc)} />
               {/* CRT 역할 및 설명 */}
               {(() => {
                 const crtInfo = analyzeCrtInstruction(selectedRow.text, selectedRow.pc);
@@ -228,7 +247,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
               {mappedAsmForSelectedLine.length === 0 ? (
                 <div className="p-3 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-center text-xs text-slate-400 dark:text-[#858585]">
-                  이 라인은 주석, 공백 또는 디렉티브로서 독립된 실행 어셈블리 명령어가 생성되지 않았습니다.
+                  이 줄에 연결된 명령어가 없습니다. 주석·공백·컴파일러 줄 정보의 배치 또는 누락 때문일 수 있습니다.
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -308,6 +327,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                           </span>
                         </div>
 
+                        <TutorInstructionEvidence item={instructionAt(simulationData?.tutor, asmRow.pc)} />
                         {/* 동작 요약 */}
                         <div className="text-[11px] font-bold text-slate-800 dark:text-[#CCCCCC] pl-5 flex items-center gap-1">
                           <span className="text-blue-600 dark:text-[#388BFD]">➔</span>
@@ -386,7 +406,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
                 {/* 현재 파이프라인 인출(IF) 명령어 */}
                 {(() => {
-                  const ifBuf = currentCycleData.buffers?.IF || currentCycleData.if_stage;
+                  const ifBuf = currentCycleData.stage_activity?.IF || currentCycleData.buffers?.IF || currentCycleData.if_stage;
                   const ifInst = ifBuf?.assembly || "bubble";
                   const isIdleStep0 = ifInst === "empty" && currentCycleData.clock === 0;
 
@@ -408,7 +428,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                     );
                   }
 
-                  const isCrtCycle = ifBuf?.source_line === null || (ifBuf && ifBuf.source_line === undefined && (ifInst.startsWith("auipc") || ifInst.startsWith("jalr")));
+                  const context = instructionAt(simulationData?.tutor, ifBuf?.pc);
+                  const isCrtCycle = context?.mapping_status === 'unmapped';
                   const crtAnalysis = isCrtCycle ? analyzeCrtInstruction(ifInst, ifBuf?.pc) : null;
                   const ifAnalysis = analyzeAsmInstruction(ifInst);
                   return (
@@ -420,7 +441,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                           </span>
                           {isCrtCycle && (
                             <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
-                              CRT
+                              소스 위치 미확인
                             </span>
                           )}
                         </div>
@@ -447,43 +468,14 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                     );
                   }
 
-                  const { cycle_events } = currentCycleData;
-                  const isStall = cycle_events.stall?.has_stall;
-                  const isForward = cycle_events.forwarding?.has_forwarded;
-                  const isFlush = cycle_events.control_hazard?.has_flush;
-
-                  return (
-                    <div
-                      className={`p-2.5 rounded-lg border text-[11px] leading-relaxed ${
-                        isStall
-                          ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-200"
-                          : isFlush
-                          ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200"
-                          : isForward
-                          ? "bg-cyan-50 dark:bg-cyan-950/30 border-cyan-200 dark:border-cyan-900/60 text-cyan-900 dark:text-cyan-200"
-                          : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60 text-emerald-900 dark:text-emerald-200"
-                      }`}
-                    >
-                      <strong className="font-bold block mb-0.5">
-                        {isStall
-                          ? "⚠️ 데이터 해저드 (Data Stall)"
-                          : isFlush
-                          ? "🔄 제어 해저드 (Branch Flush)"
-                          : isForward
-                          ? "⚡ 데이터 포워딩 (Forwarding 활성화)"
-                          : "✅ 정상 파이프라인 전진"}
-                      </strong>
-                      <span className="opacity-90">
-                        {isStall
-                          ? cycle_events.stall?.stall_desc || "필요한 피연산자가 준비되지 않아 파이프라인이 1사이클 정지되었습니다."
-                          : isFlush
-                          ? cycle_events.control_hazard?.flush_reason || "분기 예측 실패로 인해 파이프라인 버블이 플러시되었습니다."
-                          : isForward
-                          ? cycle_events.forwarding?.forwarding_desc || "ALU 결과를 후속 명령어에 직접 포워딩하여 지연 없이 실행합니다."
-                          : "현재 사이클에 해저드 없이 5개 스테이지가 순차적으로 실행되고 있습니다."}
-                      </span>
+                  const events = simulationData?.tutor?.cycle_explanations
+                    ?.find(x => x.cycle === currentCycleData.clock)?.events ?? [];
+                  return events.length ? <div className="space-y-2">{events.map(event => (
+                    <div key={event.type} className="p-2.5 rounded-lg border text-[11px] leading-relaxed">
+                      <strong className="block">{event.title}</strong>
+                      <span>{event.detail}</span>
                     </div>
-                  );
+                  ))}</div> : <div className="text-[11px]">현재 사이클에 보고된 스톨·포워딩·플러시 해설이 없습니다.</div>;
                 })()}
               </div>
             ) : activeTarget === "asm" ? (
@@ -509,6 +501,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             )}
           </div>
         )}
+        <TutorCycleEvidence bundle={simulationData?.tutor} historyIndex={currentCycleData ? simulationData?.history.indexOf(currentCycleData) : undefined} />
       </div>
     </section>
   );
