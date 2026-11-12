@@ -34,6 +34,10 @@ interface Props {
 }
 
 const QUESTION_EXAMPLES = [
+  { label: '⚡ 해저드 분석', question: '파이프라인 해저드의 종류와 원인을 설명해줘' },
+  { label: '📄 C·ASM 매핑', question: 'C 코드와 어셈블리 매핑 원리 알려줘' },
+  { label: '💾 스택 구조', question: '스택 프레임(sp/s0) 구조 설명해줘' },
+  { label: '📊 CPI 최적화', question: 'CPI 성능 개선 팁 알려줘' },
   { label: 'C 코드 설명', question: '선택한 C 코드가 하는 일을 줄별로 설명하고, 변수 값이 어떻게 바뀌는지 알려줘.' },
   { label: 'C 흐름·반환값', question: '첨부한 C 원문 전체의 실행 흐름과 반환값을 설명해줘. 실제 실행 결과와 코드로 추론한 값은 구분해줘.' },
   { label: 'ASM 레지스터', question: '선택한 RISC-V 명령어가 읽고 쓰는 레지스터를 알려줘. 이전 레지스터 값이 없으면 결과값은 추측하지 마.' },
@@ -391,55 +395,18 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       {/* 대화 본문 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
         {/* 추천 질문 칩 바 */}
-        <div className="shrink-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex items-center gap-1.5 overflow-x-auto text-[11px] [scrollbar-width:none]">
-          <button
-            type="button"
-            disabled={!canSend}
-            onClick={() => setInputMessage("파이프라인 해저드의 종류와 원인을 설명해줘")}
-            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
-              isSingle
-                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
-          >
-            ⚡ 해저드 분석
-          </button>
-          <button
-            type="button"
-            disabled={!canSend}
-            onClick={() => setInputMessage("C 코드와 어셈블리 매핑 원리 알려줘")}
-            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
-              isSingle
-                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
-          >
-            📄 C·ASM 매핑
-          </button>
-          <button
-            type="button"
-            disabled={!canSend}
-            onClick={() => setInputMessage("스택 프레임(sp/s0) 구조 설명해줘")}
-            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
-              isSingle
-                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
-          >
-            💾 스택 구조
-          </button>
-          <button
-            type="button"
-            disabled={!canSend}
-            onClick={() => setInputMessage("CPI 성능 개선 팁 알려줘")}
-            className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
-              isSingle
-                ? "hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                : "hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-            } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs`}
-          >
-            📊 CPI 최적화
-          </button>
+        <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
+          {QUESTION_EXAMPLES.map(example => (
+            <button key={example.label} type="button" disabled={!canSend}
+              onClick={() => setInputMessage(example.question)} title={example.question}
+              className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
+                isSingle
+                  ? 'hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]'
+                  : 'hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]'
+              } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs disabled:opacity-50`}>
+              {example.label}
+            </button>
+          ))}
         </div>
 
         {/* 메시지 리스트 */}
@@ -466,19 +433,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 {msg.sender === 'ai'
                   ? <Suspense fallback={<span className="whitespace-pre-wrap">{msg.text}</span>}><AssistantMarkdown text={msg.text} /></Suspense>
                   : msg.text}
-                {msg.id === 'welcome' && <details className="mt-2">
-                  <summary className="cursor-pointer text-[11px] font-medium">질문 예시</summary>
-                  <p className="mt-1 text-[10px] text-[#57606A] dark:text-gray-400">예시를 눌러 입력하세요. 실행 분석은 실행 첨부가 필요해요.</p>
-                  <div aria-label="질문 예시 목록" tabIndex={0} className="mt-2 flex flex-nowrap gap-1.5 overflow-x-auto pb-2 max-w-full">
-                    {QUESTION_EXAMPLES.map(example => <button key={example.label} type="button" disabled={!canSend}
-                      onClick={() => setInputMessage(example.question)} title={example.question}
-                      className={`shrink-0 whitespace-nowrap text-left rounded-full px-2 py-1 border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${isSingle
-                        ? 'hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8]'
-                        : 'hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED]'} disabled:opacity-50 text-[11px] transition-colors cursor-pointer shadow-2xs`}>
-                      {example.label}
-                    </button>)}
-                  </div>
-                </details>}
                 {msg.sender === 'user' && <p className="mt-1 text-[10px]" data-testid="question-context">
                   {msg.requestedContext
                     ? `실행 첨부 · ${msg.requestedContext.mode} · clock ${msg.requestedContext.cycle}`
