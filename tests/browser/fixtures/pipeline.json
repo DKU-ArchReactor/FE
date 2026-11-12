@@ -1,0 +1,1111 @@
+{
+  "schema_version": "1.0",
+  "simulator": {
+    "mode": "pipeline",
+    "max_cycles": 2000,
+    "pipeline_model": "5-stage-in-order"
+  },
+  "program": {
+    "fingerprint": "72c5bbc8ab1b4b7f9ab0c00b4b2aa2b27a10457bfed778e90165841eddec4d0e",
+    "instructions": [
+      {
+        "pc": "0x00010094",
+        "raw_instruction": "0xFE010113",
+        "assembly": "addi sp, sp, -32"
+      },
+      {
+        "pc": "0x00010098",
+        "raw_instruction": "0x00112E23",
+        "assembly": "sw ra, 28(sp)"
+      },
+      {
+        "pc": "0x0001009C",
+        "raw_instruction": "0x00812C23",
+        "assembly": "sw s0, 24(sp)"
+      },
+      {
+        "pc": "0x000100A0",
+        "raw_instruction": "0x02010413",
+        "assembly": "addi s0, sp, 32"
+      },
+      {
+        "pc": "0x000100A4",
+        "raw_instruction": "0xFEA42623",
+        "assembly": "sw a0, -20(s0)"
+      },
+      {
+        "pc": "0x000100A8",
+        "raw_instruction": "0xFEC42783",
+        "assembly": "lw a5, -20(s0)"
+      },
+      {
+        "pc": "0x000100AC",
+        "raw_instruction": "0x00078513",
+        "assembly": "addi a0, a5, 0"
+      },
+      {
+        "pc": "0x000100B0",
+        "raw_instruction": "0x00400893",
+        "assembly": "addi a7, zero, 4"
+      },
+      {
+        "pc": "0x000100B4",
+        "raw_instruction": "0x00000073",
+        "assembly": "ecall"
+      },
+      {
+        "pc": "0x000100B8",
+        "raw_instruction": "0x00000013",
+        "assembly": "addi zero, zero, 0"
+      },
+      {
+        "pc": "0x000100BC",
+        "raw_instruction": "0x01C12083",
+        "assembly": "lw ra, 28(sp)"
+      },
+      {
+        "pc": "0x000100C0",
+        "raw_instruction": "0x01812403",
+        "assembly": "lw s0, 24(sp)"
+      },
+      {
+        "pc": "0x000100C4",
+        "raw_instruction": "0x02010113",
+        "assembly": "addi sp, sp, 32"
+      },
+      {
+        "pc": "0x000100C8",
+        "raw_instruction": "0x00008067",
+        "assembly": "jalr zero, ra, 0"
+      },
+      {
+        "pc": "0x000100CC",
+        "raw_instruction": "0xFF010113",
+        "assembly": "addi sp, sp, -16"
+      },
+      {
+        "pc": "0x000100D0",
+        "raw_instruction": "0x00112623",
+        "assembly": "sw ra, 12(sp)"
+      },
+      {
+        "pc": "0x000100D4",
+        "raw_instruction": "0x00812423",
+        "assembly": "sw s0, 8(sp)"
+      },
+      {
+        "pc": "0x000100D8",
+        "raw_instruction": "0x01010413",
+        "assembly": "addi s0, sp, 16"
+      },
+      {
+        "pc": "0x000100DC",
+        "raw_instruction": "0x00A00893",
+        "assembly": "addi a7, zero, 10"
+      },
+      {
+        "pc": "0x000100E0",
+        "raw_instruction": "0x00000073",
+        "assembly": "ecall"
+      },
+      {
+        "pc": "0x000100E4",
+        "raw_instruction": "0x00000013",
+        "assembly": "addi zero, zero, 0"
+      },
+      {
+        "pc": "0x000100E8",
+        "raw_instruction": "0x00C12083",
+        "assembly": "lw ra, 12(sp)"
+      },
+      {
+        "pc": "0x000100EC",
+        "raw_instruction": "0x00812403",
+        "assembly": "lw s0, 8(sp)"
+      },
+      {
+        "pc": "0x000100F0",
+        "raw_instruction": "0x01010113",
+        "assembly": "addi sp, sp, 16"
+      },
+      {
+        "pc": "0x000100F4",
+        "raw_instruction": "0x00008067",
+        "assembly": "jalr zero, ra, 0"
+      },
+      {
+        "pc": "0x000100F8",
+        "raw_instruction": "0xFE010113",
+        "assembly": "addi sp, sp, -32"
+      },
+      {
+        "pc": "0x000100FC",
+        "raw_instruction": "0x00112E23",
+        "assembly": "sw ra, 28(sp)"
+      },
+      {
+        "pc": "0x00010100",
+        "raw_instruction": "0x00812C23",
+        "assembly": "sw s0, 24(sp)"
+      },
+      {
+        "pc": "0x00010104",
+        "raw_instruction": "0x02010413",
+        "assembly": "addi s0, sp, 32"
+      },
+      {
+        "pc": "0x00010108",
+        "raw_instruction": "0xFEA42623",
+        "assembly": "sw a0, -20(s0)"
+      },
+      {
+        "pc": "0x0001010C",
+        "raw_instruction": "0xFEC42783",
+        "assembly": "lw a5, -20(s0)"
+      },
+      {
+        "pc": "0x00010110",
+        "raw_instruction": "0x02F787B3",
+        "assembly": "mul a5, a5, a5"
+      },
+      {
+        "pc": "0x00010114",
+        "raw_instruction": "0x00078513",
+        "assembly": "addi a0, a5, 0"
+      },
+      {
+        "pc": "0x00010118",
+        "raw_instruction": "0x01C12083",
+        "assembly": "lw ra, 28(sp)"
+      },
+      {
+        "pc": "0x0001011C",
+        "raw_instruction": "0x01812403",
+        "assembly": "lw s0, 24(sp)"
+      },
+      {
+        "pc": "0x00010120",
+        "raw_instruction": "0x02010113",
+        "assembly": "addi sp, sp, 32"
+      },
+      {
+        "pc": "0x00010124",
+        "raw_instruction": "0x00008067",
+        "assembly": "jalr zero, ra, 0"
+      },
+      {
+        "pc": "0x00010128",
+        "raw_instruction": "0xFC010113",
+        "assembly": "addi sp, sp, -64"
+      },
+      {
+        "pc": "0x0001012C",
+        "raw_instruction": "0x02112E23",
+        "assembly": "sw ra, 60(sp)"
+      },
+      {
+        "pc": "0x00010130",
+        "raw_instruction": "0x02812C23",
+        "assembly": "sw s0, 56(sp)"
+      },
+      {
+        "pc": "0x00010134",
+        "raw_instruction": "0x04010413",
+        "assembly": "addi s0, sp, 64"
+      },
+      {
+        "pc": "0x00010138",
+        "raw_instruction": "0x000107B7",
+        "assembly": "lui a5, 65536"
+      },
+      {
+        "pc": "0x0001013C",
+        "raw_instruction": "0x21878513",
+        "assembly": "addi a0, a5, 536"
+      },
+      {
+        "pc": "0x00010140",
+        "raw_instruction": "0xF55FF0EF",
+        "assembly": "jal ra, -172"
+      },
+      {
+        "pc": "0x00010144",
+        "raw_instruction": "0x03200793",
+        "assembly": "addi a5, zero, 50"
+      },
+      {
+        "pc": "0x00010148",
+        "raw_instruction": "0xFCF42623",
+        "assembly": "sw a5, -52(s0)"
+      },
+      {
+        "pc": "0x0001014C",
+        "raw_instruction": "0x06400793",
+        "assembly": "addi a5, zero, 100"
+      },
+      {
+        "pc": "0x00010150",
+        "raw_instruction": "0xFCF42823",
+        "assembly": "sw a5, -48(s0)"
+      },
+      {
+        "pc": "0x00010154",
+        "raw_instruction": "0xFCC42783",
+        "assembly": "lw a5, -52(s0)"
+      },
+      {
+        "pc": "0x00010158",
+        "raw_instruction": "0xFCF42223",
+        "assembly": "sw a5, -60(s0)"
+      },
+      {
+        "pc": "0x0001015C",
+        "raw_instruction": "0xFD042783",
+        "assembly": "lw a5, -48(s0)"
+      },
+      {
+        "pc": "0x00010160",
+        "raw_instruction": "0xFCF42423",
+        "assembly": "sw a5, -56(s0)"
+      },
+      {
+        "pc": "0x00010164",
+        "raw_instruction": "0xFC442783",
+        "assembly": "lw a5, -60(s0)"
+      },
+      {
+        "pc": "0x00010168",
+        "raw_instruction": "0xFEF42623",
+        "assembly": "sw a5, -20(s0)"
+      },
+      {
+        "pc": "0x0001016C",
+        "raw_instruction": "0xFEC42783",
+        "assembly": "lw a5, -20(s0)"
+      },
+      {
+        "pc": "0x00010170",
+        "raw_instruction": "0x00A78793",
+        "assembly": "addi a5, a5, 10"
+      },
+      {
+        "pc": "0x00010174",
+        "raw_instruction": "0xFEF42423",
+        "assembly": "sw a5, -24(s0)"
+      },
+      {
+        "pc": "0x00010178",
+        "raw_instruction": "0xFC842783",
+        "assembly": "lw a5, -56(s0)"
+      },
+      {
+        "pc": "0x0001017C",
+        "raw_instruction": "0xFEF42223",
+        "assembly": "sw a5, -28(s0)"
+      },
+      {
+        "pc": "0x00010180",
+        "raw_instruction": "0xFE042023",
+        "assembly": "sw zero, -32(s0)"
+      },
+      {
+        "pc": "0x00010184",
+        "raw_instruction": "0xFE442783",
+        "assembly": "lw a5, -28(s0)"
+      },
+      {
+        "pc": "0x00010188",
+        "raw_instruction": "0x01478793",
+        "assembly": "addi a5, a5, 20"
+      },
+      {
+        "pc": "0x0001018C",
+        "raw_instruction": "0xFCF42E23",
+        "assembly": "sw a5, -36(s0)"
+      },
+      {
+        "pc": "0x00010190",
+        "raw_instruction": "0x1F400713",
+        "assembly": "addi a4, zero, 500"
+      },
+      {
+        "pc": "0x00010194",
+        "raw_instruction": "0x00000793",
+        "assembly": "addi a5, zero, 0"
+      },
+      {
+        "pc": "0x00010198",
+        "raw_instruction": "0x02F746B3",
+        "assembly": "div a3, a4, a5"
+      },
+      {
+        "pc": "0x0001019C",
+        "raw_instruction": "0xFCD42C23",
+        "assembly": "sw a3, -40(s0)"
+      },
+      {
+        "pc": "0x000101A0",
+        "raw_instruction": "0xFE842503",
+        "assembly": "lw a0, -24(s0)"
+      },
+      {
+        "pc": "0x000101A4",
+        "raw_instruction": "0xF55FF0EF",
+        "assembly": "jal ra, -172"
+      },
+      {
+        "pc": "0x000101A8",
+        "raw_instruction": "0xFCA42A23",
+        "assembly": "sw a0, -44(s0)"
+      },
+      {
+        "pc": "0x000101AC",
+        "raw_instruction": "0xFE842703",
+        "assembly": "lw a4, -24(s0)"
+      },
+      {
+        "pc": "0x000101B0",
+        "raw_instruction": "0x03C00793",
+        "assembly": "addi a5, zero, 60"
+      },
+      {
+        "pc": "0x000101B4",
+        "raw_instruction": "0x02F71E63",
+        "assembly": "bne a4, a5, 60"
+      },
+      {
+        "pc": "0x000101B8",
+        "raw_instruction": "0xFDC42703",
+        "assembly": "lw a4, -36(s0)"
+      },
+      {
+        "pc": "0x000101BC",
+        "raw_instruction": "0x07800793",
+        "assembly": "addi a5, zero, 120"
+      },
+      {
+        "pc": "0x000101C0",
+        "raw_instruction": "0x02F71863",
+        "assembly": "bne a4, a5, 48"
+      },
+      {
+        "pc": "0x000101C4",
+        "raw_instruction": "0xFD842703",
+        "assembly": "lw a4, -40(s0)"
+      },
+      {
+        "pc": "0x000101C8",
+        "raw_instruction": "0xFFF00793",
+        "assembly": "addi a5, zero, -1"
+      },
+      {
+        "pc": "0x000101CC",
+        "raw_instruction": "0x02F71263",
+        "assembly": "bne a4, a5, 36"
+      },
+      {
+        "pc": "0x000101D0",
+        "raw_instruction": "0xFD442703",
+        "assembly": "lw a4, -44(s0)"
+      },
+      {
+        "pc": "0x000101D4",
+        "raw_instruction": "0x000017B7",
+        "assembly": "lui a5, 4096"
+      },
+      {
+        "pc": "0x000101D8",
+        "raw_instruction": "0xE1078793",
+        "assembly": "addi a5, a5, -496"
+      },
+      {
+        "pc": "0x000101DC",
+        "raw_instruction": "0x00F71A63",
+        "assembly": "bne a4, a5, 20"
+      },
+      {
+        "pc": "0x000101E0",
+        "raw_instruction": "0x000107B7",
+        "assembly": "lui a5, 65536"
+      },
+      {
+        "pc": "0x000101E4",
+        "raw_instruction": "0x23C78513",
+        "assembly": "addi a0, a5, 572"
+      },
+      {
+        "pc": "0x000101E8",
+        "raw_instruction": "0xEADFF0EF",
+        "assembly": "jal ra, -340"
+      },
+      {
+        "pc": "0x000101EC",
+        "raw_instruction": "0x0100006F",
+        "assembly": "jal zero, 16"
+      },
+      {
+        "pc": "0x000101F0",
+        "raw_instruction": "0x000107B7",
+        "assembly": "lui a5, 65536"
+      },
+      {
+        "pc": "0x000101F4",
+        "raw_instruction": "0x25C78513",
+        "assembly": "addi a0, a5, 604"
+      },
+      {
+        "pc": "0x000101F8",
+        "raw_instruction": "0xE9DFF0EF",
+        "assembly": "jal ra, -356"
+      },
+      {
+        "pc": "0x000101FC",
+        "raw_instruction": "0xED1FF0EF",
+        "assembly": "jal ra, -304"
+      },
+      {
+        "pc": "0x00010200",
+        "raw_instruction": "0x00000793",
+        "assembly": "addi a5, zero, 0"
+      },
+      {
+        "pc": "0x00010204",
+        "raw_instruction": "0x00078513",
+        "assembly": "addi a0, a5, 0"
+      },
+      {
+        "pc": "0x00010208",
+        "raw_instruction": "0x03C12083",
+        "assembly": "lw ra, 60(sp)"
+      },
+      {
+        "pc": "0x0001020C",
+        "raw_instruction": "0x03812403",
+        "assembly": "lw s0, 56(sp)"
+      },
+      {
+        "pc": "0x00010210",
+        "raw_instruction": "0x04010113",
+        "assembly": "addi sp, sp, 64"
+      },
+      {
+        "pc": "0x00010214",
+        "raw_instruction": "0x00008067",
+        "assembly": "jalr zero, ra, 0"
+      }
+    ],
+    "memory_regions": [
+      {
+        "name": ".text",
+        "start": "0x00010094",
+        "end_exclusive": "0x00010218",
+        "kind": "code"
+      },
+      {
+        "name": ".rodata",
+        "start": "0x00010218",
+        "end_exclusive": "0x00010287",
+        "kind": "data"
+      }
+    ],
+    "initial_stack_pointer": "0x7FFFEFFC",
+    "entry_point": "0x00010128",
+    "instruction_words": 97,
+    "data_words": 28
+  },
+  "status": "CYCLE_LIMIT",
+  "initial_state": {
+    "current_pc": "0x00010128",
+    "registers": {
+      "x0": "0x00000000",
+      "x1": "0x00000000",
+      "x2": "0x7FFFEFFC",
+      "x3": "0x00000000",
+      "x4": "0x00000000",
+      "x5": "0x00000000",
+      "x6": "0x00000000",
+      "x7": "0x00000000",
+      "x8": "0x00000000",
+      "x9": "0x00000000",
+      "x10": "0x00000000",
+      "x11": "0x00000000",
+      "x12": "0x00000000",
+      "x13": "0x00000000",
+      "x14": "0x00000000",
+      "x15": "0x00000000",
+      "x16": "0x00000000",
+      "x17": "0x00000000",
+      "x18": "0x00000000",
+      "x19": "0x00000000",
+      "x20": "0x00000000",
+      "x21": "0x00000000",
+      "x22": "0x00000000",
+      "x23": "0x00000000",
+      "x24": "0x00000000",
+      "x25": "0x00000000",
+      "x26": "0x00000000",
+      "x27": "0x00000000",
+      "x28": "0x00000000",
+      "x29": "0x00000000",
+      "x30": "0x00000000",
+      "x31": "0x00000000"
+    },
+    "memory_snapshot": {
+      "0x00010218": "0x61766441",
+      "0x0001021C": "0x6465636E",
+      "0x00010220": "0x70695020",
+      "0x00010224": "0x6E696C65",
+      "0x00010228": "0x65542065",
+      "0x0001022C": "0x53207473",
+      "0x00010230": "0x74726174",
+      "0x00010234": "0x0A2E2E2E",
+      "0x00010238": "0x00000000",
+      "0x0001023C": "0x61766441",
+      "0x00010240": "0x6465636E",
+      "0x00010244": "0x73655420",
+      "0x00010248": "0x65522074",
+      "0x0001024C": "0x746C7573",
+      "0x00010250": "0x4C41203A",
+      "0x00010254": "0x4150204C",
+      "0x00010258": "0x000A5353",
+      "0x0001025C": "0x61766441",
+      "0x00010260": "0x6465636E",
+      "0x00010264": "0x73655420",
+      "0x00010268": "0x65522074",
+      "0x0001026C": "0x746C7573",
+      "0x00010270": "0x4556203A",
+      "0x00010274": "0x49464952",
+      "0x00010278": "0x49544143",
+      "0x0001027C": "0x46204E4F",
+      "0x00010280": "0x454C4941",
+      "0x00010284": "0x00000A44"
+    },
+    "console_output": "",
+    "metrics": {
+      "accumulated_instructions": 0,
+      "accumulated_stalls": 0,
+      "accumulated_forwards": 0
+    }
+  },
+  "summary": {
+    "total_cycles": 2,
+    "instructions_executed": 97,
+    "data_hazards": 9,
+    "control_hazards": 8,
+    "stalls": 9,
+    "forwards": 44,
+    "executed_cycles": 2
+  },
+  "history": [
+    {
+      "clock": 0,
+      "buffers": {
+        "WB": null,
+        "MEM": null,
+        "EX": null,
+        "ID": {
+          "pc": "0x00010128",
+          "raw_instruction": "0xFC010113",
+          "assembly": "addi sp, sp, -64",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        },
+        "IF": {
+          "pc": "0x0001012C",
+          "raw_instruction": "0x02112E23",
+          "assembly": "sw ra, 60(sp)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        }
+      },
+      "stage_activity": {
+        "IF": {
+          "pc": "0x00010128",
+          "raw_instruction": "0xFC010113",
+          "assembly": "addi sp, sp, -64",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        },
+        "ID": {
+          "assembly": "bubble",
+          "status": "empty",
+          "stage": "ID"
+        },
+        "EX": {
+          "assembly": "bubble",
+          "status": "empty",
+          "stage": "EX"
+        },
+        "MEM": {
+          "assembly": "bubble",
+          "status": "empty",
+          "stage": "MEM"
+        },
+        "WB": {
+          "assembly": "bubble",
+          "status": "empty",
+          "stage": "WB"
+        }
+      },
+      "cycle_events": {
+        "stall": {
+          "has_stall": false,
+          "stage": null,
+          "assembly": null,
+          "stall_reason": null,
+          "stall_desc": null
+        },
+        "forwarding": {
+          "has_forwarded": false,
+          "stage": null,
+          "assembly": null,
+          "forwarded_operand_count": 0,
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "forwarding_desc": null
+        },
+        "control_hazard": {
+          "has_control_instruction": false,
+          "has_flush": false,
+          "stage": null,
+          "assembly": null,
+          "taken": null,
+          "target_pc": null,
+          "fallthrough_pc": null,
+          "flushed_stages": [],
+          "flush_reason": null,
+          "redirect_pc": null
+        },
+        "runtime_error": {
+          "has_error": false,
+          "code": null,
+          "stage": null,
+          "assembly": null,
+          "message": null,
+          "reason": null
+        }
+      },
+      "global_result": {
+        "current_pc": "0x00010130",
+        "registers": {
+          "x0": "0x00000000",
+          "x1": "0x00000000",
+          "x2": "0x7FFFEFFC",
+          "x3": "0x00000000",
+          "x4": "0x00000000",
+          "x5": "0x00000000",
+          "x6": "0x00000000",
+          "x7": "0x00000000",
+          "x8": "0x00000000",
+          "x9": "0x00000000",
+          "x10": "0x00000000",
+          "x11": "0x00000000",
+          "x12": "0x00000000",
+          "x13": "0x00000000",
+          "x14": "0x00000000",
+          "x15": "0x00000000",
+          "x16": "0x00000000",
+          "x17": "0x00000000",
+          "x18": "0x00000000",
+          "x19": "0x00000000",
+          "x20": "0x00000000",
+          "x21": "0x00000000",
+          "x22": "0x00000000",
+          "x23": "0x00000000",
+          "x24": "0x00000000",
+          "x25": "0x00000000",
+          "x26": "0x00000000",
+          "x27": "0x00000000",
+          "x28": "0x00000000",
+          "x29": "0x00000000",
+          "x30": "0x00000000",
+          "x31": "0x00000000"
+        },
+        "memory_snapshot": {
+          "0x00010218": "0x61766441",
+          "0x0001021C": "0x6465636E",
+          "0x00010220": "0x70695020",
+          "0x00010224": "0x6E696C65",
+          "0x00010228": "0x65542065",
+          "0x0001022C": "0x53207473",
+          "0x00010230": "0x74726174",
+          "0x00010234": "0x0A2E2E2E",
+          "0x00010238": "0x00000000",
+          "0x0001023C": "0x61766441",
+          "0x00010240": "0x6465636E",
+          "0x00010244": "0x73655420",
+          "0x00010248": "0x65522074",
+          "0x0001024C": "0x746C7573",
+          "0x00010250": "0x4C41203A",
+          "0x00010254": "0x4150204C",
+          "0x00010258": "0x000A5353",
+          "0x0001025C": "0x61766441",
+          "0x00010260": "0x6465636E",
+          "0x00010264": "0x73655420",
+          "0x00010268": "0x65522074",
+          "0x0001026C": "0x746C7573",
+          "0x00010270": "0x4556203A",
+          "0x00010274": "0x49464952",
+          "0x00010278": "0x49544143",
+          "0x0001027C": "0x46204E4F",
+          "0x00010280": "0x454C4941",
+          "0x00010284": "0x00000A44"
+        },
+        "console_output": "",
+        "metrics": {
+          "accumulated_instructions": 0,
+          "accumulated_stalls": 0,
+          "accumulated_forwards": 0
+        }
+      },
+      "if_stage": {
+        "pc": "0x0001012C",
+        "raw_instruction": "0x02112E23",
+        "assembly": "sw ra, 60(sp)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        }
+      },
+      "id_stage": {
+        "assembly": "addi sp, sp, -64",
+        "status": "normal",
+        "decoded_fields": {
+          "op": "addi",
+          "rd": "x2",
+          "rs1": {
+            "name": "sp",
+            "num": 2,
+            "current_value": "0x00000000"
+          },
+          "rs2": {
+            "name": "zero",
+            "num": 0,
+            "current_value": "0x00000000"
+          },
+          "imm": -64
+        },
+        "hazard_detect": {
+          "has_stall": false,
+          "stall_reason": null
+        },
+        "pc": "0x00010128",
+        "raw_instruction": "0xFC010113",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        }
+      },
+      "ex_stage": {
+        "assembly": "bubble",
+        "status": "empty",
+        "stage": "EX"
+      },
+      "mem_stage": {
+        "assembly": "bubble",
+        "status": "empty",
+        "stage": "MEM"
+      },
+      "wb_stage": {
+        "assembly": "bubble",
+        "status": "empty",
+        "stage": "WB"
+      }
+    },
+    {
+      "clock": 1,
+      "buffers": {
+        "WB": null,
+        "MEM": null,
+        "EX": {
+          "pc": "0x00010128",
+          "raw_instruction": "0xFC010113",
+          "assembly": "addi sp, sp, -64",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        },
+        "ID": {
+          "pc": "0x0001012C",
+          "raw_instruction": "0x02112E23",
+          "assembly": "sw ra, 60(sp)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        },
+        "IF": {
+          "pc": "0x00010130",
+          "raw_instruction": "0x02812C23",
+          "assembly": "sw s0, 56(sp)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        }
+      },
+      "stage_activity": {
+        "IF": {
+          "pc": "0x0001012C",
+          "raw_instruction": "0x02112E23",
+          "assembly": "sw ra, 60(sp)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        },
+        "ID": {
+          "assembly": "addi sp, sp, -64",
+          "status": "normal",
+          "decoded_fields": {
+            "op": "addi",
+            "rd": "x2",
+            "rs1": {
+              "name": "sp",
+              "num": 2,
+              "current_value": "0x7FFFEFFC"
+            },
+            "rs2": {
+              "name": "zero",
+              "num": 0,
+              "current_value": "0x00000000"
+            },
+            "imm": -64
+          },
+          "hazard_detect": {
+            "has_stall": false,
+            "stall_reason": null
+          },
+          "pc": "0x00010128",
+          "raw_instruction": "0xFC010113",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          }
+        },
+        "EX": {
+          "assembly": "bubble",
+          "status": "empty",
+          "stage": "EX"
+        },
+        "MEM": {
+          "assembly": "bubble",
+          "status": "empty",
+          "stage": "MEM"
+        },
+        "WB": {
+          "assembly": "bubble",
+          "status": "empty",
+          "stage": "WB"
+        }
+      },
+      "cycle_events": {
+        "stall": {
+          "has_stall": false,
+          "stage": null,
+          "assembly": null,
+          "stall_reason": null,
+          "stall_desc": null
+        },
+        "forwarding": {
+          "has_forwarded": false,
+          "stage": null,
+          "assembly": null,
+          "forwarded_operand_count": 0,
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "forwarding_desc": null
+        },
+        "control_hazard": {
+          "has_control_instruction": false,
+          "has_flush": false,
+          "stage": null,
+          "assembly": null,
+          "taken": null,
+          "target_pc": null,
+          "fallthrough_pc": null,
+          "flushed_stages": [],
+          "flush_reason": null,
+          "redirect_pc": null
+        },
+        "runtime_error": {
+          "has_error": false,
+          "code": null,
+          "stage": null,
+          "assembly": null,
+          "message": null,
+          "reason": null
+        }
+      },
+      "global_result": {
+        "current_pc": "0x00010134",
+        "registers": {
+          "x0": "0x00000000",
+          "x1": "0x00000000",
+          "x2": "0x7FFFEFFC",
+          "x3": "0x00000000",
+          "x4": "0x00000000",
+          "x5": "0x00000000",
+          "x6": "0x00000000",
+          "x7": "0x00000000",
+          "x8": "0x00000000",
+          "x9": "0x00000000",
+          "x10": "0x00000000",
+          "x11": "0x00000000",
+          "x12": "0x00000000",
+          "x13": "0x00000000",
+          "x14": "0x00000000",
+          "x15": "0x00000000",
+          "x16": "0x00000000",
+          "x17": "0x00000000",
+          "x18": "0x00000000",
+          "x19": "0x00000000",
+          "x20": "0x00000000",
+          "x21": "0x00000000",
+          "x22": "0x00000000",
+          "x23": "0x00000000",
+          "x24": "0x00000000",
+          "x25": "0x00000000",
+          "x26": "0x00000000",
+          "x27": "0x00000000",
+          "x28": "0x00000000",
+          "x29": "0x00000000",
+          "x30": "0x00000000",
+          "x31": "0x00000000"
+        },
+        "memory_snapshot": {
+          "0x00010218": "0x61766441",
+          "0x0001021C": "0x6465636E",
+          "0x00010220": "0x70695020",
+          "0x00010224": "0x6E696C65",
+          "0x00010228": "0x65542065",
+          "0x0001022C": "0x53207473",
+          "0x00010230": "0x74726174",
+          "0x00010234": "0x0A2E2E2E",
+          "0x00010238": "0x00000000",
+          "0x0001023C": "0x61766441",
+          "0x00010240": "0x6465636E",
+          "0x00010244": "0x73655420",
+          "0x00010248": "0x65522074",
+          "0x0001024C": "0x746C7573",
+          "0x00010250": "0x4C41203A",
+          "0x00010254": "0x4150204C",
+          "0x00010258": "0x000A5353",
+          "0x0001025C": "0x61766441",
+          "0x00010260": "0x6465636E",
+          "0x00010264": "0x73655420",
+          "0x00010268": "0x65522074",
+          "0x0001026C": "0x746C7573",
+          "0x00010270": "0x4556203A",
+          "0x00010274": "0x49464952",
+          "0x00010278": "0x49544143",
+          "0x0001027C": "0x46204E4F",
+          "0x00010280": "0x454C4941",
+          "0x00010284": "0x00000A44"
+        },
+        "console_output": "",
+        "metrics": {
+          "accumulated_instructions": 0,
+          "accumulated_stalls": 0,
+          "accumulated_forwards": 0
+        }
+      },
+      "if_stage": {
+        "pc": "0x00010130",
+        "raw_instruction": "0x02812C23",
+        "assembly": "sw s0, 56(sp)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        }
+      },
+      "id_stage": {
+        "assembly": "sw ra, 60(sp)",
+        "status": "normal",
+        "decoded_fields": {
+          "op": "sw",
+          "rd": "x28",
+          "rs1": {
+            "name": "sp",
+            "num": 2,
+            "current_value": "0x00000000"
+          },
+          "rs2": {
+            "name": "ra",
+            "num": 1,
+            "current_value": "0x00000000"
+          },
+          "imm": 60
+        },
+        "hazard_detect": {
+          "has_stall": false,
+          "stall_reason": null
+        },
+        "pc": "0x0001012C",
+        "raw_instruction": "0x02112E23",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        }
+      },
+      "ex_stage": {
+        "assembly": "addi sp, sp, -64",
+        "status": "normal",
+        "alu_operation": "addi",
+        "operand_1": "0x7FFFEFFC",
+        "operand_2": "0x00000000",
+        "alu_result": "0x00000000",
+        "forwarding_info": {
+          "has_forwarded": false,
+          "forwarded_from": [],
+          "forwarded_to": [],
+          "target_register": [],
+          "forwarded_value": []
+        },
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "pc": "0x00010128",
+        "raw_instruction": "0xFC010113"
+      },
+      "mem_stage": {
+        "assembly": "bubble",
+        "status": "empty",
+        "stage": "MEM"
+      },
+      "wb_stage": {
+        "assembly": "bubble",
+        "status": "empty",
+        "stage": "WB"
+      }
+    }
+  ],
+  "console_output": "Advanced Pipeline Test Start...\nAdvanced Test Result: ALL PASS\n"
+}

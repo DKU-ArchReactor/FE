@@ -1,3 +1,4 @@
+import { getAuthSession, notifyAuthChanged, useAuthSession } from '@/api/authSession';
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getMe } from "@/api/auth";
@@ -8,30 +9,31 @@ import { ArchLogo } from "@/components/ArchLogo";
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<UserMeResponse | null>(null);
+  const auth = useAuthSession();
+  const [profile, setProfile] = useState<{ epoch: number; user: UserMeResponse } | null>(null);
+  const user = auth.authenticated && profile?.epoch === auth.epoch ? profile.user : null;
 
   const isActive = (path: string) => location.pathname === path;
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setUser(null);
-      return;
-    }
-
-    getMe()
-      .then((data) => setUser(data))
-      .catch(() => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("token_type");
-        setUser(null);
-      });
-  }, [location.pathname]);
+    if (!auth.authenticated) return;
+    let active = true;
+    getMe().then(data => {
+      if (active && getAuthSession().epoch === auth.epoch) setProfile({ epoch: auth.epoch, user: data });
+    }).catch(() => {
+      if (!active || getAuthSession().epoch !== auth.epoch) return;
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("token_type");
+      notifyAuthChanged();
+    });
+    return () => { active = false; };
+  }, [location.pathname, auth.authenticated, auth.epoch]);
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
+    notifyAuthChanged();
     localStorage.removeItem("token_type");
-    setUser(null);
+    setProfile(null);
     navigate("/login");
   };
 

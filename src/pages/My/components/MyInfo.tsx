@@ -1,3 +1,4 @@
+import { notifyAuthChanged } from '@/api/authSession';
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMe } from "@/api/auth";
@@ -33,6 +34,7 @@ const MyInfo = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
+    notifyAuthChanged();
     localStorage.removeItem("token_type");
     navigate("/login");
   };
