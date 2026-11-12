@@ -585,19 +585,21 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
         }
       `}</style>
 
-      {/* 상단 심플 바 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-sky-500">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="px-2 py-0.5 rounded bg-sky-600 text-white font-mono text-[10px] font-bold shrink-0">
-            {state.isIdle ? "STEP 0" : `CLK ${state.clock}`}
+      {/* 상단 헤더 (PipelineVisualizer 및 전체 패널 표준 h-8 규격) */}
+      <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-blue-500">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] font-bold text-blue-500">◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            SINGLE-CYCLE DATAPATH
+          </h3>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
+            (CLK:{state.clock})
           </span>
-          <span className="font-mono text-[11px] text-[var(--ar-text-muted)] shrink-0">{state.pc}</span>
-          <code className="font-mono text-[12px] font-bold text-[#005FB8] dark:text-[#38BDF8] truncate">{state.assembly}</code>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <span
-            className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+            className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full border ${
               isBusLoad
                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
                 : isBusStore
