@@ -29,7 +29,7 @@ const LoginPage = () => {
       localStorage.setItem("access_token", res.access_token);
       notifyAuthChanged();
       localStorage.setItem("token_type", res.token_type);
-      navigate("/");
+      navigate("/simulator");
     } catch (error) {
       if (axios.isAxiosError<ValidationErrorResponse>(error)) {
         const detail = error.response?.data?.detail;

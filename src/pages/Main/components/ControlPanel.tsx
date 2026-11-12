@@ -58,7 +58,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               onClick={() => onChangeEditorTarget?.("c")}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
                 editorTarget === "c"
-                  ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
+                  ? isSingle
+                    ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
+                    : "bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED] text-white border-[#7C3AED] dark:border-[#8B5CF6] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -69,7 +71,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               onClick={() => onChangeEditorTarget?.("asm")}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
                 editorTarget === "asm"
-                  ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
+                  ? isSingle
+                    ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
+                    : "bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED] text-white border-[#7C3AED] dark:border-[#8B5CF6] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -89,7 +93,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               onClick={() => onChangeSimulationMode?.("single")}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
                 isSingle
-                  ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
+                  ? "bg-[var(--ar-mode-single)] hover:bg-[var(--ar-mode-single-hover)] text-white border-[var(--ar-mode-single)] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -100,7 +104,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               onClick={() => onChangeSimulationMode?.("pipeline")}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
                 !isSingle
-                  ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
+                  ? "bg-[var(--ar-mode-pipeline)] hover:bg-[var(--ar-mode-pipeline-hover)] text-white border-[var(--ar-mode-pipeline)] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -114,7 +118,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
             Cycle:
           </span>
-          <span className="text-base font-bold text-[#005FB8] dark:text-[#DCDCAA]">
+          <span className={`text-base font-bold transition-colors ${
+            isSingle
+              ? "text-[#005FB8] dark:text-[#DCDCAA]"
+              : "text-[#7C3AED] dark:text-[#C084FC]"
+          }`}>
             {currentCycle}
           </span>
           <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">/{maxCycle}</span>
@@ -128,7 +136,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             disabled={!isReady || totalCycles <= 1}
             value={currentCycle}
             onChange={(e) => onJumpToCycle(Number(e.target.value))}
-            className="w-full h-1 bg-[#E1E4E8] dark:bg-[#333333] rounded appearance-none cursor-pointer focus:outline-none accent-[#005FB8] dark:accent-[#007ACC] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none"
+            className={`w-full h-1 bg-[#E1E4E8] dark:bg-[#333333] rounded appearance-none cursor-pointer focus:outline-none transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
+              isSingle
+                ? "accent-[#005FB8] dark:accent-[#007ACC]"
+                : "accent-[#7C3AED] dark:accent-[#A855F7]"
+            }`}
           />
 
           {!isReady && (
@@ -187,7 +199,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           className={`w-[76px] shrink-0 justify-center py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
             isPlaying 
               ? 'bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold' 
-              : 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
+              : isSingle
+              ? 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
+              : 'bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED]'
           }`}
         >
           <span className="w-2.5 h-2.5 flex items-center justify-center shrink-0">
@@ -235,7 +249,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               onClick={() => onChangeSpeed(speed)}
               className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
                 isSelected
-                  ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold"
+                  ? isSingle
+                    ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold"
+                    : "bg-[#7C3AED] dark:bg-[#8B5CF6] text-white font-bold"
                   : "text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC] hover:bg-[#EAEAEA] dark:hover:bg-[#333333]"
               }`}
             >

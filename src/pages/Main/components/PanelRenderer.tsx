@@ -54,7 +54,9 @@ interface PanelRendererProps {
   onTranslationFile: (file: File) => void;
   onSelectTranslationLine: (line: number | null, asmIndex?: number | null) => void;
   onSaveTranslationFile: (name?: string) => Promise<boolean>;
+  onSaveAssemblyFile?: (name?: string) => Promise<boolean>;
   onOpenSavedFileInEditor: (fileId: string) => void;
+  onOpenSavedAssemblyFile?: (fileId: string) => void;
   onCustomAssemblyChange: (val: string) => void;
   onSimulateAssembly: () => void;
   onResetCustomAssembly: () => void;
@@ -98,7 +100,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   onTranslationFile,
   onSelectTranslationLine,
   onSaveTranslationFile,
+  onSaveAssemblyFile,
   onOpenSavedFileInEditor,
+  onOpenSavedAssemblyFile,
   onCustomAssemblyChange,
   onSimulateAssembly,
   onResetCustomAssembly,
@@ -158,6 +162,10 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           onAssemblyChange={onCustomAssemblyChange}
           onSimulateAssembly={onSimulateAssembly}
           onResetAssembly={onResetCustomAssembly}
+          onSave={onSaveAssemblyFile}
+          onOpenSavedFile={onOpenSavedAssemblyFile}
+          savedFiles={savedFiles}
+          currentFileId={fileId}
         />
       );
 
@@ -188,6 +196,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       return (
         <PipelineVisualizer
           currentData={currentData}
+          prevData={prevData}
+          simulationData={simulationData}
           loadingMessage={loadingMessage}
           mode={simulationMode}
         />
@@ -220,6 +230,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           simulationData={simulationData}
           currentCycle={currentCycle}
           onJumpToCycle={onJumpToCycle}
+          mappedRows={mappedAssemblyRows}
+          mode={simulationMode}
         />
       );
 

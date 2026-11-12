@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import type { CycleHistoryItem } from '@/type/simulation';
+import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
+import SingleCycleDatapath from './SingleCycleDatapath';
 
 interface PipelineVisualizerProps {
   currentData: CycleHistoryItem | null;
+  prevData?: CycleHistoryItem | null;
+  simulationData?: SimulationResult | null;
   loadingMessage?: string | null;
   mode?: "single" | "pipeline";
 }
@@ -10,26 +13,25 @@ interface PipelineVisualizerProps {
 const MASTER_WIDTH = 900;
 const MASTER_HEIGHT = 1350;
 
-const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, loadingMessage, mode = "pipeline" }) => {
+const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
+  currentData,
+  prevData,
+  simulationData,
+  loadingMessage,
+  mode = "pipeline",
+}) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const isSingle = mode === "single";
 
-  // Single-Cycle 모드에서는 파이프라인 5단계 분할 회로도가 맞지 않으므로 싱글모드 전용 다이어그램 개발 전까지 숨김/안내 처리
+  // Single-Cycle 모드에서는 온칩(ALU + 레지스터) ↔ 시스템 버스 ↔ DRAM 데이터패스 다이어그램 렌더링
   if (isSingle) {
     return (
-      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-8 flex flex-col items-center justify-center gap-3 text-center transition-colors duration-150 select-none">
-        <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-2xl shadow-xs">
-          📐
-        </div>
-        <div className="flex flex-col gap-1 max-w-md">
-          <h3 className="text-sm font-bold text-[var(--ar-text-primary)]">
-            Single-Cycle 전용 데이터패스 다이어그램 준비 중
-          </h3>
-          <p className="text-xs text-[var(--ar-text-muted)] leading-relaxed">
-            단일 사이클 모드에서는 5단계 파이프라인 레지스터가 없는 전용 단일 사이클 하드웨어 다이어그램이 적용될 예정입니다.
-          </p>
-        </div>
-      </div>
+      <SingleCycleDatapath
+        currentData={currentData}
+        prevData={prevData}
+        simulationData={simulationData}
+        loadingMessage={loadingMessage}
+      />
     );
   }
 
@@ -114,9 +116,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({ currentData, lo
       `}</style>
 
       {/* 1. 상단 헤더 & 컨트롤러 */}
-      <div className={`shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 ${isSingle ? "border-l-amber-500" : "border-l-blue-500"}`}>
+      <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-blue-500">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`text-[11px] font-bold ${isSingle ? "text-amber-500" : "text-blue-500"}`}>◆</span>
+          <span className="text-[11px] font-bold text-blue-500">◆</span>
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>

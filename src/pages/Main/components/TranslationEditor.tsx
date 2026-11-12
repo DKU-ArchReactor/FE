@@ -51,7 +51,7 @@ export default function TranslationEditor({
   const { theme } = useTheme();
   const trackSelection = useAssistantSelection('c', onSourceSelection);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<any>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const selectedLineRef = useRef<number | null | undefined>(selectedLine);
   const activeTargetRef = useRef<"c" | "asm">(activeTarget);
@@ -190,7 +190,7 @@ export default function TranslationEditor({
     >
       {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명) */}
       <header
-        className={`shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 py-1.5 min-w-0 transition-colors border-l-2 border-l-blue-600 dark:border-l-blue-500 ${
+        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] ${
           activeTarget !== "c"
             ? "bg-[#F1F5F9] dark:bg-[#1A1A1C]"
             : "bg-[var(--ar-header-bg)]"
@@ -327,7 +327,7 @@ export default function TranslationEditor({
           {/* 4. 컴파일 버튼 */}
           <button
             type="button"
-            className="h-[22px] rounded bg-[#005FB8] dark:bg-[#007ACC] px-2.5 text-[10.5px] font-semibold text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0"
+            className="h-[22px] rounded bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold"
             onClick={onCompile}
             disabled={busy || !source.trim()}
             title="C 코드 컴파일 및 어셈블리 변환"

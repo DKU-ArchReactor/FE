@@ -113,14 +113,14 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                                 onPairReset?.(secIdx, slotIdx);
                               }}
                               title="좌우로 드래그하여 가로 분할 비율 조절 (더블클릭: 50:50 리셋)"
-                              className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+                              className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
                             >
                               <div
                                 className={`w-[3px] rounded-full transition-all duration-200 ${
                                   resizingPair?.secIdx === secIdx &&
                                   resizingPair?.slotIdx === slotIdx
-                                    ? "h-16 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                                    : "h-8 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-14 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                                    ? "h-16 bg-[var(--ar-accent)] shadow-sm"
+                                    : "h-8 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-14 group-hover:bg-[var(--ar-accent)]"
                                 }`}
                               />
                             </div>
@@ -170,14 +170,14 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                               ? "위아래로 드래그하여 다이어그램과 해저드 영역 높이 조절 (더블클릭: 기본 위치 리셋)"
                               : "위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 기본 리셋)"
                           }
-                          className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+                          className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
                         >
                           <div
                             className={`h-[3px] rounded-full transition-all duration-200 ${
                               resizingRowSlot?.secIdx === secIdx &&
                               resizingRowSlot?.slotIdx === slotIdx
-                                ? "w-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                                : "w-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                                ? "w-24 bg-[var(--ar-accent)] shadow-sm"
+                                : "w-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-20 group-hover:bg-[var(--ar-accent)]"
                             }`}
                           />
                         </div>
