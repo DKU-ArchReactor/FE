@@ -1,3 +1,5 @@
+import type { EditorSelection } from './utils/assistantSource';
+import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
@@ -57,6 +59,7 @@ const MainPage: React.FC = () => {
   );
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
+  const [sourceSelection, setSourceSelection] = useState<EditorSelection | null>(null);
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
@@ -66,7 +69,10 @@ const MainPage: React.FC = () => {
   const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
+  const auth = useAuthSession();
+  const workspaceKey = JSON.stringify([fileMgr.translationSource, customAssembly, editorTarget, auth.epoch]);
   const simSession = useSimulationSession({
+    workspaceKey,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
     translationBusy: fileMgr.translationBusy,
@@ -181,6 +187,7 @@ const MainPage: React.FC = () => {
   const renderPanel = (panelKey: PanelKey) => (
     <PanelRenderer
       panelKey={panelKey}
+      onSourceSelection={setSourceSelection}
       simulationData={simSession.simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
@@ -240,7 +247,7 @@ const MainPage: React.FC = () => {
           onResetSimulation();
         }
       }}
-      onCustomAssemblyChange={setCustomAssembly}
+      onCustomAssemblyChange={(value) => { simSession.clearSimulationCache(); setCustomAssembly(value); }}
       onSimulateAssembly={() =>
         simSession.handleAssemblySimulation(customAssembly, {
           onSimulationComplete: playback.handleSimulationComplete,
@@ -292,6 +299,7 @@ const MainPage: React.FC = () => {
               if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
                 playback.triggerPlaybackFeedback("reset");
               }
+              setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {
                 setTranslationSelectedLine(null);
@@ -344,10 +352,18 @@ const MainPage: React.FC = () => {
       </div>
 
       <AiAssistantPopup
+        key={auth.epoch}
+        sourceSelection={sourceSelection}
+        editorLanguage={editorTarget}
+        editorContent={editorTarget === 'c' ? fileMgr.translationSource : customAssembly}
+        authenticated={auth.authenticated}
+        simulation={simSession.simulationData}
+        currentData={playback.currentData}
+        mode={simSession.simulationEngineMode}
+        beforeExecution={simSession.isSingleEngine && playback.currentCycle === 0}
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
-        mode={simSession.simulationEngineMode}
       />
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}

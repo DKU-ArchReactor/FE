@@ -1,3 +1,5 @@
+import { useAssistantSelection } from '../hooks/useAssistantSelection';
+import type { EditorSelection } from '../utils/assistantSource';
 import { useRef, useEffect, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
@@ -6,6 +8,7 @@ import type { FileSummary } from "@/type/file";
 import CFileUploadPopup from "./CFileUploadPopup";
 
 type Props = {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   source: string;
   fileName?: string;
   onChange: (source: string) => void;
@@ -27,6 +30,7 @@ type Props = {
 
 export default function TranslationEditor({
   source,
+  onSourceSelection,
   fileName = "main.c",
   onChange,
   onCompile,
@@ -45,6 +49,7 @@ export default function TranslationEditor({
   activeTarget = "c",
 }: Props) {
   const { theme } = useTheme();
+  const trackSelection = useAssistantSelection('c', onSourceSelection);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -104,6 +109,7 @@ export default function TranslationEditor({
   }, [selectedLine]);
 
   const handleEditorMount: OnMount = (editorInstance, monacoInstance) => {
+    trackSelection(editorInstance);
     editorRef.current = editorInstance;
     monacoRef.current = monacoInstance;
 

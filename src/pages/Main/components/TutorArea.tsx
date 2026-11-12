@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import { mapAssembly, type MappedAssemblyRow } from '../utils/translationCompile';
-import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction } from '../utils/tutorAnalysis';
+import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction, fetchTutor } from '../utils/tutorAnalysis';
 
 export interface TutorAreaProps {
   simulationData: SimulationResult | null;
@@ -70,10 +70,26 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     return cLines[selectedTranslationLine - 1] ?? "";
   }, [cLines, selectedTranslationLine]);
 
-  const cLineAnalysis = useMemo(() => {
-    if (!selectedTranslationLine || selectedCLineText === null) return null;
-    return analyzeCLine(selectedCLineText, selectedTranslationLine);
-  }, [selectedTranslationLine, selectedCLineText]);
+  const [, setExplanationVersion] = useState(0);
+  const [explanationError, setExplanationError] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      const items: Parameters<typeof fetchTutor>[0] = effectiveRows.flatMap(row => [
+        {kind: 'asm' as const, text: row.text},
+        ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
+      ]);
+      if (selectedCLineText !== null && selectedTranslationLine) items.push({kind: 'c', text: selectedCLineText, line: selectedTranslationLine});
+      fetchTutor(items, controller.signal).then(() => {
+        if (!controller.signal.aborted) { setExplanationError(false); setExplanationVersion(x => x + 1); }
+      }).catch(() => { if (!controller.signal.aborted) setExplanationError(true); });
+    }, 150);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [effectiveRows, selectedCLineText, selectedTranslationLine, retryVersion]);
+
+  const cLineAnalysis = selectedTranslationLine && selectedCLineText !== null
+    ? analyzeCLine(selectedCLineText, selectedTranslationLine) : null;
 
   // ----------------------------------------------------
   // 로딩 상태 화면
@@ -107,6 +123,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
       {/* 튜터 메인 본문 영역 */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3.5 space-y-3.5 select-text [scrollbar-gutter:stable]">
+        {explanationError && <div role="alert">해설을 불러오지 못했습니다. <button onClick={() => setRetryVersion(x => x + 1)}>다시 시도</button></div>}
         {/* ========================================================= */}
         {/* 모드 0: CRT (C Runtime 부트스트랩) 코드가 선택되었을 때 */}
         {/* ========================================================= */}
@@ -447,43 +464,14 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                     );
                   }
 
-                  const { cycle_events } = currentCycleData;
-                  const isStall = cycle_events.stall?.has_stall;
-                  const isForward = cycle_events.forwarding?.has_forwarded;
-                  const isFlush = cycle_events.control_hazard?.has_flush;
-
-                  return (
-                    <div
-                      className={`p-2.5 rounded-lg border text-[11px] leading-relaxed ${
-                        isStall
-                          ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-200"
-                          : isFlush
-                          ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200"
-                          : isForward
-                          ? "bg-cyan-50 dark:bg-cyan-950/30 border-cyan-200 dark:border-cyan-900/60 text-cyan-900 dark:text-cyan-200"
-                          : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60 text-emerald-900 dark:text-emerald-200"
-                      }`}
-                    >
-                      <strong className="font-bold block mb-0.5">
-                        {isStall
-                          ? "⚠️ 데이터 해저드 (Data Stall)"
-                          : isFlush
-                          ? "🔄 제어 해저드 (Branch Flush)"
-                          : isForward
-                          ? "⚡ 데이터 포워딩 (Forwarding 활성화)"
-                          : "✅ 정상 파이프라인 전진"}
-                      </strong>
-                      <span className="opacity-90">
-                        {isStall
-                          ? cycle_events.stall?.stall_desc || "필요한 피연산자가 준비되지 않아 파이프라인이 1사이클 정지되었습니다."
-                          : isFlush
-                          ? cycle_events.control_hazard?.flush_reason || "분기 예측 실패로 인해 파이프라인 버블이 플러시되었습니다."
-                          : isForward
-                          ? cycle_events.forwarding?.forwarding_desc || "ALU 결과를 후속 명령어에 직접 포워딩하여 지연 없이 실행합니다."
-                          : "현재 사이클에 해저드 없이 5개 스테이지가 순차적으로 실행되고 있습니다."}
-                      </span>
+                  const events = simulationData?.tutor?.cycle_explanations
+                    ?.find(x => x.cycle === currentCycleData.clock)?.events ?? [];
+                  return events.length ? <div className="space-y-2">{events.map(event => (
+                    <div key={event.type} className="p-2.5 rounded-lg border text-[11px] leading-relaxed">
+                      <strong className="block">{event.title}</strong>
+                      <span>{event.detail}</span>
                     </div>
-                  );
+                  ))}</div> : <div className="text-[11px]">현재 사이클에 보고된 스톨·포워딩·플러시 해설이 없습니다.</div>;
                 })()}
               </div>
             ) : activeTarget === "asm" ? (
