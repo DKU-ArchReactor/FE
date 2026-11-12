@@ -1,98 +1,14 @@
 import React, { useMemo } from 'react';
 import type { SimulationResult } from '@/type/simulation';
+import { performanceStats } from './performanceStats';
 
 interface PerformanceMetricsProps {
   simulationData: SimulationResult | null;
   currentCycle: number;
 }
 
-export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
-  simulationData,
-  currentCycle,
-}) => {
-  const history = simulationData?.history ?? [];
-
-  // 메트릭스 계산 (전체 시뮬레이션 기준 & 현재 사이클까지의 기준)
-  const stats = useMemo(() => {
-    if (!history.length) {
-      return {
-        completedInstructions: 0,
-        totalCycles: 0,
-        cpi: '1.00',
-        ipc: '1.00',
-        stalls: 0,
-        forwards: 0,
-        bubbleRatio: 0,
-      };
-    }
-
-    const isSingleMode =
-      simulationData?.simulator?.mode === 'single' ||
-      simulationData?.simulator?.pipeline_model === 'single-cycle';
-
-    if (isSingleMode) {
-      if (currentCycle === 0) {
-        return {
-          completedInstructions: 0,
-          totalCycles: 0,
-          cpi: '1.00',
-          ipc: '1.00',
-          stalls: 0,
-          forwards: 0,
-          bubbleRatio: 0,
-        };
-      }
-      return {
-        completedInstructions: currentCycle,
-        totalCycles: currentCycle,
-        cpi: '1.00',
-        ipc: '1.00',
-        stalls: 0,
-        forwards: 0,
-        bubbleRatio: 0,
-      };
-    }
-
-    // 현재 사이클까지 WB를 완료한 고유 명령어 개수 추적
-    const wbInstructions = new Set<string>();
-    let totalStalls = 0;
-    let totalForwards = 0;
-    let totalBubbles = 0;
-
-    for (let i = 0; i <= Math.min(currentCycle, history.length - 1); i++) {
-      const item = history[i];
-      if (item.buffers.WB?.assembly && item.buffers.WB?.status !== 'bubble') {
-        const key = `${item.buffers.WB.pc}_${item.buffers.WB.assembly}`;
-        wbInstructions.add(key);
-      }
-      if (item.cycle_events.stall?.has_stall) totalStalls++;
-      if (item.cycle_events.forwarding?.has_forwarded) totalForwards++;
-
-      // 5개 스테이지 중 버블 개수
-      Object.values(item.buffers).forEach((b) => {
-        if (!b || b.status === 'bubble' || b.assembly === 'bubble') {
-          totalBubbles++;
-        }
-      });
-    }
-
-    const completed = Math.max(1, wbInstructions.size);
-    const activeCycles = Math.max(1, currentCycle + 1);
-    const cpiVal = (activeCycles / completed).toFixed(2);
-    const ipcVal = (completed / activeCycles).toFixed(2);
-    const totalSlotCount = activeCycles * 5;
-    const bubbleRatio = Math.round((totalBubbles / totalSlotCount) * 100);
-
-    return {
-      completedInstructions: wbInstructions.size,
-      totalCycles: activeCycles,
-      cpi: cpiVal,
-      ipc: ipcVal,
-      stalls: totalStalls,
-      forwards: totalForwards,
-      bubbleRatio: Math.min(100, bubbleRatio),
-    };
-  }, [history, currentCycle]);
+export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulationData, currentCycle }) => {
+  const stats = useMemo(() => performanceStats(simulationData, currentCycle), [simulationData, currentCycle]);
 
   return (
     <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
@@ -128,9 +44,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
               <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">cycles</span>
             </div>
             <span className="text-[9px] text-[var(--ar-text-muted)] mt-0.5">
-              {Number(stats.cpi) <= 1.2
-                ? '최적의 파이프라인 처리량'
-                : '스톨 발생으로 지연 증가'}
+              {stats.cpi === '—' ? '완료 명령어가 없거나 지표가 제공되지 않았습니다' : '선택 시점까지의 사이클 / 완료 명령어'}
             </span>
           </div>
 
@@ -159,19 +73,19 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
           <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
             <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">완수 명령어</span>
             <span className="text-xs font-mono font-bold text-[#1F2328] dark:text-[#CCCCCC]">
-              {stats.completedInstructions}
+              {stats.completedInstructions ?? '—'}
             </span>
           </div>
           <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
             <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">스톨(Stall)</span>
             <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
-              {stats.stalls} 회
+              {stats.stalls ?? '—'} 회
             </span>
           </div>
           <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
             <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">포워딩</span>
             <span className="text-xs font-mono font-bold text-[#005FB8] dark:text-[#79C0FF]">
-              {stats.forwards} 회
+              {stats.forwards ?? '—'} 회
             </span>
           </div>
         </div>
