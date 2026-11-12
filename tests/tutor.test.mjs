@@ -73,3 +73,23 @@ test('a cancelled response does not populate the cache', async () => {
   await tutor.fetchTutor([{ kind: 'asm', text: 'add a0, a1, a2' }], controller.signal);
   assert.equal(tutor.analyzeAsmInstruction('add a0, a1, a2').action, '해설 대기');
 });
+
+test('PC matching preserves distinct mappings for repeated instruction text', () => {
+  const tutor = load(() => assert.fail('unexpected request'));
+  const bundle = {asm_instructions: [
+    {pc: '0x00010000', text: 'nop', source_line: 2, retire_count: 3},
+    {pc: '0x00010004', text: 'nop', source_line: null, retire_count: 0},
+  ]};
+  assert.equal(tutor.instructionAt(bundle, '0x10000').source_line, 2);
+  assert.equal(tutor.instructionAt(bundle, '0X10004').retire_count, 0);
+  assert.equal(tutor.instructionAt(bundle, 'garbage'), undefined);
+});
+
+test('missing source locations are not labelled as confirmed CRT', () => {
+  const tutor = load(() => assert.fail('unexpected request'));
+  tutor.seedTutor({asm_instructions: [{pc: '0x10000', text: 'nop',
+    explanation: explanation('asm', 'nop'),
+    runtime_explanation: {...explanation('crt', 'unmapped'), category: 'unmapped'},
+  }]});
+  assert.equal(tutor.analyzeCrtInstruction('nop', '0x10000').badge, '미확인');
+});

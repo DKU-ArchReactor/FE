@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 
 const source = readFileSync(new URL('../src/components/AssistantMarkdown.tsx', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source.replace(/^import ['"].*\.css['"];\n/gm, ''), {
+const compiled = ts.transpileModule(source.replace(/^import ['"].*\.css['"];\r?\n/gm, ''), {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
 }).outputText.replace(/from (["'])([^"']+)\1/g, (_, quote, name) => `from ${quote}${import.meta.resolve(name)}${quote}`);
 const { AssistantMarkdown } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));

@@ -1,7 +1,8 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import { mapAssembly, type MappedAssemblyRow } from '../utils/translationCompile';
-import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction, fetchTutor } from '../utils/tutorAnalysis';
+import { analyzeCLine, analyzeAsmInstruction, analyzeCrtInstruction, fetchTutor, instructionAt } from '../utils/tutorAnalysis';
+import { TutorCycleEvidence, TutorInstructionEvidence } from './TutorEvidence';
 
 export interface TutorAreaProps {
   simulationData: SimulationResult | null;
@@ -106,7 +107,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   return (
     <section
       className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
-      aria-label="AI 튜터 해설 패널"
+      aria-label="튜터 해설 패널"
     >
       {/* 튜터 상단 헤더 */}
       <header className="h-8 shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 border-l-emerald-500">
@@ -136,10 +137,10 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   <span className="text-base">🚀</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
-                      CRT
+                      소스 위치 미확인
                     </span>
                     <strong className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC]">
-                      C Runtime 부트스트랩 (진입 초기화)
+                      {analyzeCrtInstruction(selectedRow.text, selectedRow.pc).title}
                     </strong>
                   </div>
                 </div>
@@ -158,6 +159,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                 </span>
               </div>
 
+              <TutorInstructionEvidence item={instructionAt(simulationData?.tutor, selectedRow.pc)} />
               {/* CRT 역할 및 설명 */}
               {(() => {
                 const crtInfo = analyzeCrtInstruction(selectedRow.text, selectedRow.pc);
@@ -245,7 +247,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
               {mappedAsmForSelectedLine.length === 0 ? (
                 <div className="p-3 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-center text-xs text-slate-400 dark:text-[#858585]">
-                  이 라인은 주석, 공백 또는 디렉티브로서 독립된 실행 어셈블리 명령어가 생성되지 않았습니다.
+                  이 줄에 연결된 명령어가 없습니다. 주석·공백·컴파일러 줄 정보의 배치 또는 누락 때문일 수 있습니다.
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -325,6 +327,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                           </span>
                         </div>
 
+                        <TutorInstructionEvidence item={instructionAt(simulationData?.tutor, asmRow.pc)} />
                         {/* 동작 요약 */}
                         <div className="text-[11px] font-bold text-slate-800 dark:text-[#CCCCCC] pl-5 flex items-center gap-1">
                           <span className="text-blue-600 dark:text-[#388BFD]">➔</span>
@@ -403,7 +406,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
                 {/* 현재 파이프라인 인출(IF) 명령어 */}
                 {(() => {
-                  const ifBuf = currentCycleData.buffers?.IF || currentCycleData.if_stage;
+                  const ifBuf = currentCycleData.stage_activity?.IF || currentCycleData.buffers?.IF || currentCycleData.if_stage;
                   const ifInst = ifBuf?.assembly || "bubble";
                   const isIdleStep0 = ifInst === "empty" && currentCycleData.clock === 0;
 
@@ -425,7 +428,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                     );
                   }
 
-                  const isCrtCycle = ifBuf?.source_line === null || (ifBuf && ifBuf.source_line === undefined && (ifInst.startsWith("auipc") || ifInst.startsWith("jalr")));
+                  const context = instructionAt(simulationData?.tutor, ifBuf?.pc);
+                  const isCrtCycle = context?.mapping_status === 'unmapped';
                   const crtAnalysis = isCrtCycle ? analyzeCrtInstruction(ifInst, ifBuf?.pc) : null;
                   const ifAnalysis = analyzeAsmInstruction(ifInst);
                   return (
@@ -437,7 +441,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                           </span>
                           {isCrtCycle && (
                             <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
-                              CRT
+                              소스 위치 미확인
                             </span>
                           )}
                         </div>
@@ -497,6 +501,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             )}
           </div>
         )}
+        <TutorCycleEvidence bundle={simulationData?.tutor} historyIndex={currentCycleData ? simulationData?.history.indexOf(currentCycleData) : undefined} />
       </div>
     </section>
   );

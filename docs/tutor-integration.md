@@ -1,13 +1,25 @@
-# 백엔드 규칙 기반 튜터 연동
+# 독립 TUTOR 응답 연동
 
-백엔드 튜터 API를 먼저 배포한 뒤 이 프런트 변경을 배포한다.
+TUTOR gRPC 해설 기능, BE gRPC 연결을 먼저 배포한 뒤 이 프런트 변경을 배포한다.
+FE는 기존 BE API만 호출하며 TUTOR의 서버 주소나 ELF를 직접 취급하지 않는다.
+이 브랜치는 PR #18이 병합된 develop 92d7537의 서버 튜터·소스 선택 기반 AI 채팅 연동에 상세 매핑 표시를 추가한다.
+컴파일·실행 요청 취소와 assistant_context 응답 전달을 함께 반영했다.
 
 - 컴파일 응답의 `tutor.c_lines`와 `tutor.asm_instructions`를 캐시한다. C 컴파일에 ASM 출력이 없으면 시뮬레이션의 코드 매핑에서 명령어 해설을 받는다.
 - 시뮬레이션 응답 바깥의 `tutor`를 보존하고, `cycle_explanations`에서 현재 클록의 스톨·포워딩·플러시를 모두 표시한다.
 - 선택한 C 줄 및 명령어의 해설이 캐시에 없으면 `POST /api/v1/tutor/explain`으로 최대 128개씩 요청한다. 선택 변경 시 진행 중 요청을 취소하며 실패 시 재시도 버튼을 표시한다.
-- `tutorAnalysis.ts`는 서버 해설의 캐시와 화면 표시 변환만 담당한다. 해설 규칙은 FastAPI가 소유한다.
+- `tutorAnalysis.ts`는 서버 해설의 캐시와 화면 표시 변환만 담당한다. 해설 규칙은 독립 TUTOR 서버가 소유한다.
 - 기존 응답에 `tutor`가 없다면 명령어 해설은 추가 API로 조회한다. 사이클 해설은 새 백엔드에서 다시 실행한 결과가 필요하다.
 
-AI 채팅, Bedrock 연결, 전체 실행 맥락 분석은 이 변경에 포함하지 않는다.
+AI 채팅과 실행 문맥 선택 동작은 [어시스턴트 연동 문서](assistant-integration.md)를 따른다.
 
-검증: `node --test tests/tutor.test.mjs`, `npm run build`, 변경 파일 ESLint.
+- source_mapping이 있으면 검증된 PC–C 줄 매핑을 우선 사용한다. 실행되지 않은 명령어도 보존한다.
+- 상세 정보는 PC로 조회해 같은 명령어 텍스트의 함수·파일·줄·열·완료 횟수를 혼동하지 않는다.
+- `TutorEvidence.tsx`는 읽기/쓰기 레지스터와 실제 값 변화를 기존 패널 안에 표시한다.
+- 실행 전 초기 화면과 원본 clock 0의 첫 실행은 history index로 구별한다.
+- 소스 정보가 없는 명령어를 CRT 초기화로 단정하지 않는다.
+- 어셈블리 목록의 미매핑 태그도 CRT 대신 '미매핑'으로 표시한다. 읽기/쓰기 정보가 누락되면 '없음' 대신 '미제공'으로 표시한다.
+
+검증: `node --test tests/*.test.mjs`, `npm run build`, 변경 파일 ESLint.
+모킹 API를 사용하는 Playwright 브라우저 테스트 17개와 단위 테스트 29개를 확인했다.
+배포된 FE·BE·TUTOR의 전체 연결과 상세 패널의 운영 데이터 표시는 배포 후 확인해야 한다.

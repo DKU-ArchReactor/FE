@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { test, expect, type Page } from "@playwright/test";
 const id = (mode: string, run = 1) =>
   `${mode === "single" ? "11111111" : "22222222"}-1111-4111-8111-${String(run).padStart(12, "0")}`;
@@ -387,7 +388,7 @@ test("full workspace connects captured run to the actual assistant popup", async
   await page.route("https://**/*", route => route.abort());
   await page.route("https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/**", route => {
     const suffix = new URL(route.request().url()).pathname.split('/min/vs/')[1];
-    return route.fulfill({path: new URL(`../../node_modules/monaco-editor/min/vs/${suffix}`, import.meta.url).pathname});
+    return route.fulfill({path: fileURLToPath(new URL(`../../node_modules/monaco-editor/min/vs/${suffix}`, import.meta.url))});
   });
   await page.goto("/pipeline");
   await page

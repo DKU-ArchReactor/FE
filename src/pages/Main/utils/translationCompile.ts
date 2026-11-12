@@ -14,6 +14,14 @@ export function extractAssemblyFromSimulation(
 ): MappedAssemblyRow[] {
   if (!simulationResult) return [];
 
+  const tutorInstructions = simulationResult.tutor?.asm_instructions;
+  if (simulationResult.tutor?.source_mapping && tutorInstructions?.length) {
+    return tutorInstructions.filter(item => item.pc).map(item => ({
+      pc: item.pc, text: item.text, sourceLine: item.source_line ?? null,
+      isRuntime: false,
+    }));
+  }
+
   // 1순위: CORE가 제공하는 정적 코드 매핑 테이블(program.code_mapping) 직접 사용
   // 실행되지 않은 분기문(if/else)까지 포함된 완전한 전체 어셈블리 목록 및 C 라인 매핑 제공
   const codeMap = simulationResult.program?.code_mapping;

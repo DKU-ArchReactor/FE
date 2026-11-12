@@ -3,11 +3,28 @@ import api from '@/api/config';
 export interface RuleExplanation {
   kind: 'c' | 'asm' | 'crt'; category: string; title: string;
   summary: string; detail: string; opcode?: string | null; operands?: string | null;
+  reads?: string[]; writes?: string[]; notes?: string[];
+  supported?: boolean; evidence_level?: 'syntax' | 'observed' | 'unknown';
+}
+export interface TutorInstruction {
+  text: string; explanation: RuleExplanation; runtime_explanation?: RuleExplanation | null;
+  pc?: string; source_line?: number | null; source_file?: string | null;
+  source_column?: number | null; function?: string | null;
+  mapping_status?: 'mapped' | 'unmapped'; mapping_basis?: string;
+  retire_count?: number; observed_in_history?: boolean;
+}
+export interface TutorExecutionStep {
+  history_index: number; cycle: number; display_clock: number; retired_pc: string | null;
+  register_changes: {key: string; before: unknown; after: unknown}[];
+  memory_changes: {key: string; before: unknown; after: unknown}[];
+  memory_transfer: Record<string, unknown> | null;
 }
 export interface TutorBundle {
   schema_version: string;
   c_lines?: { line: number; text: string; explanation: RuleExplanation }[];
-  asm_instructions?: { text: string; explanation: RuleExplanation; runtime_explanation?: RuleExplanation | null; pc?: string }[];
+  asm_instructions?: TutorInstruction[];
+  execution_steps?: TutorExecutionStep[];
+  source_mapping?: {basis: string; warnings: string[]; notes: string[]};
   cycle_explanations?: { history_index: number; cycle: number; events: {
     type: string; title: string; summary: string; detail: string;
   }[] }[];
@@ -46,5 +63,10 @@ export function analyzeAsmInstruction(text: string) {
 }
 export function analyzeCrtInstruction(text: string, pc?: string) {
   const x = cache.get(key('crt', text, 1, pc)) ?? pending;
-  return {title: x.title, badge: 'CRT', summary: x.summary, detail: x.detail, role: x.title, instructionDetail: analyzeAsmInstruction(text)};
+  return {title: x.title, badge: x.category === 'unmapped' ? '미확인' : '문맥', summary: x.summary, detail: x.detail, role: x.title, instructionDetail: analyzeAsmInstruction(text)};
+}
+
+export function instructionAt(bundle: TutorBundle | null | undefined, pc?: string) {
+  if (!pc || !/^0x[0-9a-f]+$/i.test(pc)) return undefined;
+  return bundle?.asm_instructions?.find(item => item.pc && Number.parseInt(item.pc, 16) === Number.parseInt(pc, 16));
 }
