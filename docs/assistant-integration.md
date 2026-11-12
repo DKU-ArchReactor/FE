@@ -120,12 +120,34 @@ Execution is separate: use `+ 실행 · clock N` to attach the currently selecte
 
 Validation: 25 Node tests and production build; local UI checks use actual C/ASM Monaco drag selections and isolated mock chat requests. These do not constitute a live SOLID source-attachment test.
 
-Welcome copy is one sentence with seven collapsible question examples for selected/full C, selected/full ASM, cycle events, CPI, and code/execution comparison. Examples and top suggestion chips fill the input without sending; users review attachments and press Send.
+Welcome copy is one sentence. Eight emoji-labeled suggestions share one horizontally scrolling row above the conversation: code explanation, C/ASM mapping, registers, control flow, stack, hazards, CPI, and code/execution comparison. They fill the input without sending; users review attachments and press Send. Prompts distinguish provided execution evidence from general explanations and request missing data.
 
 ## 컴파일 안내 및 질문 예시
 
 - C 컴파일 또는 ASM 어셈블 결과가 도착하면 어시스턴트 버튼을 강조하고, 코드 흐름을 질문하도록 안내하는 말풍선을 표시합니다. 실패하거나 무효화된 요청에는 표시하지 않습니다.
 - 말풍선 닫기·어시스턴트 열기·새 빌드·코드/작성 모드 변경 시 안내를 정리합니다. 닫은 안내는 단순 스텝 이동에 다시 나타나지 않습니다.
-- 첫 인사는 “코드와 실행 과정에서 궁금한 점을 물어보세요.”입니다. 대화 안의 질문 예시 영역은 제거하고, 기존 해저드 분석·C·ASM 매핑 등과 함께 상단 한 줄의 가로 스크롤 버튼으로 표시합니다. 예시 선택은 입력창만 채우고 자동 전송하지 않습니다.
+- 첫 인사는 “코드와 실행 과정에서 궁금한 점을 물어보세요.”입니다. 대화 안의 질문 예시 영역은 제거하고, 중복 주제를 통합한 이모지 버튼 8개를 상단 한 줄의 가로 스크롤로 표시합니다. 예시 선택은 입력창만 채우고 자동 전송하지 않습니다.
 - 로컬 모의 검증: `/tests/browser/compile-hint.html`에서 실제 Main 화면의 컴파일·어셈블·실패·닫기·열기를 확인할 수 있습니다. 앱 API 요청은 모의 응답이며 실제 SOLID를 호출하지 않습니다.
 - `develop` 병합은 DEV S3 자동 배포를 실행합니다. `main` 운영 배포는 별도입니다. 이 UI 변경은 백엔드 질문 한도 변경과 독립적입니다.
+
+
+## 실제 SOLID 버튼 검증 (2026-11-13)
+
+로컬 프론트에서 운영 백엔드에 로그인하고 내장 loop.c를 pipeline으로 컴파일한 뒤 clock 25의 실행과 C 원문 전체를 첨부했습니다. 8개 버튼을 같은 대화에서 각각 한 번 전송했습니다. 이전 답변이 후속 질문에 영향을 줄 수 있는 사용 흐름 검증이며 독립 평가나 정확도 보장은 아닙니다. 대화 원문·계정 정보·비밀값은 이 문서에 저장하지 않습니다.
+
+| 버튼 | 관찰 결과 |
+| --- | --- |
+| 코드 설명 | 응답 수신. 정적 합계 10 설명은 맞지만 불필요한 전체 실행 해설과 추측이 길게 이어짐. |
+| C·ASM 매핑 | 일반 요청 실패 안내. UI 정보만으로 서버/판별/공급자 중 원인은 확정하지 못함. |
+| 레지스터 변화 | 응답 수신 후 길이 제한으로 중단. 명령어별 읽기/쓰기는 설명했으나 추측성 타이밍 설명 포함. |
+| 분기·반복 | C 반복 조건 설명은 맞음. 초기화 여부 추측과 주소 계산 오류 포함. |
+| 스택 구조 | 간결 지침 적용 후 짧게 수신. 두 주소 차이 0x20(32바이트)를 4바이트로 잘못 계산. |
+| 해저드 분석 | 짧게 수신하고 스톨을 인식. load 주소 계산 단계를 MEM으로 잘못 설명하고 플러시 여부는 누락. |
+| CPI 분석 | 짧게 수신. 포워딩만으로 load-use 스톨 대부분을 없앨 수 있다는 근거 없는 개선 효과 제시. |
+| 코드·실행 비교 | 짧게 수신. not_verified임에도 유사한 코드라는 이유로 동일 구현이라고 과도하게 확정. |
+
+길이 개선: 추천 질문에 결론 한 문장 + 핵심 근거 2~3개, 약 500자, 반복 표/요약 생략 지침을 추가했습니다. 마지막 4개 질문은 이 지침으로 검증했으며 잘림 없이 완료했습니다. 모든 직접 입력 질문에 적용할 기본 규칙은 백엔드 시스템 프롬프트의 별도 로컬 변경으로 준비했습니다. 운영 배포 전이므로 이 결과는 새 백엔드 지침의 실모델 검증이 아닙니다.
+
+남은 개선: (1) PerformanceMetrics가 서버 누적 지표 대신 WB PC/명령어를 중복 제거해 계산하므로 반복 실행 및 어시스턴트 지표와 달라질 수 있습니다. 서버의 누적 완료 명령어/포워딩 수와 집계 기준을 통일해야 합니다. (2) 주소 산술, load-use/포워딩 효과, 초안과 실행 동일성 판단을 회귀 평가에 포함해야 합니다. (3) 매핑 요청 오류는 응답 오류 코드와 서버 상관관계 식별자를 통한 진단이 필요합니다. 추가 실제 요청 재시도는 하지 않았습니다.
+
+검증: 프론트 Node 테스트 29개와 변경 파일 lint 통과. 답변을 짧게 하는 것만으로 기술적 정확성이 보장되지는 않습니다.

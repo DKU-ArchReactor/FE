@@ -33,18 +33,17 @@ interface Props {
   anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
+const BRIEF_ANSWER_REQUEST = ' 답변은 결론 한 문장과 핵심 근거 2~3개로, 500자 안팎으로 짧게 해줘. 표·전체 코드 재출력·반복 요약은 생략하고, 자료가 부족하면 필요한 자료만 한 문장으로 알려줘.';
+
 const QUESTION_EXAMPLES = [
-  { label: '⚡ 해저드 분석', question: '파이프라인 해저드의 종류와 원인을 설명해줘' },
-  { label: '📄 C·ASM 매핑', question: 'C 코드와 어셈블리 매핑 원리 알려줘' },
-  { label: '💾 스택 구조', question: '스택 프레임(sp/s0) 구조 설명해줘' },
-  { label: '📊 CPI 최적화', question: 'CPI 성능 개선 팁 알려줘' },
-  { label: 'C 코드 설명', question: '선택한 C 코드가 하는 일을 줄별로 설명하고, 변수 값이 어떻게 바뀌는지 알려줘.' },
-  { label: 'C 흐름·반환값', question: '첨부한 C 원문 전체의 실행 흐름과 반환값을 설명해줘. 실제 실행 결과와 코드로 추론한 값은 구분해줘.' },
-  { label: 'ASM 레지스터', question: '선택한 RISC-V 명령어가 읽고 쓰는 레지스터를 알려줘. 이전 레지스터 값이 없으면 결과값은 추측하지 마.' },
-  { label: 'ASM 분기·반복', question: '첨부한 ASM 원문 전체의 분기와 반복 흐름을 설명하고, 종료 조건을 찾아줘.' },
-  { label: '스톨·포워딩·플러시', question: '첨부된 사이클에서 스톨·포워딩·플러시가 발생했는지, 제공된 이벤트를 근거로 설명해줘.' },
-  { label: 'CPI 계산', question: '첨부된 사이클의 누적 CPI와 계산에 사용된 사이클 수·완료 명령어 수를 알려줘. 없는 값은 없다고 말해줘.' },
-  { label: '코드·실행 비교', question: '작성 중인 코드와 첨부 실행이 같은 코드인지 확인 가능한지 먼저 말하고, 확인되는 범위에서 실행 상태를 설명해줘.' },
+  { label: '📝 코드 설명', question: '첨부한 C 또는 RISC-V 코드의 동작과 흐름을 설명해줘. 선택한 부분만 첨부됐다면 그 범위만, 전체가 첨부됐다면 전체 흐름과 반환값·종료 조건을 설명해줘. 코드로 추론한 내용과 실제 실행 결과는 구분하고, 코드가 없으면 첨부를 요청해줘.' },
+  { label: '🔗 C·ASM 매핑', question: 'C 코드의 연산과 제어 흐름이 RISC-V 명령어에 어떻게 대응하는지 설명해줘. 제공된 소스 매핑이 있으면 근거로 사용하고, 없으면 일반적인 변환 원리와 예시로 설명하되 실제 컴파일 결과의 매핑이라고 단정하지 마.' },
+  { label: '🗃️ 레지스터 변화', question: '첨부한 RISC-V 명령어가 읽고 쓰는 레지스터와 변화 원리를 설명해줘. 실제 실행 상태가 있으면 그 값을 근거로 하고, 이전 값이나 명령어가 없으면 필요한 자료를 요청하고 결과값은 추측하지 마.' },
+  { label: '🔀 분기·반복', question: '첨부한 코드의 분기와 반복 흐름, 종료 조건을 설명해줘. 실제로 선택된 분기나 반복 횟수는 실행 근거가 있을 때만 말하고, 선택 범위 밖의 코드가 필요하면 요청해줘.' },
+  { label: '💾 스택 구조', question: 'RISC-V의 sp·s0와 스택 프레임 구조를 설명해줘. 첨부한 코드나 실행 상태에 근거가 있으면 연결해서 설명하고, 없으면 일반 원리로 설명하되 실제 주소·값·스택 배치를 만들어내지 마.' },
+  { label: '⚡ 해저드 분석', question: '실행 정보가 첨부됐다면 해당 사이클의 스톨·포워딩·플러시 여부와 원인을 제공된 이벤트로 설명해줘. 실행 정보가 없다면 첨부 코드의 의존성과 해저드 발생 조건을, 코드도 없다면 일반 원리를 설명해줘. 발생 가능성과 실제 발생 사실은 구분해줘.' },
+  { label: '📊 CPI 분석', question: '실행 정보가 첨부됐다면 누적 CPI와 계산에 사용된 사이클 수·완료 명령어 수, 근거가 있는 개선 가능성을 설명해줘. 실행 정보가 없으면 CPI(Cycles Per Instruction)의 계산 원리와 일반적인 개선 방법을 설명해줘. 없는 수치나 개선 효과는 추측하지 마.' },
+  { label: '🔍 코드·실행 비교', question: '작성 중인 코드와 첨부 실행이 같은 코드인지 확인 가능한지 먼저 말하고, 확인되는 범위에서 실행 상태를 설명해줘. 코드나 실행 정보가 부족하면 필요한 자료를 요청하고, 코드가 비슷하다는 이유만으로 같은 실행이라고 단정하지 마.' },
 ];
 
 const POPUP_WIDTH = 380;
@@ -398,7 +397,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
         <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
           {QUESTION_EXAMPLES.map(example => (
             <button key={example.label} type="button" disabled={!canSend}
-              onClick={() => setInputMessage(example.question)} title={example.question}
+              onClick={() => setInputMessage(example.question + BRIEF_ANSWER_REQUEST)} title={example.question}
               className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
                 isSingle
                   ? 'hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]'
