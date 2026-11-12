@@ -121,3 +121,11 @@ Execution is separate: use `+ 실행 · clock N` to attach the currently selecte
 Validation: 25 Node tests and production build; local UI checks use actual C/ASM Monaco drag selections and isolated mock chat requests. These do not constitute a live SOLID source-attachment test.
 
 Welcome copy is one sentence with seven collapsible question examples for selected/full C, selected/full ASM, cycle events, CPI, and code/execution comparison. Examples and top suggestion chips fill the input without sending; users review attachments and press Send.
+
+## 컴파일 안내 및 질문 예시
+
+- C 컴파일 또는 ASM 어셈블 결과가 도착하면 어시스턴트 버튼을 강조하고, 코드 흐름을 질문하도록 안내하는 말풍선을 표시합니다. 실패하거나 무효화된 요청에는 표시하지 않습니다.
+- 말풍선 닫기·어시스턴트 열기·새 빌드·코드/작성 모드 변경 시 안내를 정리합니다. 닫은 안내는 단순 스텝 이동에 다시 나타나지 않습니다.
+- 첫 인사는 “코드와 실행 과정에서 궁금한 점을 물어보세요.”입니다. 질문 예시는 기본 접힘이며, 펼치면 한 줄의 가로 스크롤 버튼을 표시합니다. 예시 선택은 입력창만 채우고 자동 전송하지 않습니다.
+- 로컬 모의 검증: `/tests/browser/compile-hint.html`에서 실제 Main 화면의 컴파일·어셈블·실패·닫기·열기를 확인할 수 있습니다. 앱 API 요청은 모의 응답이며 실제 SOLID를 호출하지 않습니다.
+- `develop` 병합은 DEV S3 자동 배포를 실행합니다. `main` 운영 배포는 별도입니다. 이 UI 변경은 백엔드 질문 한도 변경과 독립적입니다.

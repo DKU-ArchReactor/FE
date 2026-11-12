@@ -23,6 +23,7 @@ type UseSimulationSessionParams = {
 
 type SimulationCallbacks = {
   onSimulationComplete: (result: SimulationResult) => void;
+  onCompilationComplete?: () => void;
   triggerPlaybackFeedback: (type: PlaybackFeedbackType) => void;
   isPlaying: boolean;
   currentCycle: number;
@@ -89,7 +90,7 @@ export function useSimulationSession({
       isCurrent: () => request.isCurrent() && auth.epoch === getAuthSession().epoch };
   };
 
-  const handleTranslationCompile = async (callbacks: Pick<SimulationCallbacks, "onSimulationComplete" | "triggerPlaybackFeedback">) => {
+  const handleTranslationCompile = async (callbacks: Pick<SimulationCallbacks, "onSimulationComplete" | "triggerPlaybackFeedback" | "onCompilationComplete">) => {
     if (!translationSource.trim() || translationBusy) return;
     const request = beginRequest();
     setSimulationCache({ single: null, pipeline: null });
@@ -110,6 +111,7 @@ export function useSimulationSession({
       setResultWorkspace(workspaceKey);
 
       setTranslationAssembly(assembly);
+      callbacks.onCompilationComplete?.();
       setActiveBuildId(buildId ?? null);
       setActiveSimulationToken(simulationToken ?? null);
 
@@ -133,7 +135,7 @@ export function useSimulationSession({
 
   const handleAssemblySimulation = async (
     customAssembly: string,
-    callbacks: Pick<SimulationCallbacks, "onSimulationComplete" | "triggerPlaybackFeedback">
+    callbacks: Pick<SimulationCallbacks, "onSimulationComplete" | "triggerPlaybackFeedback" | "onCompilationComplete">
   ) => {
     const codeToSimulate = customAssembly;
     if (!codeToSimulate.trim() || translationBusy) return;
@@ -159,6 +161,7 @@ export function useSimulationSession({
       setResultWorkspace(workspaceKey);
 
       setTranslationAssembly(assembly);
+      callbacks.onCompilationComplete?.();
       setActiveBuildId(buildId ?? null);
       setActiveSimulationToken(simulationToken ?? null);
 

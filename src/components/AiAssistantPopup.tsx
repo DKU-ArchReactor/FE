@@ -77,7 +77,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     {
       id: "welcome",
       sender: "ai",
-      text: "C·RISC-V 코드와 실행 결과를 설명해 드릴게요.",
+      text: "코드와 실행 과정에서 궁금한 점을 물어보세요.",
       time: "방금 전",
     },
   ]);
@@ -469,10 +469,12 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 {msg.id === 'welcome' && <details className="mt-2">
                   <summary className="cursor-pointer text-[11px] font-medium">질문 예시</summary>
                   <p className="mt-1 text-[10px] text-[#57606A] dark:text-gray-400">예시를 눌러 입력하세요. 실행 분석은 실행 첨부가 필요해요.</p>
-                  <div className="mt-2 grid grid-cols-2 gap-1">
+                  <div aria-label="질문 예시 목록" tabIndex={0} className="mt-2 flex flex-nowrap gap-1.5 overflow-x-auto pb-2 max-w-full">
                     {QUESTION_EXAMPLES.map(example => <button key={example.label} type="button" disabled={!canSend}
                       onClick={() => setInputMessage(example.question)} title={example.question}
-                      className="min-w-0 whitespace-nowrap text-left rounded-md px-2 py-1 border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] disabled:opacity-50 text-[11px]">
+                      className={`shrink-0 whitespace-nowrap text-left rounded-full px-2 py-1 border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${isSingle
+                        ? 'hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8]'
+                        : 'hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED]'} disabled:opacity-50 text-[11px] transition-colors cursor-pointer shadow-2xs`}>
                       {example.label}
                     </button>)}
                   </div>
