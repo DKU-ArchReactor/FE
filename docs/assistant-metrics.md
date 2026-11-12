@@ -1,0 +1,5 @@
+# Selected-cycle performance metrics
+
+The performance panel now uses `history[index].global_result.metrics`, matching the assistant's selected-frame counters. It no longer counts distinct PC/assembly pairs in WB or counts a forwarding boolean as the number of forwarding paths. Pipeline index is the selected zero-based cycle; single step 0 is before execution, and step 1 selects history[0]. CPI is elapsed cycles / accumulated retired instructions; zero retirement or unavailable counters display an em dash instead of a fabricated CPI. Bubble ratio remains a visualization of occupied pipeline slots, not an assistant metric.
+
+Regression tests cover repeated PCs, multiple forwarding paths per cycle, zero retirement, missing counters, selected-versus-future state, and single-cycle initial state. In a logged-in local UI backed by the live API, built-in loop.c at pipeline clock 25 now displays CPI 2.00, 13 retired instructions, 1 stall and 7 forwards, replacing the old 1.73 / 15 / 1 / 6. This verification recompiles the built-in example but makes no SOLID call. No backend changes or deployments are required for this frontend correction.
