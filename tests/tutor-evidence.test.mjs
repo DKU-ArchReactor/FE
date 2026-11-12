@@ -21,3 +21,12 @@ test('initial snapshot does not show evidence belonging to the first executed cl
   assert.match(html, /Clock 1/);
   assert.match(html, /x10: 0x0 → 0x5/);
 });
+
+test('missing operand metadata is shown as unavailable rather than no register access', () => {
+  const item = {pc: '0x10000', text: 'nop', explanation: {
+    kind: 'asm', category: 'test', title: 'test', summary: 'test', detail: 'test',
+  }};
+  const html = renderToStaticMarkup(createElement(exports.TutorInstructionEvidence, {item}));
+  assert.match(html, /읽기: 미제공/);
+  assert.match(html, /쓰기: 미제공/);
+});

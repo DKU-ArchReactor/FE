@@ -650,9 +650,9 @@ export default function TranslationMapping({
                               ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
                               : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
                         }`}
-                      title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
+                      title="대응하는 C 소스 위치가 확인되지 않았습니다. CRT 여부는 줄 정보만으로 확정할 수 없습니다."
                     >
-                      CRT
+                      미매핑
                     </span>
                   )}
                 </div>
