@@ -34,13 +34,13 @@ interface Props {
 }
 
 const QUESTION_EXAMPLES = [
-  { label: '선택한 C 코드 설명', question: '선택한 C 코드가 하는 일을 줄별로 설명하고, 변수 값이 어떻게 바뀌는지 알려줘.' },
-  { label: '전체 C 코드의 흐름·반환값', question: '첨부한 C 원문 전체의 실행 흐름과 반환값을 설명해줘. 실제 실행 결과와 코드로 추론한 값은 구분해줘.' },
-  { label: '선택한 ASM의 레지스터 변화', question: '선택한 RISC-V 명령어가 읽고 쓰는 레지스터를 알려줘. 이전 레지스터 값이 없으면 결과값은 추측하지 마.' },
-  { label: '전체 ASM의 분기·반복', question: '첨부한 ASM 원문 전체의 분기와 반복 흐름을 설명하고, 종료 조건을 찾아줘.' },
-  { label: '현재 사이클의 스톨·포워딩·플러시', question: '첨부된 사이클에서 스톨·포워딩·플러시가 발생했는지, 제공된 이벤트를 근거로 설명해줘.' },
-  { label: '현재 사이클의 CPI 계산', question: '첨부된 사이클의 누적 CPI와 계산에 사용된 사이클 수·완료 명령어 수를 알려줘. 없는 값은 없다고 말해줘.' },
-  { label: '코드와 실행 결과 함께 분석', question: '작성 중인 코드와 첨부 실행이 같은 코드인지 확인 가능한지 먼저 말하고, 확인되는 범위에서 실행 상태를 설명해줘.' },
+  { label: 'C 코드 설명', question: '선택한 C 코드가 하는 일을 줄별로 설명하고, 변수 값이 어떻게 바뀌는지 알려줘.' },
+  { label: 'C 흐름·반환값', question: '첨부한 C 원문 전체의 실행 흐름과 반환값을 설명해줘. 실제 실행 결과와 코드로 추론한 값은 구분해줘.' },
+  { label: 'ASM 레지스터', question: '선택한 RISC-V 명령어가 읽고 쓰는 레지스터를 알려줘. 이전 레지스터 값이 없으면 결과값은 추측하지 마.' },
+  { label: 'ASM 분기·반복', question: '첨부한 ASM 원문 전체의 분기와 반복 흐름을 설명하고, 종료 조건을 찾아줘.' },
+  { label: '스톨·포워딩·플러시', question: '첨부된 사이클에서 스톨·포워딩·플러시가 발생했는지, 제공된 이벤트를 근거로 설명해줘.' },
+  { label: 'CPI 계산', question: '첨부된 사이클의 누적 CPI와 계산에 사용된 사이클 수·완료 명령어 수를 알려줘. 없는 값은 없다고 말해줘.' },
+  { label: '코드·실행 비교', question: '작성 중인 코드와 첨부 실행이 같은 코드인지 확인 가능한지 먼저 말하고, 확인되는 범위에서 실행 상태를 설명해줘.' },
 ];
 
 const POPUP_WIDTH = 380;
@@ -99,6 +99,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
   const addresses = attachment.scope === scope ? attachment.addresses : [];
   const unavailable = contextAvailability(simulation, currentData, mode, beforeExecution, now);
   const memory = availableMemory(currentData);
+  const sourceUnsupported = attachSource && Boolean(sourceContent.trim()) && status?.enabled === true && status.editor_source_supported !== true;
   const canSend = authenticated && status?.enabled === true && !isThinking;
   useEffect(() => {
     if (!isOpen) return;
@@ -236,6 +237,8 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     const text = (textToSend ?? inputMessage).trim();
     if (!text || requestRef.current || !canSend) return;
     setLocalError('');
+    // The attachment bar already explains unavailable source support.
+    if (sourceUnsupported) return;
     let context: ExecutionContext | undefined;
     let editorSource;
     try {
@@ -463,13 +466,13 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 {msg.sender === 'ai'
                   ? <Suspense fallback={<span className="whitespace-pre-wrap">{msg.text}</span>}><AssistantMarkdown text={msg.text} /></Suspense>
                   : msg.text}
-                {msg.id === 'welcome' && <details open className="mt-2">
+                {msg.id === 'welcome' && <details className="mt-2">
                   <summary className="cursor-pointer text-[11px] font-medium">질문 예시</summary>
                   <p className="mt-1 text-[10px] text-[#57606A] dark:text-gray-400">예시를 눌러 입력하세요. 실행 분석은 실행 첨부가 필요해요.</p>
                   <div className="mt-2 grid grid-cols-2 gap-1">
                     {QUESTION_EXAMPLES.map(example => <button key={example.label} type="button" disabled={!canSend}
                       onClick={() => setInputMessage(example.question)} title={example.question}
-                      className="text-left rounded-md px-2 py-1 border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] disabled:opacity-50 text-[11px]">
+                      className="min-w-0 whitespace-nowrap text-left rounded-md px-2 py-1 border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] disabled:opacity-50 text-[11px]">
                       {example.label}
                     </button>)}
                   </div>
@@ -535,7 +538,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             <button
               type="submit"
               aria-label="전송"
-              disabled={!inputMessage.trim() || !canSend}
+              disabled={!inputMessage.trim() || !canSend || sourceUnsupported}
               className={`px-3 py-1.5 rounded-lg ${
                 isSingle
                   ? "bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3]"
@@ -554,8 +557,8 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           </div>
           <p className="text-[#57606A] dark:text-gray-400">선택된 코드를 어시스턴트가 참고합니다.</p>
           {(!authenticated || statusError || !status?.enabled) && <p role="status">{!authenticated ? '로그인 후 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : 'AI 연결 준비 중')}</p>}
-          {attachSource && sourceContent.trim() && status?.enabled && status.editor_source_supported !== true && <p role="status">원문 첨부 지원 대기 중입니다.</p>}
-          {(statusError || status?.enabled === false || (attachSource && sourceContent.trim() && status?.enabled && status.editor_source_supported !== true)) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
+          {sourceUnsupported && <p role="status">원문 첨부 지원 대기 중입니다.</p>}
+          {(statusError || status?.enabled === false || (sourceUnsupported)) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
           {attach && unavailable && <p role="alert">{unavailable}</p>}
           <div id="assistant-attachment-settings" hidden={!settingsOpen} className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
           <label className="flex gap-2 items-center">
