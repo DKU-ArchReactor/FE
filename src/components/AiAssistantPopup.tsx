@@ -1,4 +1,5 @@
 import type { ExecutionContext, ExecutionReference } from '@/type/assistant';
+import { captureEditorSource } from '@/pages/Main/utils/assistantSource';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 import { contextAvailability, availableMemory, freezeExecutionContext } from '@/pages/Main/utils/assistantContext';
 import { getAssistantStatus, isServiceNotice, streamChat, type AssistantStatus, type ChatMessage } from "@/api/assistant";
@@ -15,9 +16,12 @@ interface Message {
   notice?: string;
   context?: ExecutionReference;
   requestedContext?: ExecutionContext;
+  sourceInfo?: { language: 'c' | 'asm'; characters: number };
 }
 
 interface Props {
+  editorLanguage?: 'c' | 'asm';
+  editorContent?: string;
   authenticated: boolean;
   simulation: SimulationResult | null;
   currentData: CycleHistoryItem | null;
@@ -31,7 +35,7 @@ interface Props {
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 500;
 
-export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, authenticated, simulation, currentData, mode, beforeExecution }) => {
+export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, authenticated, simulation, currentData, mode, beforeExecution, editorLanguage = 'c', editorContent = '' }) => {
   // 1. 위치 및 드래그 상태 관리
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -47,11 +51,12 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
 
   // 2. 대화 메시지 상태
   const [inputMessage, setInputMessage] = useState("");
+  const [attachSource, setAttachSource] = useState(true);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       sender: "ai",
-      text: "ArchReactor AI 어시스턴트입니다. 로그인 후 C 코드, RISC-V, 파이프라인에 대해 질문해 주세요.\n실행 첨부를 선택하면 질문 시점의 레지스터·CPI·튜터 해설과 선택 메모리를 참고합니다. C 원문과 전체 실행 이력은 자동 전달되지 않습니다.",
+      text: "ArchReactor AI 어시스턴트입니다. 로그인 후 C 코드, RISC-V, 파이프라인에 대해 질문해 주세요.\n현재 작성 모드의 원문은 질문을 보낼 때 자동 첨부되며 해제할 수 있습니다. 실행 첨부를 선택하면 해당 시점의 레지스터·CPI·튜터 해설과 선택 메모리도 참고합니다. 전체 실행 이력은 전달하지 않습니다.",
       time: "방금 전",
     },
   ]);
@@ -211,7 +216,9 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     if (!text || requestRef.current || !canSend) return;
     setLocalError('');
     let context: ExecutionContext | undefined;
+    let editorSource;
     try {
+      editorSource = captureEditorSource(attachSource, editorLanguage, editorContent, status?.editor_source_supported === true);
       if (attach) context = freezeExecutionContext(simulation, currentData, mode, beforeExecution, addresses);
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : '실행 정보를 확인해 주세요.');
@@ -222,6 +229,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     requestRef.current = controller;
     const userMsg: Message = {
       id: `user-${Date.now()}`, sender: 'user', text, time: '방금 전', complete: false, requestedContext: context,
+      sourceInfo: editorSource ? { language: editorSource.language, characters: [...editorSource.content].length } : undefined,
     };
     const replyId = `ai-${Date.now()}`;
     setMessages(prev => [...prev, userMsg, {
@@ -248,7 +256,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             : event.stop_reason !== 'end_turn' ? '모델이 답변 생성을 종료했습니다.' : undefined,
           }));
         }
-      }, context);
+      }, context, editorSource);
     } catch (error) {
       const notice = controller.signal.aborted ? '답변 생성을 중단했습니다.'
         : error instanceof Error ? error.message : 'AI 요청에 실패했습니다.';
@@ -346,6 +354,18 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           <p role="status">{!authenticated ? '로그인 후 AI 어시스턴트를 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : !status.enabled ? 'AI 어시스턴트 연결 준비 중' : 'C 코드·RISC-V·컴퓨터 구조 학습 질문을 도와드립니다.')}</p>
           {(statusError || status?.enabled === false) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
           <label className="flex gap-2 items-center">
+            <input type="checkbox" checked={attachSource} disabled={isThinking}
+              onChange={e => { setAttachSource(e.target.checked); setLocalError(''); }} />
+            작성 중인 원문 자동 첨부
+          </label>
+          <p>{attachSource
+            ? `${editorLanguage.toUpperCase()} 원문 ${[...editorContent].length.toLocaleString()}자 · 질문 전송 시 SOLID에 전달 (최대 12,000자)`
+            : '원문 미첨부 · 코드가 필요한 질문은 원문 첨부를 켜 주세요.'}</p>
+          {attachSource && !editorContent.trim() && <p>편집기가 비어 있어 원문은 보내지 않습니다.</p>}
+          {attachSource && status?.enabled && status.editor_source_supported !== true && <p>
+            백엔드 원문 첨부 지원 대기 중입니다. <button type="button" className="underline" onClick={() => setStatusRevision(v => v + 1)}>연결 다시 확인</button>
+          </p>}
+          <label className="flex gap-2 items-center">
             <input type="checkbox" checked={attach} disabled={!authenticated || isThinking || (!attach && Boolean(unavailable))}
               onChange={e => { setAttachment({ scope, enabled: e.target.checked, addresses: [] }); setLocalError(''); }} />
             선택 실행 첨부 {scope && currentData && !beforeExecution ? `· ${mode} · clock ${currentData.clock}` : ''}
@@ -365,7 +385,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             <button type="button" disabled={isThinking} className="underline" onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}>메모리 선택 해제</button>
             {addresses.some(address => !memory.includes(address)) && <p>선택한 주소가 현재 사이클에 없습니다. 선택을 해제해 주세요.</p>}
           </details>}
-          <p className="text-[#57606A] dark:text-[#AAAAAA]">질문 전송 시점의 clock(0부터 시작)을 사용합니다. C 원문·전체 이력은 첨부하지 않습니다.</p>
+          <p className="text-[#57606A] dark:text-[#AAAAAA]">실행은 질문 시점의 clock(0부터 시작)을 사용합니다. 작성 중인 원문과 실행 결과는 별도 자료이며, 전체 이력은 첨부하지 않습니다.</p>
           {localError && <p role="alert">{localError}</p>}
         </div>
         {/* 추천 질문 칩 바 */}
@@ -430,6 +450,9 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                   {msg.requestedContext
                     ? `실행 첨부 · ${msg.requestedContext.mode} · clock ${msg.requestedContext.cycle}`
                     : '실행 정보 미첨부'}
+                </p>}
+                {msg.sender === 'user' && <p className="mt-1 text-[10px]" data-testid="question-source">
+                  {msg.sourceInfo ? `${msg.sourceInfo.language.toUpperCase()} 원문 첨부 · ${msg.sourceInfo.characters.toLocaleString()}자` : '원문 미첨부'}
                 </p>}
                 {msg.sender === 'ai' && (msg.context || (isThinking && msg.requestedContext)) && <p data-testid="execution-badge" className="mt-2 text-[10px]" title={(msg.context || msg.requestedContext)!.execution_id}>
                   {msg.context ? '참고한 실행' : '요청한 실행'} {(msg.context || msg.requestedContext)!.execution_id.slice(0, 8)} · {(msg.context || msg.requestedContext)!.mode} · clock {(msg.context || msg.requestedContext)!.cycle} 기준 (0부터 시작)

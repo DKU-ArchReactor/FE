@@ -1,3 +1,8 @@
+export interface EditorSource {
+  language: 'c' | 'asm';
+  content: string;
+}
+
 export interface ExecutionReference {
   execution_id: string;
   result_version: string;

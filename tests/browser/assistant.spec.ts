@@ -52,7 +52,7 @@ async function setup(
     );
   const runs: Record<string, unknown>[] = [];
   await page.route("**/api/v1/assistant/status", (route) =>
-    route.fulfill({ json: { enabled: options.enabled ?? true, code: "TEST" } }),
+    route.fulfill({ json: { enabled: options.enabled ?? true, code: "TEST", editor_source_supported: true } }),
   );
   await page.route("**/api/v1/build/compile", (route) =>
     route.fulfill({

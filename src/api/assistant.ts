@@ -1,4 +1,4 @@
-import type { ExecutionContext, ExecutionReference } from "@/type/assistant";
+import type { EditorSource, ExecutionContext, ExecutionReference } from "@/type/assistant";
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 export type ChatEvent =
   | { type: "delta"; text: string }
@@ -9,7 +9,7 @@ export type ChatEvent =
       context?: ExecutionReference;
     }
   | { type: "error"; code: string; message: string };
-export type AssistantStatus = { enabled: boolean; code: string };
+export type AssistantStatus = { enabled: boolean; code: string; editor_source_supported?: boolean };
 
 export class ChatApiError extends Error {
   code: string;
@@ -127,6 +127,7 @@ export async function streamChat(
   signal: AbortSignal,
   onEvent: (event: ChatEvent) => void,
   context?: ExecutionContext,
+  editorSource?: EditorSource,
 ): Promise<void> {
   const token = localStorage.getItem("access_token");
   if (!token)
@@ -146,6 +147,7 @@ export async function streamChat(
     body: JSON.stringify({
       messages: boundedHistory(messages),
       ...(context ? { context } : {}),
+      ...(editorSource ? { editor_source: editorSource } : {}),
     }),
   });
   if (!response.ok) {

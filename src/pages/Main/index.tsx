@@ -326,6 +326,8 @@ const MainPage: React.FC = () => {
 
       <AiAssistantPopup
         key={auth.epoch}
+        editorLanguage={editorTarget}
+        editorContent={editorTarget === 'c' ? fileMgr.translationSource : customAssembly}
         authenticated={auth.authenticated}
         simulation={simSession.simulationData}
         currentData={playback.currentData}

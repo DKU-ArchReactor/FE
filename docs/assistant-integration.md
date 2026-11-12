@@ -63,7 +63,7 @@ usage alone never means a refusal, and is never displayed as zero token usage.
 
 ## Limits
 
-This does not attach C source, compile-time C-line explanations, the entire trace,
+Execution references do not attach compile-time C-line explanations, the entire trace,
 console output or a full memory dump. It is not an autonomous execution analyzer.
 Snapshot defaults remain server-controlled (three recent executions / 30 minutes).
 Each compile currently runs both modes, so two snapshots can be retained. Local
@@ -96,6 +96,15 @@ contract behaviour; they do not substitute for an authenticated production E2E.
 
 Assistant messages render Markdown headings, lists, tables, quotes, code and KaTeX math. Both dollar delimiters and SOLID-style LaTeX delimiters are supported; code examples remain literal. The renderer loads on demand and keeps streaming text available while loading. Raw HTML is skipped, remote Markdown images are not loaded, and links are limited to HTTP(S). KaTeX trust is disabled and expansion/size are bounded. All KaTeX consumers use the same patched version through the package override.
 
-Each question records whether execution evidence was attached. The popup explains how to compile/assemble, step and attach when there is no result, and explicitly warns when an available result is not selected. Editor C/assembly source is still not attached automatically.
+Each question records whether execution evidence was attached. The popup explains how to compile/assemble, step and attach when there is no result, and explicitly warns when an available result is not selected. At that earlier follow-up, editor source was not attached. The current editor-source section below supersedes that behavior.
 
 Validation: 20 Node tests (including Markdown/math, unsafe output, partial streaming syntax), production build and changed-source lint pass. Static browser preview: `/tests/browser/markdown.html` (development only, synthetic data, no model call). This follow-up does not rerun the previous 17 browser scenarios or the production model smoke test. The existing dependency audit findings outside the added rendering dependency chain remain a separate maintenance task.
+
+
+## Current editor source (requires the editor-source backend API)
+
+When a question is sent, the active C editor or editable ASM input is captured as `editor_source: { language, content }`. It defaults on, can be disabled, and sends nothing while typing. Compiled assembly from an older build is never substituted. The popup shows language/length and each question's attachment state. A draft is not proof of execution and may differ from an attached snapshot.
+
+Limits: 12,000 Unicode code points / 48,000 UTF-8 bytes. Empty text is omitted; oversize text is rejected rather than silently truncated. If `/assistant/status` lacks `editor_source_supported: true`, the UI explains that the backend is not ready and does not send the source request. Deploy the supporting backend first. Turning attachment off omits the current editor field; previous answers may still contain quoted code in conversation history.
+
+Latest verification: 23 Node tests, build and changed-source lint passed. Browser checks on the actual PR main screen verified C/ASM selection, source counts and logged-out blocking. The isolated `/tests/browser/source-attachment.html` fixture verified C capture, edit refresh, ASM capture, opt-out, and unsupported-server blocking with an unchanged request count. This fixture uses synthetic code and mock SSE, not SOLID. The production backend remains the separate live API; source-bearing SOLID smoke testing is pending deployment of the new backend.
