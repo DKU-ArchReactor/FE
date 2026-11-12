@@ -268,7 +268,6 @@ test("disabled service has status retry and disabled suggestions", async ({
   await page.route("**/api/v1/assistant/status", (route) =>
     route.fulfill({ json: { enabled: true, code: "ENABLED" } }),
   );
-  await page.getByRole("button", { name: "첨부 설정 ▾" }).click();
   await page.getByRole("button", { name: "연결 다시 확인" }).click();
   await expect(page.getByRole("button", { name: /해저드 분석/ })).toBeEnabled();
 });

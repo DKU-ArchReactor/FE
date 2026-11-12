@@ -488,26 +488,18 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           </div>
           <p className="text-[#57606A] dark:text-gray-400">선택된 코드를 어시스턴트가 참고합니다.</p>
           {(!authenticated || statusError || !status?.enabled) && <p role="status">{!authenticated ? '로그인 후 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : 'AI 연결 준비 중')}</p>}
-          {attachSource && sourceContent.trim() && status?.enabled && status.editor_source_supported !== true && <p role="status">원문 첨부 지원 대기 · 설정에서 연결을 다시 확인해 주세요.</p>}
+          {attachSource && sourceContent.trim() && status?.enabled && status.editor_source_supported !== true && <p role="status">원문 첨부 지원 대기 중입니다.</p>}
+          {(statusError || status?.enabled === false || (attachSource && sourceContent.trim() && status?.enabled && status.editor_source_supported !== true)) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
           {attach && unavailable && <p role="alert">{unavailable}</p>}
           <div id="assistant-attachment-settings" hidden={!settingsOpen} className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
-          <p>{!authenticated ? '로그인 후 AI 어시스턴트를 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : !status.enabled ? 'AI 어시스턴트 연결 준비 중' : 'C 코드·RISC-V·컴퓨터 구조 학습 질문을 도와드립니다.')}</p>
-          {(statusError || status?.enabled === false) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
           <label className="flex gap-2 items-center">
             <input type="checkbox" checked={attachSource} disabled={isThinking}
               onChange={e => { setAttachSource(e.target.checked); setLocalError(''); }} />
             작성 중인 원문 자동 첨부
           </label>
           <p>{attachSource
-            ? `${sourceLabel} ${[...sourceContent].length.toLocaleString()}자 · 질문 전송 시 SOLID에 전달 (최대 12,000자)`
-            : '원문 미첨부 · 코드가 필요한 질문은 원문 첨부를 켜 주세요.'}</p>
-          <p className="text-[#57606A] dark:text-gray-400">편집기에서 드래그한 부분을 우선 첨부합니다. 선택을 풀면 전체 원문을 사용합니다.</p>
-          {attachSource && !sourceContent.trim() && <p>편집기가 비어 있어 원문은 보내지 않습니다.</p>}
-          {attachSource && status?.enabled && status.editor_source_supported !== true && <p>
-            백엔드 원문 첨부 지원 대기 중입니다. <button type="button" className="underline" onClick={() => setStatusRevision(v => v + 1)}>연결 다시 확인</button>
-          </p>}
-          {unavailable && <p>{unavailable}</p>}
-          {!unavailable && !attach && <p>실행 정보 미첨부: + 실행 칩을 눌러 첨부할 수 있습니다.</p>}
+            ? `${sourceLabel} · ${[...sourceContent].length.toLocaleString()}자 / 최대 12,000자`
+            : '원문 미첨부'}</p>
           {attach && !unavailable && <details>
             <summary>메모리 선택 ({addresses.length}/16) · 기본 미전송</summary>
             <select multiple aria-label="첨부할 메모리 주소" size={3} disabled={isThinking} value={addresses.map(String)} className="w-full bg-white dark:bg-[#252526]"
@@ -521,7 +513,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             <button type="button" disabled={isThinking} className="underline" onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}>메모리 선택 해제</button>
             {addresses.some(address => !memory.includes(address)) && <p>선택한 주소가 현재 사이클에 없습니다. 선택을 해제해 주세요.</p>}
           </details>}
-          <p className="text-[#57606A] dark:text-[#AAAAAA]">실행은 질문 시점의 clock(0부터 시작)을 사용합니다. 작성 중인 원문과 실행 결과는 별도 자료이며, 전체 이력은 첨부하지 않습니다.</p>
           </div>
           {localError && <p role="alert">{localError}</p>}
         </div>
