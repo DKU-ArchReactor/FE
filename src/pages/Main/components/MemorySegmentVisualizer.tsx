@@ -98,12 +98,18 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     }
   }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
 
-  // 사용자가 코드를 펼쳤거나 코드가 새로 로드되었을 때, 가장 낮은 주소(main 시작점)가 있는 맨 아래로 스크롤
+  // 사용자가 코드를 펼쳤거나 실행 중 PC가 변경되었을 때, 현재 실행 중인 명령어(data-active="true") 위치로 자동 포커싱
   React.useEffect(() => {
     if (isUserCodeExpanded && userCodeScrollRef.current) {
-      userCodeScrollRef.current.scrollTop = userCodeScrollRef.current.scrollHeight;
+      const activeEl = userCodeScrollRef.current.querySelector<HTMLElement>('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else {
+        // 활성 명령어가 없으면 시작 지점(하단)으로 이동
+        userCodeScrollRef.current.scrollTop = userCodeScrollRef.current.scrollHeight;
+      }
     }
-  }, [isUserCodeExpanded, userInstructions.length]);
+  }, [isUserCodeExpanded, currentPc, userInstructions.length]);
 
   // 스택에 새 데이터가 푸시되거나 스택 항목이 변경되었을 때, 스택의 최신 성장 방향(아래/낮은 주소)으로 자동 스크롤
   React.useEffect(() => {
@@ -199,69 +205,68 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                   )}
                 </div>
 
-                {/* 우측: 데이터 리스트 (Code 영역은 닫혔을 땐 하단(65,536) 정렬, 펼쳤을 땐 상단 경계선 바로 아래에 오도록 justify-start 적용) */}
+                {/* 우측: 데이터 리스트 (Code 영역은 내부 스크롤로 가두기 위해 overflow-hidden 적용) */}
                 <div
                   ref={seg.key === 'stack' ? stackScrollRef : undefined}
-                  className={`flex-1 flex flex-col min-w-0 pl-1.5 py-0.5 overflow-y-auto custom-scrollbar ${
+                  className={`flex-1 flex flex-col min-w-0 pl-1.5 py-0.5 ${
+                    isCode ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'
+                  } ${
                     isCode ? (isUserCodeExpanded ? 'justify-start' : 'justify-end') : items.length === 0 && !isReserved ? 'justify-center' : 'justify-start'
                   }`}
                 >
                   {isReserved ? (
-                    <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 text-slate-500">
+                    <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-slate-500 font-semibold text-[10.5px]">
+                        <span className="font-mono text-slate-500 dark:text-slate-400 font-semibold text-[10.5px]">
                           0 ~ 65,535
                         </span>
-                        <span className="text-[9px] font-mono text-slate-400">64KB</span>
+                        <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">64KB</span>
                       </div>
-                      <span className="font-sans text-[9.5px] text-slate-400 leading-tight">
+                      <span className="font-sans text-[9.5px] text-slate-400 dark:text-slate-500 leading-tight">
                         NULL Pointer Guard (접근 금지 보호 구역)
                       </span>
                     </div>
                   ) : isCode ? (
-                    <div className={`flex flex-col gap-1.5 py-0.5 ${isUserCodeExpanded ? 'flex-1 min-h-0' : ''}`}>
+                    <div className={`flex flex-col gap-1.5 py-0.5 ${isUserCodeExpanded ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
                       {/* 1. 사용자 프로그램 메인 코드 통합 블록 (펼쳤을 때 세로 영역을 유연하게 차지하며 내부 스크롤 보장) */}
-                      <div className={`rounded-lg border border-amber-300 bg-amber-50/70 p-1.5 shadow-2xs flex flex-col gap-1 ${
-                        isUserCodeExpanded ? 'flex-1 min-h-0' : ''
+                      <div className={`rounded-lg border border-amber-300 dark:border-amber-900/60 bg-[#FFFDF7] dark:bg-[#1E1D1A] p-1.5 shadow-2xs flex flex-col gap-1 ${
+                        isUserCodeExpanded ? 'flex-1 min-h-0 overflow-hidden' : ''
                       }`}>
-                        {/* 1층: 주소 범위 & 뱃지 */}
-                        <div className="flex items-center justify-between gap-1 shrink-0">
+                        {/* 1층: 타이틀 & 명령어 개수 뱃지 & 토글 버튼 */}
+                        <div className="flex items-center justify-between gap-1 text-[10px] shrink-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-semibold text-amber-900 dark:text-amber-300 font-sans truncate">
+                              User Program (main)
+                            </span>
+                            <span className="text-[9px] px-1 py-0.2 rounded font-sans font-bold bg-amber-200 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 shrink-0">
+                              {userRange.count > 0 ? `${userRange.count} instrs` : '대기'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsUserCodeExpanded(!isUserCodeExpanded)}
+                            className="text-[9.5px] font-medium text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 bg-amber-100/90 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/70 px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0"
+                          >
+                            {isUserCodeExpanded ? '닫기 ▼' : '열기 ▲'}
+                          </button>
+                        </div>
+
+                        {/* 2층: 주소 범위 & Current PC */}
+                        <div className="flex items-center justify-between gap-1 text-[9.5px] border-t border-amber-200/60 dark:border-amber-900/40 pt-1 shrink-0 font-mono">
                           <span
                             title={
                               userRange.start && userRange.end
                                 ? `Hex: ${normalizeHex(userRange.start)} ~ ${normalizeHex(userRange.end)}`
                                 : undefined
                             }
-                            className="text-[11px] font-bold text-amber-950 font-mono tracking-tight cursor-help"
+                            className="text-amber-950 dark:text-amber-200 font-semibold tracking-tight cursor-help truncate"
                           >
                             {userRange.start && userRange.end
                               ? `${formatAddressDecimal(userRange.start)} ~ ${formatAddressDecimal(userRange.end)}`
                               : '— ~ —'}
                           </span>
-                          <span className="text-[9px] px-1 py-0.2 rounded font-sans font-bold bg-amber-200 text-amber-800 shrink-0">
-                            {userRange.count > 0 ? `${userRange.count} instrs` : '컴파일 대기'}
-                          </span>
-                        </div>
-
-                        {/* 2층: 영역 라벨 & 명령어 토글 버튼 */}
-                        <div className="flex items-center justify-between gap-1 text-[10px] shrink-0">
-                          <span className="font-semibold text-amber-900 font-sans">
-                            User Program (main)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setIsUserCodeExpanded(!isUserCodeExpanded)}
-                            className="text-[9.5px] font-medium text-amber-700 hover:text-amber-900 bg-amber-100/90 hover:bg-amber-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0"
-                          >
-                            {isUserCodeExpanded ? '닫기 ▼' : '열기 ▲'}
-                          </button>
-                        </div>
-
-                        {/* 3층: 현재 실행 중인 PC 위치 */}
-                        <div className="flex items-center justify-between text-[9.5px] border-t border-amber-200/60 pt-1 shrink-0">
-                          <span className="text-slate-500 font-sans">Current PC</span>
-                          <span className="font-mono font-bold text-amber-950">
-                            {currentPc ? formatAddressDecimal(currentPc) : '—'}
+                          <span className="text-amber-900 dark:text-amber-300 font-bold shrink-0">
+                            PC {currentPc ? formatAddressDecimal(currentPc) : '—'}
                           </span>
                         </div>
 
@@ -269,24 +274,32 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         {isUserCodeExpanded && (
                           <div
                             ref={userCodeScrollRef}
-                            className="mt-1 border-t border-amber-200/80 pt-1 divide-y divide-amber-100 flex-1 min-h-[70px] max-h-48 overflow-y-auto custom-scrollbar"
+                            className="mt-0.5 border border-amber-200/80 dark:border-amber-900/50 rounded bg-white dark:bg-[#141414] p-0.5 pb-1 divide-y divide-amber-100/60 dark:divide-amber-900/30 flex-1 min-h-0 overflow-y-auto custom-scrollbar"
                           >
                             {userInstructions.length === 0 ? (
-                              <div className="text-[10px] text-amber-800/60 font-sans italic py-2 text-center">
+                              <div className="text-[10px] text-amber-800/60 dark:text-amber-400/60 font-sans italic py-2 text-center">
                                 컴파일 후 명령어가 로드됩니다.
                               </div>
                             ) : (
                               userInstructions.map((item) => (
                                 <div
                                   key={item.address}
-                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[10px] font-mono shrink-0 ${
+                                  data-active={item.isChanged ? 'true' : undefined}
+                                  className={`flex items-center justify-between px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 transition-colors ${
                                     item.isChanged
-                                      ? 'bg-amber-200/80 text-amber-950 font-bold'
-                                      : 'text-slate-700 hover:bg-amber-100/50'
+                                      ? 'bg-amber-500 text-white font-bold shadow-xs'
+                                      : 'text-slate-700 dark:text-slate-300 hover:bg-amber-50/60 dark:hover:bg-amber-950/30'
                                   }`}
                                 >
-                                  <span>{formatAddressDecimal(item.address)}</span>
-                                  <span className="font-semibold text-indigo-950">{item.decText}</span>
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    {item.isChanged && <span className="text-[8px] animate-pulse">▶</span>}
+                                    <span className={item.isChanged ? 'text-white' : 'text-slate-500 dark:text-slate-400'}>
+                                      {formatAddressDecimal(item.address)}
+                                    </span>
+                                  </div>
+                                  <span className={`font-semibold truncate ml-2 ${item.isChanged ? 'text-amber-100' : 'text-indigo-900 dark:text-indigo-300'}`}>
+                                    {item.decText}
+                                  </span>
                                 </div>
                               ))
                             )}
@@ -294,27 +307,23 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         )}
                       </div>
 
-                      {/* 2. C 런타임 스타트업 영역 (최하위 코드 주소 0x00010000 영역이므로 메인 코드 아래, NULL 바로 위에 위치) */}
-                      <div className="flex flex-col gap-0.5 px-1.5 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 shrink-0">
-                        <div className="flex items-center justify-between">
-                          <span
-                            title={
-                              startupRange.start && startupRange.end
-                                ? `Hex: ${normalizeHex(startupRange.start)} ~ ${normalizeHex(startupRange.end)} (${startupRange.bytes} Bytes)`
-                                : undefined
-                            }
-                            className="font-mono text-slate-600 font-semibold text-[10.5px] cursor-help"
-                          >
-                            {startupRange.start && startupRange.end
-                              ? `${formatAddressDecimal(startupRange.start)} ~ ${formatAddressDecimal(startupRange.end)}`
-                              : '— ~ —'}
-                          </span>
-                          <span className="text-[9px] font-mono text-slate-400">
-                            {startupRange.bytes > 0 ? `${startupRange.bytes}B` : '—B'}
+                      {/* 2. C 런타임 스타트업 영역 (공간 절약을 위한 컴팩트 단일 라인 칩) */}
+                      <div
+                        title={
+                          startupRange.start && startupRange.end
+                            ? `Hex: ${normalizeHex(startupRange.start)} ~ ${normalizeHex(startupRange.end)} (${startupRange.bytes} Bytes)`
+                            : undefined
+                        }
+                        className="flex items-center justify-between px-2 py-1 rounded border border-dashed border-slate-300 dark:border-slate-700 bg-slate-100/80 dark:bg-[#1A1D23] shrink-0 text-[9.5px] cursor-help"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 text-slate-600 dark:text-slate-400">
+                          <span className="font-sans font-medium text-slate-600 dark:text-slate-300">_start</span>
+                          <span className="font-mono text-[9px] text-slate-400 dark:text-slate-500">
+                            ({startupRange.start && startupRange.end ? `${formatAddressDecimal(startupRange.start)}~` : '—'})
                           </span>
                         </div>
-                        <span className="font-sans text-[9.5px] text-slate-400 leading-tight">
-                          System Runtime Startup (_start)
+                        <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
+                          {startupRange.bytes > 0 ? `${startupRange.bytes}B` : '—B'}
                         </span>
                       </div>
                     </div>
