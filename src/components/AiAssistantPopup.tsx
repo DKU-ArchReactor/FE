@@ -1,13 +1,26 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import type { ExecutionContext, ExecutionReference } from '@/type/assistant';
+import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
+import { contextAvailability, availableMemory, freezeExecutionContext } from '@/pages/Main/utils/assistantContext';
+import { getAssistantStatus, isServiceNotice, streamChat, type AssistantStatus, type ChatMessage } from "@/api/assistant";
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 
 interface Message {
   id: string;
   sender: "ai" | "user";
   text: string;
   time: string;
+  complete?: boolean;
+  notice?: string;
+  context?: ExecutionReference;
+  requestedContext?: ExecutionContext;
 }
 
 interface Props {
+  authenticated: boolean;
+  simulation: SimulationResult | null;
+  currentData: CycleHistoryItem | null;
+  mode: "single" | "pipeline";
+  beforeExecution: boolean;
   isOpen: boolean;
   onClose: () => void;
   anchorRef?: React.RefObject<HTMLElement | null>;
@@ -16,7 +29,7 @@ interface Props {
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 500;
 
-export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }) => {
+export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, authenticated, simulation, currentData, mode, beforeExecution }) => {
   // 1. 위치 및 드래그 상태 관리
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -36,11 +49,45 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
     {
       id: "welcome",
       sender: "ai",
-      text: "안녕하세요! ArchReactor AI 어시스턴트입니다. ✨\nC 소스 코드 번역, RISC-V 어셈블리 명령어, 5단계 파이프라인의 데이터 해저드나 스톨 원인에 대해 무엇이든 질문해 보세요!",
+      text: "ArchReactor AI 어시스턴트입니다. 로그인 후 C 코드, RISC-V, 파이프라인에 대해 질문해 주세요.\n실행 첨부를 선택하면 질문 시점의 레지스터·CPI·튜터 해설과 선택 메모리를 참고합니다. C 원문과 전체 실행 이력은 자동 전달되지 않습니다.",
       time: "방금 전",
     },
   ]);
   const [isThinking, setIsThinking] = useState(false);
+  const requestRef = useRef<AbortController | null>(null);
+  const [status, setStatus] = useState<AssistantStatus | null>(null);
+  const [statusError, setStatusError] = useState('');
+  const [statusRevision, setStatusRevision] = useState(0);
+  const [localError, setLocalError] = useState('');
+  const [now, setNow] = useState(Date.now);
+  const descriptor = simulation?.assistant_context;
+  const scope = descriptor?.available ? `${mode}:${descriptor.execution_id}` : '';
+  useLayoutEffect(() => {
+    setAttachment({ scope: '', enabled: false, addresses: [] });
+    setLocalError('');
+  }, [scope]);
+  const [attachment, setAttachment] = useState({ scope: '', enabled: false, addresses: [] as number[] });
+  const attach = attachment.scope === scope && attachment.enabled;
+  const addresses = attachment.scope === scope ? attachment.addresses : [];
+  const unavailable = contextAvailability(simulation, currentData, mode, beforeExecution, now);
+  const memory = availableMemory(currentData);
+  const canSend = authenticated && status?.enabled === true && !isThinking;
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    setStatus(null);
+    setStatusError('');
+    getAssistantStatus(controller.signal).then(value => { if (!controller.signal.aborted) setStatus(value); }).catch(error => {
+      if (!controller.signal.aborted) setStatusError(error instanceof Error ? error.message : '연결 상태 확인에 실패했습니다.');
+    });
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [isOpen, statusRevision]);
+
+  useEffect(() => {
+    if (!isOpen) requestRef.current?.abort();
+  }, [isOpen]);
+  useEffect(() => () => requestRef.current?.abort(), []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 버튼 바로 아래 기본 위치 계산 (버튼 오른쪽 정렬 & 바로 아래 8px)
@@ -76,18 +123,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
       return () => clearTimeout(timer);
     }
   }, [isOpen, hasAnimated]);
-
-  // 창 열릴 때 화면 밖으로 벗어나지 않도록 좌표 보정
-  useEffect(() => {
-    if (isOpen && position) {
-      const maxX = Math.max(12, window.innerWidth - POPUP_WIDTH - 12);
-      const maxY = Math.max(12, window.innerHeight - POPUP_HEIGHT - 12);
-      setPosition({
-        x: Math.max(12, Math.min(maxX, position.x)),
-        y: Math.max(12, Math.min(maxY, position.y)),
-      });
-    }
-  }, [isOpen]);
 
   // 브라우저 리사이즈 시 화면 내 유지
   useEffect(() => {
@@ -169,52 +204,57 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
   }, [messages, isThinking, isOpen]);
 
   // 메시지 전송
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend ?? inputMessage).trim();
-    if (!text || isThinking) return;
-
+    if (!text || requestRef.current || !canSend) return;
+    setLocalError('');
+    let context: ExecutionContext | undefined;
+    try {
+      if (attach) context = freezeExecutionContext(simulation, currentData, mode, beforeExecution, addresses);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : '실행 정보를 확인해 주세요.');
+      return;
+    }
+    if (text.length > 8000) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
     const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      sender: "user",
-      text,
-      time: "방금 전",
+      id: `user-${Date.now()}`, sender: 'user', text, time: '방금 전', complete: false, requestedContext: context,
     };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInputMessage("");
+    const replyId = `ai-${Date.now()}`;
+    setMessages(prev => [...prev, userMsg, {
+      id: replyId, sender: 'ai', text: '', time: '방금 전', requestedContext: context,
+    }]);
+    setInputMessage('');
     setIsThinking(true);
-
-    setTimeout(() => {
-      let replyText = "";
-      const lower = text.toLowerCase();
-
-      if (lower.includes("해저드") || lower.includes("스톨") || lower.includes("hazard") || lower.includes("stall")) {
-        replyText =
-          "⚡ [파이프라인 해저드 분석]\n5단계 파이프라인에서 직전 명령어가 메모리에서 값을 로드(lw)하고 바로 다음 명령어가 해당 레지스터를 참조하면 'Load-Use 데이터 해저드'가 발생하여 1사이클 스톨(버블)이 불가피합니다.\n\n해결 팁: 로드 명령어와 사용 명령어 사이에 독립적인 연산 명령어를 재배치하면 스톨 없이 100% 포워딩(Forwarding)으로 통과할 수 있습니다.";
-      } else if (lower.includes("매핑") || lower.includes("번역") || lower.includes("c") || lower.includes("어셈블리")) {
-        replyText =
-          "📄 [C-어셈블리 매핑 안내]\n작성된 C 언어 코드는 GCC RV32IM 컴파일러를 통해 스택 기반 명령어로 변환됩니다. 상단 에디터에서 원하는 코드 줄을 클릭하시면 하단 Tutor 패널에 각 C 행에 정확히 대응되는 RISC-V 명령어 목록과 하드웨어 레지스터 동작이 실시간 표시됩니다.";
-      } else if (lower.includes("스택") || lower.includes("메모리") || lower.includes("stack") || lower.includes("sp")) {
-        replyText =
-          "💾 [스택 프레임 구조]\n함수 호출 시 `addi sp, sp, -32`로 스택 포인터를 낮춰 프레임을 할당하고, 이전 프레임 포인터(`s0`)와 복귀 주소(`ra`)를 스택 상단에 저장합니다. 지역 변수는 `s0` 기준 마이너스 오프셋(예: -20(s0))에 기록되어 함수 종료 시 안전하게 정리됩니다.";
-      } else if (lower.includes("cpi") || lower.includes("성능") || lower.includes("최적화")) {
-        replyText =
-          "📊 [CPI 및 파이프라인 최적화]\n이상적인 5-Stage 파이프라인의 CPI는 1.0입니다. 그러나 브랜치 미스예측(2 Flush)과 Load-Use 스톨(1 Stall)로 인해 실제 CPI는 1.2~1.5 수준이 됩니다. 루프 언롤링(Loop Unrolling)과 명령어 재배치 기법을 통해 CPI를 1.0에 근접하도록 단축할 수 있습니다.";
-      } else {
-        replyText = `💡 [AI 분석 답변]\n"${text}"에 관한 질문이 접수되었습니다. 현재 시뮬레이션 중인 RISC-V 32-bit 프로세서 아키텍처 관점에서 파이프라인 제어와 레지스터 상태를 연계하여 최적의 실행 흐름을 지원합니다. 추가적으로 궁금한 레지스터 번호나 명령어(예: addi, lw, bne)를 말씀해 주세요!`;
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `ai-${Date.now()}`,
-          sender: "ai",
-          text: replyText,
-          time: "방금 전",
-        },
-      ]);
+    const updateReply = (change: (message: Message) => Message) => {
+      setMessages(prev => prev.map(message => message.id === replyId ? change(message) : message));
+    };
+    let responseText = '';
+    try {
+      const history: ChatMessage[] = [...messages.filter(m => m.id !== 'welcome' && m.complete), userMsg]
+        .map(m => ({ role: m.sender === 'ai' ? 'assistant' : 'user', content: m.text }));
+      await streamChat(history, controller.signal, event => {
+        if (controller.signal.aborted) return;
+        if (event.type === 'delta') { responseText += event.text; updateReply(m => ({ ...m, text: m.text + event.text })); }
+        if (event.type === 'done') {
+          const complete = event.stop_reason === 'end_turn' && !isServiceNotice(responseText);
+          setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, complete } : m));
+          updateReply(m => ({
+          ...m, complete, context: event.context, requestedContext: undefined,
+          notice: event.stop_reason === 'max_tokens' ? '답변 길이 한도에 도달했습니다. 이어서 질문해 주세요.'
+            : event.stop_reason !== 'end_turn' ? '모델이 답변 생성을 종료했습니다.' : undefined,
+          }));
+        }
+      }, context);
+    } catch (error) {
+      const notice = controller.signal.aborted ? '답변 생성을 중단했습니다.'
+        : error instanceof Error ? error.message : 'AI 요청에 실패했습니다.';
+      updateReply(m => ({ ...m, complete: false, notice, requestedContext: undefined }));
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null;
       setIsThinking(false);
-    }, 600);
+    }
   };
 
   if (!isOpen) return null;
@@ -300,17 +340,44 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
 
       {/* 대화 본문 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
+        <div className="shrink-0 px-3 py-2 text-[11px] border-b border-[#E5E5E5] dark:border-[#333333] space-y-1 max-h-44 overflow-y-auto">
+          <p role="status">{!authenticated ? '로그인 후 AI 어시스턴트를 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : !status.enabled ? 'AI 어시스턴트 연결 준비 중' : 'C 코드·RISC-V·컴퓨터 구조 학습 질문을 도와드립니다.')}</p>
+          {(statusError || status?.enabled === false) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
+          <label className="flex gap-2 items-center">
+            <input type="checkbox" checked={attach} disabled={!authenticated || isThinking || (!attach && Boolean(unavailable))}
+              onChange={e => { setAttachment({ scope, enabled: e.target.checked, addresses: [] }); setLocalError(''); }} />
+            선택 실행 첨부 {scope && currentData && !beforeExecution ? `· ${mode} · clock ${currentData.clock}` : ''}
+          </label>
+          {unavailable && <p>{unavailable}</p>}
+          {attach && !unavailable && <details>
+            <summary>메모리 선택 ({addresses.length}/16) · 기본 미전송</summary>
+            <select multiple aria-label="첨부할 메모리 주소" size={3} disabled={isThinking} value={addresses.map(String)} className="w-full bg-white dark:bg-[#252526]"
+              onChange={e => {
+                const next = Array.from(e.currentTarget.selectedOptions, option => Number(option.value));
+                if (next.length > 16) { setLocalError('메모리는 최대 16개 선택할 수 있습니다.'); return; }
+                setLocalError(''); setAttachment({ scope, enabled: true, addresses: next });
+              }}>
+              {memory.map(address => <option key={address} value={address}>0x{address.toString(16).padStart(8, '0')}</option>)}
+            </select>
+            <button type="button" disabled={isThinking} className="underline" onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}>메모리 선택 해제</button>
+            {addresses.some(address => !memory.includes(address)) && <p>선택한 주소가 현재 사이클에 없습니다. 선택을 해제해 주세요.</p>}
+          </details>}
+          <p className="text-[#57606A] dark:text-[#AAAAAA]">질문 전송 시점의 clock(0부터 시작)을 사용합니다. C 원문·전체 이력은 첨부하지 않습니다.</p>
+          {localError && <p role="alert">{localError}</p>}
+        </div>
         {/* 추천 질문 칩 바 */}
         <div className="shrink-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex items-center gap-1.5 overflow-x-auto text-[11px] [scrollbar-width:none]">
           <button
             type="button"
-            onClick={() => handleSendMessage("현재 파이프라인 해저드 분석해줘")}
+            disabled={!canSend}
+            onClick={() => handleSendMessage("파이프라인 해저드의 종류와 원인을 설명해줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
             ⚡ 해저드 분석
           </button>
           <button
             type="button"
+            disabled={!canSend}
             onClick={() => handleSendMessage("C 코드와 어셈블리 매핑 원리 알려줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
@@ -318,6 +385,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
           </button>
           <button
             type="button"
+            disabled={!canSend}
             onClick={() => handleSendMessage("스택 프레임(sp/s0) 구조 설명해줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
@@ -325,6 +393,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
           </button>
           <button
             type="button"
+            disabled={!canSend}
             onClick={() => handleSendMessage("CPI 성능 개선 팁 알려줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
@@ -352,6 +421,12 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
                 }`}
               >
                 {msg.text}
+                {msg.sender === 'ai' && (msg.context || (isThinking && msg.requestedContext)) && <p data-testid="execution-badge" className="mt-2 text-[10px]" title={(msg.context || msg.requestedContext)!.execution_id}>
+                  {msg.context ? '참고한 실행' : '요청한 실행'} {(msg.context || msg.requestedContext)!.execution_id.slice(0, 8)} · {(msg.context || msg.requestedContext)!.mode} · clock {(msg.context || msg.requestedContext)!.cycle} 기준 (0부터 시작)
+                </p>}
+                {msg.sender === 'user' && Boolean(msg.requestedContext?.memory_addresses.length) && <p className="mt-1 text-[10px]">선택 메모리: {msg.requestedContext!.memory_addresses.map(a => `0x${a.toString(16)}`).join(', ')}</p>}
+                {msg.notice && msg.sender === 'ai' && <button type="button" disabled={!canSend} className="block mt-1 underline" onClick={() => { const index = messages.findIndex(m => m.id === msg.id); setInputMessage(messages[index - 1]?.text || ''); }}>질문 다시 입력</button>}
+                {msg.notice && <p role="status" className="mt-1 text-[#57606A] dark:text-[#AAAAAA]">{msg.notice}</p>}
               </div>
             </div>
           ))}
@@ -382,12 +457,18 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="C 코드나 파이프라인에 대해 질문하세요..."
-              disabled={isThinking}
+              disabled={!canSend}
+              maxLength={8000}
               className="flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-xs text-[#1F2328] dark:text-[#CCCCCC] placeholder:text-[#8C959F] dark:placeholder:text-[#6E7681] focus:outline-none focus:border-[#005FB8] dark:focus:border-[#007ACC] focus:ring-1 focus:ring-[#005FB8] dark:focus:ring-[#007ACC] transition-colors"
             />
+            {isThinking && (
+              <button type="button" onClick={() => requestRef.current?.abort()}
+                className="px-2 py-1.5 text-xs cursor-pointer">중단</button>
+            )}
             <button
               type="submit"
-              disabled={!inputMessage.trim() || isThinking}
+              aria-label="전송"
+              disabled={!inputMessage.trim() || !canSend}
               className="px-3 py-1.5 rounded-lg bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0"
             >
               <span>전송</span>

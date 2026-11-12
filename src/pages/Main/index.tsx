@@ -1,3 +1,4 @@
+import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
@@ -61,7 +62,10 @@ const MainPage: React.FC = () => {
   const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
+  const auth = useAuthSession();
+  const workspaceKey = JSON.stringify([fileMgr.translationSource, customAssembly, editorTarget, auth.epoch]);
   const simSession = useSimulationSession({
+    workspaceKey,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
     translationBusy: fileMgr.translationBusy,
@@ -225,7 +229,7 @@ const MainPage: React.FC = () => {
       onSelectTranslationLine={handleSelectTranslationLine}
       onSaveTranslationFile={fileMgr.handleSaveTranslationFile}
       onOpenSavedFileInEditor={(id) => fileMgr.handleOpenSavedFileInEditor(id, onResetSimulation)}
-      onCustomAssemblyChange={setCustomAssembly}
+      onCustomAssemblyChange={(value) => { simSession.clearSimulationCache(); setCustomAssembly(value); }}
       onSimulateAssembly={() =>
         simSession.handleAssemblySimulation(customAssembly, {
           onSimulationComplete: playback.handleSimulationComplete,
@@ -321,6 +325,12 @@ const MainPage: React.FC = () => {
       </div>
 
       <AiAssistantPopup
+        key={auth.epoch}
+        authenticated={auth.authenticated}
+        simulation={simSession.simulationData}
+        currentData={playback.currentData}
+        mode={simSession.simulationEngineMode}
+        beforeExecution={simSession.isSingleEngine && playback.currentCycle === 0}
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}

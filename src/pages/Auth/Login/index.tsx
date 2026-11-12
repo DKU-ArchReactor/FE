@@ -1,3 +1,4 @@
+import { notifyAuthChanged } from '@/api/authSession';
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -26,6 +27,7 @@ const LoginPage = () => {
     try {
       const res = await login(formData);
       localStorage.setItem("access_token", res.access_token);
+      notifyAuthChanged();
       localStorage.setItem("token_type", res.token_type);
       navigate("/");
     } catch (error) {

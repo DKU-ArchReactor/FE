@@ -45,19 +45,22 @@ const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
 };
 
 export const runSimulation = async (
-  data: SimulationRunRequest
+  data: SimulationRunRequest,
+  signal?: AbortSignal
 ): Promise<SimulationResult> => {
   const payload: SimulationRunRequest = {
     mode: data.mode ?? "pipeline",
+    ...(data.capture_assistant_context ? { capture_assistant_context: true } : {}),
     max_cycles: data.max_cycles ?? 2000,
     ...(data.build_id
       ? { build_id: data.build_id }
       : { simulation_token: data.simulation_token }),
   };
 
-  const response = await apiConfig.post("/api/v1/simulation/run", payload);
+  const response = await apiConfig.post("/api/v1/simulation/run", payload, { signal });
 
   const tutor = response.data?.tutor;
+  const assistant_context = response.data?.assistant_context;
   seedTutor(tutor);
   let resultData = response.data;
 
@@ -66,10 +69,11 @@ export const runSimulation = async (
     if (import.meta.env.DEV && import.meta.env.VITE_S3_BUCKET_URL) {
       fetchUrl = fetchUrl.replace(import.meta.env.VITE_S3_BUCKET_URL, "/s3-proxy");
     }
-    let res = await fetch(fetchUrl);
+    let res = await fetch(fetchUrl, { signal });
     if (!res.ok && fetchUrl !== rawUrl) {
-      res = await fetch(rawUrl);
+      res = await fetch(rawUrl, { signal });
     }
+    if (!res.ok) throw new Error("실행 결과를 불러오지 못했습니다.");
     return res.json();
   };
 
@@ -102,6 +106,6 @@ export const runSimulation = async (
   }
 
   const normalized = normalizeSimulationResult(resultData as SimulationResult);
-  return { ...normalized, tutor };
+  return { ...normalized, tutor, assistant_context };
 };
 
