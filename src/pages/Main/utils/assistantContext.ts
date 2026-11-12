@@ -9,7 +9,7 @@ export function contextAvailability(
   now = Date.now(),
 ): string | null {
   const descriptor = result?.assistant_context;
-  if (!descriptor) return "실행 정보가 없습니다. 로그인 상태에서 컴파일(또는 어셈블) → 한 단계 실행 → 선택 실행 첨부 순서로 진행해 주세요.";
+  if (!descriptor) return "실행 정보가 없습니다. 로그인 상태에서 컴파일(또는 어셈블) → 한 단계 실행 → + 실행 칩 선택 순서로 진행해 주세요.";
   if (!descriptor.available)
     return "이번 실행 정보는 첨부할 수 없습니다. 일반 질문은 가능합니다.";
   if (

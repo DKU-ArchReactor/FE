@@ -1,5 +1,5 @@
 import type { ExecutionContext, ExecutionReference } from '@/type/assistant';
-import { captureEditorSource } from '@/pages/Main/utils/assistantSource';
+import { captureEditorSource, selectedEditorSource, type EditorSelection } from '@/pages/Main/utils/assistantSource';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 import { contextAvailability, availableMemory, freezeExecutionContext } from '@/pages/Main/utils/assistantContext';
 import { getAssistantStatus, isServiceNotice, streamChat, type AssistantStatus, type ChatMessage } from "@/api/assistant";
@@ -16,10 +16,11 @@ interface Message {
   notice?: string;
   context?: ExecutionReference;
   requestedContext?: ExecutionContext;
-  sourceInfo?: { language: 'c' | 'asm'; characters: number };
+  sourceInfo?: { language: 'c' | 'asm'; characters: number; label: string };
 }
 
 interface Props {
+  sourceSelection?: EditorSelection | null;
   editorLanguage?: 'c' | 'asm';
   editorContent?: string;
   authenticated: boolean;
@@ -35,7 +36,7 @@ interface Props {
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 500;
 
-export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, authenticated, simulation, currentData, mode, beforeExecution, editorLanguage = 'c', editorContent = '' }) => {
+export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, authenticated, simulation, currentData, mode, beforeExecution, editorLanguage = 'c', editorContent = '', sourceSelection }) => {
   // 1. 위치 및 드래그 상태 관리
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -52,6 +53,15 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
   // 2. 대화 메시지 상태
   const [inputMessage, setInputMessage] = useState("");
   const [attachSource, setAttachSource] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const selectedSource = selectedEditorSource(sourceSelection, editorLanguage, editorContent);
+  const sourceContent = selectedSource?.content ?? editorContent;
+  const sourceLabel = selectedSource
+    ? `${editorLanguage.toUpperCase()} 코드 ${selectedSource.startLine}–${selectedSource.endLine}줄`
+    : `${editorLanguage.toUpperCase()} 원문 전체`;
+  useEffect(() => {
+    if (selectedEditorSource(sourceSelection, editorLanguage, editorContent)) setAttachSource(true);
+  }, [sourceSelection, editorLanguage, editorContent]);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -218,7 +228,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     let context: ExecutionContext | undefined;
     let editorSource;
     try {
-      editorSource = captureEditorSource(attachSource, editorLanguage, editorContent, status?.editor_source_supported === true);
+      editorSource = captureEditorSource(attachSource, editorLanguage, sourceContent, status?.editor_source_supported === true);
       if (attach) context = freezeExecutionContext(simulation, currentData, mode, beforeExecution, addresses);
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : '실행 정보를 확인해 주세요.');
@@ -229,7 +239,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     requestRef.current = controller;
     const userMsg: Message = {
       id: `user-${Date.now()}`, sender: 'user', text, time: '방금 전', complete: false, requestedContext: context,
-      sourceInfo: editorSource ? { language: editorSource.language, characters: [...editorSource.content].length } : undefined,
+      sourceInfo: editorSource ? { language: editorSource.language, characters: [...editorSource.content].length, label: sourceLabel } : undefined,
     };
     const replyId = `ai-${Date.now()}`;
     setMessages(prev => [...prev, userMsg, {
@@ -350,44 +360,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
 
       {/* 대화 본문 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
-        <div className="shrink-0 px-3 py-2 text-[11px] border-b border-[#E5E5E5] dark:border-[#333333] space-y-1 max-h-44 overflow-y-auto">
-          <p role="status">{!authenticated ? '로그인 후 AI 어시스턴트를 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : !status.enabled ? 'AI 어시스턴트 연결 준비 중' : 'C 코드·RISC-V·컴퓨터 구조 학습 질문을 도와드립니다.')}</p>
-          {(statusError || status?.enabled === false) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
-          <label className="flex gap-2 items-center">
-            <input type="checkbox" checked={attachSource} disabled={isThinking}
-              onChange={e => { setAttachSource(e.target.checked); setLocalError(''); }} />
-            작성 중인 원문 자동 첨부
-          </label>
-          <p>{attachSource
-            ? `${editorLanguage.toUpperCase()} 원문 ${[...editorContent].length.toLocaleString()}자 · 질문 전송 시 SOLID에 전달 (최대 12,000자)`
-            : '원문 미첨부 · 코드가 필요한 질문은 원문 첨부를 켜 주세요.'}</p>
-          {attachSource && !editorContent.trim() && <p>편집기가 비어 있어 원문은 보내지 않습니다.</p>}
-          {attachSource && status?.enabled && status.editor_source_supported !== true && <p>
-            백엔드 원문 첨부 지원 대기 중입니다. <button type="button" className="underline" onClick={() => setStatusRevision(v => v + 1)}>연결 다시 확인</button>
-          </p>}
-          <label className="flex gap-2 items-center">
-            <input type="checkbox" checked={attach} disabled={!authenticated || isThinking || (!attach && Boolean(unavailable))}
-              onChange={e => { setAttachment({ scope, enabled: e.target.checked, addresses: [] }); setLocalError(''); }} />
-            선택 실행 첨부 {scope && currentData && !beforeExecution ? `· ${mode} · clock ${currentData.clock}` : ''}
-          </label>
-          {unavailable && <p>{unavailable}</p>}
-          {!unavailable && !attach && <p>실행 정보 미첨부: 현재 실행을 질문하려면 ‘선택 실행 첨부’를 켜 주세요.</p>}
-          {attach && !unavailable && <details>
-            <summary>메모리 선택 ({addresses.length}/16) · 기본 미전송</summary>
-            <select multiple aria-label="첨부할 메모리 주소" size={3} disabled={isThinking} value={addresses.map(String)} className="w-full bg-white dark:bg-[#252526]"
-              onChange={e => {
-                const next = Array.from(e.currentTarget.selectedOptions, option => Number(option.value));
-                if (next.length > 16) { setLocalError('메모리는 최대 16개 선택할 수 있습니다.'); return; }
-                setLocalError(''); setAttachment({ scope, enabled: true, addresses: next });
-              }}>
-              {memory.map(address => <option key={address} value={address}>0x{address.toString(16).padStart(8, '0')}</option>)}
-            </select>
-            <button type="button" disabled={isThinking} className="underline" onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}>메모리 선택 해제</button>
-            {addresses.some(address => !memory.includes(address)) && <p>선택한 주소가 현재 사이클에 없습니다. 선택을 해제해 주세요.</p>}
-          </details>}
-          <p className="text-[#57606A] dark:text-[#AAAAAA]">실행은 질문 시점의 clock(0부터 시작)을 사용합니다. 작성 중인 원문과 실행 결과는 별도 자료이며, 전체 이력은 첨부하지 않습니다.</p>
-          {localError && <p role="alert">{localError}</p>}
-        </div>
         {/* 추천 질문 칩 바 */}
         <div className="shrink-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex items-center gap-1.5 overflow-x-auto text-[11px] [scrollbar-width:none]">
           <button
@@ -452,7 +424,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                     : '실행 정보 미첨부'}
                 </p>}
                 {msg.sender === 'user' && <p className="mt-1 text-[10px]" data-testid="question-source">
-                  {msg.sourceInfo ? `${msg.sourceInfo.language.toUpperCase()} 원문 첨부 · ${msg.sourceInfo.characters.toLocaleString()}자` : '원문 미첨부'}
+                  {msg.sourceInfo ? `${msg.sourceInfo.label} 첨부 · ${msg.sourceInfo.characters.toLocaleString()}자` : '원문 미첨부'}
                 </p>}
                 {msg.sender === 'ai' && (msg.context || (isThinking && msg.requestedContext)) && <p data-testid="execution-badge" className="mt-2 text-[10px]" title={(msg.context || msg.requestedContext)!.execution_id}>
                   {msg.context ? '참고한 실행' : '요청한 실행'} {(msg.context || msg.requestedContext)!.execution_id.slice(0, 8)} · {(msg.context || msg.requestedContext)!.mode} · clock {(msg.context || msg.requestedContext)!.cycle} 기준 (0부터 시작)
@@ -508,6 +480,51 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
               <span className="text-[10px]">➤</span>
             </button>
           </form>
+        <div data-testid="attachment-bar" className="shrink-0 pt-2 mt-2 text-[11px] border-t border-[#E5E5E5] dark:border-[#333333] space-y-1.5 max-h-48 overflow-y-auto">
+          <div className="flex items-center flex-wrap gap-1.5">
+            {attachSource && sourceContent.trim() ? <button type="button" disabled={isThinking} aria-label="코드 첨부 해제" onClick={() => setAttachSource(false)} className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200">{sourceLabel} <span aria-hidden="true">×</span></button> : <span className="text-gray-500">코드 미첨부</span>}
+            {attach && currentData ? <button type="button" disabled={isThinking} aria-label="실행 첨부 해제" onClick={() => setAttachment({ scope, enabled: false, addresses: [] })} className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200">실행 · clock {currentData.clock} <span aria-hidden="true">×</span></button> : !unavailable && <button type="button" disabled={!authenticated || isThinking} onClick={() => setAttachment({ scope, enabled: true, addresses: [] })} className="rounded-full border border-dashed border-gray-400 px-2 py-1">+ 실행 · clock {currentData?.clock}</button>}
+            <button type="button" aria-expanded={settingsOpen} aria-controls="assistant-attachment-settings" onClick={() => setSettingsOpen(value => !value)} className="ml-auto text-[#57606A] dark:text-gray-300 hover:underline">첨부 설정 {settingsOpen ? '▴' : '▾'}</button>
+          </div>
+          <p className="text-[#57606A] dark:text-gray-400">선택된 코드를 어시스턴트가 참고합니다.</p>
+          {(!authenticated || statusError || !status?.enabled) && <p role="status">{!authenticated ? '로그인 후 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : 'AI 연결 준비 중')}</p>}
+          {attachSource && sourceContent.trim() && status?.enabled && status.editor_source_supported !== true && <p role="status">원문 첨부 지원 대기 · 설정에서 연결을 다시 확인해 주세요.</p>}
+          {attach && unavailable && <p role="alert">{unavailable}</p>}
+          <div id="assistant-attachment-settings" hidden={!settingsOpen} className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+          <p>{!authenticated ? '로그인 후 AI 어시스턴트를 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : !status.enabled ? 'AI 어시스턴트 연결 준비 중' : 'C 코드·RISC-V·컴퓨터 구조 학습 질문을 도와드립니다.')}</p>
+          {(statusError || status?.enabled === false) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
+          <label className="flex gap-2 items-center">
+            <input type="checkbox" checked={attachSource} disabled={isThinking}
+              onChange={e => { setAttachSource(e.target.checked); setLocalError(''); }} />
+            작성 중인 원문 자동 첨부
+          </label>
+          <p>{attachSource
+            ? `${sourceLabel} ${[...sourceContent].length.toLocaleString()}자 · 질문 전송 시 SOLID에 전달 (최대 12,000자)`
+            : '원문 미첨부 · 코드가 필요한 질문은 원문 첨부를 켜 주세요.'}</p>
+          <p className="text-[#57606A] dark:text-gray-400">편집기에서 드래그한 부분을 우선 첨부합니다. 선택을 풀면 전체 원문을 사용합니다.</p>
+          {attachSource && !sourceContent.trim() && <p>편집기가 비어 있어 원문은 보내지 않습니다.</p>}
+          {attachSource && status?.enabled && status.editor_source_supported !== true && <p>
+            백엔드 원문 첨부 지원 대기 중입니다. <button type="button" className="underline" onClick={() => setStatusRevision(v => v + 1)}>연결 다시 확인</button>
+          </p>}
+          {unavailable && <p>{unavailable}</p>}
+          {!unavailable && !attach && <p>실행 정보 미첨부: + 실행 칩을 눌러 첨부할 수 있습니다.</p>}
+          {attach && !unavailable && <details>
+            <summary>메모리 선택 ({addresses.length}/16) · 기본 미전송</summary>
+            <select multiple aria-label="첨부할 메모리 주소" size={3} disabled={isThinking} value={addresses.map(String)} className="w-full bg-white dark:bg-[#252526]"
+              onChange={e => {
+                const next = Array.from(e.currentTarget.selectedOptions, option => Number(option.value));
+                if (next.length > 16) { setLocalError('메모리는 최대 16개 선택할 수 있습니다.'); return; }
+                setLocalError(''); setAttachment({ scope, enabled: true, addresses: next });
+              }}>
+              {memory.map(address => <option key={address} value={address}>0x{address.toString(16).padStart(8, '0')}</option>)}
+            </select>
+            <button type="button" disabled={isThinking} className="underline" onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}>메모리 선택 해제</button>
+            {addresses.some(address => !memory.includes(address)) && <p>선택한 주소가 현재 사이클에 없습니다. 선택을 해제해 주세요.</p>}
+          </details>}
+          <p className="text-[#57606A] dark:text-[#AAAAAA]">실행은 질문 시점의 clock(0부터 시작)을 사용합니다. 작성 중인 원문과 실행 결과는 별도 자료이며, 전체 이력은 첨부하지 않습니다.</p>
+          </div>
+          {localError && <p role="alert">{localError}</p>}
+        </div>
         </footer>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import type { EditorSelection } from './utils/assistantSource';
 import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
@@ -53,6 +54,7 @@ const MainPage: React.FC = () => {
   });
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
+  const [sourceSelection, setSourceSelection] = useState<EditorSelection | null>(null);
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
@@ -180,6 +182,7 @@ const MainPage: React.FC = () => {
   const renderPanel = (panelKey: PanelKey) => (
     <PanelRenderer
       panelKey={panelKey}
+      onSourceSelection={setSourceSelection}
       simulationData={simSession.simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
@@ -277,6 +280,7 @@ const MainPage: React.FC = () => {
               if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
                 playback.triggerPlaybackFeedback("reset");
               }
+              setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {
                 setTranslationSelectedLine(null);
@@ -326,6 +330,7 @@ const MainPage: React.FC = () => {
 
       <AiAssistantPopup
         key={auth.epoch}
+        sourceSelection={sourceSelection}
         editorLanguage={editorTarget}
         editorContent={editorTarget === 'c' ? fileMgr.translationSource : customAssembly}
         authenticated={auth.authenticated}

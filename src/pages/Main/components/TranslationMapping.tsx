@@ -1,3 +1,5 @@
+import { useAssistantSelection } from '../hooks/useAssistantSelection';
+import type { EditorSelection } from '../utils/assistantSource';
 import { useMemo, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "@/context/ThemeContext";
@@ -6,6 +8,7 @@ import type { StageBuffer } from "@/type/simulation";
 import AsmFileUploadPopup from "./AsmFileUploadPopup";
 
 type Props = {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   source: string;
   assembly: string;
   mappedRows?: MappedAssemblyRow[];
@@ -60,6 +63,7 @@ function splitInstruction(text: string): { opcode: string; operands: string } {
 
 export default function TranslationMapping({
   source,
+  onSourceSelection,
   assembly,
   mappedRows,
   busy,
@@ -77,6 +81,7 @@ export default function TranslationMapping({
   onResetAssembly,
 }: Props) {
   const { theme } = useTheme();
+  const trackSelection = useAssistantSelection('asm', onSourceSelection);
   const sourceLines = source.split(/\r?\n/);
   const rows: MappedAssemblyRow[] = useMemo(() => {
     if (mappedRows && mappedRows.length > 0) return mappedRows;
@@ -390,6 +395,7 @@ export default function TranslationMapping({
       {activeTarget === "asm" ? (
         <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
           <Editor
+            onMount={trackSelection}
             height="100%"
             language="plaintext"
             theme={theme === "dark" ? "vs-dark" : "vs"}

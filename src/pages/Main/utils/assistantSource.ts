@@ -16,3 +16,22 @@ export function captureEditorSource(
   }
   return { language, content };
 }
+
+/** Local selection only; the API still receives plain language/content. */
+export interface EditorSelection {
+  language: 'c' | 'asm';
+  document: string;
+  start: number;
+  end: number;
+}
+
+export function selectedEditorSource(selection: EditorSelection | null | undefined, language: 'c' | 'asm', content: string) {
+  if (!selection || selection.language !== language || selection.document !== content ||
+      !Number.isInteger(selection.start) || !Number.isInteger(selection.end) ||
+      selection.start < 0 || selection.end > content.length || selection.end <= selection.start) return null;
+  const text = content.slice(selection.start, selection.end);
+  if (!text.trim()) return null;
+  const startLine = content.slice(0, selection.start).split('\n').length;
+  const endLine = content.slice(0, selection.end - (text.endsWith('\n') ? 1 : 0)).split('\n').length;
+  return { content: text, startLine, endLine };
+}

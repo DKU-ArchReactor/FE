@@ -108,3 +108,14 @@ When a question is sent, the active C editor or editable ASM input is captured a
 Limits: 12,000 Unicode code points / 48,000 UTF-8 bytes. Empty text is omitted; oversize text is rejected rather than silently truncated. If `/assistant/status` lacks `editor_source_supported: true`, the UI explains that the backend is not ready and does not send the source request. Deploy the supporting backend first. Turning attachment off omits the current editor field; previous answers may still contain quoted code in conversation history.
 
 Latest verification: 23 Node tests, build and changed-source lint passed. Browser checks on the actual PR main screen verified C/ASM selection, source counts and logged-out blocking. The isolated `/tests/browser/source-attachment.html` fixture verified C capture, edit refresh, ASM capture, opt-out, and unsupported-server blocking with an unchanged request count. This fixture uses synthetic code and mock SSE, not SOLID. The production backend remains the separate live API; source-bearing SOLID smoke testing is pending deployment of the new backend.
+
+
+## Compact attachments and selected code
+
+Attachment chips now sit below the send input; details and memory selection are collapsed under attachment settings. Dragging (or keyboard-selecting) nonblank text in the active C/ASM Monaco editor automatically selects that snippet for the next question. The chip shows original line numbers, and the message records the sent range. Moving focus to chat retains the selection. Clearing the selection uses the whole current draft; changing language or document invalidates an old selection. Removing the code chip disables source attachment until re-enabled or a new valid selection is made.
+
+The API contract remains `editor_source: { language, content }`; only the selected text is sent, without a full-document copy or local range metadata. Existing source size checks and backend capability gating still apply. Prior answer text can still quote previously attached code.
+
+Execution is separate: use `+ 실행 · clock N` to attach the currently selected cycle, and the chip's remove button to omit it. There is no duplicate execution checkbox. Code selection does not infer an execution cycle, and cycle ranges are not supported. Memory selection, expiry and request-time snapshot validation remain unchanged.
+
+Validation: 25 Node tests and production build; local UI checks use actual C/ASM Monaco drag selections and isolated mock chat requests. These do not constitute a live SOLID source-attachment test.

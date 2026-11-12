@@ -53,3 +53,19 @@ test('chat sends editor source separately from history and retains SSE completio
     else delete globalThis.localStorage;
   }
 });
+
+const { selectedEditorSource } = await load('../src/pages/Main/utils/assistantSource.ts');
+test('selection preserves exact partial text and excludes a trailing newline from line labels', () => {
+  const document = 'int main() {\n  return 8;\n}\n';
+  const selection = { language: 'c', document, start: 13, end: 25 };
+  const result = selectedEditorSource(selection, 'c', document);
+  assert.deepEqual(result, {content: '  return 8;\n', startLine: 2, endLine: 2});
+  assert.deepEqual(captureEditorSource(true, 'c', result.content, true), {language:'c',content:'  return 8;\n'});
+  assert.equal(selectedEditorSource(selection, 'asm', document), null);
+  assert.equal(selectedEditorSource(selection, 'c', document+' '), null);
+});
+test('empty, whitespace and invalid selections never become source snippets', () => {
+  for (const [start,end] of [[0,0],[-1,2],[0,99],[1.5,2],[0,2]]) {
+    assert.equal(selectedEditorSource({language:'asm',document:'  addi a0, zero, 8',start,end}, 'asm', '  addi a0, zero, 8'), null);
+  }
+});

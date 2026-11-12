@@ -1,3 +1,4 @@
+import type { EditorSelection } from '../utils/assistantSource';
 import React from "react";
 import type { PanelKey } from "../types";
 
@@ -19,6 +20,7 @@ import type { MappedAssemblyRow } from "../utils/translationCompile";
 const EMPTY_REGISTERS: Record<string, string> = {};
 
 interface PanelRendererProps {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   panelKey: PanelKey;
   simulationData: SimulationResult | null;
   currentData: CycleHistoryItem | null;
@@ -65,6 +67,7 @@ interface PanelRendererProps {
 
 export const PanelRenderer: React.FC<PanelRendererProps> = ({
   panelKey,
+  onSourceSelection,
   simulationData,
   currentData,
   prevData,
@@ -108,6 +111,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "cSource":
       return (
         <TranslationEditor
+          onSourceSelection={onSourceSelection}
           source={translationSource}
           fileName={cFileName || "main.c"}
           onChange={onUpdateTranslationSource}
@@ -131,6 +135,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "source":
       return (
         <TranslationMapping
+          onSourceSelection={onSourceSelection}
           source={translationSource}
           assembly={editorTarget === "asm" ? customAssembly : translationAssembly}
           mappedRows={editorTarget === "asm" ? undefined : mappedAssemblyRows}

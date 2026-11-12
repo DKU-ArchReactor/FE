@@ -86,7 +86,8 @@ async function send(page: Page, text = "왜 스톨이야?") {
   await page.getByRole("button", { name: "전송", exact: true }).click();
 }
 const attach = (page: Page) =>
-  page.getByRole("checkbox", { name: /선택 실행 첨부/ });
+  page.getByRole("button", { name: /\+ 실행 · clock/ });
+const attached = (page: Page) => page.getByRole("button", { name: "실행 첨부 해제", exact: true });
 
 test("capture, real clock zero, frozen selected memory and done reference", async ({
   page,
@@ -97,9 +98,10 @@ test("capture, real clock zero, frozen selected memory and done reference", asyn
   expect(runs.every((run) => run.capture_assistant_context === true)).toBe(
     true,
   );
-  await expect(attach(page)).toBeDisabled();
+  await expect(attach(page)).toHaveCount(0);
   await page.getByText("next cycle", { exact: true }).click();
-  await attach(page).check();
+  await attach(page).click();
+  await page.getByRole("button", { name: "첨부 설정 ▾" }).click();
   await page.getByText(/메모리 선택 \(0\/16\)/).click();
   await page.getByLabel("첨부할 메모리 주소").selectOption(["4096", "4100"]);
   let submitted: any;
@@ -139,15 +141,15 @@ test("mode change, edit and account switch invalidate attachment and conversatio
   await setup(page);
   await compile(page);
   await page.getByText("next cycle", { exact: true }).click();
-  await attach(page).check();
+  await attach(page).click();
   await page.getByText("pipeline", { exact: true }).click();
-  await expect(attach(page)).not.toBeChecked();
-  await attach(page).check();
+  await expect(attached(page)).toHaveCount(0);
+  await attach(page).click();
   await page.getByText("edit source", { exact: true }).click();
   await expect(page.getByTestId("run")).toHaveText("none");
-  await expect(attach(page)).not.toBeChecked();
+  await expect(attached(page)).toHaveCount(0);
   await compile(page);
-  await attach(page).check();
+  await attach(page).click();
   await page.route("**/api/v1/assistant/chat", (route) =>
     route.fulfill({
       contentType: "text/event-stream",
@@ -185,7 +187,7 @@ test("late compilation after source edit cannot restore a stale execution", asyn
   release();
   await expect(page.getByTestId("busy")).toHaveText("false");
   await expect(page.getByTestId("run")).toHaveText("none");
-  await expect(attach(page)).toBeDisabled();
+  await expect(attach(page)).toHaveCount(0);
 });
 
 test("out-of-domain guidance carries no evidence badge or future history", async ({
@@ -194,7 +196,7 @@ test("out-of-domain guidance carries no evidence badge or future history", async
   await setup(page);
   await compile(page);
   await page.getByText("next cycle", { exact: true }).click();
-  await attach(page).check();
+  await attach(page).click();
   const requests: any[] = [];
   await page.route("**/api/v1/assistant/chat", (route) => {
     requests.push(route.request().postDataJSON());
@@ -225,7 +227,7 @@ for (const [status, code] of [
     await setup(page);
     await compile(page);
     await page.getByText("next cycle", { exact: true }).click();
-    await attach(page).check();
+    await attach(page).click();
     let count = 0;
     await page.route("**/api/v1/assistant/chat", (route) => {
       count++;
@@ -236,7 +238,7 @@ for (const [status, code] of [
       page.getByRole("button", { name: "질문 다시 입력" }),
     ).toBeVisible();
     expect(count).toBe(1);
-    await expect(attach(page)).toBeChecked();
+    await expect(attached(page)).toBeVisible();
     await expect(page.getByTestId("execution-badge")).toHaveCount(0);
   });
 }
@@ -258,7 +260,7 @@ test("disabled service has status retry and disabled suggestions", async ({
 }) => {
   await setup(page, { enabled: false });
   await expect(
-    page.getByText("AI 어시스턴트 연결 준비 중", { exact: true }),
+    page.getByText("AI 연결 준비 중", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /해저드 분석/ }),
@@ -266,13 +268,14 @@ test("disabled service has status retry and disabled suggestions", async ({
   await page.route("**/api/v1/assistant/status", (route) =>
     route.fulfill({ json: { enabled: true, code: "ENABLED" } }),
   );
+  await page.getByRole("button", { name: "첨부 설정 ▾" }).click();
   await page.getByRole("button", { name: "연결 다시 확인" }).click();
   await expect(page.getByRole("button", { name: /해저드 분석/ })).toBeEnabled();
 });
 test("old server without descriptor allows general chat", async ({ page }) => {
   await setup(page, { context: false });
   await compile(page);
-  await expect(attach(page)).toBeDisabled();
+  await expect(attach(page)).toHaveCount(0);
   let request: any;
   await page.route("**/api/v1/assistant/chat", (route) => {
     request = route.request().postDataJSON();
@@ -400,7 +403,7 @@ test("full workspace connects captured run to the actual assistant popup", async
   await page
     .getByTitle("한 단계 실행 (Step Over / Forward)", { exact: true })
     .click();
-  await attach(page).check();
+  await attach(page).click();
   await page.route("**/api/v1/assistant/chat", (route) => {
     const { memory_addresses, ...reference } = route
       .request()
@@ -428,7 +431,7 @@ test("truncation and mismatched done reference never claim successful completion
   await setup(page);
   await compile(page);
   await page.getByText("next cycle", { exact: true }).click();
-  await attach(page).check();
+  await attach(page).click();
   await page.route("**/api/v1/assistant/chat", (route) =>
     route.fulfill({
       contentType: "text/event-stream",
