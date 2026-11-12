@@ -91,3 +91,11 @@ Before release, verify the deployed backend schema and exercise real login,
 compile, single/pipeline, optional memory, streaming, expiry and quota behaviour
 against the intended environment. This PR's browser tests establish frontend
 contract behaviour; they do not substitute for an authenticated production E2E.
+
+## Markdown and attachment guidance follow-up
+
+Assistant messages render Markdown headings, lists, tables, quotes, code and KaTeX math. Both dollar delimiters and SOLID-style LaTeX delimiters are supported; code examples remain literal. The renderer loads on demand and keeps streaming text available while loading. Raw HTML is skipped, remote Markdown images are not loaded, and links are limited to HTTP(S). KaTeX trust is disabled and expansion/size are bounded. All KaTeX consumers use the same patched version through the package override.
+
+Each question records whether execution evidence was attached. The popup explains how to compile/assemble, step and attach when there is no result, and explicitly warns when an available result is not selected. Editor C/assembly source is still not attached automatically.
+
+Validation: 20 Node tests (including Markdown/math, unsafe output, partial streaming syntax), production build and changed-source lint pass. Static browser preview: `/tests/browser/markdown.html` (development only, synthetic data, no model call). This follow-up does not rerun the previous 17 browser scenarios or the production model smoke test. The existing dependency audit findings outside the added rendering dependency chain remain a separate maintenance task.

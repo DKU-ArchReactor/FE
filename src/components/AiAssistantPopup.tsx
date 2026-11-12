@@ -2,7 +2,9 @@ import type { ExecutionContext, ExecutionReference } from '@/type/assistant';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 import { contextAvailability, availableMemory, freezeExecutionContext } from '@/pages/Main/utils/assistantContext';
 import { getAssistantStatus, isServiceNotice, streamChat, type AssistantStatus, type ChatMessage } from "@/api/assistant";
-import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import React, { lazy, Suspense, useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+
+const AssistantMarkdown = lazy(() => import('./AssistantMarkdown').then(module => ({ default: module.AssistantMarkdown })));
 
 interface Message {
   id: string;
@@ -349,6 +351,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             선택 실행 첨부 {scope && currentData && !beforeExecution ? `· ${mode} · clock ${currentData.clock}` : ''}
           </label>
           {unavailable && <p>{unavailable}</p>}
+          {!unavailable && !attach && <p>실행 정보 미첨부: 현재 실행을 질문하려면 ‘선택 실행 첨부’를 켜 주세요.</p>}
           {attach && !unavailable && <details>
             <summary>메모리 선택 ({addresses.length}/16) · 기본 미전송</summary>
             <select multiple aria-label="첨부할 메모리 주소" size={3} disabled={isThinking} value={addresses.map(String)} className="w-full bg-white dark:bg-[#252526]"
@@ -414,13 +417,20 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 <span>{msg.time}</span>
               </div>
               <div
-                className={`rounded-2xl px-3.5 py-2.5 max-w-[85%] whitespace-pre-wrap break-words shadow-2xs ${
+                className={`rounded-2xl px-3.5 py-2.5 min-w-0 max-w-[85%] break-words shadow-2xs ${
                   msg.sender === "user"
-                    ? "bg-[#005FB8] dark:bg-[#007ACC] text-white rounded-tr-none font-medium"
+                    ? "bg-[#005FB8] dark:bg-[#007ACC] text-white rounded-tr-none font-medium whitespace-pre-wrap"
                     : "bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] text-[#1F2328] dark:text-[#CCCCCC] rounded-tl-none font-normal"
                 }`}
               >
-                {msg.text}
+                {msg.sender === 'ai'
+                  ? <Suspense fallback={<span className="whitespace-pre-wrap">{msg.text}</span>}><AssistantMarkdown text={msg.text} /></Suspense>
+                  : msg.text}
+                {msg.sender === 'user' && <p className="mt-1 text-[10px]" data-testid="question-context">
+                  {msg.requestedContext
+                    ? `실행 첨부 · ${msg.requestedContext.mode} · clock ${msg.requestedContext.cycle}`
+                    : '실행 정보 미첨부'}
+                </p>}
                 {msg.sender === 'ai' && (msg.context || (isThinking && msg.requestedContext)) && <p data-testid="execution-badge" className="mt-2 text-[10px]" title={(msg.context || msg.requestedContext)!.execution_id}>
                   {msg.context ? '참고한 실행' : '요청한 실행'} {(msg.context || msg.requestedContext)!.execution_id.slice(0, 8)} · {(msg.context || msg.requestedContext)!.mode} · clock {(msg.context || msg.requestedContext)!.cycle} 기준 (0부터 시작)
                 </p>}
