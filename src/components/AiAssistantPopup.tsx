@@ -33,6 +33,16 @@ interface Props {
   anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
+const QUESTION_EXAMPLES = [
+  { label: '선택한 C 코드 설명', question: '선택한 C 코드가 하는 일을 줄별로 설명하고, 변수 값이 어떻게 바뀌는지 알려줘.' },
+  { label: '전체 C 코드의 흐름·반환값', question: '첨부한 C 원문 전체의 실행 흐름과 반환값을 설명해줘. 실제 실행 결과와 코드로 추론한 값은 구분해줘.' },
+  { label: '선택한 ASM의 레지스터 변화', question: '선택한 RISC-V 명령어가 읽고 쓰는 레지스터를 알려줘. 이전 레지스터 값이 없으면 결과값은 추측하지 마.' },
+  { label: '전체 ASM의 분기·반복', question: '첨부한 ASM 원문 전체의 분기와 반복 흐름을 설명하고, 종료 조건을 찾아줘.' },
+  { label: '현재 사이클의 스톨·포워딩·플러시', question: '첨부된 사이클에서 스톨·포워딩·플러시가 발생했는지, 제공된 이벤트를 근거로 설명해줘.' },
+  { label: '현재 사이클의 CPI 계산', question: '첨부된 사이클의 누적 CPI와 계산에 사용된 사이클 수·완료 명령어 수를 알려줘. 없는 값은 없다고 말해줘.' },
+  { label: '코드와 실행 결과 함께 분석', question: '작성 중인 코드와 첨부 실행이 같은 코드인지 확인 가능한지 먼저 말하고, 확인되는 범위에서 실행 상태를 설명해줘.' },
+];
+
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 500;
 
@@ -66,7 +76,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     {
       id: "welcome",
       sender: "ai",
-      text: "ArchReactor AI 어시스턴트입니다. 로그인 후 C 코드, RISC-V, 파이프라인에 대해 질문해 주세요.\n현재 작성 모드의 원문은 질문을 보낼 때 자동 첨부되며 해제할 수 있습니다. 실행 첨부를 선택하면 해당 시점의 레지스터·CPI·튜터 해설과 선택 메모리도 참고합니다. 전체 실행 이력은 전달하지 않습니다.",
+      text: "C·RISC-V 코드와 실행 결과를 설명해 드릴게요.",
       time: "방금 전",
     },
   ]);
@@ -215,7 +225,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
 
   // 대화 스크롤 하단 이동
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && messages.length > 1) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isThinking, isOpen]);
@@ -365,7 +375,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           <button
             type="button"
             disabled={!canSend}
-            onClick={() => handleSendMessage("파이프라인 해저드의 종류와 원인을 설명해줘")}
+            onClick={() => setInputMessage("파이프라인 해저드의 종류와 원인을 설명해줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
             ⚡ 해저드 분석
@@ -373,7 +383,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           <button
             type="button"
             disabled={!canSend}
-            onClick={() => handleSendMessage("C 코드와 어셈블리 매핑 원리 알려줘")}
+            onClick={() => setInputMessage("C 코드와 어셈블리 매핑 원리 알려줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
             📄 C·ASM 매핑
@@ -381,7 +391,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           <button
             type="button"
             disabled={!canSend}
-            onClick={() => handleSendMessage("스택 프레임(sp/s0) 구조 설명해줘")}
+            onClick={() => setInputMessage("스택 프레임(sp/s0) 구조 설명해줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
             💾 스택 구조
@@ -389,7 +399,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           <button
             type="button"
             disabled={!canSend}
-            onClick={() => handleSendMessage("CPI 성능 개선 팁 알려줘")}
+            onClick={() => setInputMessage("CPI 성능 개선 팁 알려줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
             📊 CPI 최적화
@@ -418,6 +428,17 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 {msg.sender === 'ai'
                   ? <Suspense fallback={<span className="whitespace-pre-wrap">{msg.text}</span>}><AssistantMarkdown text={msg.text} /></Suspense>
                   : msg.text}
+                {msg.id === 'welcome' && <details open className="mt-2">
+                  <summary className="cursor-pointer text-[11px] font-medium">질문 예시</summary>
+                  <p className="mt-1 text-[10px] text-[#57606A] dark:text-gray-400">예시를 눌러 입력하세요. 실행 분석은 실행 첨부가 필요해요.</p>
+                  <div className="mt-2 grid grid-cols-2 gap-1">
+                    {QUESTION_EXAMPLES.map(example => <button key={example.label} type="button" disabled={!canSend}
+                      onClick={() => setInputMessage(example.question)} title={example.question}
+                      className="text-left rounded-md px-2 py-1 border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] disabled:opacity-50 text-[11px]">
+                      {example.label}
+                    </button>)}
+                  </div>
+                </details>}
                 {msg.sender === 'user' && <p className="mt-1 text-[10px]" data-testid="question-context">
                   {msg.requestedContext
                     ? `실행 첨부 · ${msg.requestedContext.mode} · clock ${msg.requestedContext.cycle}`

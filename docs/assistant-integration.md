@@ -119,3 +119,5 @@ The API contract remains `editor_source: { language, content }`; only the select
 Execution is separate: use `+ 실행 · clock N` to attach the currently selected cycle, and the chip's remove button to omit it. There is no duplicate execution checkbox. Code selection does not infer an execution cycle, and cycle ranges are not supported. Memory selection, expiry and request-time snapshot validation remain unchanged.
 
 Validation: 25 Node tests and production build; local UI checks use actual C/ASM Monaco drag selections and isolated mock chat requests. These do not constitute a live SOLID source-attachment test.
+
+Welcome copy is one sentence with seven collapsible question examples for selected/full C, selected/full ASM, cycle events, CPI, and code/execution comparison. Examples and top suggestion chips fill the input without sending; users review attachments and press Send.
