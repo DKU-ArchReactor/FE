@@ -84,7 +84,8 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       time: "방금 전",
     },
   ]);
-  const [isThinking, setIsThinking] = useState(false);
+  const [responsePhase, setResponsePhase] = useState<"waiting" | "receiving" | null>(null);
+  const isThinking = responsePhase !== null;
   const requestRef = useRef<AbortController | null>(null);
   const [status, setStatus] = useState<AssistantStatus | null>(null);
   const [statusError, setStatusError] = useState('');
@@ -263,7 +264,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       id: replyId, sender: 'ai', text: '', time: '방금 전', requestedContext: context,
     }]);
     setInputMessage('');
-    setIsThinking(true);
+    setResponsePhase("waiting");
     const updateReply = (change: (message: Message) => Message) => {
       setMessages(prev => prev.map(message => message.id === replyId ? change(message) : message));
     };
@@ -273,14 +274,20 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
         .map(m => ({ role: m.sender === 'ai' ? 'assistant' : 'user', content: m.text }));
       await streamChat(history, controller.signal, event => {
         if (controller.signal.aborted) return;
-        if (event.type === 'delta') { responseText += event.text; updateReply(m => ({ ...m, text: m.text + event.text })); }
+        if (event.type === 'delta' && event.text) {
+          setResponsePhase('receiving');
+          responseText += event.text;
+          updateReply(m => ({ ...m, text: m.text + event.text }));
+        }
         if (event.type === 'done') {
-          const complete = event.stop_reason === 'end_turn' && !isServiceNotice(responseText);
+          const serviceNotice = isServiceNotice(responseText);
+          const complete = event.stop_reason === 'end_turn' && !serviceNotice;
           setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, complete } : m));
           updateReply(m => ({
-          ...m, complete, context: event.context, requestedContext: undefined,
+          ...m, complete, context: complete ? event.context : undefined, requestedContext: undefined,
           notice: event.stop_reason === 'max_tokens' ? '답변 길이 한도에 도달했습니다. 이어서 질문해 주세요.'
-            : event.stop_reason !== 'end_turn' ? '모델이 답변 생성을 종료했습니다.' : undefined,
+            : event.stop_reason !== 'end_turn' ? '모델이 답변 생성을 종료했습니다.'
+            : serviceNotice ? '질문을 구체적으로 바꿔 다시 입력할 수 있습니다.' : undefined,
           }));
         }
       }, context, editorSource);
@@ -289,8 +296,10 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
         : error instanceof Error ? error.message : 'AI 요청에 실패했습니다.';
       updateReply(m => ({ ...m, complete: false, notice, requestedContext: undefined }));
     } finally {
-      if (requestRef.current === controller) requestRef.current = null;
-      setIsThinking(false);
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        setResponsePhase(null);
+      }
     }
   };
 
@@ -452,12 +461,12 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
 
           {/* AI 응답 대기 로딩 */}
           {isThinking && (
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] max-w-[140px]">
+            <div role="status" aria-live="polite" data-testid="assistant-progress" className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] max-w-[140px]">
               <div className={`w-4 h-4 border-2 ${
                 isSingle ? "border-[#005FB8] dark:border-[#007ACC]" : "border-[#7C3AED] dark:border-[#8B5CF6]"
               } border-t-transparent rounded-full animate-spin`} />
               <span className="text-[11px] text-[#57606A] dark:text-[#858585] font-medium animate-pulse">
-                답변 분석 중...
+                {responsePhase === 'waiting' ? '답변 준비 중…' : '답변 받는 중…'}
               </span>
             </div>
           )}
@@ -486,22 +495,23 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                   : "focus:border-[#7C3AED] dark:focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#7C3AED] dark:focus:ring-[#8B5CF6]"
               } transition-colors`}
             />
-            {isThinking && (
-              <button type="button" onClick={() => requestRef.current?.abort()}
-                className="px-2 py-1.5 text-xs cursor-pointer">중단</button>
-            )}
             <button
-              type="submit"
-              aria-label="전송"
-              disabled={!inputMessage.trim() || !canSend || sourceUnsupported}
-              className={`px-3 py-1.5 rounded-lg ${
-                isSingle
-                  ? "bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3]"
-                  : "bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED]"
-              } text-white text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
+              type={isThinking ? "button" : "submit"}
+              aria-label={isThinking ? "중단" : "전송"}
+              onClick={isThinking ? () => requestRef.current?.abort() : undefined}
+              disabled={!isThinking && (!inputMessage.trim() || !canSend || sourceUnsupported)}
+              className={`px-3 py-1.5 rounded-lg border ${
+                isThinking
+                  ? "bg-white text-[#1F2328] border-[#D0D7DE] hover:bg-[#F3F4F6]"
+                  : isSingle
+                    ? "border-transparent bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white"
+                    : "border-transparent bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED] text-white"
+              } text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
             >
-              <span>전송</span>
-              <span className="text-[10px]">➤</span>
+              {isThinking ? <>
+                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-xs bg-current" />
+                <span>중단</span>
+              </> : <><span>전송</span><span aria-hidden="true" className="text-[10px]">➤</span></>}
             </button>
           </form>
         <div data-testid="attachment-bar" className="shrink-0 pt-2 mt-2 text-[11px] border-t border-[#E5E5E5] dark:border-[#333333] space-y-1.5 max-h-48 overflow-y-auto">

@@ -13,7 +13,7 @@ const compiled = ts.transpileModule(source, {
     target: ts.ScriptTarget.ES2022,
   },
 });
-const { consumeChatStream, boundedHistory } = await import(
+const { consumeChatStream, boundedHistory, isServiceNotice } = await import(
   "data:text/javascript;base64," +
     Buffer.from(compiled.outputText).toString("base64")
 );
@@ -142,4 +142,13 @@ test("history rejects oversized individual messages and non-user final turn", ()
     boundedHistory([{ role: "user", content: "😀".repeat(8000) }]).length,
     1,
   );
+});
+
+// The server can attach a context reference even when evidence selection fails.
+test("recognizes the exact evidence fallback without excluding ordinary explanations", () => {
+  const notice = "이 질문에 대한 실행 근거를 확인하지 못했습니다. 확인할 명령어나 사이클을 구체적으로 알려 주세요.";
+  assert.equal(isServiceNotice(notice), true);
+  assert.equal(isServiceNotice(`  ${notice}\n`), true);
+  assert.equal(isServiceNotice(`${notice} 추가로 확인한 사실입니다.`), false);
+  assert.equal(isServiceNotice("스톨은 없지만 포워딩은 활성화되어 있습니다."), false);
 });
