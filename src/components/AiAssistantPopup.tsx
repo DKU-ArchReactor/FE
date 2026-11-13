@@ -495,24 +495,22 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                   : "focus:border-[#7C3AED] dark:focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#7C3AED] dark:focus:ring-[#8B5CF6]"
               } transition-colors`}
             />
-            {isThinking && (
-              <button type="button" onClick={() => requestRef.current?.abort()}
-                className="px-2 py-1.5 text-xs cursor-pointer">중단</button>
-            )}
             <button
-              type="submit"
-              aria-label="전송"
-              aria-busy={isThinking}
-              disabled={!inputMessage.trim() || !canSend || sourceUnsupported}
-              className={`px-3 py-1.5 rounded-lg ${
-                isSingle
-                  ? "bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3]"
-                  : "bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED]"
-              } text-white text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
+              type={isThinking ? "button" : "submit"}
+              aria-label={isThinking ? "중단" : "전송"}
+              onClick={isThinking ? () => requestRef.current?.abort() : undefined}
+              disabled={!isThinking && (!inputMessage.trim() || !canSend || sourceUnsupported)}
+              className={`px-3 py-1.5 rounded-lg border ${
+                isThinking
+                  ? "bg-white text-[#1F2328] border-[#D0D7DE] hover:bg-[#F3F4F6]"
+                  : isSingle
+                    ? "border-transparent bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white"
+                    : "border-transparent bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED] text-white"
+              } text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
             >
               {isThinking ? <>
-                <span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-white/50 border-t-white animate-spin" />
-                <span>응답 대기</span>
+                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-xs bg-current" />
+                <span>중단</span>
               </> : <><span>전송</span><span aria-hidden="true" className="text-[10px]">➤</span></>}
             </button>
           </form>
