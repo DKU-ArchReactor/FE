@@ -1,0 +1,73 @@
+import { test, expect, type Page } from '@playwright/test';
+const input = (page: Page) => page.getByPlaceholder('C 코드나 파이프라인에 대해 질문하세요...');
+const send = async (page: Page, question = '현재 CPI를 알려줘') => {
+  await input(page).fill(question);
+  await page.getByRole('button', { name: '전송', exact: true }).click();
+};
+test.beforeEach(async ({ page }) => {
+  await page.goto('/tests/browser/validated-response.html');
+  await expect(input(page)).toBeEnabled();
+});
+test('keepalive waits; one validated delta renders Markdown, done releases loading and keeps the original cycle', async ({ page }) => {
+  await page.getByRole('button', { name: /\+ 실행 · clock/ }).click();
+  await send(page);
+  await expect(page.getByTestId('assistant-progress')).toHaveText('답변 준비 중…');
+  await expect(page.getByRole('button', { name: '전송', exact: true })).toHaveAttribute('aria-busy', 'true');
+  await expect(input(page)).toBeDisabled();
+  await page.getByRole('button', { name: '연결 유지', exact: true }).click();
+  await expect(page.getByTestId('assistant-progress')).toHaveText('답변 준비 중…');
+  await page.screenshot({ path: 'test-results/validated-waiting.png' });
+  await page.getByRole('button', { name: '답변 전송', exact: true }).click();
+  await expect(page.getByTestId('assistant-progress')).toHaveText('답변 받는 중…');
+  await expect(page.locator('strong').filter({ hasText: 'CPI = 2' })).toBeVisible();
+  await expect(input(page)).toBeDisabled();
+  await expect(page.getByTestId('execution-badge')).toContainText('요청한 실행');
+  await page.getByRole('button', { name: '완료', exact: true }).click();
+  await expect(page.getByTestId('assistant-progress')).toHaveCount(0);
+  await expect(input(page)).toBeEnabled();
+  await expect(page.getByTestId('execution-badge')).toContainText('참고한 실행');
+  await expect(page.getByTestId('request-count')).toHaveText('전송 1회');
+  await page.screenshot({ path: 'test-results/validated-complete.png' });
+});
+test('fixed validation notice with done.context is not a verified answer or future history; retry only fills input', async ({ page }) => {
+  await page.getByRole('button', { name: /\+ 실행 · clock/ }).click();
+  await send(page);
+  await page.getByRole('button', { name: '근거 확인 불가', exact: true }).click();
+  await expect(page.getByTestId('assistant-progress')).toHaveCount(0);
+  await expect(page.getByTestId('execution-badge')).toHaveCount(0);
+  await page.getByRole('button', { name: '질문 다시 입력' }).click();
+  await expect(input(page)).toHaveValue('현재 CPI를 알려줘');
+  await expect(page.getByTestId('request-count')).toHaveText('전송 1회');
+  await send(page, '선택한 사이클의 스톨을 설명해줘');
+  await expect(page.getByTestId('last-history')).toHaveText(JSON.stringify([{ role: 'user', content: '선택한 사이클의 스톨을 설명해줘' }]));
+  await page.getByRole('button', { name: '한 번에 완료', exact: true }).click();
+  await expect(page.getByTestId('execution-badge')).toContainText('참고한 실행');
+});
+test('stop before first delta and close during reception cancel the connection and never reuse partial replies', async ({ page }) => {
+  await send(page);
+  await page.getByRole('button', { name: '중단', exact: true }).click();
+  await expect(page.getByTestId('cancel-count')).toHaveText('중단 1회');
+  await expect(page.getByTestId('assistant-progress')).toHaveCount(0);
+  await send(page, '스톨이 뭐야?');
+  await page.getByRole('button', { name: '답변 전송', exact: true }).click();
+  await expect(page.getByTestId('assistant-progress')).toHaveText('답변 받는 중…');
+  await page.getByTitle('창 닫기', { exact: true }).click();
+  await expect(page.getByTestId('cancel-count')).toHaveText('중단 2회');
+  await page.getByRole('button', { name: '대화 열기' }).click();
+  await send(page, '포워딩 원리를 알려줘');
+  await expect(page.getByTestId('last-history')).toHaveText(JSON.stringify([{ role: 'user', content: '포워딩 원리를 알려줘' }]));
+  await page.getByRole('button', { name: '한 번에 완료', exact: true }).click();
+  await expect(input(page)).toBeEnabled();
+});
+test('server error and premature end stop loading without automatic retry', async ({ page }) => {
+  await send(page);
+  await page.getByRole('button', { name: '일시 오류', exact: true }).click();
+  await expect(page.getByText('응답 시간이 초과되었습니다. 다시 시도해 주세요.', { exact: true })).toBeVisible();
+  await expect(input(page)).toBeEnabled();
+  await expect(page.getByTestId('request-count')).toHaveText('전송 1회');
+  await send(page, 'CPI 계산 원리');
+  await page.getByRole('button', { name: '연결 종료', exact: true }).click();
+  await expect(page.getByText(/답변 연결이 완료 전에 끊겼습니다/)).toBeVisible();
+  await expect(page.getByTestId('assistant-progress')).toHaveCount(0);
+  await expect(page.getByTestId('request-count')).toHaveText('전송 2회');
+});

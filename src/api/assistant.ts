@@ -204,8 +204,9 @@ export async function streamChat(
 // notices, never infer refusals from missing usage (usage can be unavailable).
 export function isServiceNotice(text: string): boolean {
   return [
+    "이 질문에 대한 실행 근거를 확인하지 못했습니다. 확인할 명령어나 사이클을 구체적으로 알려 주세요.",
     "ArchReactor 사용법과 컴퓨터 구조 학습 질문에만 답변할 수 있어요. C 코드, RV32IM RISC-V, 레지스터·메모리, 파이프라인, 스톨·포워딩·플러시, CPI 또는 제공한 코드·실행 결과에 관해 질문해 주세요.",
     "ArchReactor 또는 컴퓨터 구조와 관련된 질문을 구체적으로 알려 주세요. 다른 주제의 요청이 함께 있다면 관련 질문만 분리해서 보내 주세요. 짧은 후속 질문이라면 어떤 코드나 개념에 대한 질문인지 덧붙여 주세요.",
     "안녕하세요! ArchReactor 사용법과 컴퓨터 구조 학습을 도와드려요. C 코드, RV32IM RISC-V, 레지스터·메모리, 파이프라인, 스톨·포워딩·플러시, CPI를 질문하거나 코드·실행 결과를 붙여 주세요. 현재 화면이나 전체 실행 기록을 자동으로 읽지는 않아요.",
-  ].includes(text);
+  ].includes(text.trim());
 }
