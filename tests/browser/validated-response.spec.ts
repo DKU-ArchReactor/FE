@@ -14,6 +14,8 @@ test('keepalive waits; one validated delta renders Markdown, done releases loadi
   await expect(page.getByTestId('assistant-progress')).toHaveText('답변 준비 중…');
   await expect(page.getByRole('button', { name: '전송', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '중단', exact: true })).toBeEnabled();
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole('button', { name: '중단', exact: true })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(input(page)).toBeDisabled();
   await page.getByRole('button', { name: '연결 유지', exact: true }).click();
   await expect(page.getByTestId('assistant-progress')).toHaveText('답변 준비 중…');
