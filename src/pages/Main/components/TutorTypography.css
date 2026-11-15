@@ -1,0 +1,134 @@
+@font-face {
+  font-family: 'Pretendard Tutor';
+  src: url('/fonts/pretendard/PretendardVariable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+.ar-tutor {
+  --ar-tutor-font: 'Pretendard Tutor', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  font-family: var(--ar-tutor-font);
+  font-synthesis: none;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.ar-tutor .font-sans {
+  font-family: var(--ar-tutor-font);
+}
+
+.ar-tutor summary {
+  scroll-margin-block-start: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  border-radius: 4px;
+  padding: 8px 4px;
+  line-height: 1.6;
+  transition: background-color 150ms ease;
+}
+
+.ar-tutor summary::-webkit-details-marker {
+  display: none;
+}
+
+.ar-tutor summary:hover {
+  background: var(--ar-header-bg);
+}
+
+.ar-tutor summary::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-inline: 4px;
+  flex-shrink: 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--ar-text-muted);
+  transform: rotate(-45deg);
+  transition: transform 150ms ease, color 150ms ease;
+}
+
+.ar-tutor details[open] > summary {
+  color: var(--ar-text-primary);
+  font-weight: 650;
+}
+
+.ar-tutor details[open] > summary::after {
+  color: var(--ar-accent);
+  transform: rotate(45deg);
+}
+
+.ar-tutor .tutor-disclosure,
+.ar-tutor .tutor-concept {
+  padding: 0;
+  overflow: clip;
+  border: 1px solid var(--ar-border);
+  border-radius: 8px;
+  background: var(--ar-panel-bg);
+}
+
+.ar-tutor .tutor-disclosure > summary,
+.ar-tutor .tutor-concept > summary {
+  padding: 10px 12px;
+  border-radius: 7px;
+}
+
+.ar-tutor .tutor-disclosure[open] > summary,
+.ar-tutor .tutor-concept[open] > summary {
+  border-bottom: 1px solid var(--ar-border);
+  border-radius: 7px 7px 0 0;
+  background: var(--ar-header-bg);
+}
+
+.ar-tutor .tutor-disclosure > div,
+.ar-tutor .tutor-concept > div {
+  padding: 12px;
+}
+
+.ar-tutor .tutor-disclosure > div > details {
+  padding-top: 0;
+}
+
+.ar-tutor .tutor-disclosure > div > details:first-child {
+  border-top: 0;
+}
+
+.ar-tutor .tutor-disclosure > div > details[open] > :not(summary) {
+  margin: 4px 0 12px 4px;
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid var(--ar-border);
+}
+
+.ar-tutor .tutor-concept[open] {
+  border-color: var(--ar-text-muted);
+}
+
+.ar-tutor .tutor-disclosure-state {
+  margin-inline-start: auto;
+  color: var(--ar-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.ar-tutor .tutor-disclosure-state::before {
+  content: '펼치기';
+}
+
+.ar-tutor .tutor-disclosure[open] > summary > .tutor-disclosure-state::before {
+  content: '접기';
+}
+
+.ar-tutor .font-mono,
+.ar-tutor code {
+  font-family: 'Cascadia Code', Consolas, 'Liberation Mono', 'Pretendard Tutor', monospace;
+  font-variant-numeric: tabular-nums;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}

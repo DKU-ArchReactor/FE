@@ -85,6 +85,12 @@ test('PC matching preserves distinct mappings for repeated instruction text', ()
   assert.equal(tutor.instructionAt(bundle, 'garbage'), undefined);
 });
 
+test('encoded PC evidence takes precedence over text-only cached semantics', () => {
+  const tutor = load(() => assert.fail('unexpected request'));
+  tutor.seedTutor({asm_instructions: [{text: 'lui a0, 4096', explanation: explanation('asm', 'text cache')}]});
+  assert.equal(tutor.analyzeAsmInstruction('lui a0, 4096', explanation('asm', 'machine encoding')).explanation, 'machine encoding');
+});
+
 test('missing source locations are not labelled as confirmed CRT', () => {
   const tutor = load(() => assert.fail('unexpected request'));
   tutor.seedTutor({asm_instructions: [{pc: '0x10000', text: 'nop',

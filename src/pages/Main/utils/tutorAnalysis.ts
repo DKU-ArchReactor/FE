@@ -1,29 +1,54 @@
-// Presentation adapter only. All educational explanations come from FastAPI.
+// Presentation adapter only. Educational explanations come from the TUTOR service.
 import api from '@/api/config';
 export interface RuleExplanation {
   kind: 'c' | 'asm' | 'crt'; category: string; title: string;
   summary: string; detail: string; opcode?: string | null; operands?: string | null;
+  operation?: string | null;
   reads?: string[]; writes?: string[]; notes?: string[];
   supported?: boolean; evidence_level?: 'syntax' | 'observed' | 'unknown';
 }
 export interface TutorInstruction {
   text: string; explanation: RuleExplanation; runtime_explanation?: RuleExplanation | null;
   pc?: string; source_line?: number | null; source_file?: string | null;
+  raw_instruction?: string | null;
   source_column?: number | null; function?: string | null;
   mapping_status?: 'mapped' | 'unmapped'; mapping_basis?: string;
   retire_count?: number; observed_in_history?: boolean;
+  teaching?: {
+    operand_roles: {operand: string; role: string}[];
+    principle: string;
+    register_connections: {register: string; pc: string; text: string}[];
+    walkthrough?: {title: string; text: string}[];
+    concepts?: {id: string; title: string; explanation: string; example: string;
+      plain?: string;
+      question: string; answer: string; sources: {title: string; url: string}[]}[];
+  };
 }
 export interface TutorExecutionStep {
   history_index: number; cycle: number; display_clock: number; retired_pc: string | null;
   register_changes: {key: string; before: unknown; after: unknown}[];
   memory_changes: {key: string; before: unknown; after: unknown}[];
   memory_transfer: Record<string, unknown> | null;
+  instruction_observations?: {pc: string; stage: string; summary: string; kind?: 'address' | 'value' | 'control'}[];
 }
 export interface TutorBundle {
   schema_version: string;
+  performance_analysis?: {
+    schema_version: string;
+    snapshots: {history_index: number; cycles: number; completed: number | null; cpi: number | null;
+      stall_cycles: number; flush_cycles: number; forwarding_cycles: number; overlap_cycles: number; hazard_cycles: number;
+      idle_cycles: number; hazard_idle_cycles: number; other_idle_cycles: number; unknown_completion_cycles: number; extra_cycles: number | null}[];
+    records: {history_index: number; cycle: number; kind: 'stall' | 'flush' | 'forwarding'; reason: string | null;
+      instruction: {pc: string | null; assembly: string | null; source_line: number | null};
+      dependencies: {register: string; stage: string; pc: string | null; assembly: string | null; source_line: number | null}[];
+      title: string; detail: string}[];
+    notes: string[];
+  };
   c_lines?: { line: number; text: string; explanation: RuleExplanation }[];
   asm_instructions?: TutorInstruction[];
   execution_steps?: TutorExecutionStep[];
+  line_explanations?: {source_line: number; summary: string; detail: string;
+    steps: {pc: string; text: string; summary: string}[]}[];
   source_mapping?: {basis: string; warnings: string[]; notes: string[]};
   cycle_explanations?: { history_index: number; cycle: number; events: {
     type: string; title: string; summary: string; detail: string;
@@ -57,9 +82,10 @@ export function analyzeCLine(text: string, line: number) {
   const x = cache.get(key('c', text, line)) ?? pending;
   return {type: x.title, badgeColor: 'bg-slate-100 text-slate-700 border border-slate-200', summary: x.summary, detail: x.detail};
 }
-export function analyzeAsmInstruction(text: string) {
-  const x = cache.get(key('asm', text)) ?? pending;
-  return {opcode: x.opcode ?? '', operands: x.operands ?? '', action: x.title, explanation: x.summary, hardwareDetail: x.detail};
+export function analyzeAsmInstruction(text: string, verified?: RuleExplanation) {
+  const x = verified ?? cache.get(key('asm', text)) ?? pending;
+  return {opcode: x.opcode ?? '', operands: x.operands ?? '', action: x.title, explanation: x.summary,
+    operation: x.operation, hardwareDetail: x.detail};
 }
 export function analyzeCrtInstruction(text: string, pc?: string) {
   const x = cache.get(key('crt', text, 1, pc)) ?? pending;

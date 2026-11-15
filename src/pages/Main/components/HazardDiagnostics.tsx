@@ -44,6 +44,11 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
   const isStall = cycle_events.stall?.has_stall;
   const isForward = cycle_events.forwarding?.has_forwarded;
   const isBranchFlush = cycle_events.control_hazard?.has_flush;
+  const historyIndex = simulationData.history.indexOf(currentCycleData);
+  const explanations = simulationData.tutor?.cycle_explanations?.find(step => step.history_index === historyIndex)?.events ?? [];
+  const stallExplanation = explanations.find(event => event.type === 'stall');
+  const forwardExplanation = explanations.find(event => event.type === 'forwarding');
+  const flushExplanation = explanations.find(event => event.type === 'flush');
 
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
@@ -56,7 +61,7 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
           </h3>
         </div>
         <span className="text-[10px] font-mono font-semibold text-[#57606A] dark:text-[#858585] uppercase">
-          CYCLE {currentCycle}
+          {historyIndex >= 0 && `STEP ${historyIndex + 1} · `}CLOCK {currentCycleData.clock ?? '—'}
         </span>
       </div>
 
@@ -67,7 +72,7 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
           {isStall && (
             <span className="px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/70 text-red-700 dark:text-red-300 text-[10px] font-bold border border-red-200 dark:border-red-800 flex items-center gap-1.5 animate-pulse">
               <span className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400 shrink-0" />
-              Data Hazard (Stall)
+              Stall 감지
             </span>
           )}
           {isForward && (
@@ -95,11 +100,11 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
           {isStall && (
             <div>
               <p className="font-bold text-red-600 dark:text-red-400">
-                [Load-Use Hazard 감지]
+                {stallExplanation?.title ?? (cycle_events.stall.stall_reason === 'load_use' ? 'Load-Use 데이터 의존성' : '명령어 진행 대기')}
               </p>
               <p className="text-[11px] text-[#57606A] dark:text-[#858585] mt-0.5">
-                {cycle_events.stall.stall_desc ||
-                  '메모리 로드(lw) 명령어의 결과를 바로 다음 명령어가 참조하여 1사이클 버블이 삽입되었습니다.'}
+                {stallExplanation?.detail || cycle_events.stall.stall_desc ||
+                  '현재 클록에서 명령어 진행이 지연됐습니다. 구체적인 대기 원인은 제공되지 않았습니다.'}
               </p>
             </div>
           )}
@@ -110,8 +115,8 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
                 [하드웨어 데이터 포워딩]
               </p>
               <p className="text-[11px] text-[#57606A] dark:text-[#858585] mt-0.5">
-                {cycle_events.forwarding.forwarding_desc ||
-                  '이전 명령어의 연산 결과를 레지스터에 기록되기 전에 파이프라인 버퍼에서 직접 당겨와 스톨을 방지했습니다.'}
+                {forwardExplanation?.detail || cycle_events.forwarding.forwarding_desc ||
+                  '준비된 값을 피연산자 경로로 직접 전달했습니다. 전달 경로와 레지스터는 실행 이력에서 확인합니다.'}
               </p>
             </div>
           )}
@@ -122,15 +127,15 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
                 [분기 플러시 발생]
               </p>
               <p className="text-[11px] text-[#57606A] dark:text-[#858585] mt-0.5">
-                {cycle_events.control_hazard.flush_reason ||
-                  '분기(Branch/Jump) 예측이 실패하거나 점프가 확정되어 잘못 인출된 앞선 명령어들을 파이프라인에서 비웠습니다.'}
+                {flushExplanation?.detail || cycle_events.control_hazard.flush_reason ||
+                  '제어 흐름 변경으로 후속 명령어를 비웠습니다. 구체적인 원인은 제공되지 않았습니다.'}
               </p>
             </div>
           )}
 
           {!isStall && !isForward && !isBranchFlush && (
             <p className="text-[11px] text-[#57606A] dark:text-[#858585]">
-              현재 사이클에서는 해저드나 분기 지연 없이 모든 파이프라인 스테이지가 원활하게 진행되고 있습니다.
+              현재 클록에서 스톨·포워딩·플러시 이벤트가 보고되지 않았습니다.
             </p>
           )}
         </div>

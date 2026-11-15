@@ -21,11 +21,12 @@ export function performanceStats(simulationData: SimulationResult | null, curren
     for (const item of history.slice(0, index + 1)) {
       for (const stage of ['IF', 'ID', 'EX', 'MEM', 'WB'] as const) {
         const buffer = item.buffers[stage];
-        if (!buffer || buffer.status === 'bubble' || buffer.assembly === 'bubble') bubbles++;
+        if (!buffer || ['empty', 'bubble', 'flush', 'flushed'].includes(buffer.status) || buffer.flush_info?.is_flushed || ['bubble', 'empty'].includes(buffer.assembly)) bubbles++;
       }
     }
   }
   return {
+    isSingle: single,
     completedInstructions: completed,
     totalCycles: cycles,
     cpi: completed !== null && completed > 0 ? (cycles / completed).toFixed(2) : '—',
