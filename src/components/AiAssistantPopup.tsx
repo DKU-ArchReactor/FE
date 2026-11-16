@@ -323,7 +323,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           setHasAnimated(true);
         }
       }}
-      className={`fixed z-50 flex flex-col rounded-xl overflow-hidden select-none border-2 ${
+      className={`fixed z-50 flex flex-col rounded-xl overflow-hidden select-none border-2 max-md:!left-2 max-md:!right-2 max-md:!top-14 max-md:!bottom-[126px] max-md:!w-auto max-md:!h-auto ${
         isSingle
           ? "border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
           : "border-[#7C3AED]/40 dark:border-[#A855F7]/50 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(168,85,247,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
