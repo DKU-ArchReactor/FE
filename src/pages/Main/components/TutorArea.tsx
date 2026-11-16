@@ -21,6 +21,7 @@ export interface TutorAreaProps {
   currentActiveAsmIndex?: number | null;
   isUserSelected?: boolean;
   activeTarget?: "c" | "asm";
+  onClose?: () => void;
 }
 
 // Static ASM requests and the selected C line have independent cancellation/retry lifetimes.
@@ -53,6 +54,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   currentActiveAsmIndex: providedActiveAsmIndex,
   isUserSelected = false,
   activeTarget = "c",
+  onClose,
 }) => {
   // 1. C 소스 코드 라인별 배열
   const cLines = useMemo(() => {
@@ -171,9 +173,21 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             ARCHREACTOR TUTOR
           </h3>
         </div>
-        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
-          {followsExecution && executionFocus ? `${executionFocus.stage} · 실행 따라가기` : activeTarget === "asm" ? "ASM INSTRUCTION" : "INSTRUCTION"}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
+            {followsExecution && executionFocus ? `${executionFocus.stage} · 실행 따라가기` : activeTarget === "asm" ? "ASM INSTRUCTION" : "INSTRUCTION"}
+          </span>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              title="튜터 모달 닫기"
+              className="w-5 h-5 rounded flex items-center justify-center bg-black/5 dark:bg-white/10 text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)] transition-colors cursor-pointer text-xs font-bold leading-none shrink-0"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </header>
       {/* 튜터 메인 본문 영역 */}
       <div ref={tutorBodyRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4 select-text [scrollbar-gutter:stable]">
@@ -191,10 +205,10 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           <div className="flex flex-col gap-3">
             <div className="rounded-xl border border-slate-300 dark:border-[#3E3E42] bg-slate-50/70 dark:bg-[#252526]/60 p-3.5 flex flex-col gap-3 shadow-2xs">
               {/* 상단 뱃지 및 제목 */}
-              <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 dark:border-[#333333] pb-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
+              <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 dark:border-[#333333] pb-2.5">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] whitespace-nowrap shrink-0">
                       소스 위치 미확인
                     </span>
                     <strong className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC]">
@@ -203,7 +217,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   </div>
                 </div>
                 {selectedRow.pc && (
-                  <span className="text-[10px] font-mono text-slate-500 dark:text-[#858585] bg-white dark:bg-[#1E1E1E] px-2 py-0.5 rounded border border-slate-200 dark:border-[#333333]">
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-[#858585] bg-white dark:bg-[#1E1E1E] px-2 py-0.5 rounded border border-slate-200 dark:border-[#333333] whitespace-nowrap shrink-0">
                     PC: {selectedRow.pc}
                   </span>
                 )}
@@ -488,19 +502,19 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   const ifAnalysis = analyzeAsmInstruction(ifInst, context?.explanation);
                   return (
                     <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-[#252526] border border-slate-100 dark:border-[#333333]">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-1.5 text-[11px]">
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                           <span className="font-bold text-indigo-700 dark:text-[#79C0FF] font-sans">
                             [IF 인출 단계] {ifInst}
                           </span>
                           {isCrtCycle && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585]">
+                            <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] whitespace-nowrap shrink-0">
                               소스 위치 미확인
                             </span>
                           )}
                         </div>
                         {ifBuf?.pc && (
-                          <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585]">
+                          <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585] whitespace-nowrap shrink-0">
                             PC: {ifBuf.pc}
                           </span>
                         )}

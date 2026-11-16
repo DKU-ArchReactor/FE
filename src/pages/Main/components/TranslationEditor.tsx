@@ -55,10 +55,16 @@ export default function TranslationEditor({
   const decorationsRef = useRef<string[]>([]);
   const selectedLineRef = useRef<number | null | undefined>(selectedLine);
   const activeTargetRef = useRef<"c" | "asm">(activeTarget);
+  const onSelectLineRef = useRef<Props["onSelectLine"]>(onSelectLine);
+  const lastMouseSelectTimeRef = useRef<number>(0);
 
   useEffect(() => {
     activeTargetRef.current = activeTarget;
   }, [activeTarget]);
+
+  useEffect(() => {
+    onSelectLineRef.current = onSelectLine;
+  }, [onSelectLine]);
 
   // 저장 상태 관리
   const [isSaving, setIsSaving] = useState(false);
@@ -120,10 +126,27 @@ export default function TranslationEditor({
 
       const clickedLine = e.target.position?.lineNumber;
       if (clickedLine) {
+        lastMouseSelectTimeRef.current = Date.now();
         if (selectedLineRef.current === clickedLine) {
-          onSelectLine?.(null);
+          onSelectLineRef.current?.(null);
         } else {
-          onSelectLine?.(clickedLine);
+          onSelectLineRef.current?.(clickedLine);
+        }
+      }
+    });
+
+    // 모바일 터치 환경(onMouseDown 미발생 시)에서 줄 탭으로 커서가 이동한 경우 선택 반영
+    editorInstance.onDidChangeCursorPosition((e) => {
+      if (activeTargetRef.current !== "c") return;
+      if (
+        e.reason === monacoInstance.editor.CursorChangeReason.Explicit &&
+        e.source !== "keyboard" &&
+        e.source !== "modelChange" &&
+        Date.now() - lastMouseSelectTimeRef.current > 80
+      ) {
+        const line = e.position.lineNumber;
+        if (line) {
+          onSelectLineRef.current?.(line);
         }
       }
     });
