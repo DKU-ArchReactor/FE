@@ -502,7 +502,17 @@ export default function TranslationMapping({
                     onSelectLine?.(row.sourceLine, index);
                   }
                 }}
-                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${isCurrentSingleActive && !isSelectedPrimary
+                role="button"
+                tabIndex={0}
+                aria-label={`ASM L${index + 1} ${row.text}`}
+                aria-pressed={isSelectedPrimary}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.currentTarget.click();
+                  }
+                }}
+                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ar-accent)] ${isCurrentSingleActive && !isSelectedPrimary
                   ? "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs"
                   : isSelectedPrimary
                     ? mode === "pipeline"
