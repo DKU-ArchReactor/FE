@@ -23,6 +23,24 @@ export interface TutorAreaProps {
   activeTarget?: "c" | "asm";
 }
 
+// Static ASM requests and the selected C line have independent cancellation/retry lifetimes.
+function useTutorExplanations(items: Parameters<typeof fetchTutor>[0], retryVersion: number) {
+  const [, setExplanationVersion] = useState(0);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchTutor(items, controller.signal).then(changed => {
+        if (controller.signal.aborted) return;
+        setError(false);
+        if (changed) setExplanationVersion(version => version + 1);
+      }).catch(() => { if (!controller.signal.aborted) setError(true); });
+    }, 150);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [items, retryVersion]);
+  return error;
+}
+
 const TutorArea: React.FC<TutorAreaProps> = ({
   simulationData,
   currentCycleData,
@@ -94,23 +112,18 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     return cLines[selectedTranslationLine - 1] ?? "";
   }, [cLines, selectedTranslationLine]);
 
-  const [, setExplanationVersion] = useState(0);
-  const [explanationError, setExplanationError] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      const items: Parameters<typeof fetchTutor>[0] = effectiveRows.flatMap(row => [
-        {kind: 'asm' as const, text: row.text},
-        ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
-      ]);
-      if (selectedCLineText !== null && selectedTranslationLine) items.push({kind: 'c', text: selectedCLineText, line: selectedTranslationLine});
-      fetchTutor(items, controller.signal).then(changed => {
-        if (!controller.signal.aborted) { setExplanationError(false); if (changed) setExplanationVersion(x => x + 1); }
-      }).catch(() => { if (!controller.signal.aborted) setExplanationError(true); });
-    }, 150);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [effectiveRows, selectedCLineText, selectedTranslationLine, retryVersion]);
+  const asmExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => effectiveRows.flatMap(row => [
+    {kind: 'asm' as const, text: row.text},
+    ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
+  ]), [effectiveRows]);
+  const cExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() =>
+    selectedCLineText !== null && selectedTranslationLine
+      ? [{kind: 'c', text: selectedCLineText, line: selectedTranslationLine}] : [],
+  [selectedCLineText, selectedTranslationLine]);
+  const asmExplanationError = useTutorExplanations(asmExplanationItems, retryVersion);
+  const cExplanationError = useTutorExplanations(cExplanationItems, retryVersion);
+  const explanationError = asmExplanationError || cExplanationError;
 
   const cLineAnalysis = selectedTranslationLine && selectedCLineText !== null
     ? analyzeCLine(selectedCLineText, selectedTranslationLine) : null;

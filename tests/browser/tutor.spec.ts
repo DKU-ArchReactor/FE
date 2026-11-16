@@ -9,6 +9,76 @@ test.beforeEach(async ({page}) => {
   }}));
 });
 
+test('switching C lines does not cancel or restart pending ASM explanations', async ({page}) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => {release = resolve;});
+  let asmRequests = 0;
+  await page.route('**/api/v1/tutor/explain', async route => {
+    const items = route.request().postDataJSON().items as {kind: string; text: string}[];
+    if (items.some(item => item.kind !== 'c')) {
+      asmRequests++;
+      await pending;
+    }
+    await route.fulfill({json: {items: items.map(item => ({
+      kind: item.kind, category: 'test', title: '문맥', summary: `loaded ${item.text}`, detail: '',
+    }))}});
+  });
+  await page.goto('/tests/browser/tutor.html');
+  try {
+    await expect.poll(() => asmRequests).toBe(1);
+    await page.getByRole('button', {name: 'select second C line'}).click();
+    await expect(page.getByText('loaded return x;', {exact: true})).toBeVisible();
+    const received = page.waitForResponse(response => response.url().endsWith('/api/v1/tutor/explain')
+      && response.request().postDataJSON().items.some((item: {kind: string}) => item.kind === 'crt'));
+    release();
+    await expect((await received).ok()).toBe(true);
+    await page.getByRole('button', {name: 'select unmapped ASM'}).click();
+    await page.getByText('소스 위치와 실행 문맥', {exact: true}).click();
+    await expect(page.getByText('loaded nop', {exact: true})).toBeVisible();
+    expect(asmRequests).toBe(1);
+  } finally {
+    release();
+  }
+});
+
+test('ASM errors survive a successful C explanation and remain manually retryable', async ({page}) => {
+  let asmRequests = 0;
+  await page.route('**/api/v1/tutor/explain', route => {
+    const items = route.request().postDataJSON().items as {kind: string; text: string}[];
+    if (items.some(item => item.kind !== 'c') && ++asmRequests === 1) {
+      return route.fulfill({status: 503, json: {detail: 'temporary failure'}});
+    }
+    return route.fulfill({json: {items: items.map(item => ({
+      kind: item.kind, category: 'test', title: '문맥', summary: `loaded ${item.text}`, detail: '',
+    }))}});
+  });
+  await page.goto('/tests/browser/tutor.html');
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('button', {name: 'select second C line'}).click();
+  await expect(page.getByText('loaded return x;', {exact: true})).toBeVisible();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('button', {name: '다시 시도', exact: true}).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(asmRequests).toBe(2);
+});
+
+test('closed CPI details are deferred and reopening uses the current history', async ({page}) => {
+  await page.goto('/tests/browser/tutor.html');
+  const summary = page.locator('details').filter({has: page.locator('summary', {hasText: 'CPI와 해저드 분석'})});
+  await expect(summary.locator(':scope > div')).toHaveCount(0);
+  await summary.locator(':scope > summary').click();
+  await expect(summary).toContainText('1 ÷ 1 = 1.00');
+  await summary.locator(':scope > summary').click();
+  await expect(summary.locator(':scope > div')).toHaveCount(0);
+  await page.getByRole('button', {name: 'follow next step'}).click();
+  await expect(summary.locator(':scope > div')).toHaveCount(0);
+  await summary.locator(':scope > summary').click();
+  await expect(summary).toContainText('2 ÷ 1 = 2.00');
+  await summary.getByText('주요 관찰 원인', {exact: true}).click();
+  await expect(summary.getByText('실행 이력에서 확인한 대기 원인', {exact: true})).toBeVisible();
+  await expect(summary).toHaveAttribute('open', '');
+});
+
 test('instruction detail rows have consistent spacing when closed and after toggling', async ({page}) => {
   await page.goto('/tests/browser/tutor.html');
   await page.getByRole('button', {name: 'select second ASM', exact: true}).click();

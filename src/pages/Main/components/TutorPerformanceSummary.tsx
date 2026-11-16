@@ -1,9 +1,32 @@
+import { memo, useMemo, useState } from 'react';
 import type {TutorBundle} from '../utils/tutorAnalysis';
 
 export default function TutorPerformanceSummary({bundle, historyIndex}: {bundle?: TutorBundle; historyIndex?: number}) {
+  const [open, setOpen] = useState(false);
   const analysis = bundle?.performance_analysis;
-  const snapshot = analysis?.snapshots.find(item => item.history_index === historyIndex);
+  const snapshots = useMemo(() => {
+    const index = new Map<number, NonNullable<TutorBundle['performance_analysis']>['snapshots'][number]>();
+    for (const snapshot of analysis?.snapshots ?? []) {
+      if (!index.has(snapshot.history_index)) index.set(snapshot.history_index, snapshot);
+    }
+    return index;
+  }, [analysis]);
+  const snapshot = historyIndex == null ? undefined : snapshots.get(historyIndex);
   if (!analysis || !snapshot || historyIndex == null) return null;
+  return <div className="ar-tutor text-[var(--ar-text-muted)]">
+    <details open={open} className="tutor-disclosure text-xs leading-6" onToggle={event => {
+      if (event.target === event.currentTarget) setOpen(event.currentTarget.open);
+    }}>
+      <summary className="cursor-pointer text-xs font-semibold text-[var(--ar-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]">CPI와 해저드 분석</summary>
+      {open && <TutorPerformanceDetails analysis={analysis} snapshot={snapshot} historyIndex={historyIndex} />}
+    </details>
+  </div>;
+}
+
+type Analysis = NonNullable<TutorBundle['performance_analysis']>;
+export const TutorPerformanceDetails = memo(function TutorPerformanceDetails({analysis, snapshot, historyIndex}: {
+  analysis: Analysis; snapshot: Analysis['snapshots'][number]; historyIndex: number;
+}) {
   const priorities = {stall: 3, flush: 2, forwarding: 1};
   const groups = new Map<string, {pc: string | null; assembly: string | null; line: number | null; stalls: number; flushes: number; forwards: number; detail: string; priority: number}>();
   for (const record of analysis.records) {
@@ -21,9 +44,7 @@ export default function TutorPerformanceSummary({bundle, historyIndex}: {bundle?
     groups.set(key, group);
   }
   const hotspots = [...groups.values()].sort((left, right) => right.stalls - left.stalls || right.flushes - left.flushes || right.forwards - left.forwards).slice(0, 3);
-  return <div className="ar-tutor text-[var(--ar-text-muted)]">
-    <details className="tutor-disclosure text-xs leading-6">
-      <summary className="cursor-pointer text-xs font-semibold text-[var(--ar-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]">CPI와 해저드 분석</summary>
+  return (
       <div className="space-y-3">
         <p className="text-[var(--ar-text-primary)]">선택한 시점까지 {snapshot.cycles}클록을 실행했습니다. {snapshot.completed != null ? `완료 명령어는 ${snapshot.completed}개입니다.` : '완료 명령어 수는 제공되지 않았습니다.'}
           {snapshot.cpi != null && ` CPI는 ${snapshot.cycles} ÷ ${snapshot.completed} = ${snapshot.cpi.toFixed(2)}클록/명령어입니다.`}</p>
@@ -48,6 +69,5 @@ export default function TutorPerformanceSummary({bundle, historyIndex}: {bundle?
         </section>}
         <ul className="space-y-1 border-t border-[var(--ar-border)] pt-2">{analysis.notes.map(note => <li key={note}>{note}</li>)}</ul>
       </div>
-    </details>
-  </div>;
-}
+  );
+});

@@ -15,6 +15,7 @@ function component(file, name) {
   return exports[name];
 }
 const Summary = component('TutorPerformanceSummary.tsx', 'default');
+const Details = component('TutorPerformanceSummary.tsx', 'TutorPerformanceDetails');
 const Hazards = component('HazardDiagnostics.tsx', 'HazardDiagnostics');
 const snapshot = {history_index: 0, cycles: 2, completed: 1, cpi: 2, stall_cycles: 1, flush_cycles: 1, forwarding_cycles: 0,
   overlap_cycles: 1, hazard_cycles: 1, idle_cycles: 1, hazard_idle_cycles: 1, other_idle_cycles: 0, unknown_completion_cycles: 0, extra_cycles: 1};
@@ -22,11 +23,18 @@ const record = {history_index: 0, cycle: 0, kind: 'stall', instruction: {pc: '0x
 
 test('performance summary uses the selected prefix and never reveals a future hotspot', () => {
   const bundle = {performance_analysis: {snapshots: [snapshot], records: [record, {...record, history_index: 2, instruction: {pc: '0x10008', assembly: 'future-only-instruction'}, detail: 'future-only-reason'}], notes: []}};
-  const html = renderToStaticMarkup(createElement(Summary, {bundle, historyIndex: 0}));
+  const html = renderToStaticMarkup(createElement(Details, {analysis: bundle.performance_analysis, snapshot, historyIndex: 0}));
   assert.match(html, /2 ÷ 1 = 2.00/);
   assert.match(html, /known load dependency/);
   assert.doesNotMatch(html, /future-only/);
   assert.equal(renderToStaticMarkup(createElement(Summary, {bundle, historyIndex: -1})), '');
+});
+
+test('a collapsed performance summary does not read hazard records or render detail content', () => {
+  const analysis = {snapshots: [snapshot], get records() {assert.fail('closed summaries must not aggregate hazards');}, notes: []};
+  const html = renderToStaticMarkup(createElement(Summary, {bundle: {performance_analysis: analysis}, historyIndex: 0}));
+  assert.match(html, /CPI와 해저드 분석/);
+  assert.doesNotMatch(html, /완료 명령어|스톨 관찰/);
 });
 
 test('older tutor payloads remain usable without performance analysis', () => {

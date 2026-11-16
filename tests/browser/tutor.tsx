@@ -33,11 +33,14 @@ const bundle: TutorBundle = {
 };
 seedTutor(bundle);
 const simulation = {...single, tutor: bundle} as SimulationResult;
+const mappedRows = [{pc: '0x10000', text: 'addi a0, zero, 3', sourceLine: 1},
+  {pc: '0x10004', text: 'addi a1, a0, 1', sourceLine: 1}, {pc: '0x10008', text: 'nop', sourceLine: null}];
 const followHistory = [0, 1].map(index => ({...simulation.history[0], stage_activity: undefined,
   buffers: {...simulation.history[0].buffers, EX: null, MEM: null, WB: null, ID: null,
     IF: {pc: index ? '0x10004' : '0x10000', assembly: index ? 'addi a1,a0,1' : 'addi a0,zero,3', status: 'normal'}}}));
 
 export function TutorHarness() {
+  const [sourceLine, setSourceLine] = useState(1);
   const [target, setTarget] = useState<'c' | 'asm'>('c');
   const [selected, setSelected] = useState(true);
   const [asmIndex, setAsmIndex] = useState(0);
@@ -52,14 +55,14 @@ export function TutorHarness() {
     <button onClick={() => setSelected(!selected)}>toggle selection</button>
     <button onClick={() => setAsmIndex(1)}>select second ASM</button>
     <button onClick={() => setAsmIndex(2)}>select unmapped ASM</button>
+    <button onClick={() => setSourceLine(2)}>select second C line</button>
     <button onClick={() => {setSelected(false); setFollowStep(0);}}>follow first step</button>
     <button onClick={() => {setSelected(false); setFollowStep(1);}}>follow next step</button>
     <button onClick={() => setPipeline(!pipeline)}>toggle pipeline focus</button>
-    <TutorArea simulationData={data as SimulationResult} currentCycleData={displayed} translationSource="int x = 3;"
-      mappedRows={[{pc: '0x10000', text: 'addi a0, zero, 3', sourceLine: 1},
-        {pc: '0x10004', text: 'addi a1, a0, 1', sourceLine: 1}, {pc: '0x10008', text: 'nop', sourceLine: null}]}
+    <TutorArea simulationData={data as SimulationResult} currentCycleData={displayed} translationSource={'int x = 3;\nreturn x;'}
+      mappedRows={mappedRows}
       isUserSelected={selected}
-      selectedTranslationLine={selected ? 1 : null} selectedAsmIndex={selected ? asmIndex : null} activeTarget={target} />
+      selectedTranslationLine={selected ? sourceLine : null} selectedAsmIndex={selected ? asmIndex : null} activeTarget={target} />
   </div>;
 }
 createRoot(document.getElementById('root')!).render(<TutorHarness />);
