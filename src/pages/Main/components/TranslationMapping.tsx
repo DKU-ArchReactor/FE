@@ -1,3 +1,5 @@
+import { useAssistantSelection } from '../hooks/useAssistantSelection';
+import type { EditorSelection } from '../utils/assistantSource';
 import { useMemo, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "@/context/ThemeContext";
@@ -7,6 +9,7 @@ import type { FileSummary } from "@/type/file";
 import AsmFileUploadPopup from "./AsmFileUploadPopup";
 
 type Props = {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   source: string;
   assembly: string;
   mappedRows?: MappedAssemblyRow[];
@@ -65,6 +68,7 @@ function splitInstruction(text: string): { opcode: string; operands: string } {
 
 export default function TranslationMapping({
   source,
+  onSourceSelection,
   assembly,
   mappedRows,
   busy,
@@ -86,6 +90,7 @@ export default function TranslationMapping({
   currentFileId,
 }: Props) {
   const { theme } = useTheme();
+  const trackSelection = useAssistantSelection('asm', onSourceSelection);
   const sourceLines = source.split(/\r?\n/);
   const rows: MappedAssemblyRow[] = useMemo(() => {
     if (mappedRows && mappedRows.length > 0) return mappedRows;
@@ -408,6 +413,7 @@ export default function TranslationMapping({
       {activeTarget === "asm" ? (
         <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
           <Editor
+            onMount={trackSelection}
             height="100%"
             language="plaintext"
             theme={theme === "dark" ? "vs-dark" : "vs"}
@@ -650,9 +656,9 @@ export default function TranslationMapping({
                               ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
                               : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
                         }`}
-                      title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
+                      title="대응하는 C 소스 위치가 확인되지 않았습니다. CRT 여부는 줄 정보만으로 확정할 수 없습니다."
                     >
-                      CRT
+                      미매핑
                     </span>
                   )}
                 </div>

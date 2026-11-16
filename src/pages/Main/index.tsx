@@ -1,8 +1,11 @@
+import type { EditorSelection } from './utils/assistantSource';
+import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
 import PanelRenderer from "./components/PanelRenderer";
 import SlidingViewportTrack from "./components/SlidingViewportTrack";
+import AssistantCompileHint from "./components/AssistantCompileHint";
 import AiAssistantPopup from "@/components/AiAssistantPopup";
 import PlaybackFeedbackOverlay from "./components/PlaybackFeedbackOverlay";
 
@@ -57,8 +60,12 @@ const MainPage: React.FC = () => {
   );
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
+  const [sourceSelection, setSourceSelection] = useState<EditorSelection | null>(null);
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
+  const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
+  const aiPopupOpenRef = useRef(isAiPopupOpen);
+  useEffect(() => { aiPopupOpenRef.current = isAiPopupOpen; }, [isAiPopupOpen]);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
 
   const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
@@ -66,7 +73,10 @@ const MainPage: React.FC = () => {
   const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
+  const auth = useAuthSession();
+  const workspaceKey = JSON.stringify([fileMgr.translationSource, customAssembly, editorTarget, auth.epoch]);
   const simSession = useSimulationSession({
+    workspaceKey,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
     translationBusy: fileMgr.translationBusy,
@@ -74,6 +84,11 @@ const MainPage: React.FC = () => {
     setTranslationError: fileMgr.setTranslationError,
     setTranslationAssembly: fileMgr.setTranslationAssembly,
   });
+
+  const showAssistantHint = assistantHint?.workspace === workspaceKey && !isAiPopupOpen && !fileMgr.translationBusy;
+  const onCompilationComplete = () => {
+    if (!aiPopupOpenRef.current) setAssistantHint({ workspace: workspaceKey, language: editorTarget });
+  };
 
   const handleClearSelection = useCallback(() => {
     setTranslationSelectedLine(null);
@@ -91,6 +106,7 @@ const MainPage: React.FC = () => {
   });
 
   const onResetSimulation = () => {
+    setAssistantHint(null);
     simSession.clearSimulationCache();
     playback.setCurrentCycle(0);
     playback.setIsPlaying(false);
@@ -181,6 +197,7 @@ const MainPage: React.FC = () => {
   const renderPanel = (panelKey: PanelKey) => (
     <PanelRenderer
       panelKey={panelKey}
+      onSourceSelection={setSourceSelection}
       simulationData={simSession.simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
@@ -220,12 +237,14 @@ const MainPage: React.FC = () => {
           }
         );
       }}
-      onTranslationCompile={() =>
-        simSession.handleTranslationCompile({
+      onTranslationCompile={() => {
+        setAssistantHint(null);
+        return simSession.handleTranslationCompile({
+          onCompilationComplete,
           onSimulationComplete: playback.handleSimulationComplete,
           triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
-        })
-      }
+        });
+      }}
       onTranslationFile={handleTranslationFile}
       onSelectTranslationLine={handleSelectTranslationLine}
       onSaveTranslationFile={fileMgr.handleSaveTranslationFile}
@@ -240,14 +259,17 @@ const MainPage: React.FC = () => {
           onResetSimulation();
         }
       }}
-      onCustomAssemblyChange={setCustomAssembly}
-      onSimulateAssembly={() =>
-        simSession.handleAssemblySimulation(customAssembly, {
+      onCustomAssemblyChange={(value) => { setAssistantHint(null); simSession.clearSimulationCache(); setCustomAssembly(value); }}
+      onSimulateAssembly={() => {
+        setAssistantHint(null);
+        return simSession.handleAssemblySimulation(customAssembly, {
+          onCompilationComplete,
           onSimulationComplete: playback.handleSimulationComplete,
           triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
-        })
-      }
+        });
+      }}
       onResetCustomAssembly={() => {
+        setAssistantHint(null);
         playback.triggerPlaybackFeedback("trash");
         setCustomAssembly(DEFAULT_CUSTOM_ASSEMBLY);
         simSession.clearSimulationCache();
@@ -289,9 +311,11 @@ const MainPage: React.FC = () => {
             mode={simSession.simulationEngineMode}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
+              setAssistantHint(null);
               if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
                 playback.triggerPlaybackFeedback("reset");
               }
+              setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {
                 setTranslationSelectedLine(null);
@@ -310,12 +334,14 @@ const MainPage: React.FC = () => {
         </div>
 
         {/* AI 어시스턴트 팝업 버튼 */}
+        <div className="relative h-full aspect-square shrink-0">
         <button
           ref={aiButtonRef}
           type="button"
-          onClick={() => setIsAiPopupOpen((prev) => !prev)}
+          onClick={() => { setAssistantHint(null); setIsAiPopupOpen((prev) => !prev); }}
+          aria-describedby={showAssistantHint ? 'assistant-compile-hint' : undefined}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
-          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 outline-none group active:scale-95 ${
+          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 outline-none group active:scale-95 ${showAssistantHint ? 'ring-2 ring-[var(--ar-accent)] ring-offset-2 shadow-lg' : ''} ${
             isAiPopupOpen
               ? simSession.isSingleEngine
                 ? "bg-gradient-to-tr from-[#003870] via-[#005FB8] to-[#1E70BF] text-white shadow-[0_4px_18px_rgba(0,95,184,0.45)] scale-[1.03]"
@@ -341,13 +367,23 @@ const MainPage: React.FC = () => {
             </svg>
           </div>
         </button>
+        {showAssistantHint && <AssistantCompileHint language={assistantHint.language} onDismiss={() => setAssistantHint(null)} onOpen={() => { setAssistantHint(null); setIsAiPopupOpen(true); }} />}
+        </div>
       </div>
 
       <AiAssistantPopup
+        key={auth.epoch}
+        sourceSelection={sourceSelection}
+        editorLanguage={editorTarget}
+        editorContent={editorTarget === 'c' ? fileMgr.translationSource : customAssembly}
+        authenticated={auth.authenticated}
+        simulation={simSession.simulationData}
+        currentData={playback.currentData}
+        mode={simSession.simulationEngineMode}
+        beforeExecution={simSession.isSingleEngine && playback.currentCycle === 0}
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
-        mode={simSession.simulationEngineMode}
       />
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}

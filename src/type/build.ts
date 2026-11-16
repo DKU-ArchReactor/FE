@@ -1,3 +1,4 @@
+import type { TutorBundle } from "@/pages/Main/utils/tutorAnalysis";
 export interface BuildCompileRequest {
     file_id?: string;
     content?: string;
@@ -7,6 +8,7 @@ export interface BuildCompileRequest {
 }
 
 export interface BuildCompileResponse {
+    tutor?: TutorBundle | null;
     build_id: string | null;
     status: string;
     assembly_url?: string | null;

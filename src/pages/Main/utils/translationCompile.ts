@@ -14,6 +14,14 @@ export function extractAssemblyFromSimulation(
 ): MappedAssemblyRow[] {
   if (!simulationResult) return [];
 
+  const tutorInstructions = simulationResult.tutor?.asm_instructions;
+  if (simulationResult.tutor?.source_mapping && tutorInstructions?.length) {
+    return tutorInstructions.filter(item => item.pc).map(item => ({
+      pc: item.pc, text: item.text, sourceLine: item.source_line ?? null,
+      isRuntime: false,
+    }));
+  }
+
   // 1순위: CORE가 제공하는 정적 코드 매핑 테이블(program.code_mapping) 직접 사용
   // 실행되지 않은 분기문(if/else)까지 포함된 완전한 전체 어셈블리 목록 및 C 라인 매핑 제공
   const codeMap = simulationResult.program?.code_mapping;
@@ -68,14 +76,15 @@ export interface TranslationCompileResult {
 
 export async function compileTranslation(
   source: string,
-  preferredMode: "single" | "pipeline" = "single"
+  preferredMode: "single" | "pipeline" = "single",
+  options: { capture: boolean; signal: AbortSignal }
 ): Promise<TranslationCompileResult> {
   const result = await compileCode({
     content: source,
     lang: "c",
     compile_profile: "rv32im",
     compiler_opt: "-O0 -g",
-  });
+  }, options.signal);
   if (result.status !== "success") {
     throw new Error(result.log || "컴파일에 실패했습니다.");
   }
@@ -88,7 +97,7 @@ export async function compileTranslation(
   // 어셈블리 텍스트 가져오기 (선택적 / 폴백 지원)
   if (result.assembly_url) {
     try {
-      const response = await fetch(result.assembly_url);
+      const response = await fetch(result.assembly_url, { signal: options.signal });
       if (response.ok) {
         assembly = await response.text();
       }
@@ -103,11 +112,12 @@ export async function compileTranslation(
     ? { simulation_token: result.simulation_token }
     : null;
 
+  options.signal.throwIfAborted();
   if (targetToken) {
     try {
       const [pRes, sRes] = await Promise.allSettled([
-        runSimulation({ ...targetToken, mode: "pipeline", max_cycles: 2000 }),
-        runSimulation({ ...targetToken, mode: "single", max_cycles: 2000 }),
+        runSimulation({ ...targetToken, mode: "pipeline", max_cycles: 2000, capture_assistant_context: options.capture }, options.signal),
+        runSimulation({ ...targetToken, mode: "single", max_cycles: 2000, capture_assistant_context: options.capture }, options.signal),
       ]);
       if (pRes.status === "fulfilled") pipelineResult = pRes.value;
       if (sRes.status === "fulfilled") singleResult = sRes.value;
@@ -116,7 +126,7 @@ export async function compileTranslation(
     }
   }
 
-  const activeResult = preferredMode === "single" ? (singleResult ?? pipelineResult) : (pipelineResult ?? singleResult);
+  const activeResult = preferredMode === "single" ? singleResult : pipelineResult;
 
   // S3 assembly_url이 없으면(단일 패스 컴파일), 상단 code_mapping에서 어셈블리 텍스트를 자동 생성
   if (!assembly && activeResult) {
@@ -138,14 +148,15 @@ export async function compileTranslation(
 
 export async function compileAssemblyDirectly(
   assemblySource: string,
-  preferredMode: "single" | "pipeline" = "single"
+  preferredMode: "single" | "pipeline" = "single",
+  options: { capture: boolean; signal: AbortSignal }
 ): Promise<TranslationCompileResult> {
   const result = await compileCode({
     content: assemblySource,
     lang: "asm",
     compile_profile: "rv32im",
     compiler_opt: "",
-  });
+  }, options.signal);
   if (result.status !== "success") {
     throw new Error(result.log || "어셈블리 빌드에 실패했습니다.");
   }
@@ -158,11 +169,12 @@ export async function compileAssemblyDirectly(
     ? { simulation_token: result.simulation_token }
     : null;
 
+  options.signal.throwIfAborted();
   if (targetToken) {
     try {
       const [pRes, sRes] = await Promise.allSettled([
-        runSimulation({ ...targetToken, mode: "pipeline", max_cycles: 2000 }),
-        runSimulation({ ...targetToken, mode: "single", max_cycles: 2000 }),
+        runSimulation({ ...targetToken, mode: "pipeline", max_cycles: 2000, capture_assistant_context: options.capture }, options.signal),
+        runSimulation({ ...targetToken, mode: "single", max_cycles: 2000, capture_assistant_context: options.capture }, options.signal),
       ]);
       if (pRes.status === "fulfilled") pipelineResult = pRes.value;
       if (sRes.status === "fulfilled") singleResult = sRes.value;
@@ -171,7 +183,7 @@ export async function compileAssemblyDirectly(
     }
   }
 
-  const activeResult = preferredMode === "single" ? (singleResult ?? pipelineResult) : (pipelineResult ?? singleResult);
+  const activeResult = preferredMode === "single" ? singleResult : pipelineResult;
 
   return {
     assembly: assemblySource,
