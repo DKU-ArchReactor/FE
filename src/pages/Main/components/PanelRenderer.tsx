@@ -65,6 +65,7 @@ interface PanelRendererProps {
   // 저장된 파일 목록 상태
   savedFiles: FileSummary[];
   isLoggedIn: boolean;
+  onCloseTutor?: () => void;
 }
 
 export const PanelRenderer: React.FC<PanelRendererProps> = ({
@@ -110,6 +111,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
 
   savedFiles,
   isLoggedIn,
+  onCloseTutor,
 }) => {
   switch (panelKey) {
     case "cSource":
@@ -189,6 +191,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           }
           isUserSelected={editorTarget === "c" && translationSelectedLine !== null}
           activeTarget={editorTarget}
+          onClose={onCloseTutor}
         />
       );
 

@@ -12,7 +12,7 @@ export const ThemeSwitch: React.FC = () => {
       aria-checked={isDark}
       onClick={toggleTheme}
       title={isDark ? "현재 다크 모드 (클릭하여 라이트 모드로 전환)" : "현재 라이트 모드 (클릭하여 다크 모드로 전환)"}
-      className={`relative inline-flex h-7 w-[58px] shrink-0 cursor-pointer items-center rounded-full p-[3px] border transition-all duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#005FB8] dark:focus-visible:ring-[#007ACC] shadow-2xs group ${
+      className={`relative inline-flex h-7 w-7 md:w-[58px] shrink-0 cursor-pointer items-center justify-center md:justify-start rounded-full p-[3px] border transition-all duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#005FB8] dark:focus-visible:ring-[#007ACC] shadow-2xs group ${
         isDark
           ? "bg-[#1E1E24] border-[#3E3E48] hover:border-[#52525B]"
           : "bg-[#E6E8EC] border-[#D0D7DE] hover:border-[#B1B8C0]"
@@ -20,9 +20,9 @@ export const ThemeSwitch: React.FC = () => {
     >
       <span className="sr-only">VS Code 테마 전환</span>
 
-      {/* 좌측 트랙 배경 아이콘: 태양 (Light Mode 아이콘) */}
+      {/* 좌측 트랙 배경 아이콘: 태양 (Light Mode 아이콘, 모바일 숨김) */}
       <span
-        className={`absolute left-[7px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-opacity duration-300 pointer-events-none select-none ${
+        className={`hidden md:flex absolute left-[7px] top-1/2 -translate-y-1/2 items-center justify-center transition-opacity duration-300 pointer-events-none select-none ${
           isDark ? "opacity-30 group-hover:opacity-50" : "opacity-0"
         }`}
       >
@@ -41,9 +41,9 @@ export const ThemeSwitch: React.FC = () => {
         </svg>
       </span>
 
-      {/* 우측 트랙 배경 아이콘: 달 (Dark Mode 아이콘) */}
+      {/* 우측 트랙 배경 아이콘: 달 (Dark Mode 아이콘, 모바일 숨김) */}
       <span
-        className={`absolute right-[7px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-opacity duration-300 pointer-events-none select-none ${
+        className={`hidden md:flex absolute right-[7px] top-1/2 -translate-y-1/2 items-center justify-center transition-opacity duration-300 pointer-events-none select-none ${
           isDark ? "opacity-0" : "opacity-35 group-hover:opacity-55"
         }`}
       >
@@ -56,11 +56,11 @@ export const ThemeSwitch: React.FC = () => {
         </svg>
       </span>
 
-      {/* 좌우로 부드럽게 슬라이딩하는 노브 (Thumb) */}
+      {/* 활성 아이콘 노브 (모바일에서는 중앙 단일 버튼, md 이상에서는 좌우 슬라이딩) */}
       <span
         className={`pointer-events-none flex h-5 w-5 items-center justify-center rounded-full shadow-md transform transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
           isDark
-            ? "translate-x-[30px] bg-[#2D2D32] border border-[#505058] text-[#82AAFF] shadow-[0_2px_5px_rgba(0,0,0,0.5)]"
+            ? "translate-x-0 md:translate-x-[30px] bg-[#2D2D32] border border-[#505058] text-[#82AAFF] shadow-[0_2px_5px_rgba(0,0,0,0.5)]"
             : "translate-x-0 bg-white border border-[#E1E4E8] text-amber-500 shadow-[0_2px_4px_rgba(0,0,0,0.12)]"
         }`}
       >
