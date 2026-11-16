@@ -70,12 +70,15 @@ export function seedTutor(bundle?: TutorBundle | null) {
 export async function fetchTutor(items: {kind: 'c'|'asm'|'crt'; text: string; line?: number; pc?: string}[], signal: AbortSignal) {
   const unique = new Map(items.map(x => [key(x.kind, x.text, x.line ?? 1, x.pc), x]));
   const missing = [...unique].filter(([k]) => !cache.has(k));
+  let changed = false;
   for (let start = 0; start < missing.length; start += 128) {
     const chunk = missing.slice(start, start + 128);
     const {data} = await api.post<{items: RuleExplanation[]}>('/api/v1/tutor/explain', {items: chunk.map(([, x]) => x)}, {signal});
-    if (signal.aborted) return;
+    if (signal.aborted) return false;
     chunk.forEach(([k], i) => put(k, data.items[i]));
+    changed = true;
   }
+  return changed;
 }
 const pending: RuleExplanation = {kind: 'c', category: 'pending', title: '해설 대기', summary: '해설을 불러오는 중입니다.', detail: ''};
 export function analyzeCLine(text: string, line: number) {
@@ -92,7 +95,17 @@ export function analyzeCrtInstruction(text: string, pc?: string) {
   return {title: x.title, badge: x.category === 'unmapped' ? '미확인' : '문맥', summary: x.summary, detail: x.detail, role: x.title, instructionDetail: analyzeAsmInstruction(text)};
 }
 
+const instructionIndexes = new WeakMap<TutorBundle, Map<number, TutorInstruction>>();
 export function instructionAt(bundle: TutorBundle | null | undefined, pc?: string) {
-  if (!pc || !/^0x[0-9a-f]+$/i.test(pc)) return undefined;
-  return bundle?.asm_instructions?.find(item => item.pc && Number.parseInt(item.pc, 16) === Number.parseInt(pc, 16));
+  if (!bundle || !pc || !/^0x[0-9a-f]+$/i.test(pc)) return undefined;
+  let index = instructionIndexes.get(bundle);
+  if (!index) {
+    index = new Map();
+    for (const item of bundle.asm_instructions ?? []) {
+      const address = Number.parseInt(item.pc ?? '', 16);
+      if (Number.isFinite(address) && !index.has(address)) index.set(address, item);
+    }
+    instructionIndexes.set(bundle, index);
+  }
+  return index.get(Number.parseInt(pc, 16));
 }

@@ -1,5 +1,40 @@
 import {test, expect} from '@playwright/test';
 
+test.beforeEach(async ({page}) => {
+  // Unseeded runtime explanations must stay inside this isolated fixture server.
+  await page.route('**/api/v1/tutor/explain', route => route.fulfill({json: {
+    items: route.request().postDataJSON().items.map((item: {kind: string; text: string}) => ({
+      kind: item.kind, category: 'unmapped', title: '문맥', summary: item.text, detail: '',
+    })),
+  }}));
+});
+
+test('instruction detail rows have consistent spacing when closed and after toggling', async ({page}) => {
+  await page.goto('/tests/browser/tutor.html');
+  await page.getByRole('button', {name: 'select second ASM', exact: true}).click();
+  const details = page.locator('[data-asm-index="1"] .tutor-instruction-details');
+  await details.locator(':scope > summary').click();
+  const rows = details.locator(':scope > div > details > summary');
+  await expect(rows).toHaveCount(3);
+  const measure = () => rows.evaluateAll(elements => elements.map(element => {
+    const rect = element.getBoundingClientRect();
+    return {top: rect.top, bottom: rect.bottom, height: rect.height};
+  }));
+  const check = async () => {
+    const boxes = await measure();
+    expect(Math.max(...boxes.map(box => box.height)) - Math.min(...boxes.map(box => box.height))).toBeLessThanOrEqual(1);
+    for (let i = 1; i < boxes.length; i++) {
+      expect(boxes[i].top - boxes[i - 1].bottom).toBeLessThanOrEqual(1);
+    }
+  };
+  await check();
+  await rows.first().click();
+  await rows.first().click();
+  await check();
+  await page.setViewportSize({width: 390, height: 844});
+  await check();
+});
+
 test('CPI and instruction hazard analysis advance with history and exclude future records', async ({page}) => {
   await page.goto('/tests/browser/tutor.html');
   await page.getByText('CPI와 해저드 분석', {exact: true}).click();

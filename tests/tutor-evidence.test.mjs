@@ -15,6 +15,31 @@ const bundle = {execution_steps: [{history_index: 0, cycle: 0, display_clock: 1,
   retired_pc: '0x10000', register_changes: [{key: 'x10', before: '0x0', after: '0x5'}],
   memory_changes: [], memory_transfer: null}]};
 
+test('rewinding repeated PCs restores earlier values, counts and hazards; new runs stay separate', () => {
+  const item = {pc: '0x10000', text: 'add a0,a1,a2', explanation: {}};
+  const bundle = {execution_steps: [
+    {history_index: 0, display_clock: 1, retired_pc: null,
+      instruction_observations: [{pc: '0x00010000', stage: 'EX', summary: 'early value'}]},
+    {history_index: 1, display_clock: 2, retired_pc: '0x10000'},
+    {history_index: 2, display_clock: 3, retired_pc: '0x10000',
+      instruction_observations: [{pc: '0x10000', stage: 'EX', summary: 'later value'}]},
+  ], performance_analysis: {records: [
+    {history_index: 2, kind: 'stall', instruction: {pc: '0x10000'}, detail: 'later hazard'},
+  ]}};
+  const render = (bundle, historyIndex) => renderToStaticMarkup(createElement(exports.TutorInstructionEvidence, {item, bundle, historyIndex}));
+  assert.match(render(bundle, 2), /later value/);
+  assert.match(render(bundle, 2), /확인된 완료 2회/);
+  assert.match(render(bundle, 2), /later hazard/);
+  const rewound = render(bundle, 0);
+  assert.match(rewound, /early value/);
+  assert.match(rewound, /확인된 완료 0회/);
+  assert.doesNotMatch(rewound, /later value|later hazard/);
+  const newRun = {execution_steps: [{history_index: 0, display_clock: 1,
+    instruction_observations: [{pc: '0x10000', stage: 'EX', summary: 'new run value'}]}]};
+  assert.match(render(newRun, 0), /new run value/);
+  assert.doesNotMatch(render(newRun, 0), /early value|later value|확인된 완료/);
+});
+
 test('initial snapshot does not show evidence belonging to the first executed clock', () => {
   assert.equal(renderToStaticMarkup(createElement(exports.TutorCycleEvidence, {bundle, historyIndex: -1})), '');
   const html = renderToStaticMarkup(createElement(exports.TutorCycleEvidence, {bundle, historyIndex: 0}));

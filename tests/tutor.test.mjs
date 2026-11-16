@@ -19,6 +19,13 @@ function load(post) {
 }
 const explanation = (kind, text) => ({ kind, category: 'test', title: text, summary: text, detail: text });
 
+test('explanation refresh reports changes only when uncached items are received', async () => {
+  const tutor = load(async (_url, {items}) => ({data: {items: items.map(x => explanation(x.kind, x.text))}}));
+  const items = [{kind: 'asm', text: 'addi a0,zero,8'}];
+  assert.equal(await tutor.fetchTutor(items, new AbortController().signal), true);
+  assert.equal(await tutor.fetchTutor(items, new AbortController().signal), false);
+});
+
 test('compile and simulation explanations are displayed without another request', async () => {
   const tutor = load(() => assert.fail('seeded explanations must not request the API'));
   tutor.seedTutor({ schema_version: '1.0',

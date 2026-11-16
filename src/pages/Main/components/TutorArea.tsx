@@ -48,7 +48,14 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     return mapAssembly(translationAssembly, cLines.length);
   }, [propMappedRows, translationAssembly, cLines.length]);
 
-  const historyIndex = currentCycleData ? simulationData?.history.indexOf(currentCycleData) : undefined;
+  const historyPositions = useMemo(() => {
+    const positions = new Map<CycleHistoryItem, number>();
+    simulationData?.history.forEach((step, index) => {
+      if (!positions.has(step)) positions.set(step, index);
+    });
+    return positions;
+  }, [simulationData?.history]);
+  const historyIndex = currentCycleData ? historyPositions.get(currentCycleData) ?? -1 : undefined;
   const executionFocus = historyIndex != null && historyIndex >= 0
     ? tutorExecutionFocus(currentCycleData, effectiveRows, simulationData?.simulator.mode === 'single') : null;
   const currentActiveAsmIndex = executionFocus?.index ?? providedActiveAsmIndex;
@@ -98,8 +105,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
       ]);
       if (selectedCLineText !== null && selectedTranslationLine) items.push({kind: 'c', text: selectedCLineText, line: selectedTranslationLine});
-      fetchTutor(items, controller.signal).then(() => {
-        if (!controller.signal.aborted) { setExplanationError(false); setExplanationVersion(x => x + 1); }
+      fetchTutor(items, controller.signal).then(changed => {
+        if (!controller.signal.aborted) { setExplanationError(false); if (changed) setExplanationVersion(x => x + 1); }
       }).catch(() => { if (!controller.signal.aborted) setExplanationError(true); });
     }, 150);
     return () => { clearTimeout(timer); controller.abort(); };
