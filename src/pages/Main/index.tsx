@@ -1,3 +1,5 @@
+import { executionReference } from '@/api/assistant';
+import BuildStatusBar from "./components/BuildStatusBar";
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
@@ -62,6 +64,7 @@ const MainPage: React.FC = () => {
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
   const simSession = useSimulationSession({
+    savedFileId: fileMgr.isLoggedIn ? fileMgr.fileId : null,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
     translationBusy: fileMgr.translationBusy,
@@ -69,6 +72,8 @@ const MainPage: React.FC = () => {
     setTranslationError: fileMgr.setTranslationError,
     setTranslationAssembly: fileMgr.setTranslationAssembly,
   });
+
+  useEffect(() => { simSession.clearSimulationCache(); }, [customAssembly, editorTarget]);
 
   const handleClearSelection = useCallback(() => {
     setTranslationSelectedLine(null);
@@ -324,7 +329,13 @@ const MainPage: React.FC = () => {
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
+        contextKey={JSON.stringify([editorTarget, fileMgr.translationSource, customAssembly, simSession.activeBuildId, simSession.simulationData?.assistant_context?.execution_id, simSession.simulationEngineMode, playback.currentCycle, fileMgr.translationBusy])}
+        execution={!fileMgr.translationBusy && !(simSession.isSingleEngine && playback.currentCycle === 0) && simSession.simulationData?.history?.[playback.activeCycleIndex]
+          ? executionReference(simSession.simulationData.assistant_context, simSession.simulationEngineMode, playback.activeCycleIndex)
+          : undefined}
       />
+
+      <BuildStatusBar result={simSession.buildResult} busy={fileMgr.translationBusy} hasSimulation={!!simSession.simulationData} />
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 */}
       <div

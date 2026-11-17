@@ -1,13 +1,20 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { streamChat, type ChatMessage, type ExecutionReference } from "@/api/assistant";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 
 interface Message {
   id: string;
   sender: "ai" | "user";
   text: string;
   time: string;
+  complete?: boolean;
+  notice?: string;
+  contextLabel?: string;
+  scope?: string;
 }
 
 interface Props {
+  execution?: ExecutionReference;
+  contextKey?: string;
   isOpen: boolean;
   onClose: () => void;
   anchorRef?: React.RefObject<HTMLElement | null>;
@@ -16,7 +23,7 @@ interface Props {
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 500;
 
-export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }) => {
+export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, execution, contextKey = "" }) => {
   // 1. 위치 및 드래그 상태 관리
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -36,11 +43,28 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
     {
       id: "welcome",
       sender: "ai",
-      text: "안녕하세요! ArchReactor AI 어시스턴트입니다. ✨\nC 소스 코드 번역, RISC-V 어셈블리 명령어, 5단계 파이프라인의 데이터 해저드나 스톨 원인에 대해 무엇이든 질문해 보세요!",
+      text: "ArchReactor AI 어시스턴트입니다. 로그인 후 C 코드, RISC-V, 파이프라인에 대해 질문해 주세요.\n저장된 빌드를 실행한 뒤 선택 사이클을 포함해 질문할 수 있습니다. 그 외에는 질문에 적은 내용만 전달됩니다.",
       time: "방금 전",
     },
   ]);
   const [isThinking, setIsThinking] = useState(false);
+  const requestRef = useRef<AbortController | null>(null);
+  const [includeExecution, setIncludeExecution] = useState(true);
+  const scope = JSON.stringify([contextKey, includeExecution]);
+  const cancelRequest = useCallback((notice: string) => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setIsThinking(false);
+    setMessages(prev => prev.map(m => m.sender === 'ai' && m.id !== 'welcome' && !m.complete
+      ? { ...m, notice } : m));
+  }, []);
+  useLayoutEffect(() => {
+    cancelRequest('코드 또는 선택한 실행이 바뀌어 이전 답변을 중단했습니다.');
+  }, [scope, cancelRequest]);
+  useEffect(() => {
+    if (!isOpen) cancelRequest('답변 생성을 중단했습니다.');
+  }, [isOpen]);
+  useEffect(() => () => requestRef.current?.abort(), []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 버튼 바로 아래 기본 위치 계산 (버튼 오른쪽 정렬 & 바로 아래 8px)
@@ -169,52 +193,44 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
   }, [messages, isThinking, isOpen]);
 
   // 메시지 전송
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend ?? inputMessage).trim();
-    if (!text || isThinking) return;
-
+    if (!text || requestRef.current) return;
+    if (text.length > 8000) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
     const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      sender: "user",
-      text,
-      time: "방금 전",
+      id: `user-${Date.now()}`, sender: 'user', text, time: '방금 전', complete: true, scope,
     };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInputMessage("");
+    const replyId = `ai-${Date.now()}`;
+    setMessages(prev => [...prev, userMsg, {
+      id: replyId, sender: 'ai', text: '', time: '방금 전', scope,
+      contextLabel: includeExecution && execution ? `선택 ${execution.cycle + 1}번째 기록 · 저장된 실행 분석` : '텍스트 질문',
+    }]);
+    setInputMessage('');
     setIsThinking(true);
-
-    setTimeout(() => {
-      let replyText = "";
-      const lower = text.toLowerCase();
-
-      if (lower.includes("해저드") || lower.includes("스톨") || lower.includes("hazard") || lower.includes("stall")) {
-        replyText =
-          "⚡ [파이프라인 해저드 분석]\n5단계 파이프라인에서 직전 명령어가 메모리에서 값을 로드(lw)하고 바로 다음 명령어가 해당 레지스터를 참조하면 'Load-Use 데이터 해저드'가 발생하여 1사이클 스톨(버블)이 불가피합니다.\n\n해결 팁: 로드 명령어와 사용 명령어 사이에 독립적인 연산 명령어를 재배치하면 스톨 없이 100% 포워딩(Forwarding)으로 통과할 수 있습니다.";
-      } else if (lower.includes("매핑") || lower.includes("번역") || lower.includes("c") || lower.includes("어셈블리")) {
-        replyText =
-          "📄 [C-어셈블리 매핑 안내]\n작성된 C 언어 코드는 GCC RV32IM 컴파일러를 통해 스택 기반 명령어로 변환됩니다. 상단 에디터에서 원하는 코드 줄을 클릭하시면 하단 Tutor 패널에 각 C 행에 정확히 대응되는 RISC-V 명령어 목록과 하드웨어 레지스터 동작이 실시간 표시됩니다.";
-      } else if (lower.includes("스택") || lower.includes("메모리") || lower.includes("stack") || lower.includes("sp")) {
-        replyText =
-          "💾 [스택 프레임 구조]\n함수 호출 시 `addi sp, sp, -32`로 스택 포인터를 낮춰 프레임을 할당하고, 이전 프레임 포인터(`s0`)와 복귀 주소(`ra`)를 스택 상단에 저장합니다. 지역 변수는 `s0` 기준 마이너스 오프셋(예: -20(s0))에 기록되어 함수 종료 시 안전하게 정리됩니다.";
-      } else if (lower.includes("cpi") || lower.includes("성능") || lower.includes("최적화")) {
-        replyText =
-          "📊 [CPI 및 파이프라인 최적화]\n이상적인 5-Stage 파이프라인의 CPI는 1.0입니다. 그러나 브랜치 미스예측(2 Flush)과 Load-Use 스톨(1 Stall)로 인해 실제 CPI는 1.2~1.5 수준이 됩니다. 루프 언롤링(Loop Unrolling)과 명령어 재배치 기법을 통해 CPI를 1.0에 근접하도록 단축할 수 있습니다.";
-      } else {
-        replyText = `💡 [AI 분석 답변]\n"${text}"에 관한 질문이 접수되었습니다. 현재 시뮬레이션 중인 RISC-V 32-bit 프로세서 아키텍처 관점에서 파이프라인 제어와 레지스터 상태를 연계하여 최적의 실행 흐름을 지원합니다. 추가적으로 궁금한 레지스터 번호나 명령어(예: addi, lw, bne)를 말씀해 주세요!`;
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `ai-${Date.now()}`,
-          sender: "ai",
-          text: replyText,
-          time: "방금 전",
-        },
-      ]);
-      setIsThinking(false);
-    }, 600);
+    const updateReply = (change: (message: Message) => Message) => {
+      if (requestRef.current !== controller || controller.signal.aborted) return;
+      setMessages(prev => prev.map(message => message.id === replyId ? change(message) : message));
+    };
+    try {
+      const history: ChatMessage[] = [...messages.filter(m => m.id !== 'welcome' && m.complete && m.scope === scope), userMsg]
+        .map(m => ({ role: m.sender === 'ai' ? 'assistant' : 'user', content: m.text }));
+      await streamChat(history, controller.signal, event => {
+        if (event.type === 'delta') updateReply(m => ({ ...m, text: m.text + event.text }));
+        if (event.type === 'done') updateReply(m => ({
+          ...m, complete: ['end_turn', 'stop'].includes(event.stop_reason),
+          notice: ['max_tokens', 'length'].includes(event.stop_reason) ? '답변 길이 한도에 도달했습니다. 이어서 질문해 주세요.'
+            : !['end_turn', 'stop'].includes(event.stop_reason) ? '모델이 답변 생성을 종료했습니다.' : undefined,
+        }));
+      }, includeExecution ? execution : undefined);
+    } catch (error) {
+      const notice = controller.signal.aborted ? '답변 생성을 중단했습니다.'
+        : error instanceof Error ? error.message : 'AI 요청에 실패했습니다.';
+      updateReply(m => ({ ...m, complete: false, notice }));
+    } finally {
+      if (requestRef.current === controller) { requestRef.current = null; setIsThinking(false); }
+    }
   };
 
   if (!isOpen) return null;
@@ -298,13 +314,20 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
         </div>
       </header>
 
+      <div className="shrink-0 border-b border-[var(--ar-border)] px-3 py-2 text-[11px]">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={includeExecution && !!execution}
+          disabled={!execution} onChange={e => setIncludeExecution(e.target.checked)} />선택한 실행을 포함해 질문</label>
+        <p className="mt-1 text-[var(--ar-text-muted)]">{execution
+          ? `선택 ${execution.cycle + 1}번째 기록 · 현재 화면의 실행 결과를 서버에 보관한 자료로 분석합니다.`
+          : '로그인 후 C 파일을 저장하고 다시 실행해 주세요. 보관된 실행이 없거나 만료되면 텍스트 질문만 가능합니다.'}</p>
+      </div>
       {/* 대화 본문 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
         {/* 추천 질문 칩 바 */}
         <div className="shrink-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex items-center gap-1.5 overflow-x-auto text-[11px] [scrollbar-width:none]">
           <button
             type="button"
-            onClick={() => handleSendMessage("현재 파이프라인 해저드 분석해줘")}
+            onClick={() => handleSendMessage("파이프라인 해저드의 종류와 원인을 설명해줘")}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC] whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
           >
             ⚡ 해저드 분석
@@ -351,7 +374,9 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
                     : "bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] text-[#1F2328] dark:text-[#CCCCCC] rounded-tl-none font-normal"
                 }`}
               >
+                {msg.contextLabel && <p className="mb-1 text-[10px] text-blue-600 dark:text-blue-300">{msg.contextLabel}</p>}
                 {msg.text}
+                {msg.notice && <p role="status" className="mt-1 text-[#57606A] dark:text-[#AAAAAA]">{msg.notice}</p>}
               </div>
             </div>
           ))}
@@ -383,8 +408,13 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef }
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="C 코드나 파이프라인에 대해 질문하세요..."
               disabled={isThinking}
+              maxLength={8000}
               className="flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-xs text-[#1F2328] dark:text-[#CCCCCC] placeholder:text-[#8C959F] dark:placeholder:text-[#6E7681] focus:outline-none focus:border-[#005FB8] dark:focus:border-[#007ACC] focus:ring-1 focus:ring-[#005FB8] dark:focus:ring-[#007ACC] transition-colors"
             />
+            {isThinking && (
+              <button type="button" onClick={() => cancelRequest('답변 생성을 중단했습니다.')}
+                className="px-2 py-1.5 text-xs cursor-pointer">중단</button>
+            )}
             <button
               type="submit"
               disabled={!inputMessage.trim() || isThinking}
