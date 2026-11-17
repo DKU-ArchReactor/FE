@@ -83,6 +83,7 @@ async function compile(page: Page) {
 async function send(page: Page, text = "왜 스톨이야?") {
   await page
     .getByPlaceholder("C 코드나 파이프라인에 대해 질문하세요...")
+    .filter({visible: true})
     .fill(text);
   await page.getByRole("button", { name: "전송", exact: true }).click();
 }
@@ -423,7 +424,7 @@ test("full workspace connects captured run to the actual assistant popup", async
   await page.screenshot({ path: "test-results/full-workspace.png" });
   await page.getByTitle("창 닫기", {exact: true}).click();
   await page.setViewportSize({width: 390, height: 844});
-  await page.locator('.monaco-editor').filter({visible: true}).first().locator('.view-lines .view-line').first().click();
+  await page.getByRole('button', {name: /^ASM L\d+ /}).first().click();
   const closeTutor = page.getByTitle('튜터 모달 닫기', {exact: true});
   await expect(closeTutor).toBeVisible();
   await closeTutor.click();
