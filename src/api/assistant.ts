@@ -1,7 +1,12 @@
-export type ExecutionReference = { build_id: string; mode: 'single' | 'pipeline'; max_cycles: number; history_index: number };
+export type ExecutionReference = { execution_id: string; result_version: string; artifact_sha256: string; mode: 'single' | 'pipeline'; cycle: number; memory_addresses: number[] };
+export type ExecutionDescriptor = Omit<ExecutionReference, 'cycle' | 'memory_addresses'> & { available: true; cycle_min: number; cycle_max: number; expires_at: string };
+
+export function executionReference(descriptor: ExecutionDescriptor | undefined, mode: string, cycle: number): ExecutionReference | undefined {
+  if (!descriptor?.available || descriptor.mode !== mode || !Number.isInteger(cycle) || cycle < descriptor.cycle_min || cycle > descriptor.cycle_max || !Number.isFinite(Date.parse(descriptor.expires_at)) || Date.parse(descriptor.expires_at) <= Date.now()) return undefined;
+  return { execution_id: descriptor.execution_id, result_version: descriptor.result_version, artifact_sha256: descriptor.artifact_sha256, mode: descriptor.mode, cycle, memory_addresses: [] };
+}
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 type ChatEvent =
-  | { type: 'context'; kind: string; build_id: string; execution_id: string; core_version: string; mode: string; history_index: number }
   | { type: 'delta'; text: string }
   | { type: 'done'; stop_reason: string; usage?: Record<string, number> }
   | { type: 'error'; code: string; message: string };
@@ -39,7 +44,7 @@ export async function consumeChatStream(
         if (!data) continue;
         const event = JSON.parse(data) as ChatEvent;
         if (event.type === 'error') throw new Error(event.message);
-        if (event.type === 'delta' || event.type === 'done' || event.type === 'context') onEvent(event);
+        if (event.type === 'delta' || event.type === 'done') onEvent(event);
         if (event.type === 'done') { completed = true; break; }
       }
       if (done) break;
@@ -61,7 +66,7 @@ export async function streamChat(
   const response = await fetch(`${base}/api/v1/assistant/chat`, {
     method: 'POST', signal,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messages: boundedHistory(messages, !!execution), ...(execution ? { execution } : {}) }),
+    body: JSON.stringify({ messages: boundedHistory(messages, !!execution), ...(execution ? { context: execution } : {}) }),
   });
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
@@ -70,7 +75,7 @@ export async function streamChat(
     const payload = await response.json().catch(() => null);
     const detail = typeof payload?.detail === 'string' ? payload.detail : payload?.detail?.message;
     const explanation: Record<number, string> = { 413: '선택한 실행 정보가 너무 큽니다. 더 짧은 실행으로 다시 시도해 주세요.', 422: '선택한 사이클이나 대화 길이를 확인해 주세요.', 429: '요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.', 503: 'AI 연결이 아직 준비되지 않았습니다.' };
-    throw new Error(explanation[response.status] || detail || 'AI 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    throw new Error(detail || explanation[response.status] || 'AI 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.');
   }
   if (!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
     throw new Error('AI 응답 형식을 확인할 수 없습니다.');

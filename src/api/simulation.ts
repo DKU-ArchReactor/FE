@@ -50,6 +50,7 @@ export const runSimulation = async (
   const payload: SimulationRunRequest = {
     mode: data.mode ?? "pipeline",
     max_cycles: data.max_cycles ?? 2000,
+    capture_assistant_context: !!data.build_id && !!localStorage.getItem("access_token"),
     ...(data.build_id
       ? { build_id: data.build_id }
       : { simulation_token: data.simulation_token }),
@@ -102,6 +103,6 @@ export const runSimulation = async (
   }
 
   const normalized = normalizeSimulationResult(resultData as SimulationResult);
-  return { ...normalized, tutor };
+  return { ...normalized, tutor, assistant_context: response.data?.assistant_context };
 };
 

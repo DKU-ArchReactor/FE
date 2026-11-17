@@ -205,7 +205,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     const replyId = `ai-${Date.now()}`;
     setMessages(prev => [...prev, userMsg, {
       id: replyId, sender: 'ai', text: '', time: '방금 전', scope,
-      contextLabel: includeExecution && execution ? `선택 ${execution.history_index + 1}번째 기록 · 재실행 분석` : '텍스트 질문',
+      contextLabel: includeExecution && execution ? `선택 ${execution.cycle + 1}번째 기록 · 저장된 실행 분석` : '텍스트 질문',
     }]);
     setInputMessage('');
     setIsThinking(true);
@@ -217,7 +217,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       const history: ChatMessage[] = [...messages.filter(m => m.id !== 'welcome' && m.complete && m.scope === scope), userMsg]
         .map(m => ({ role: m.sender === 'ai' ? 'assistant' : 'user', content: m.text }));
       await streamChat(history, controller.signal, event => {
-        if (event.type === 'context') updateReply(m => ({ ...m, contextLabel: `선택 ${event.history_index + 1}번째 기록 · 재실행 분석 · CORE ${event.core_version}` }));
         if (event.type === 'delta') updateReply(m => ({ ...m, text: m.text + event.text }));
         if (event.type === 'done') updateReply(m => ({
           ...m, complete: ['end_turn', 'stop'].includes(event.stop_reason),
@@ -319,8 +318,8 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
         <label className="flex items-center gap-2"><input type="checkbox" checked={includeExecution && !!execution}
           disabled={!execution} onChange={e => setIncludeExecution(e.target.checked)} />선택한 실행을 포함해 질문</label>
         <p className="mt-1 text-[var(--ar-text-muted)]">{execution
-          ? `선택 ${execution.history_index + 1}번째 기록 · 저장된 빌드를 다시 실행해 분석합니다. 현재 화면과 결과가 다를 수 있습니다.`
-          : '로그인 후 C 파일을 저장하고 컴파일한 다음 실행 기록을 선택해 주세요. 지금은 텍스트 질문만 가능합니다.'}</p>
+          ? `선택 ${execution.cycle + 1}번째 기록 · 현재 화면의 실행 결과를 서버에 보관한 자료로 분석합니다.`
+          : '로그인 후 C 파일을 저장하고 다시 실행해 주세요. 보관된 실행이 없거나 만료되면 텍스트 질문만 가능합니다.'}</p>
       </div>
       {/* 대화 본문 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">

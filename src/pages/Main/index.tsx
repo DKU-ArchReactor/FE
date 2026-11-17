@@ -1,3 +1,4 @@
+import { executionReference } from '@/api/assistant';
 import BuildStatusBar from "./components/BuildStatusBar";
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
@@ -328,11 +329,10 @@ const MainPage: React.FC = () => {
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
-        contextKey={JSON.stringify([editorTarget, fileMgr.translationSource, customAssembly, simSession.activeBuildId, simSession.simulationEngineMode, playback.currentCycle, fileMgr.translationBusy])}
-        execution={!fileMgr.translationBusy && !(simSession.isSingleEngine && playback.currentCycle === 0) && simSession.activeBuildId && simSession.simulationData?.history?.[playback.activeCycleIndex] ? {
-          build_id: simSession.activeBuildId, mode: simSession.simulationEngineMode,
-          max_cycles: 2000, history_index: playback.activeCycleIndex,
-        } : undefined}
+        contextKey={JSON.stringify([editorTarget, fileMgr.translationSource, customAssembly, simSession.activeBuildId, simSession.simulationData?.assistant_context?.execution_id, simSession.simulationEngineMode, playback.currentCycle, fileMgr.translationBusy])}
+        execution={!fileMgr.translationBusy && !(simSession.isSingleEngine && playback.currentCycle === 0) && simSession.simulationData?.history?.[playback.activeCycleIndex]
+          ? executionReference(simSession.simulationData.assistant_context, simSession.simulationEngineMode, playback.activeCycleIndex)
+          : undefined}
       />
 
       <BuildStatusBar result={simSession.buildResult} busy={fileMgr.translationBusy} hasSimulation={!!simSession.simulationData} />
