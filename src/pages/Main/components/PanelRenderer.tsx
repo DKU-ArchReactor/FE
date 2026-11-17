@@ -1,3 +1,4 @@
+import type { EditorSelection } from '../utils/assistantSource';
 import React from "react";
 import type { PanelKey } from "../types";
 
@@ -19,6 +20,7 @@ import type { MappedAssemblyRow } from "../utils/translationCompile";
 const EMPTY_REGISTERS: Record<string, string> = {};
 
 interface PanelRendererProps {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   panelKey: PanelKey;
   simulationData: SimulationResult | null;
   currentData: CycleHistoryItem | null;
@@ -50,7 +52,7 @@ interface PanelRendererProps {
   onResetTranslationSource: () => void;
   onTranslationCompile: () => void;
   onTranslationFile: (file: File) => void;
-  onSelectTranslationLine: (line: number | null, asmIndex?: number | null) => void;
+  onSelectTranslationLine: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   onSaveTranslationFile: (name?: string) => Promise<boolean>;
   onSaveAssemblyFile?: (name?: string) => Promise<boolean>;
   onOpenSavedFileInEditor: (fileId: string) => void;
@@ -63,10 +65,12 @@ interface PanelRendererProps {
   // 저장된 파일 목록 상태
   savedFiles: FileSummary[];
   isLoggedIn: boolean;
+  onCloseTutor?: () => void;
 }
 
 export const PanelRenderer: React.FC<PanelRendererProps> = ({
   panelKey,
+  onSourceSelection,
   simulationData,
   currentData,
   prevData,
@@ -107,11 +111,13 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
 
   savedFiles,
   isLoggedIn,
+  onCloseTutor,
 }) => {
   switch (panelKey) {
     case "cSource":
       return (
         <TranslationEditor
+          onSourceSelection={onSourceSelection}
           source={translationSource}
           fileName={cFileName || "main.c"}
           onChange={onUpdateTranslationSource}
@@ -135,6 +141,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "source":
       return (
         <TranslationMapping
+          onSourceSelection={onSourceSelection}
           source={translationSource}
           assembly={editorTarget === "asm" ? customAssembly : translationAssembly}
           mappedRows={editorTarget === "asm" ? undefined : mappedAssemblyRows}
@@ -186,6 +193,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           }
           isUserSelected={editorTarget === "c" && translationSelectedLine !== null}
           activeTarget={editorTarget}
+          onClose={onCloseTutor}
         />
       );
 

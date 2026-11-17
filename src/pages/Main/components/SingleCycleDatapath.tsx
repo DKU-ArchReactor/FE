@@ -572,6 +572,16 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
   const isAluActive = !state.isIdle;
   const isOnChipWriteBack = !state.isIdle && state.regWrite && !state.memRead;
 
+  const compactBadge = isBusLoad
+    ? "LOAD"
+    : isBusStore
+    ? "STORE"
+    : state.opcode === "beq" || state.opcode === "bne" || state.opcode === "blt" || state.opcode === "bge" || state.opcode === "bltu" || state.opcode === "bgeu"
+    ? "BRANCH"
+    : state.opcode === "jal" || state.opcode === "jalr"
+    ? "JUMP"
+    : "ALU";
+
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
       <style>{`
@@ -585,19 +595,21 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
         }
       `}</style>
 
-      {/* 상단 심플 바 */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-2 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-sky-500">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="px-2 py-0.5 rounded bg-sky-600 text-white font-mono text-[10px] font-bold shrink-0">
-            {state.isIdle ? "STEP 0" : `CLK ${state.clock}`}
+      {/* 1. 상단 메인 헤더 (PipelineVisualizer 및 전체 패널 표준 h-8 규격 유지) */}
+      <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-blue-500 font-sans">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] font-bold text-blue-500">◆</span>
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+            SINGLE-CYCLE DATAPATH
+          </h3>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
+            (CLK:{state.clock})
           </span>
-          <span className="font-mono text-[11px] text-[var(--ar-text-muted)] shrink-0">{state.pc}</span>
-          <code className="font-mono text-[12px] font-bold text-[#005FB8] dark:text-[#38BDF8] truncate">{state.assembly}</code>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <span
-            className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+            className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full border ${
               isBusLoad
                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
                 : isBusStore
@@ -605,7 +617,7 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
                 : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/40"
             }`}
           >
-            {state.txBadgeText}
+            {compactBadge}
           </span>
 
           <div className="flex items-center bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] rounded px-1 py-0.5 text-[#57606A] dark:text-[#CCCCCC] text-[10px]">
@@ -637,13 +649,62 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
         </div>
       </div>
 
+      {/* 2. 서브 상태 바 (현재 실행 명령어 및 핵심 제어 신호 인디케이터 독립 분리) */}
+      <div className="h-7 shrink-0 px-3.5 bg-[#FAFBFD] dark:bg-[#181C24] border-b border-[var(--ar-border)] flex items-center justify-between text-[10px] min-w-0 select-none">
+        {/* 좌측: 현재 실행 중인 명령어 정보 */}
+        <div className="flex items-center gap-2 min-w-0 font-mono">
+          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold shrink-0">
+            PC {state.pc ? state.pc.toLowerCase() : "0x00010000"}
+          </span>
+          <span className="font-bold text-slate-800 dark:text-slate-100 truncate">
+            {state.assembly || "nop"}
+          </span>
+        </div>
+
+        {/* 우측: 핵심 제어 신호 인디케이터 */}
+        <div className="flex items-center gap-1.5 font-mono text-[9px] shrink-0">
+          <span
+            title="레지스터 파일 쓰기 활성화 (RegWrite)"
+            className={`px-1.5 py-0.5 rounded font-bold border transition-colors ${
+              state.regWrite
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                : "bg-slate-100 dark:bg-slate-800/80 text-slate-400 border-slate-200 dark:border-slate-700/80"
+            }`}
+          >
+            RegWrite: {state.regWrite ? "1" : "0"}
+          </span>
+          <span
+            title="ALU 두 번째 입력 소스 (ALUSrc: 레지스터 vs 즉시값)"
+            className={`px-1.5 py-0.5 rounded font-bold border transition-colors ${
+              state.hasImmediate
+                ? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40"
+                : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/40"
+            }`}
+          >
+            ALUSrc: {state.hasImmediate ? "Imm" : "Reg"}
+          </span>
+          <span
+            title="메모리 읽기/쓰기 동작 (MemRead / MemWrite)"
+            className={`px-1.5 py-0.5 rounded font-bold border transition-colors ${
+              isBusLoad
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                : isBusStore
+                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40"
+                : "bg-slate-100 dark:bg-slate-800/80 text-slate-400 border-slate-200 dark:border-slate-700/80"
+            }`}
+          >
+            Mem: {isBusLoad ? "Read" : isBusStore ? "Write" : "Idle"}
+          </span>
+        </div>
+      </div>
+
       {/* 메인 다이어그램 */}
       <div className="flex-1 overflow-auto relative w-full min-h-0 p-2 custom-scrollbar flex">
         <div
           className="m-auto shrink-0 transition-[height,width] duration-150"
           style={{ width: `${zoomLevel * 100}%`, height: `${zoomLevel * 100}%` }}
         >
-          <svg viewBox="0 0 920 760" preserveAspectRatio="xMidYMid meet" className="w-full h-full select-none block">
+          <svg viewBox="0 0 920 680" preserveAspectRatio="xMidYMid meet" className="w-full h-full select-none block">
             <defs>
               <marker id="arr-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto">
                 <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#94A3B8" />
@@ -867,168 +928,166 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
               </text>
             </g>
 
-            {/* ZONE 2: SYSTEM BUS */}
-            <rect
-              x="20"
-              y="428"
-              width="880"
-              height="68"
-              rx="10"
-              className={
-                isBusLoad
-                  ? "fill-[#ECFDF5] dark:fill-[#0F2922] stroke-[#059669]"
-                  : isBusStore
-                  ? "fill-[#FFFBEB] dark:fill-[#2B2111] stroke-[#D97706]"
-                  : "fill-[#F1F5F9] dark:fill-[#1A1F29] stroke-[#CBD5E1] dark:stroke-[#2D3545]"
-              }
-              strokeWidth="2"
-            />
-            <text x="460" y="456" textAnchor="middle" className="font-sans text-[13px] font-extrabold fill-[#1E293B] dark:fill-[#E2E8F0]">
-              SYSTEM BUS (ON-CHIP ⇄ MEMORY)
-            </text>
-            <text
-              x="460"
-              y="478"
-              textAnchor="middle"
-              className={`font-mono text-[11.5px] font-bold ${
-                isBusLoad ? "fill-[#059669] dark:fill-[#34D399]" : isBusStore ? "fill-[#D97706] dark:fill-[#FBBF24]" : "fill-[#64748B] dark:fill-[#94A3B8]"
-              }`}
-            >
-              {isBusLoad
-                ? `LOAD : Memory[${state.memAddressHex}] = ${state.memDataDec} (${state.memDataHex}) ➔ Register ${formatRegLabel(state.rdKey)}`
-                : isBusStore
-                ? `STORE : Register ${formatRegLabel(state.rs2Key)} = ${state.memDataDec} (${state.memDataHex}) ➔ Memory[${state.memAddressHex}]`
-                : "IDLE (버스 대기 중 · 온칩 내부 연산만 수행)"}
-            </text>
-
-            {/* 버스 배선 (좌측 x=230) */}
-            <g>
-              {isBusLoad ? (
-                <>
-                  <line x1="230" y1="524" x2="230" y2="382" stroke="#059669" strokeWidth="4" markerEnd="url(#arr-emerald)" className="wire-flow-fwd" />
-                  <rect x="148" y="396" width="164" height="22" rx="5" className="fill-[#ECFDF5] dark:fill-[#0B2922] stroke-[#059669]" strokeWidth="1.2" />
-                  <text x="230" y="411" textAnchor="middle" className="font-mono text-[10.5px] font-extrabold fill-[#065F46] dark:fill-[#6EE7B7]">
-                    ▲ DATA READ: {state.memDataDec}
-                  </text>
-                </>
-              ) : isBusStore ? (
-                <>
-                  <line x1="230" y1="380" x2="230" y2="522" stroke="#D97706" strokeWidth="4" markerEnd="url(#arr-amber)" className="wire-flow-fwd" />
-                  <rect x="148" y="396" width="164" height="22" rx="5" className="fill-[#FFFBEB] dark:fill-[#2B2111] stroke-[#D97706]" strokeWidth="1.2" />
-                  <text x="230" y="411" textAnchor="middle" className="font-mono text-[10.5px] font-extrabold fill-[#B45309] dark:fill-[#FCD34D]">
-                    ▼ DATA WRITE: {state.memDataDec}
-                  </text>
-                </>
-              ) : (
-                <line x1="230" y1="380" x2="230" y2="524" stroke="#CBD5E1" strokeWidth="2.5" strokeDasharray="4 4" />
-              )}
-            </g>
-
-            {/* 버스 배선 (우측 x=690) */}
-            <g>
-              <line
-                x1="690"
-                y1="380"
-                x2="690"
-                y2="522"
-                stroke={isBusActive ? "#0284C7" : "#CBD5E1"}
-                strokeWidth={isBusActive ? "3.5" : "2.5"}
-                strokeDasharray={isBusActive ? undefined : "4 4"}
-                markerEnd={isBusActive ? "url(#arr-blue)" : "url(#arr-muted)"}
-                className={isBusActive ? "wire-flow-fwd" : ""}
+            {/* ZONE 2 & 3: SYSTEM BUS & OFF-CHIP DRAM (메모리 접근 여부에 따른 스포트라이트/고스트 효과) */}
+            <g className={`transition-all duration-200 ${isBusActive ? "opacity-100" : "opacity-35 dark:opacity-25"}`}>
+              {/* ZONE 2: SYSTEM BUS */}
+              <rect
+                x="20"
+                y="416"
+                width="880"
+                height="58"
+                rx="10"
+                className={
+                  isBusLoad
+                    ? "fill-[#ECFDF5] dark:fill-[#0F2922] stroke-[#059669]"
+                    : isBusStore
+                    ? "fill-[#FFFBEB] dark:fill-[#2B2111] stroke-[#D97706]"
+                    : "fill-[#F1F5F9] dark:fill-[#1A1F29] stroke-[#CBD5E1] dark:stroke-[#2D3545]"
+                }
+                strokeWidth="2"
               />
-              {isBusActive && (
-                <>
-                  <rect x="608" y="396" width="164" height="22" rx="5" className="fill-[#F0F9FF] dark:fill-[#0C2538] stroke-[#0284C7]" strokeWidth="1.2" />
-                  <text x="690" y="411" textAnchor="middle" className="font-mono text-[10.5px] font-extrabold fill-[#0369A1] dark:fill-[#7DD3FC]">
-                    ▼ ADDR: {state.memAddressHex}
-                  </text>
-                </>
-              )}
-            </g>
+              <text x="460" y="437" textAnchor="middle" className="font-sans text-[12px] font-extrabold fill-[#1E293B] dark:fill-[#E2E8F0]">
+                SYSTEM BUS (ON-CHIP ⇄ MEMORY)
+              </text>
+              <text
+                x="460"
+                y="457"
+                textAnchor="middle"
+                className={`font-mono text-[11px] font-bold ${
+                  isBusLoad ? "fill-[#059669] dark:fill-[#34D399]" : isBusStore ? "fill-[#D97706] dark:fill-[#FBBF24]" : "fill-[#64748B] dark:fill-[#94A3B8]"
+                }`}
+              >
+                {isBusLoad
+                  ? `LOAD : Memory[${state.memAddressHex}] = ${state.memDataDec} (${state.memDataHex}) ➔ Register ${formatRegLabel(state.rdKey)}`
+                  : isBusStore
+                  ? `STORE : Register ${formatRegLabel(state.rs2Key)} = ${state.memDataDec} (${state.memDataHex}) ➔ Memory[${state.memAddressHex}]`
+                  : "IDLE · 온칩 내부 연산 (DRAM 접근 없음)"}
+              </text>
 
-            {/* ZONE 3: OFF-CHIP DRAM MEMORY */}
-            <rect x="20" y="524" width="880" height="220" rx="14" className="fill-[#F8FAFC] dark:fill-[#151921] stroke-[#CBD5E1] dark:stroke-[#2D3545]" strokeWidth="2" />
-            <rect x="40" y="540" width="840" height="34" rx="8" className="fill-[#059669]/10 dark:fill-[#059669]/20" />
-            <text x="460" y="562" textAnchor="middle" className="font-sans text-[13px] font-extrabold fill-[#065F46] dark:fill-[#34D399]">
-              3. MEMORY (OFF-CHIP DRAM)
-            </text>
+              {/* 버스 배선 (좌측 x=230) */}
+              <g>
+                {isBusLoad ? (
+                  <>
+                    <line x1="230" y1="498" x2="230" y2="382" stroke="#059669" strokeWidth="4" markerEnd="url(#arr-emerald)" className="wire-flow-fwd" />
+                    <rect x="148" y="388" width="164" height="20" rx="5" className="fill-[#ECFDF5] dark:fill-[#0B2922] stroke-[#059669]" strokeWidth="1.2" />
+                    <text x="230" y="402" textAnchor="middle" className="font-mono text-[10px] font-extrabold fill-[#065F46] dark:fill-[#6EE7B7]">
+                      ▲ DATA READ: {state.memDataDec}
+                    </text>
+                  </>
+                ) : isBusStore ? (
+                  <>
+                    <line x1="230" y1="380" x2="230" y2="498" stroke="#D97706" strokeWidth="4" markerEnd="url(#arr-amber)" className="wire-flow-fwd" />
+                    <rect x="148" y="388" width="164" height="20" rx="5" className="fill-[#FFFBEB] dark:fill-[#2B2111] stroke-[#D97706]" strokeWidth="1.2" />
+                    <text x="230" y="402" textAnchor="middle" className="font-mono text-[10px] font-extrabold fill-[#B45309] dark:fill-[#FCD34D]">
+                      ▼ DATA WRITE: {state.memDataDec}
+                    </text>
+                  </>
+                ) : (
+                  <line x1="230" y1="380" x2="230" y2="498" stroke="#CBD5E1" strokeWidth="2" strokeDasharray="4 4" />
+                )}
+              </g>
 
-            {memoryColumns.map((slot, idx) => {
-              const cardW = 198;
-              const gap = 16;
-              const cx = 40 + idx * (cardW + gap);
-              const cy = 588;
-              const isTarget = !slot.isEmpty && Boolean(state.memAddressHex) && slot.addr.toLowerCase() === state.memAddressHex?.toLowerCase();
+              {/* 버스 배선 (우측 x=690) */}
+              <g>
+                <line
+                  x1="690"
+                  y1="380"
+                  x2="690"
+                  y2="498"
+                  stroke={isBusActive ? "#0284C7" : "#CBD5E1"}
+                  strokeWidth={isBusActive ? "3.5" : "2"}
+                  strokeDasharray={isBusActive ? undefined : "4 4"}
+                  markerEnd={isBusActive ? "url(#arr-blue)" : "url(#arr-muted)"}
+                  className={isBusActive ? "wire-flow-fwd" : ""}
+                />
+                {isBusActive && (
+                  <>
+                    <rect x="608" y="388" width="164" height="20" rx="5" className="fill-[#F0F9FF] dark:fill-[#0C2538] stroke-[#0284C7]" strokeWidth="1.2" />
+                    <text x="690" y="402" textAnchor="middle" className="font-mono text-[10px] font-extrabold fill-[#0369A1] dark:fill-[#7DD3FC]">
+                      ▼ ADDR: {state.memAddressHex}
+                    </text>
+                  </>
+                )}
+              </g>
 
-              return (
-                <g key={`${slot.addr}-${idx}`}>
-                  <rect
-                    x={cx}
-                    y={cy}
-                    width={cardW}
-                    height="136"
-                    rx="10"
-                    className={
-                      slot.isEmpty
-                        ? "fill-[#F8FAFC]/60 dark:fill-[#181C24] stroke-[#E2E8F0] dark:stroke-[#262C38]"
-                        : isTarget && isBusLoad
-                        ? "fill-[#ECFDF5] dark:fill-[#0E2F26] stroke-[#059669]"
-                        : isTarget && isBusStore
-                        ? "fill-[#FFFBEB] dark:fill-[#2B2111] stroke-[#D97706]"
-                        : "fill-white dark:fill-[#1C212B] stroke-[#CBD5E1] dark:stroke-[#333C4D]"
-                    }
-                    strokeWidth={isTarget ? "2.5" : "1.5"}
-                    strokeDasharray={slot.isEmpty ? "5 4" : undefined}
-                  />
-                  {slot.isEmpty ? (
-                    <>
-                      <text x={cx + cardW / 2} y={cy + 62} textAnchor="middle" className="font-sans text-[11px] font-bold fill-[#94A3B8] dark:fill-[#475569]">
-                        EMPTY MEMORY SLOT
+              {/* ZONE 3: OFF-CHIP DRAM MEMORY */}
+              <rect x="20" y="498" width="880" height="170" rx="14" className="fill-[#F8FAFC] dark:fill-[#151921] stroke-[#CBD5E1] dark:stroke-[#2D3545]" strokeWidth="2" />
+              <rect x="40" y="510" width="840" height="26" rx="6" className="fill-[#059669]/10 dark:fill-[#059669]/20" />
+              <text x="460" y="528" textAnchor="middle" className="font-sans text-[12px] font-extrabold fill-[#065F46] dark:fill-[#34D399]">
+                3. MEMORY (OFF-CHIP DRAM)
+              </text>
+
+              {memoryColumns.map((slot, idx) => {
+                const cardW = 198;
+                const gap = 16;
+                const cx = 40 + idx * (cardW + gap);
+                const cy = 546;
+                const isTarget = !slot.isEmpty && Boolean(state.memAddressHex) && slot.addr.toLowerCase() === state.memAddressHex?.toLowerCase();
+
+                return (
+                  <g key={`${slot.addr}-${idx}`}>
+                    <rect
+                      x={cx}
+                      y={cy}
+                      width={cardW}
+                      height="110"
+                      rx="8"
+                      className={
+                        slot.isEmpty
+                          ? "fill-[#F8FAFC]/40 dark:fill-[#161920]/40 stroke-[#E2E8F0]/70 dark:stroke-[#262C38]/70"
+                          : isTarget && isBusLoad
+                          ? "fill-[#ECFDF5] dark:fill-[#0E2F26] stroke-[#059669]"
+                          : isTarget && isBusStore
+                          ? "fill-[#FFFBEB] dark:fill-[#2B2111] stroke-[#D97706]"
+                          : "fill-white dark:fill-[#1C212B] stroke-[#CBD5E1] dark:stroke-[#333C4D]"
+                      }
+                      strokeWidth={isTarget ? "2.2" : "1.2"}
+                      strokeDasharray={slot.isEmpty ? "4 4" : undefined}
+                    />
+                    {slot.isEmpty ? (
+                      <text x={cx + cardW / 2} y={cy + 60} textAnchor="middle" className="font-mono text-[11px] font-medium fill-[#94A3B8]/60 dark:fill-[#475569]">
+                        —
                       </text>
-                      <text x={cx + cardW / 2} y={cy + 82} textAnchor="middle" className="font-mono text-[10px] fill-[#CBD5E1] dark:fill-[#334155]">
-                        (미사용 영역)
-                      </text>
-                    </>
-                  ) : (
-                    <>
-                      <text x={cx + 14} y={cy + 26} className="font-sans text-[10px] font-bold fill-[#64748B]">
-                        ADDRESS
-                      </text>
-                      {isTarget && (
-                        <text
-                          x={cx + cardW - 14}
-                          y={cy + 26}
-                          textAnchor="end"
-                          className={`font-mono text-[10px] font-extrabold ${isBusLoad ? "fill-[#059669] dark:fill-[#34D399]" : "fill-[#D97706] dark:fill-[#FBBF24]"}`}
-                        >
-                          {isBusLoad ? "▲ READ" : "▼ WRITE"}
+                    ) : (
+                      <>
+                        <text x={cx + 12} y={cy + 22} className="font-sans text-[9.5px] font-bold fill-[#64748B]">
+                          ADDRESS
                         </text>
-                      )}
-                      <text x={cx + 14} y={cy + 46} className="font-mono text-[12.5px] font-extrabold fill-[#0F172A] dark:fill-white">
-                        {slot.addr}
-                      </text>
+                        {isTarget && (
+                          <text
+                            x={cx + cardW - 12}
+                            y={cy + 22}
+                            textAnchor="end"
+                            className={`font-mono text-[9.5px] font-extrabold ${isBusLoad ? "fill-[#059669] dark:fill-[#34D399]" : "fill-[#D97706] dark:fill-[#FBBF24]"}`}
+                          >
+                            {isBusLoad ? "▲ READ" : "▼ WRITE"}
+                          </text>
+                        )}
+                        <text x={cx + 12} y={cy + 40} className="font-mono text-[12px] font-extrabold fill-[#0F172A] dark:fill-white">
+                          {slot.addr}
+                        </text>
 
-                      <line x1={cx + 14} y1={cy + 58} x2={cx + cardW - 14} y2={cy + 58} className="stroke-[#E2E8F0] dark:stroke-[#2D3545]" strokeWidth="1" />
+                        <line x1={cx + 12} y1={cy + 49} x2={cx + cardW - 12} y2={cy + 49} className="stroke-[#E2E8F0] dark:stroke-[#2D3545]" strokeWidth="1" />
 
-                      <text x={cx + 14} y={cy + 78} className="font-sans text-[10px] font-bold fill-[#64748B]">
-                        VALUE
-                      </text>
-                      <text
-                        x={cx + 14}
-                        y={cy + 104}
-                        className={`font-mono ${getResponsiveNumberClass(String(slot.dec), "text-[18px]", "text-[15px]", "text-[12.5px]")} font-black fill-[#0F172A] dark:fill-white`}
-                      >
-                        {slot.dec}
-                      </text>
-                      <text x={cx + 14} y={cy + 123} className="font-mono text-[10.5px] fill-[#64748B]">
-                        {slot.val}
-                      </text>
-                    </>
-                  )}
-                </g>
-              );
-            })}
+                        <text x={cx + 12} y={cy + 65} className="font-sans text-[9.5px] font-bold fill-[#64748B]">
+                          VALUE
+                        </text>
+                        <text
+                          x={cx + 12}
+                          y={cy + 86}
+                          className={`font-mono ${getResponsiveNumberClass(String(slot.dec), "text-[16px]", "text-[13.5px]", "text-[11px]")} font-black fill-[#0F172A] dark:fill-white`}
+                        >
+                          {slot.dec}
+                        </text>
+                        <text x={cx + 12} y={cy + 101} className="font-mono text-[10px] fill-[#64748B]">
+                          {slot.val}
+                        </text>
+                      </>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
           </svg>
         </div>
       </div>

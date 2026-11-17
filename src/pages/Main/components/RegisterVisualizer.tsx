@@ -137,26 +137,33 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-sm transition-colors duration-150">
       {/* VS Code VARIABLES / WATCH 스타일 헤더 (레지스터 전용 앰버 액센트 바) */}
-      <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-amber-500 font-sans">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[11px] text-amber-500 font-bold">◆</span>
-          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+      <div className="h-8 shrink-0 flex items-center justify-between px-2 md:px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-amber-500 font-sans">
+        <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+          <span className="text-[10px] md:text-[11px] text-amber-500 font-bold shrink-0">◆</span>
+          <h3 className="font-sans text-[9.5px] sm:text-[10px] md:text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-tight md:tracking-wide truncate">
             REGISTERS (x0 ~ x31)
           </h3>
         </div>
-        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
+        <span className="hidden md:inline text-[10px] text-[var(--ar-text-muted)] font-mono shrink-0">
           CLK:{cycle ?? 0}
         </span>
       </div>
 
       {/* 32개 레지스터 그리드: VS Code 디버거 변수 인스펙터 룩앤필 */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1.5 py-0.5 divide-y divide-[var(--ar-border-subtle)]">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1 md:px-1.5 py-0.5 divide-y divide-[var(--ar-border-subtle)]">
         {regKeys.map((regKey, idx) => {
           const val = registers[regKey] || '0x00000000';
+          const decStr = formatSignedDec(val);
           const isPulsing = pulsingKeys.has(regKey);
           const hasVal = val !== '0x00000000';
           const meta = REGISTER_METAS[regKey] || { abi: regKey, group: 'temp' as RegisterGroup };
           const groupColor = GROUP_COLORS[meta.group] || GROUP_COLORS.temp;
+          const valSizeClass =
+            decStr.length > 10
+              ? 'text-[8.5px] md:text-[10.5px]'
+              : decStr.length > 7
+              ? 'text-[9.5px] md:text-[11px]'
+              : 'text-[10.5px] md:text-[11px]';
 
           // 그룹 경계선
           const prevMeta = idx > 0 ? REGISTER_METAS[regKeys[idx - 1]] : undefined;
@@ -166,7 +173,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
             <div
               key={regKey}
               title={`${meta.desc || regKey} (Hex: ${val})`}
-              className={`flex-1 min-h-0 flex items-center justify-between px-2 text-[11px] transition-colors duration-100 ${
+              className={`flex-1 min-h-0 flex items-center justify-between px-1.5 md:px-2 text-[10.5px] md:text-[11px] transition-colors duration-100 ${
                 isGroupStart ? 'border-t border-t-[#D0D7DE] dark:border-t-[#3E3E42]' : ''
               } ${
                 isPulsing
@@ -177,8 +184,8 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
               }`}
             >
               {/* 1열 (좌측): [ABI 이름] (레지스터 번호) - 고정 너비로 수직 정렬선 일치 */}
-              <div className="w-[72px] shrink-0 flex items-center gap-1 min-w-0">
-                <span className={`w-8 font-bold text-left ${
+              <div className="w-[58px] md:w-[72px] shrink-0 flex items-center gap-0.5 md:gap-1 min-w-0">
+                <span className={`w-7 md:w-8 font-bold text-left ${
                   isPulsing 
                     ? 'text-[#9A6700] dark:text-[#E5B567]' 
                     : groupColor.name
@@ -186,7 +193,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                   {meta.abi}
                 </span>
 
-                <span className={`text-[10px] tabular-nums ${
+                <span className={`text-[9px] md:text-[10px] tabular-nums ${
                   isPulsing
                     ? 'text-[#9A6700]/70 dark:text-[#E5B567]/70'
                     : hasVal
@@ -197,8 +204,8 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                 </span>
               </div>
 
-              {/* 2열 (중앙): 독립된 역할 설명 열 (왼쪽 시작선 완벽 일치 및 값 존재 시 볼드 파랑 강조) */}
-              <div className="flex-1 min-w-0 px-2.5 text-left truncate">
+              {/* 2열 (중앙): 독립된 역할 설명 열 (모바일 숨김, md 이상 노출) */}
+              <div className="hidden md:block flex-1 min-w-0 px-2.5 text-left truncate">
                 <span className={`text-[9.5px] font-sans tracking-tight ${
                   hasVal
                     ? 'font-bold text-[#005FB8] dark:text-[#79C0FF]'
@@ -208,13 +215,13 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                 </span>
               </div>
 
-              {/* 3열 (우측): 부호 있는 10진수 값 (우측 끝 정렬) */}
+              {/* 3열 (우측): 부호 있는 10진수 값 (길이에 따른 반응형 폰트 축소로 잘림 방지) */}
               <div
                 title={`Hex: ${val}`}
-                className="w-24 shrink-0 text-right tabular-nums font-mono select-text cursor-help"
+                className="flex-1 md:flex-none md:w-24 min-w-0 text-right tabular-nums font-mono select-text cursor-help whitespace-nowrap"
               >
                 <span
-                  className={`text-[11px] ${
+                  className={`${valSizeClass} ${
                     isPulsing
                       ? 'text-[#CF222E] dark:text-[#F44747] font-black'
                       : hasVal
@@ -222,7 +229,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                       : 'text-[#8C959F] dark:text-[#6E7681] font-normal'
                   }`}
                 >
-                  {formatSignedDec(val)}
+                  {decStr}
                 </span>
               </div>
             </div>

@@ -1,3 +1,5 @@
+import { useAssistantSelection } from '../hooks/useAssistantSelection';
+import type { EditorSelection } from '../utils/assistantSource';
 import { useRef, useEffect, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
@@ -6,6 +8,7 @@ import type { FileSummary } from "@/type/file";
 import CFileUploadPopup from "./CFileUploadPopup";
 
 type Props = {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   source: string;
   fileName?: string;
   onChange: (source: string) => void;
@@ -16,7 +19,7 @@ type Props = {
   error: string;
   selectedLine?: number | null;
   executionLine?: number | null;
-  onSelectLine?: (line: number | null) => void;
+  onSelectLine?: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   savedFiles?: FileSummary[];
   isLoggedIn?: boolean;
   currentFileId?: string | null;
@@ -27,6 +30,7 @@ type Props = {
 
 export default function TranslationEditor({
   source,
+  onSourceSelection,
   fileName = "main.c",
   onChange,
   onCompile,
@@ -45,15 +49,22 @@ export default function TranslationEditor({
   activeTarget = "c",
 }: Props) {
   const { theme } = useTheme();
+  const trackSelection = useAssistantSelection('c', onSourceSelection);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<any>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const selectedLineRef = useRef<number | null | undefined>(selectedLine);
   const activeTargetRef = useRef<"c" | "asm">(activeTarget);
+  const onSelectLineRef = useRef<Props["onSelectLine"]>(onSelectLine);
+  const lastMouseSelectTimeRef = useRef<number>(0);
 
   useEffect(() => {
     activeTargetRef.current = activeTarget;
   }, [activeTarget]);
+
+  useEffect(() => {
+    onSelectLineRef.current = onSelectLine;
+  }, [onSelectLine]);
 
   // 저장 상태 관리
   const [isSaving, setIsSaving] = useState(false);
@@ -104,20 +115,58 @@ export default function TranslationEditor({
   }, [selectedLine]);
 
   const handleEditorMount: OnMount = (editorInstance, monacoInstance) => {
+    trackSelection(editorInstance);
     editorRef.current = editorInstance;
     monacoRef.current = monacoInstance;
 
-    // 마우스 클릭 시 동일 라인이면 토글 해제(null), 다른 라인이면 해당 라인 선택
+    // 마우스 클릭 시: 줄 번호 클릭이면 모바일 튜터 모달 오픈(openTutorModal=true), 코드 본문 클릭이면 수정 가능하도록 라인만 선택(openTutorModal=false)
     editorInstance.onMouseDown((e) => {
       // 어셈블리 작성 모드일 때는 C 라인 클릭 및 선택 비활성화
       if (activeTargetRef.current !== "c") return;
 
+      const isLineNumberClick =
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+        Boolean(e.target.element?.closest(".line-numbers"));
+
       const clickedLine = e.target.position?.lineNumber;
       if (clickedLine) {
-        if (selectedLineRef.current === clickedLine) {
-          onSelectLine?.(null);
+        lastMouseSelectTimeRef.current = Date.now();
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        if (selectedLineRef.current === clickedLine && (!isMobile || !isLineNumberClick)) {
+          onSelectLineRef.current?.(null, null, false);
         } else {
-          onSelectLine?.(clickedLine);
+          onSelectLineRef.current?.(clickedLine, null, isLineNumberClick);
+        }
+      }
+    });
+
+    // 모바일 터치 환경에서 줄 번호(.line-numbers) 탭 시 튜터 모달 오픈 보장
+    const domNode = editorInstance.getDomNode();
+    domNode?.addEventListener("click", (evt) => {
+      if (activeTargetRef.current !== "c") return;
+      if (Date.now() - lastMouseSelectTimeRef.current < 80) return;
+      const lineNumEl = (evt.target as HTMLElement | null)?.closest(".line-numbers");
+      if (lineNumEl) {
+        const parsed = parseInt((lineNumEl.textContent || "").trim(), 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          onSelectLineRef.current?.(parsed, null, true);
+        }
+      }
+    });
+
+    // 모바일 터치 환경에서 코드 본문 탭으로 커서가 이동한 경우: 모달은 띄우지 않고 라인 하이라이트만 연동
+    editorInstance.onDidChangeCursorPosition((e) => {
+      if (activeTargetRef.current !== "c") return;
+      if (
+        e.reason === monacoInstance.editor.CursorChangeReason.Explicit &&
+        e.source !== "keyboard" &&
+        e.source !== "modelChange" &&
+        Date.now() - lastMouseSelectTimeRef.current > 80
+      ) {
+        const line = e.position.lineNumber;
+        if (line) {
+          onSelectLineRef.current?.(line, null, false);
         }
       }
     });
@@ -184,7 +233,7 @@ export default function TranslationEditor({
     >
       {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명) */}
       <header
-        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors border-l-2 border-l-blue-600 dark:border-l-blue-500 ${
+        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] ${
           activeTarget !== "c"
             ? "bg-[#F1F5F9] dark:bg-[#1A1A1C]"
             : "bg-[var(--ar-header-bg)]"

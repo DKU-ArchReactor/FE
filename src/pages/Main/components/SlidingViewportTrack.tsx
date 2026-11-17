@@ -12,6 +12,7 @@ interface SlidingViewportTrackProps {
   onSlotResizeStart: (secIdx: number, slotIdx: number, topRatio: number, btmRatio: number, e: React.MouseEvent) => void;
   onPairReset?: (secIdx: number, slotIdx: number) => void;
   onSlotReset?: (secIdx: number, slotIdx: number) => void;
+  mobileExtraSection?: React.ReactNode;
 }
 
 export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
@@ -25,6 +26,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
   onSlotResizeStart,
   onPairReset,
   onSlotReset,
+  mobileExtraSection,
 }) => {
   return (
     <div ref={containerRef} className="flex-1 h-full min-w-0 overflow-hidden relative">
@@ -189,6 +191,12 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
             </div>
           );
         })}
+
+        {mobileExtraSection && (
+          <div className="flex md:hidden h-full min-h-0 shrink-0 w-full overflow-hidden p-[1.5px]">
+            {mobileExtraSection}
+          </div>
+        )}
       </div>
     </div>
   );

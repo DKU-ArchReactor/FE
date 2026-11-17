@@ -1,3 +1,5 @@
+import { useAssistantSelection } from '../hooks/useAssistantSelection';
+import type { EditorSelection } from '../utils/assistantSource';
 import { useMemo, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "@/context/ThemeContext";
@@ -7,6 +9,7 @@ import type { FileSummary } from "@/type/file";
 import AsmFileUploadPopup from "./AsmFileUploadPopup";
 
 type Props = {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   source: string;
   assembly: string;
   mappedRows?: MappedAssemblyRow[];
@@ -100,6 +103,7 @@ function splitInstruction(text: string): { opcode: string; operands: string } {
 
 export default function TranslationMapping({
   source,
+  onSourceSelection,
   assembly,
   mappedRows,
   busy,
@@ -123,6 +127,7 @@ export default function TranslationMapping({
   currentFileId,
 }: Props) {
   const { theme } = useTheme();
+  const trackSelection = useAssistantSelection('asm', onSourceSelection);
   const sourceLines = source.split(/\r?\n/);
   const rows: MappedAssemblyRow[] = useMemo(() => {
     if (mappedRows && mappedRows.length > 0) return mappedRows;
@@ -333,7 +338,7 @@ export default function TranslationMapping({
       aria-label="RISC-V 어셈블리 결과"
     >
       {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수, 우측 상태 문구) */}
-      <header className="h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 border-l-sky-500">
+      <header className="h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC]">
         <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${activeTarget === "asm"
@@ -493,6 +498,7 @@ export default function TranslationMapping({
       {activeTarget === "asm" ? (
         <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
           <Editor
+            onMount={trackSelection}
             height="100%"
             language="plaintext"
             theme={theme === "dark" ? "vs-dark" : "vs"}
@@ -631,7 +637,17 @@ export default function TranslationMapping({
                     onSelectLine?.(row.sourceLine, index);
                   }
                 }}
-                className={`flex items-stretch transition-colors duration-100 cursor-pointer group min-h-[24px] border-l-4 ${rowColorClass}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`ASM L${index + 1} ${row.text}`}
+                aria-pressed={isSelectedPrimary}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.currentTarget.click();
+                  }
+                }}
+                className={`flex items-stretch transition-colors duration-100 cursor-pointer group min-h-[24px] border-l-4 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ar-accent)] ${rowColorClass}`}
               >
                 {/* 1. 화살표 / 인디케이터 (버블 라인은 화살표 없음, 유효한 실행 라인에는 초록색 ▶ 유지) */}
                 <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
@@ -847,9 +863,9 @@ export default function TranslationMapping({
                               ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
                               : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
                         }`}
-                      title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
+                      title="대응하는 C 소스 위치가 확인되지 않았습니다. CRT 여부는 줄 정보만으로 확정할 수 없습니다."
                     >
-                      CRT
+                      미매핑
                     </span>
                   )}
                 </div>

@@ -44,12 +44,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const maxCycle = totalCycles;
 
   return (
-    <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
+    <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3 md:px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
       {/* 1. 모드 알약 버튼군 & 사이클/스텝 정보 및 슬라이더 */}
-      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+      <div className="flex items-center justify-between md:justify-start gap-2 md:gap-2.5 flex-1 min-w-0">
         {/* [모드 1]: C - ASM 알약 버튼 (좌측 라벨 명시) */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight">
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight whitespace-nowrap">
             작성 모드:
           </span>
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
@@ -84,7 +84,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
         {/* [모드 2]: Single - Pipeline 알약 버튼 (좌측 라벨 명시) */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight">
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight whitespace-nowrap">
             시뮬레이션 모드:
           </span>
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
@@ -113,8 +113,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
 
-        {/* [사이클 정보] */}
-        <div className="flex items-baseline gap-1 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5">
+        {/* [사이클 정보] (모바일 숨김, 하단 콘솔로 이동 예정) */}
+        <div className="hidden md:flex items-baseline gap-1 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5">
           <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
             Cycle:
           </span>
@@ -128,7 +128,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">/{maxCycle}</span>
         </div>
         
-        <div className="flex-1 min-w-0 flex items-center gap-2 relative">
+        <div className="hidden md:flex flex-1 min-w-0 items-center gap-2 relative">
           <input
             type="range"
             min={0}
@@ -152,8 +152,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      {/* 2. VS Code 디버그 액션 툴바 (Control Buttons) */}
-      <div className="flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] dark:bg-[#333333] p-0.5 rounded border border-[#D0D7DE] dark:border-[#3E3E42]">
+      {/* 2. VS Code 디버그 액션 툴바 (Control Buttons - 모바일 숨김) */}
+      <div className="hidden md:flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] dark:bg-[#333333] p-0.5 rounded border border-[#D0D7DE] dark:border-[#3E3E42]">
         {/* 1) 초기화 버튼 (정사각형 정지/리셋 아이콘) */}
         <button
           onClick={onReset}
@@ -232,8 +232,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </button>
       </div>
 
-      {/* 3. 속도 조절 */}
-      <div className="flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] dark:border-[#3E3E42] pl-2 text-[10px]">
+      {/* 3. 속도 조절 (모바일 숨김) */}
+      <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] dark:border-[#3E3E42] pl-2 text-[10px]">
         {[
           { label: "0.5x", speed: 2000 },
           { label: "1.0x", speed: 1000 },
