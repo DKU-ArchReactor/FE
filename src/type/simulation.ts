@@ -1,3 +1,4 @@
+import type { TutorBundle } from "@/pages/Main/utils/tutorAnalysis";
 export interface StageBuffer {
   pc?: string;
   raw_instruction?: string;
@@ -218,6 +219,7 @@ export interface SimulationRunRequest {
 }
 
 export interface SimulationResult {
+  tutor?: TutorBundle;
   schema_version: string;
   simulator: {
     mode: string;
