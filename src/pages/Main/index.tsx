@@ -63,10 +63,21 @@ const MainPage: React.FC = () => {
   const [sourceSelection, setSourceSelection] = useState<EditorSelection | null>(null);
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
+  const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
   const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
   const aiPopupOpenRef = useRef(isAiPopupOpen);
   useEffect(() => { aiPopupOpenRef.current = isAiPopupOpen; }, [isAiPopupOpen]);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsMobileAssistantViewport(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
   const [translationSelectedAsmIndex, setTranslationSelectedAsmIndex] = useState<number | null>(null);
@@ -149,7 +160,11 @@ const MainPage: React.FC = () => {
   } = useResizableLayout(sections, setSections);
 
   // 7. 에디터 상호작용 및 시뮬레이션 연결 핸들러
-  const handleSelectTranslationLine = (line: number | null, asmIndex: number | null = null) => {
+  const handleSelectTranslationLine = (
+    line: number | null,
+    asmIndex: number | null = null,
+    openTutorModal: boolean = asmIndex !== null
+  ) => {
     if (line !== null) {
       playback.setIsPlaying((prev) => {
         if (prev) playback.triggerPlaybackFeedback("pause");
@@ -158,11 +173,11 @@ const MainPage: React.FC = () => {
     }
     setTranslationSelectedLine(line);
     setTranslationSelectedAsmIndex(asmIndex);
-    if (line !== null || asmIndex !== null) {
+    if ((line !== null || asmIndex !== null) && openTutorModal) {
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setIsMobileTutorModalOpen(true);
       }
-    } else {
+    } else if (line === null && asmIndex === null) {
       setIsMobileTutorModalOpen(false);
     }
   };
@@ -297,7 +312,19 @@ const MainPage: React.FC = () => {
     : Math.max(0, playback.totalCycles - 1);
 
   const handleMobileViewportSelect = (path: string) => {
+    setIsMobileAssistantViewport(false);
     navigate(path);
+    requestAnimationFrame(() => {
+      mainWorkspaceRef.current?.scrollTo({
+        top: mainWorkspaceRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    });
+  };
+
+  const handleMobileAssistantSelect = () => {
+    setAssistantHint(null);
+    setIsMobileAssistantViewport(true);
     requestAnimationFrame(() => {
       mainWorkspaceRef.current?.scrollTo({
         top: mainWorkspaceRef.current.scrollHeight,
@@ -574,7 +601,7 @@ const MainPage: React.FC = () => {
 
           <SlidingViewportTrack
             sections={sections}
-            rightViewportIndex={rightViewportIndex}
+            rightViewportIndex={isMobileAssistantViewport ? 3 : rightViewportIndex}
             containerRef={containerRef}
             renderPanel={renderPanel}
             resizingPair={resizingPair}
@@ -583,6 +610,22 @@ const MainPage: React.FC = () => {
             onSlotResizeStart={handleSlotResizeStart}
             onPairReset={handlePairReset}
             onSlotReset={handleSlotReset}
+            mobileExtraSection={
+              <AiAssistantPopup
+                key={`mobile-${auth.epoch}`}
+                inline
+                sourceSelection={sourceSelection}
+                editorLanguage={editorTarget}
+                editorContent={editorTarget === "c" ? fileMgr.translationSource : customAssembly}
+                authenticated={auth.authenticated}
+                simulation={simSession.simulationData}
+                currentData={playback.currentData}
+                mode={simSession.simulationEngineMode}
+                beforeExecution={simSession.isSingleEngine && playback.currentCycle === 0}
+                isOpen={true}
+                onClose={() => setIsMobileAssistantViewport(false)}
+              />
+            }
           />
 
           {canGoNextViewport && (
@@ -757,13 +800,13 @@ const MainPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3-2. 바닥 밀착 4버튼 바텀바 (화면 이동 3개 + 어시스턴트 1개) */}
+        {/* 3-2. 바닥 밀착 4버튼 바텀바 (하단 뷰포트 화면 전환 4탭) */}
         <nav className="grid grid-cols-4 h-12 border-t border-[var(--ar-border)] bg-[var(--ar-header-bg)] font-sans">
           <button
             type="button"
             onClick={() => handleMobileViewportSelect("/simulator")}
             className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              rightViewportIndex === 0
+              !isMobileAssistantViewport && rightViewportIndex === 0
                 ? simSession.isSingleEngine
                   ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
                   : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
@@ -780,7 +823,7 @@ const MainPage: React.FC = () => {
             type="button"
             onClick={() => handleMobileViewportSelect("/pipeline")}
             className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              rightViewportIndex === 1
+              !isMobileAssistantViewport && rightViewportIndex === 1
                 ? simSession.isSingleEngine
                   ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
                   : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
@@ -797,7 +840,7 @@ const MainPage: React.FC = () => {
             type="button"
             onClick={() => handleMobileViewportSelect("/management")}
             className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              rightViewportIndex === 2
+              !isMobileAssistantViewport && rightViewportIndex === 2
                 ? simSession.isSingleEngine
                   ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
                   : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
@@ -812,18 +855,13 @@ const MainPage: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => {
-              setAssistantHint(null);
-              setIsAiPopupOpen((prev) => !prev);
-            }}
+            onClick={handleMobileAssistantSelect}
             className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              isAiPopupOpen
+              isMobileAssistantViewport
                 ? simSession.isSingleEngine
-                  ? "bg-gradient-to-tr from-[#005FB8] to-[#1E70BF] text-white font-bold"
-                  : "bg-gradient-to-tr from-[#7C3AED] to-[#9333EA] text-white font-bold"
-                : simSession.isSingleEngine
-                ? "text-[#005FB8] dark:text-[#38BDF8]"
-                : "text-[#7C3AED] dark:text-[#C084FC]"
+                  ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
+                  : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
+                : "text-[#57606A] dark:text-[#858585]"
             }`}
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
