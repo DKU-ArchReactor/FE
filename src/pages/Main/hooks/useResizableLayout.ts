@@ -42,9 +42,9 @@ export function useResizableLayout(
         if (containerHeight <= 0) return;
         const deltaY = e.clientY - startY;
 
-        // sec-4(다이어그램-CPI-해저드)인 경우, CPI의 자연스러운 높이(~230px)를 제외한 가용 높이 기준 연산
-        const isSec4 = sections[secIdx]?.id === 'sec-4';
-        const effectiveContainerHeight = isSec4 ? Math.max(100, containerHeight - 240) : containerHeight;
+        // sec-5(다이어그램-CPI-해저드)인 경우, CPI의 자연스러운 높이(~230px)를 제외한 가용 높이 기준 연산
+        const isSecTiming = sections[secIdx]?.id === 'sec-5';
+        const effectiveContainerHeight = isSecTiming ? Math.max(100, containerHeight - 240) : containerHeight;
 
         const combinedRatio = initialTopRatio + initialBtmRatio;
         const deltaRatio = (deltaY / effectiveContainerHeight) * combinedRatio;
@@ -55,8 +55,8 @@ export function useResizableLayout(
         setSections((prev) =>
           prev.map((sec, sIdx) => {
             if (sIdx !== secIdx) return sec;
-            const topIdx = isSec4 ? 0 : slotIdx;
-            const btmIdx = isSec4 ? 2 : slotIdx + 1;
+            const topIdx = isSecTiming ? 0 : slotIdx;
+            const btmIdx = isSecTiming ? 2 : slotIdx + 1;
 
             const updatedSlots = sec.slots.map((sl, slIdx) => {
               if (slIdx === topIdx) return { ...sl, flexRatio: Math.round(newTop * 100) / 100 };
@@ -177,7 +177,7 @@ export function useResizableLayout(
       const defaultSec = defaults[secIdx];
       if (!sec || !defaultSec) return next;
 
-      if (sec.id === 'sec-4') {
+      if (sec.id === 'sec-5') {
         sec.slots[0].flexRatio = defaultSec.slots[0]?.flexRatio ?? 1.8;
         sec.slots[1].flexRatio = defaultSec.slots[1]?.flexRatio ?? 0.7;
         sec.slots[2].flexRatio = defaultSec.slots[2]?.flexRatio ?? 1.0;

@@ -130,10 +130,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     return () => ro.disconnect();
   }, [history.length, traceRows.length]);
 
-  // Single-Cycle 모드에서는 Step 0이 초기 대기 상태(activeCycleCol = -1)이며, Step 1~N이 각 C0~CN-1 열에 매핑
-  const activeCycleCol = isSingleMode
-    ? (currentCycle > 0 ? currentCycle - 1 : -1)
-    : currentCycle;
+  // Single-Cycle 및 Pipeline 모드 공통: Cycle 0은 초기 대기 상태(activeCycleCol = -1)이며, Cycle 1~N이 각 C0~CN-1 열에 1:1 매핑
+  const activeCycleCol = currentCycle > 0 ? currentCycle - 1 : -1;
 
   // 현재 사이클이 바뀔 때 해당 사이클 열(C0~CN)과 현재 실행 중인 명령어 행이 화면에 오도록 자동 스크롤
   useEffect(() => {
@@ -404,7 +402,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     <button
                       key={cIdx}
                       type="button"
-                      onClick={() => onJumpToCycle?.(isSingleMode ? cIdx + 1 : cIdx)}
+                      onClick={() => onJumpToCycle?.(cIdx + 1)}
                       className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5] dark:border-[#333333] cursor-pointer transition-colors relative ${isCurrent
                           ? `${highlightTint.activeHeader} shadow-inner font-extrabold`
                           : hasStall
@@ -414,10 +412,10 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                               : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
                         }`}
                       style={{ width: `${COL_WIDTH}px` }}
-                      title={`Clock ${item.clock ?? cIdx}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
+                      title={`Clock ${cIdx + 1}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
                         }`}
                     >
-                      <span>C{item.clock ?? cIdx}</span>
+                      <span>C{cIdx + 1}</span>
                       {(hasStall || hasFlush) && !isCurrent && (
                         <span
                           className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-amber-500' : 'bg-purple-500'

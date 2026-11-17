@@ -44,7 +44,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
               <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {section.slots.map((slot, slotIdx) => {
                   const isMetricsFixed =
-                    section.id === "sec-4" &&
+                    section.id === "sec-5" &&
                     slot.type === "single" &&
                     slot.panel === "metrics";
 
@@ -147,11 +147,11 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                               onSlotReset?.(secIdx, slotIdx);
                               return;
                             }
-                            const isSec4 = section.id === "sec-4";
-                            const topSlot = isSec4 ? section.slots[0] : section.slots[slotIdx];
-                            const btmSlot = isSec4 ? section.slots[2] : section.slots[slotIdx + 1];
-                            const topRatio = topSlot?.flexRatio ?? (isSec4 ? 1.8 : 1);
-                            const btmRatio = btmSlot?.flexRatio ?? (isSec4 ? 1.0 : 1);
+                            const isSecTiming = section.id === "sec-5";
+                            const topSlot = isSecTiming ? section.slots[0] : section.slots[slotIdx];
+                            const btmSlot = isSecTiming ? section.slots[2] : section.slots[slotIdx + 1];
+                            const topRatio = topSlot?.flexRatio ?? (isSecTiming ? 1.8 : 1);
+                            const btmRatio = btmSlot?.flexRatio ?? (isSecTiming ? 1.0 : 1);
                             onSlotResizeStart(
                               secIdx,
                               slotIdx,
@@ -166,7 +166,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                             onSlotReset?.(secIdx, slotIdx);
                           }}
                           title={
-                            section.id === "sec-4"
+                            section.id === "sec-5"
                               ? "위아래로 드래그하여 다이어그램과 해저드 영역 높이 조절 (더블클릭: 기본 위치 리셋)"
                               : "위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 기본 리셋)"
                           }

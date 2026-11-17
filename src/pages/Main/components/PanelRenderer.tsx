@@ -145,6 +145,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           executionLine={activeExecutionCLine}
           onSelectLine={onSelectTranslationLine}
           stageBuffers={currentData?.buffers}
+          prevStageBuffers={prevData?.buffers}
+          cycleEvents={currentData?.cycle_events}
           mode={simulationMode}
           currentActiveStep={
             isSingleEngine
