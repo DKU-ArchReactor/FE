@@ -115,51 +115,18 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
         }
       `}</style>
 
-      {/* 1. 상단 헤더 & 컨트롤러 */}
+      {/* 1. 상단 헤더 & 줌 컨트롤러 */}
       <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-blue-500">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[11px] font-bold text-blue-500">◆</span>
-          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+          <span className="text-[11px] font-bold text-blue-500 shrink-0">◆</span>
+          <h3 className="font-sans text-[10px] sm:text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate">
             {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(CLK:{clock ?? 0})</span>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono shrink-0">(CLK:{clock ?? 0})</span>
         </div>
 
-        {/* 이벤트 뱃지 & 줌 컨트롤 */}
-        <div className="flex items-center gap-1.5">
-          {/* CRT 런타임 진입/초기화 식별 뱃지 */}
-          {((ifInst && (ifInst.startsWith("auipc") || ifInst.startsWith("jal") || ifInst.startsWith("li") || ifInst.startsWith("csrw"))) ||
-            (clock !== undefined && clock < 10 && !cycle_events.stall?.has_stall && !cycle_events.forwarding?.has_forwarded)) && (
-            <span
-              className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/30"
-              title="C main() 진입 전 또는 종료 후 런타임 시스템 코드"
-            >
-              Runtime/CRT
-            </span>
-          )}
-          {isSingle ? (
-            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-              Single-Cycle (No Hazard)
-            </span>
-          ) : (
-            <>
-              {isStall && (
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse shadow-2xs">
-                  ⚠️ Stall
-                </span>
-              )}
-              {isForward && (
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-600 text-white shadow-2xs">
-                  ⇄ FWD
-                </span>
-              )}
-              {isBranchFlush && (
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white shadow-2xs">
-                  🔄 Flush
-                </span>
-              )}
-            </>
-          )}
+        {/* 줌 컨트롤 */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <div className="flex items-center bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] rounded px-1 py-0.5 text-[#57606A] dark:text-[#CCCCCC] text-[10px]">
             <button
               onClick={handleZoomOut}
@@ -183,6 +150,53 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               +
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* 1-2. 헤더 하단 서브 상태 바 (Runtime/CRT, Stall, FWD, Flush 등 상태 뱃지 영역) */}
+      <div className="h-7 shrink-0 px-3.5 bg-[#FAFBFD] dark:bg-[#181C24] border-b border-[var(--ar-border)] flex items-center justify-between gap-2 text-[10px] min-w-0 select-none overflow-x-auto custom-scrollbar">
+        <span className="text-[9.5px] font-mono text-[var(--ar-text-muted)] shrink-0">
+          STATUS
+        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* CRT 런타임 진입/초기화 식별 뱃지 */}
+          {((ifInst && (ifInst.startsWith("auipc") || ifInst.startsWith("jal") || ifInst.startsWith("li") || ifInst.startsWith("csrw"))) ||
+            (clock !== undefined && clock < 10 && !cycle_events.stall?.has_stall && !cycle_events.forwarding?.has_forwarded)) && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/30 whitespace-nowrap"
+              title="C main() 진입 전 또는 종료 후 런타임 시스템 코드"
+            >
+              Runtime/CRT
+            </span>
+          )}
+          {isSingle ? (
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap">
+              Single-Cycle (No Hazard)
+            </span>
+          ) : (
+            <>
+              {isStall && (
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse shadow-2xs whitespace-nowrap">
+                  ⚠️ Stall
+                </span>
+              )}
+              {isForward && (
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-600 text-white shadow-2xs whitespace-nowrap">
+                  ⇄ FWD
+                </span>
+              )}
+              {isBranchFlush && (
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white shadow-2xs whitespace-nowrap">
+                  🔄 Flush
+                </span>
+              )}
+              {!isStall && !isForward && !isBranchFlush && (
+                <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                  Normal Flow
+                </span>
+              )}
+            </>
+          )}
         </div>
       </div>
 

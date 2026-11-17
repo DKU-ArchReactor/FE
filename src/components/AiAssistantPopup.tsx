@@ -31,6 +31,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   anchorRef?: React.RefObject<HTMLElement | null>;
+  inline?: boolean;
 }
 
 const BRIEF_ANSWER_REQUEST = ' 답변은 결론 한 문장과 핵심 근거 2~3개로, 500자 안팎으로 짧게 해줘. 표·전체 코드 재출력·반복 요약은 생략하고, 자료가 부족하면 필요한 자료만 한 문장으로 알려줘.';
@@ -49,7 +50,7 @@ const QUESTION_EXAMPLES = [
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 500;
 
-export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, authenticated, simulation, currentData, mode, beforeExecution, editorLanguage = 'c', editorContent = '', sourceSelection }) => {
+export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, inline = false, authenticated, simulation, currentData, mode, beforeExecution, editorLanguage = 'c', editorContent = '', sourceSelection }) => {
   const isSingle = mode === "single";
   // 1. 위치 및 드래그 상태 관리
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -312,42 +313,50 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
   // ========================================================
   return (
     <div
-      style={{
-        left: `${curPos.x}px`,
-        top: `${curPos.y}px`,
-        width: `${POPUP_WIDTH}px`,
-        height: `${POPUP_HEIGHT}px`,
-      }}
+      style={
+        inline
+          ? undefined
+          : {
+              left: `${curPos.x}px`,
+              top: `${curPos.y}px`,
+              width: `${POPUP_WIDTH}px`,
+              height: `${POPUP_HEIGHT}px`,
+            }
+      }
       onAnimationEnd={(e) => {
-        if (e.target === e.currentTarget) {
+        if (!inline && e.target === e.currentTarget) {
           setHasAnimated(true);
         }
       }}
-      className={`fixed z-50 flex flex-col rounded-xl overflow-hidden select-none border-2 max-md:!left-2 max-md:!right-2 max-md:!top-14 max-md:!bottom-[126px] max-md:!w-auto max-md:!h-auto ${
-        isSingle
-          ? "border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
-          : "border-[#7C3AED]/40 dark:border-[#A855F7]/50 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(168,85,247,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
-      } ${
-        isDragging
-          ? isSingle
-            ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
-            : "ring-2 ring-[#7C3AED] dark:ring-[#A855F7] shadow-[0_24px_56px_-4px_rgba(124,58,237,0.3)]"
-          : ""
-      } ${
-        !hasAnimated ? "ai-popup-drop-anim" : ""
-      } bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]`}
+      className={
+        inline
+          ? "w-full h-full flex-1 min-h-0 flex flex-col rounded-lg overflow-hidden select-none border border-[var(--ar-border)] shadow-sm bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]"
+          : `hidden md:flex fixed z-50 flex-col rounded-xl overflow-hidden select-none border-2 ${
+              isSingle
+                ? "border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
+                : "border-[#7C3AED]/40 dark:border-[#A855F7]/50 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(168,85,247,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
+            } ${
+              isDragging
+                ? isSingle
+                  ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
+                  : "ring-2 ring-[#7C3AED] dark:ring-[#A855F7] shadow-[0_24px_56px_-4px_rgba(124,58,237,0.3)]"
+                : ""
+            } ${
+              !hasAnimated ? "ai-popup-drop-anim" : ""
+            } bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]`
+      }
     >
-      {/* 팝업 헤더 (드래그 핸들 역할 - 4면 균일 2px 테두리) */}
+      {/* 팝업/패널 헤더 */}
       <header
-        onMouseDown={startDrag}
+        onMouseDown={inline ? undefined : startDrag}
         className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b ${
           isSingle
             ? "border-[#005FB8]/15 dark:border-[#007ACC]/25"
             : "border-[#7C3AED]/15 dark:border-[#A855F7]/25"
-        } cursor-grab active:cursor-grabbing transition-colors ${
-          isDragging ? "bg-[#EAEAEA] dark:bg-[#2D2D2D]" : ""
+        } ${inline ? "" : "cursor-grab active:cursor-grabbing"} transition-colors ${
+          !inline && isDragging ? "bg-[#EAEAEA] dark:bg-[#2D2D2D]" : ""
         }`}
-        title="드래그하여 원하는 위치로 이동할 수 있습니다."
+        title={inline ? undefined : "드래그하여 원하는 위치로 이동할 수 있습니다."}
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm shrink-0">✨</span>
@@ -360,44 +369,48 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 isSingle ? "bg-[#005FB8] dark:bg-[#007ACC]" : "bg-[#7C3AED] dark:bg-[#A855F7]"
               } animate-pulse`} />
             </div>
-            <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate font-mono">
-              헤더를 잡고 드래그하여 이동
-            </span>
+            {!inline && (
+              <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate font-mono">
+                헤더를 잡고 드래그하여 이동
+              </span>
+            )}
           </div>
         </div>
 
-        {/* 우측 컨트롤 버튼 (버튼 아래 원위치 / 닫기) */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* 버튼 바로 아래로 원위치 복귀 */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPosition(getAnchorPosition());
-            }}
-            title="버튼 바로 아래 기본 위치로 복귀"
-            className={`p-1 rounded text-[#57606A] dark:text-[#858585] ${
-              isSingle
-                ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-            } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
-          >
-            ↺
-          </button>
+        {/* 우측 컨트롤 버튼 (플로팅 모드 전용: 버튼 아래 원위치 / 닫기) */}
+        {!inline && (
+          <div className="flex items-center gap-1 shrink-0">
+            {/* 버튼 바로 아래로 원위치 복귀 */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPosition(getAnchorPosition());
+              }}
+              title="버튼 바로 아래 기본 위치로 복귀"
+              className={`p-1 rounded text-[#57606A] dark:text-[#858585] ${
+                isSingle
+                  ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                  : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+              } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
+            >
+              ↺
+            </button>
 
-          {/* 닫기 버튼 */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            title="창 닫기"
-            className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold"
-          >
-            ✕
-          </button>
-        </div>
+            {/* 닫기 버튼 */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              title="창 닫기"
+              className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </header>
 
       {/* 대화 본문 */}

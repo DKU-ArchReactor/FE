@@ -19,7 +19,7 @@ type Props = {
   error: string;
   selectedLine?: number | null;
   executionLine?: number | null;
-  onSelectLine?: (line: number | null) => void;
+  onSelectLine?: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   savedFiles?: FileSummary[];
   isLoggedIn?: boolean;
   currentFileId?: string | null;
@@ -119,23 +119,43 @@ export default function TranslationEditor({
     editorRef.current = editorInstance;
     monacoRef.current = monacoInstance;
 
-    // 마우스 클릭 시 동일 라인이면 토글 해제(null), 다른 라인이면 해당 라인 선택
+    // 마우스 클릭 시: 줄 번호 클릭이면 모바일 튜터 모달 오픈(openTutorModal=true), 코드 본문 클릭이면 수정 가능하도록 라인만 선택(openTutorModal=false)
     editorInstance.onMouseDown((e) => {
       // 어셈블리 작성 모드일 때는 C 라인 클릭 및 선택 비활성화
       if (activeTargetRef.current !== "c") return;
 
+      const isLineNumberClick =
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+        Boolean(e.target.element?.closest(".line-numbers"));
+
       const clickedLine = e.target.position?.lineNumber;
       if (clickedLine) {
         lastMouseSelectTimeRef.current = Date.now();
-        if (selectedLineRef.current === clickedLine) {
-          onSelectLineRef.current?.(null);
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        if (selectedLineRef.current === clickedLine && (!isMobile || !isLineNumberClick)) {
+          onSelectLineRef.current?.(null, null, false);
         } else {
-          onSelectLineRef.current?.(clickedLine);
+          onSelectLineRef.current?.(clickedLine, null, isLineNumberClick);
         }
       }
     });
 
-    // 모바일 터치 환경(onMouseDown 미발생 시)에서 줄 탭으로 커서가 이동한 경우 선택 반영
+    // 모바일 터치 환경에서 줄 번호(.line-numbers) 탭 시 튜터 모달 오픈 보장
+    const domNode = editorInstance.getDomNode();
+    domNode?.addEventListener("click", (evt) => {
+      if (activeTargetRef.current !== "c") return;
+      if (Date.now() - lastMouseSelectTimeRef.current < 80) return;
+      const lineNumEl = (evt.target as HTMLElement | null)?.closest(".line-numbers");
+      if (lineNumEl) {
+        const parsed = parseInt((lineNumEl.textContent || "").trim(), 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          onSelectLineRef.current?.(parsed, null, true);
+        }
+      }
+    });
+
+    // 모바일 터치 환경에서 코드 본문 탭으로 커서가 이동한 경우: 모달은 띄우지 않고 라인 하이라이트만 연동
     editorInstance.onDidChangeCursorPosition((e) => {
       if (activeTargetRef.current !== "c") return;
       if (
@@ -146,7 +166,7 @@ export default function TranslationEditor({
       ) {
         const line = e.position.lineNumber;
         if (line) {
-          onSelectLineRef.current?.(line);
+          onSelectLineRef.current?.(line, null, false);
         }
       }
     });

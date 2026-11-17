@@ -52,7 +52,7 @@ interface PanelRendererProps {
   onResetTranslationSource: () => void;
   onTranslationCompile: () => void;
   onTranslationFile: (file: File) => void;
-  onSelectTranslationLine: (line: number | null, asmIndex?: number | null) => void;
+  onSelectTranslationLine: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   onSaveTranslationFile: (name?: string) => Promise<boolean>;
   onSaveAssemblyFile?: (name?: string) => Promise<boolean>;
   onOpenSavedFileInEditor: (fileId: string) => void;
