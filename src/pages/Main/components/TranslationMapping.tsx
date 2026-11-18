@@ -617,13 +617,17 @@ export default function TranslationMapping({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 어셈블리 시뮬레이션 버튼 (C 에디터 컴파일 버튼과 100% 동일한 클래스, 색상, 이펙트, 구조) */}
+          {/* 어셈블리 시뮬레이션 버튼 (ASM 모드일 때만 활성화 & C 에디터 컴파일 버튼과 동일한 액센트/이펙트, C 모드일 때는 비활성화 회색 처리) */}
           <button
             type="button"
-            className="h-[22px] rounded bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold"
+            className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${
+              activeTarget === "asm"
+                ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 cursor-pointer shadow-2xs"
+                : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
+            }`}
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
-            title="어셈블리 빌드 및 시뮬레이션 준비"
+            title={activeTarget === "asm" ? "어셈블리 빌드 및 시뮬레이션 준비" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
           >
             {busy ? (
               <span className="w-3 h-3 flex items-center justify-center shrink-0">
