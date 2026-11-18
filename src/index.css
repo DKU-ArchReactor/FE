@@ -399,6 +399,84 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 /* ======================================================== */
+/* Monaco Editor ASM 직접 작성 모드 전용 하이라이트 스타일   */
+/* (앰버/인디고 테마: 하드웨어 어셈블리 고유 감성)           */
+/* ======================================================== */
+.monaco-selected-asm-line {
+  background-color: #fffbeb !important; /* amber-50 */
+}
+.monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
+  background-color: #fffbeb !important;
+  box-shadow: inset 4px 0 0 0 #d97706 !important; /* amber-600 */
+}
+.monaco-editor .line-numbers.monaco-selected-asm-linenumber {
+  color: #b45309 !important; /* amber-700 */
+  font-weight: 700 !important;
+}
+
+html.dark .monaco-selected-asm-line {
+  background-color: #451a03 !important; /* amber-950/70 */
+}
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
+  background-color: #451a03 !important;
+  box-shadow: inset 4px 0 0 0 #f59e0b !important; /* amber-500 */
+}
+html.dark .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
+  color: #fcd34d !important; /* amber-300 */
+  font-weight: 700 !important;
+}
+
+/* 실행 중인 어셈블리 라인 (에메랄드/그린 하드웨어 클록 통일) */
+.monaco-executing-asm-line {
+  background-color: #ecfdf5 !important;
+}
+.monaco-editor .margin-view-overlays > div:has(.monaco-executing-asm-linenumber) {
+  background-color: #ecfdf5 !important;
+  box-shadow: inset 4px 0 0 0 #059669 !important;
+}
+.monaco-editor .line-numbers.monaco-executing-asm-linenumber {
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+html.dark .monaco-executing-asm-line {
+  background-color: #133a27 !important;
+}
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-asm-linenumber) {
+  background-color: #133a27 !important;
+  box-shadow: inset 4px 0 0 0 #23d18b !important;
+}
+html.dark .monaco-editor .line-numbers.monaco-executing-asm-linenumber {
+  color: #7ee787 !important;
+  font-weight: 700 !important;
+}
+
+/* 실행 중이면서 선택된 어셈블리 라인 */
+.monaco-executing-selected-asm-line {
+  background-color: #fef3c7 !important; /* amber-100 */
+}
+.monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-asm-linenumber) {
+  background-color: #fef3c7 !important;
+  box-shadow: inset 4px 0 0 0 #b45309 !important;
+}
+.monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber {
+  color: #92400e !important;
+  font-weight: 700 !important;
+}
+
+html.dark .monaco-executing-selected-asm-line {
+  background-color: #78350f !important;
+}
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-asm-linenumber) {
+  background-color: #78350f !important;
+  box-shadow: inset 4px 0 0 0 #fbbf24 !important;
+}
+html.dark .monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber {
+  color: #fde68a !important;
+  font-weight: 700 !important;
+}
+
+/* ======================================================== */
 /* ArchReactor 브랜드 로고 인터랙티브 틸트 & 젤리 호버 효과 */
 /* ======================================================== */
 @keyframes logoWobble {
