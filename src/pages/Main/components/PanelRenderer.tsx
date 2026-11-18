@@ -178,9 +178,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           currentCycleData={currentData}
           loadingMessage={loadingMessage}
           translationSource={translationSource}
-          translationAssembly={translationAssembly}
-          mappedRows={mappedAssemblyRows}
-          selectedTranslationLine={effectiveSelectedLine}
+          translationAssembly={editorTarget === "asm" ? customAssembly : translationAssembly}
+          mappedRows={editorTarget === "asm" && !simulationData ? undefined : mappedAssemblyRows}
+          selectedTranslationLine={editorTarget === "asm" ? translationSelectedLine : effectiveSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           currentActiveAsmIndex={
             isSingleEngine
@@ -189,7 +189,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
                 : null
               : null
           }
-          isUserSelected={editorTarget === "c" && translationSelectedLine !== null}
+          isUserSelected={translationSelectedLine !== null || translationSelectedAsmIndex !== null}
           activeTarget={editorTarget}
           onClose={onCloseTutor}
         />

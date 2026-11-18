@@ -1,7 +1,8 @@
 import { useAssistantSelection } from '../hooks/useAssistantSelection';
 import type { EditorSelection } from '../utils/assistantSource';
 import { useMemo, useEffect, useRef, useState } from "react";
-import Editor from "@monaco-editor/react";
+import Editor, { type OnMount } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { useTheme } from "@/context/ThemeContext";
 import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
 import type { StageBuffer } from "@/type/simulation";
@@ -18,7 +19,7 @@ type Props = {
   selectedLine?: number | null;
   selectedAsmIndex?: number | null;
   executionLine?: number | null;
-  onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
+  onSelectLine?: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
     ID?: StageBuffer | null;
@@ -102,6 +103,143 @@ export default function TranslationMapping({
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [asmSaveSuccess, setAsmSaveSuccess] = useState(false);
+
+  const asmEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const asmMonacoRef = useRef<Parameters<OnMount>[1] | null>(null);
+  const asmDecorationsRef = useRef<string[]>([]);
+  const selectedLineRef = useRef<number | null | undefined>(selectedLine);
+  const activeTargetRef = useRef<"c" | "asm">(activeTarget);
+  const assemblyRef = useRef<string>(assembly);
+  const rowsRef = useRef<MappedAssemblyRow[]>(rows);
+  const onSelectLineRef = useRef<Props["onSelectLine"]>(onSelectLine);
+  const lastMouseSelectTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    selectedLineRef.current = selectedLine;
+  }, [selectedLine]);
+
+  useEffect(() => {
+    activeTargetRef.current = activeTarget;
+  }, [activeTarget]);
+
+  useEffect(() => {
+    assemblyRef.current = assembly;
+  }, [assembly]);
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+
+  useEffect(() => {
+    onSelectLineRef.current = onSelectLine;
+  }, [onSelectLine]);
+
+  const resolveAsmRowIndex = (lineNum: number): number | null => {
+    const lines = (assemblyRef.current || "").split(/\r?\n/);
+    const rawTarget = (lines[lineNum - 1] ?? "").replace(/#.*/, "").trim();
+    if (!rawTarget || rawTarget.startsWith(".") || /^[.$\w]+:$/.test(rawTarget)) {
+      return null;
+    }
+    let execIdx = -1;
+    for (let i = 0; i < Math.min(lineNum, lines.length); i++) {
+      const clean = lines[i].replace(/#.*/, "").trim();
+      if (!clean || clean.startsWith(".") || /^[.$\w]+:$/.test(clean)) continue;
+      if (/^[a-zA-Z][\w.]*\s*[^=]*$/.test(clean)) {
+        execIdx++;
+      }
+    }
+    const currentRows = rowsRef.current;
+    if (execIdx >= 0 && execIdx < currentRows.length) return execIdx;
+    const normTarget = rawTarget.replace(/\s+/g, " ").trim().toLowerCase();
+    const byText = currentRows.findIndex(
+      (r) => r.text.replace(/\s+/g, " ").trim().toLowerCase() === normTarget
+    );
+    return byText >= 0 ? byText : execIdx >= 0 ? execIdx : null;
+  };
+
+  const handleAsmEditorMount: OnMount = (editorInstance, monacoInstance) => {
+    trackSelection(editorInstance);
+    asmEditorRef.current = editorInstance;
+    asmMonacoRef.current = monacoInstance;
+
+    editorInstance.onMouseDown((e) => {
+      if (activeTargetRef.current !== "asm") return;
+
+      const isLineNumberClick =
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+        Boolean(e.target.element?.closest(".line-numbers"));
+
+      const clickedLine = e.target.position?.lineNumber;
+      if (clickedLine) {
+        lastMouseSelectTimeRef.current = Date.now();
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        if (selectedLineRef.current === clickedLine && (!isMobile || !isLineNumberClick)) {
+          onSelectLineRef.current?.(null, null, false);
+        } else {
+          const asmIdx = resolveAsmRowIndex(clickedLine);
+          onSelectLineRef.current?.(clickedLine, asmIdx, isLineNumberClick);
+        }
+      }
+    });
+
+    const domNode = editorInstance.getDomNode();
+    domNode?.addEventListener("click", (evt) => {
+      if (activeTargetRef.current !== "asm") return;
+      if (Date.now() - lastMouseSelectTimeRef.current < 80) return;
+      const lineNumEl = (evt.target as HTMLElement | null)?.closest(".line-numbers");
+      if (lineNumEl) {
+        const parsed = parseInt((lineNumEl.textContent || "").trim(), 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          const asmIdx = resolveAsmRowIndex(parsed);
+          onSelectLineRef.current?.(parsed, asmIdx, true);
+        }
+      }
+    });
+
+    editorInstance.onDidChangeCursorPosition((e) => {
+      if (activeTargetRef.current !== "asm") return;
+      if (
+        e.reason === monacoInstance.editor.CursorChangeReason.Explicit &&
+        e.source !== "keyboard" &&
+        e.source !== "modelChange" &&
+        Date.now() - lastMouseSelectTimeRef.current > 80
+      ) {
+        const line = e.position.lineNumber;
+        if (line) {
+          const asmIdx = resolveAsmRowIndex(line);
+          onSelectLineRef.current?.(line, asmIdx, false);
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!asmEditorRef.current || !asmMonacoRef.current) return;
+    if (activeTarget !== "asm") {
+      asmDecorationsRef.current = asmEditorRef.current.deltaDecorations(
+        asmDecorationsRef.current,
+        []
+      );
+      return;
+    }
+
+    const newDecorations: editor.IModelDeltaDecoration[] = [];
+    if (selectedLine && selectedLine > 0) {
+      newDecorations.push({
+        range: new asmMonacoRef.current.Range(selectedLine, 1, selectedLine, 1),
+        options: {
+          isWholeLine: true,
+          className: "monaco-selected-c-line",
+          lineNumberClassName: "monaco-selected-c-linenumber",
+        },
+      });
+    }
+    asmDecorationsRef.current = asmEditorRef.current.deltaDecorations(
+      asmDecorationsRef.current,
+      newDecorations
+    );
+  }, [selectedLine, activeTarget]);
 
   const [isSaving, setIsSaving] = useState(false);
   const isLoggedIn = !!localStorage.getItem("access_token");
@@ -413,7 +551,7 @@ export default function TranslationMapping({
       {activeTarget === "asm" ? (
         <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
           <Editor
-            onMount={trackSelection}
+            onMount={handleAsmEditorMount}
             height="100%"
             language="plaintext"
             theme={theme === "dark" ? "vs-dark" : "vs"}
