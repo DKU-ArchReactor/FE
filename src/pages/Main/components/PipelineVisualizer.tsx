@@ -219,18 +219,24 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           const rawAsm = buf?.assembly?.trim();
           const hasInst = Boolean(rawAsm && rawAsm !== "empty" && rawAsm !== "bubble");
 
+          // ID 단계부터 WB 단계까지(층 3~9) 2열 좌측에 Write-Back 피드백 버스 세로 테두리 적용
+          const hasFeedbackBorder = layer.id !== "layer-1-if" && layer.id !== "layer-2-buf-if-id";
+          const feedbackBorderClass = hasFeedbackBorder
+            ? "border-l-2 border-purple-600 dark:border-purple-400"
+            : "";
+
           // 짝수행 (버퍼 레지스터 행)
           if (isBuffer) {
             return (
               <React.Fragment key={layer.id}>
-                {/* 1열: 비움 (경계선 없음) */}
+                {/* 1열: 비움 */}
                 <div className="min-h-0" />
 
-                {/* 2열: 버퍼 레지스터 바 (다른 컴포넌트들과 통일된 라운딩, 테두리, 산세리프 톤앤매너) */}
+                {/* 2열: 버퍼 레지스터 바 (좌측에 피드백 세로선 테두리 적용 & 가로 길이를 적절히 늘려 시원하게) */}
                 <div
-                  className="bg-transparent px-2 py-0.5 flex items-stretch justify-center min-h-0"
+                  className={`bg-transparent px-3 py-0.5 flex items-stretch justify-center min-h-0 ${feedbackBorderClass}`}
                 >
-                  <div className="w-full h-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 flex items-center justify-center rounded-md shadow-2xs">
+                  <div className="w-full max-w-[470px] h-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 flex items-center justify-center rounded-md shadow-2xs">
                     <span className="text-[10px] font-bold font-sans text-slate-700 dark:text-slate-200 tracking-wider leading-none">
                       {layer.bufferName}
                     </span>
@@ -246,7 +252,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           // 홀수행 (스테이지 행)
           return (
             <React.Fragment key={layer.id}>
-              {/* 1열: 스테이지명 뱃지 (경계선 제거) */}
+              {/* 1열: 스테이지명 뱃지 */}
               <div
                 className="px-1 py-1 flex items-center justify-center min-h-0 overflow-hidden"
               >
@@ -262,10 +268,31 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 </div>
               </div>
 
-              {/* 2열: 요소 및 다이어그램 (경계선 제거, 바닥 0px까지 꽉 채워 버퍼에 맞닿음) */}
+              {/* 2열: 요소 및 다이어그램 */}
               <div
                 className="bg-transparent p-0 flex items-stretch justify-center min-h-0 overflow-hidden relative"
               >
+                {/* 
+                  Write-Back 피드백 버스 세로선 (절대 위치로 시작점과 끝점 길이 정밀 제어):
+                  - ID 층(3층): Registers 중간 높이(약 57.2%)부터 바닥까지만 채움 (위쪽 비움)
+                  - WB 층(9층): 천장부터 MemtoReg MUX 가로 라인 높이(약 88.3%)까지만 채움 (아래쪽 비움)
+                  - 중간 층(EX, MEM): 100% 꽉 채워서 관통
+                */}
+                {layer.key === "ID" && (
+                  <div
+                    className="absolute left-0 bottom-0 w-[2px] bg-purple-600 dark:bg-purple-400 z-10 pointer-events-none"
+                    style={{ top: "57.2%" }}
+                  />
+                )}
+                {layer.key === "WB" && (
+                  <div
+                    className="absolute left-0 top-0 w-[2px] bg-purple-600 dark:bg-purple-400 z-10 pointer-events-none"
+                    style={{ height: "88.33%" }}
+                  />
+                )}
+                {(layer.key === "EX" || layer.key === "MEM") && (
+                  <div className="absolute left-0 inset-y-0 w-[2px] bg-purple-600 dark:bg-purple-400 z-10 pointer-events-none" />
+                )}
                 {layer.key === "IF" ? (
                   <svg
                     viewBox="0 0 500 180"
@@ -391,82 +418,90 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   >
                     {/* 상단 버퍼에서 들어오는 입력선 */}
                     <path
-                      d="M 220 0 L 220 28"
+                      d="M 220 0 L 220 40"
                       fill="none"
                       className="stroke-slate-700 dark:stroke-slate-300"
                       strokeWidth="2"
                     />
                     {/* 분기선 (Registers & Imm Gen으로 분기) */}
                     <path
-                      d="M 115 28 L 330 28"
+                      d="M 115 40 L 330 40"
                       fill="none"
                       className="stroke-slate-700 dark:stroke-slate-300"
                       strokeWidth="2"
                     />
                     <path
-                      d="M 115 28 L 115 48"
+                      d="M 115 40 L 115 60"
                       fill="none"
                       className="stroke-slate-700 dark:stroke-slate-300"
                       strokeWidth="1.8"
                       markerEnd="url(#arr-pipe)"
                     />
                     <path
-                      d="M 330 28 L 330 48"
+                      d="M 330 40 L 330 60"
                       fill="none"
                       className="stroke-slate-700 dark:stroke-slate-300"
                       strokeWidth="1.8"
                       markerEnd="url(#arr-pipe)"
                     />
 
-                    {/* 1. Registers (Register File) 박스 */}
+                    {/* 1. Registers (Register File) 박스 (y=60으로 하향 조정) */}
                     <g>
                       <rect
                         x="30"
-                        y="44"
+                        y="60"
                         width="170"
                         height="86"
                         rx="8"
                         className="fill-emerald-50 dark:fill-emerald-950/50 stroke-emerald-500 dark:stroke-emerald-600"
                         strokeWidth="2"
                       />
-                      <text x="115" y="92" textAnchor="middle" className="text-[14px] font-bold fill-emerald-950 dark:fill-emerald-100 font-sans tracking-wide">
+                      <text x="115" y="108" textAnchor="middle" className="text-[14px] font-bold fill-emerald-950 dark:fill-emerald-100 font-sans tracking-wide">
                         Registers
                       </text>
                     </g>
 
-                    {/* 2. Imm Gen 박스 */}
+                    {/* WB 피드백 버스(좌측 테두리 x=0) -> Registers 진입 화살표 */}
+                    <path
+                      d="M 0 103 L 30 103"
+                      fill="none"
+                      className="stroke-purple-600 dark:stroke-purple-400"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* 2. Imm Gen (타원형으로 복원 & y=103으로 하향 정렬) */}
                     <g>
-                      <rect
-                        x="260"
-                        y="44"
-                        width="140"
-                        height="86"
-                        rx="8"
+                      <ellipse
+                        cx="330"
+                        cy="103"
+                        rx="60"
+                        ry="42"
                         className="fill-sky-50 dark:fill-sky-950/50 stroke-sky-500 dark:stroke-sky-600"
                         strokeWidth="2"
                       />
-                      <text x="330" y="92" textAnchor="middle" className="text-[14px] font-bold fill-sky-950 dark:fill-sky-100 font-sans tracking-wide">
+                      <text x="330" y="108" textAnchor="middle" className="text-[14px] font-bold fill-sky-950 dark:fill-sky-100 font-sans tracking-wide">
                         Imm Gen
                       </text>
                     </g>
 
                     {/* 바닥 ID/EX 버퍼로 향하는 출력 화살표들 (y=178 바닥 직결) */}
                     <path
-                      d="M 85 128 L 85 178"
+                      d="M 85 146 L 85 178"
                       fill="none"
                       className="stroke-emerald-600 dark:stroke-emerald-400"
                       strokeWidth="2"
                       markerEnd="url(#arr-pipe)"
                     />
                     <path
-                      d="M 145 128 L 145 178"
+                      d="M 145 146 L 145 178"
                       fill="none"
                       className="stroke-emerald-600 dark:stroke-emerald-400"
                       strokeWidth="2"
                       markerEnd="url(#arr-pipe)"
                     />
                     <path
-                      d="M 330 128 L 330 178"
+                      d="M 330 145 L 330 178"
                       fill="none"
                       className="stroke-sky-600 dark:stroke-sky-400"
                       strokeWidth="2"
@@ -485,34 +520,38 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   >
                     {/* ID/EX 버퍼에서 내려오는 Operand A (rs1) 입력 */}
                     <path
-                      d="M 85 0 L 85 24 L 140 24 L 140 38"
+                      d="M 85 0 L 85 46 L 140 46 L 140 66"
                       fill="none"
                       className="stroke-slate-700 dark:stroke-slate-300"
                       strokeWidth="2"
                       markerEnd="url(#arr-pipe)"
                     />
 
-                    {/* ALUSrc MUX (사다리꼴) */}
-                    <polygon
-                      points="265,30 315,30 305,68 275,68"
+                    {/* ALUSrc MUX (알약형 / Stadium Capsule - y=16으로 상향 배치하여 ALU와 완전 분리) */}
+                    <rect
+                      x="270"
+                      y="16"
+                      width="42"
+                      height="34"
+                      rx="17"
+                      ry="17"
                       className="fill-sky-50 dark:fill-sky-950/60 stroke-sky-500 dark:stroke-sky-600"
                       strokeWidth="1.8"
-                      strokeLinejoin="round"
                     />
-                    <text x="290" y="52" textAnchor="middle" className="text-[10px] font-bold fill-sky-900 dark:fill-sky-100 font-sans">
+                    <text x="291" y="37" textAnchor="middle" className="text-[10px] font-bold fill-sky-900 dark:fill-sky-100 font-sans">
                       MUX
                     </text>
 
                     {/* ID/EX 버퍼에서 내려와 MUX로 들어가는 입력 2개 */}
                     <path
-                      d="M 145 0 L 145 18 L 280 18 L 280 30"
+                      d="M 145 0 L 145 10 L 282 10 L 282 16"
                       fill="none"
                       className="stroke-slate-700 dark:stroke-slate-300"
                       strokeWidth="1.5"
                       markerEnd="url(#arr-pipe)"
                     />
                     <path
-                      d="M 300 0 L 300 30"
+                      d="M 300 0 L 300 16"
                       fill="none"
                       className="stroke-sky-600 dark:stroke-sky-400"
                       strokeWidth="1.8"
@@ -520,40 +559,40 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                       markerEnd="url(#arr-pipe)"
                     />
 
-                    {/* MUX -> ALU Operand B 화살표 (위에서 아래로 꽂힘) */}
+                    {/* MUX 출력 -> 아래로 내려와 ALU 오른쪽 어깨(x=240, y=66)로 꽂히는 화살표 */}
                     <path
-                      d="M 290 68 L 290 24 L 240 24 L 240 38"
+                      d="M 291 50 L 291 56 L 240 56 L 240 66"
                       fill="none"
                       className="stroke-slate-700 dark:stroke-slate-300"
                       strokeWidth="2"
                       markerEnd="url(#arr-pipe)"
                     />
 
-                    {/* ALU (올려주신 이미지 실루엣: 가로로 넉넉하고 완만한 V홈 사다리꼴 + 다른 요소들과 통일된 파스텔 톤앤매너) */}
+                    {/* ALU (y=66으로 추가 하향 조정하여 MUX와 여유 있는 거리 확보) */}
                     <polygon
-                      points="105,40 172,40 190,58 208,40 275,40 252,116 128,116"
+                      points="105,66 172,66 190,84 208,66 275,66 252,142 128,142"
                       className="fill-amber-50 dark:fill-amber-950/50 stroke-amber-500 dark:stroke-amber-600"
                       strokeWidth="2"
                       strokeLinejoin="round"
                     />
-                    <text x="190" y="90" textAnchor="middle" className="text-[17px] font-bold font-sans fill-amber-950 dark:fill-amber-100 tracking-wider">
+                    <text x="190" y="116" textAnchor="middle" className="text-[17px] font-bold font-sans fill-amber-950 dark:fill-amber-100 tracking-wider">
                       ALU
                     </text>
 
                     {/* 우측 Branch Add (가산기 사다리꼴) */}
                     <polygon
-                      points="370,48 440,48 428,88 382,88"
+                      points="370,66 440,66 428,106 382,106"
                       className="fill-white dark:fill-neutral-900 stroke-slate-500 dark:stroke-slate-400"
                       strokeWidth="1.8"
                       strokeLinejoin="round"
                     />
-                    <text x="405" y="72" textAnchor="middle" className="text-[11px] font-bold fill-slate-800 dark:fill-slate-200 font-sans">
+                    <text x="405" y="90" textAnchor="middle" className="text-[11px] font-bold fill-slate-800 dark:fill-slate-200 font-sans">
                       Branch Add
                     </text>
 
                     {/* ALU Result -> EX/MEM 버퍼 직결 화살표 (y=178 바닥 밀착) */}
                     <path
-                      d="M 190 116 L 190 178"
+                      d="M 190 142 L 190 178"
                       fill="none"
                       className="stroke-amber-600 dark:stroke-amber-400"
                       strokeWidth="2.2"
@@ -562,7 +601,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
                     {/* Branch Target -> EX/MEM 버퍼 직결 화살표 */}
                     <path
-                      d="M 405 92 L 405 178"
+                      d="M 405 106 L 405 178"
                       fill="none"
                       stroke="#94A3B8"
                       strokeWidth="1.6"
@@ -581,7 +620,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   >
                     {/* EX/MEM 버퍼에서 내려오는 ALU Result 화살표 */}
                     <path
-                      d="M 190 0 L 190 28"
+                      d="M 190 0 L 190 38"
                       fill="none"
                       className="stroke-amber-600 dark:stroke-amber-400"
                       strokeWidth="2"
@@ -590,36 +629,36 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
                     {/* ALU Result Bypass 선 (좌측으로 우회하여 MEM/WB 버퍼로 직통) */}
                     <path
-                      d="M 190 18 L 90 18 L 90 118"
+                      d="M 190 24 L 90 24 L 90 118"
                       fill="none"
                       className="stroke-amber-600 dark:stroke-amber-400"
                       strokeWidth="1.8"
                       strokeDasharray="4 3"
                       markerEnd="url(#arr-pipe)"
                     />
-                    <text x="96" y="65" className="text-[9px] font-mono fill-amber-700 dark:fill-amber-300">
+                    <text x="96" y="68" className="text-[9px] font-mono fill-amber-700 dark:fill-amber-300">
                       ALU Bypass
                     </text>
 
-                    {/* Data Memory 박스 */}
+                    {/* Data Memory 박스 (y=24 -> y=38로 하향 조정) */}
                     <g>
                       <rect
                         x="150"
-                        y="24"
+                        y="38"
                         width="240"
-                        height="60"
+                        height="58"
                         rx="8"
                         className="fill-sky-50 dark:fill-sky-950/50 stroke-sky-500 dark:stroke-sky-600"
                         strokeWidth="2"
                       />
-                      <text x="270" y="59" textAnchor="middle" className="text-[14px] font-bold fill-sky-950 dark:fill-sky-100 font-sans tracking-wide">
+                      <text x="270" y="72" textAnchor="middle" className="text-[14px] font-bold fill-sky-950 dark:fill-sky-100 font-sans tracking-wide">
                         Data Memory
                       </text>
                     </g>
 
                     {/* Data Memory -> MEM/WB 버퍼 직결 화살표 (y=118 바닥 밀착) */}
                     <path
-                      d="M 270 84 L 270 118"
+                      d="M 270 96 L 270 118"
                       fill="none"
                       className="stroke-sky-600 dark:stroke-sky-400"
                       strokeWidth="2.2"
@@ -652,9 +691,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                       markerEnd="url(#arr-pipe)"
                     />
 
-                    {/* MemtoReg MUX (사다리꼴) */}
-                    <polygon
-                      points="170,44 300,44 270,84 200,84"
+                    {/* MemtoReg MUX (알약형 / Stadium Capsule) */}
+                    <rect
+                      x="165"
+                      y="44"
+                      width="140"
+                      height="40"
+                      rx="20"
+                      ry="20"
                       className="fill-purple-50 dark:fill-purple-950/60 stroke-purple-500 dark:stroke-purple-600"
                       strokeWidth="1.8"
                     />
@@ -662,15 +706,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                       MemtoReg MUX
                     </text>
 
-                    {/* MUX 출력 -> Register File Write-Back 피드백 버스 화살표 */}
+                    {/* MUX 출력 -> 좌측 피드백 테두리선(x=0)으로 연결되는 수평선 */}
                     <path
-                      d="M 235 84 L 235 106 L 25 106"
+                      d="M 235 84 L 235 106 L 0 106"
                       fill="none"
                       className="stroke-purple-600 dark:stroke-purple-400"
                       strokeWidth="2"
-                      markerEnd="url(#arr-pipe)"
                     />
-                    <text x="130" y="100" className="text-[9.5px] font-mono font-bold fill-purple-700 dark:fill-purple-300">
+                    <text x="110" y="100" className="text-[9.5px] font-mono font-bold fill-purple-700 dark:fill-purple-300">
                       Write Data to rd
                     </text>
                   </svg>
