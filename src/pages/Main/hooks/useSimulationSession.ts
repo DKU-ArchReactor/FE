@@ -1,3 +1,4 @@
+import type { BuildCompileResponse } from "@/type/build";
 import { getAuthSession } from '@/api/authSession';
 import { RequestGeneration } from '../utils/assistantContext';
 import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
@@ -13,6 +14,7 @@ import type { PlaybackFeedbackType } from "../components/PlaybackFeedbackOverlay
 
 type UseSimulationSessionParams = {
   workspaceKey: string;
+  savedFileId?: string | null;
   translationSource: string;
   translationAssembly: string;
   translationBusy: boolean;
@@ -31,6 +33,7 @@ type SimulationCallbacks = {
 
 export function useSimulationSession({
   workspaceKey,
+  savedFileId,
   translationSource,
   translationAssembly,
   translationBusy,
@@ -38,6 +41,7 @@ export function useSimulationSession({
   setTranslationError,
   setTranslationAssembly,
 }: UseSimulationSessionParams) {
+  const [buildResult, setBuildResult] = useState<BuildCompileResponse | null>(null);
   const requests = useRef(new RequestGeneration());
   const [resultWorkspace, setResultWorkspace] = useState(workspaceKey);
   const [simulationCache, setSimulationCache] = useState<{
@@ -63,13 +67,17 @@ export function useSimulationSession({
   const mappedAssemblyRows = useMemo(() => {
     const fromSim = extractAssemblyFromSimulation(simulationData);
     if (fromSim.length > 0) return fromSim;
+    if (resultWorkspace === workspaceKey && buildResult?.analysis?.instructions.length) {
+      return buildResult.analysis.instructions.map(item => ({ pc: item.pc, text: item.assembly, sourceLine: item.source_line, isRuntime: false }));
+    }
     if (!translationAssembly) return [];
     return mapAssembly(translationAssembly, 1000);
-  }, [simulationData, translationAssembly]);
+  }, [simulationData, translationAssembly, buildResult, resultWorkspace, workspaceKey]);
 
   const clearSimulationCache = () => {
     requests.current.invalidate();
     setTranslationBusy(false);
+    setBuildResult(null);
     setActiveBuildId(null);
     setActiveSimulationToken(null);
     setSimulationCache({ single: null, pipeline: null });
@@ -83,6 +91,13 @@ export function useSimulationSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceKey]);
 
+  const onCompiled = (request: { isCurrent: () => boolean }, result: BuildCompileResponse) => {
+    if (!request.isCurrent()) return;
+    setResultWorkspace(workspaceKey);
+    setBuildResult(result);
+    setTranslationAssembly(result.analysis?.instructions.map(item => item.assembly).join("\n") ?? "");
+  };
+
   const beginRequest = () => {
     const request = requests.current.begin();
     const auth = getAuthSession();
@@ -94,6 +109,7 @@ export function useSimulationSession({
     if (!translationSource.trim() || translationBusy) return;
     const request = beginRequest();
     setSimulationCache({ single: null, pipeline: null });
+    setBuildResult(null);
     setActiveBuildId(null);
     setActiveSimulationToken(null);
     setTranslationBusy(true);
@@ -106,7 +122,7 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-      } = await compileTranslation(translationSource, simulationEngineMode, request);
+      } = await compileTranslation(translationSource, simulationEngineMode, { ...request, fileId: request.capture ? savedFileId : null, onCompiled: result => onCompiled(request, result) });
       if (!request.isCurrent()) return;
       setResultWorkspace(workspaceKey);
 
@@ -142,6 +158,7 @@ export function useSimulationSession({
 
     const request = beginRequest();
     setSimulationCache({ single: null, pipeline: null });
+    setBuildResult(null);
     setActiveBuildId(null);
     setActiveSimulationToken(null);
     setTranslationBusy(true);
@@ -156,7 +173,7 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-      } = await compileAssemblyDirectly(codeToSimulate, simulationEngineMode, request);
+      } = await compileAssemblyDirectly(codeToSimulate, simulationEngineMode, { ...request, onCompiled: result => onCompiled(request, result) });
       if (!request.isCurrent()) return;
       setResultWorkspace(workspaceKey);
 
@@ -224,6 +241,7 @@ export function useSimulationSession({
   };
 
   return {
+    buildResult: resultWorkspace === workspaceKey ? buildResult : null,
     simulationEngineMode,
     simulationData,
     loadingMessage,
