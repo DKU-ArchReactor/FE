@@ -402,15 +402,19 @@ function WorkspacePreview() {
 const questions = [
   [
     "설치나 로그인 없이 사용할 수 있나요?",
-    "네. 브라우저에서 바로 코드를 작성하고 컴파일·시뮬레이션을 체험할 수 있어요. 작성한 소스를 계정에 저장하고 다시 불러오려면 로그인해 주세요.",
+    "네. 브라우저 접속만으로 환경 설정 없이 C 코드 작성과 RISC-V 크로스 컴파일, 5단계 파이프라인 시뮬레이션까지 즉시 체험할 수 있어요. 작성한 소스를 계정에 영구 저장하려면 로그인해 주세요.",
   ],
   [
     "어떤 코드와 명령어를 실행할 수 있나요?",
-    "C 코드를 RISC-V 어셈블리로 컴파일하거나 어셈블리를 직접 작성해 실행할 수 있어요. 시뮬레이터는 RV32IM 명령어 집합을 기반으로 동작합니다.",
+    "C 코드를 RISC-V 어셈블리로 실시간 변환하거나 어셈블리를 직접 작성해 실행할 수 있어요. RV32I 기본 37종 정수 명령어를 완벽히 지원하며, 표준 시뮬레이터(Spike)와의 교차 검증을 통해 레지스터 및 메모리 상태 100% 비트 일치를 보장합니다.",
   ],
   [
     "싱글 사이클과 파이프라인은 어떻게 다른가요?",
-    "싱글 사이클은 하나의 명령어를 한 클록에 처리해요. 5단계 파이프라인은 여러 명령어를 서로 다른 단계에서 겹쳐 실행합니다. 실행 모드를 바꾸면서 레지스터·메모리와 사이클별 흐름을 살펴볼 수 있어요.",
+    "싱글 사이클은 하나의 명령어를 한 클록에 처리해요. 5단계 파이프라인은 IF-ID-EX-MEM-WB 단계를 통해 여러 명령어를 겹쳐 실행합니다. 데이터 포워딩, 로드-사용 스톨, 분기 플러시 등 실제 하드웨어의 해저드 제어 메커니즘을 시각적으로 관찰할 수 있어요.",
+  ],
+  [
+    "내장 튜터와 AI 에이전트는 어떻게 다른가요?",
+    "화면 좌측 하단의 '내장 튜터'는 클릭한 코드 라인과 사이클 상태를 오차 없이 1:1로 즉각 설명해주는 규칙 기반 교육 모듈입니다. 우상단 플로팅 팝업의 'AI 에이전트'는 단국대 GPU 클라우드(DKU SOLID-LLM)와 연동되어 복잡한 해저드 원인을 심층 분석하고 최적화 예제 코드까지 생성해 주는 대화형 어시스턴트입니다.",
   ],
   [
     "컴퓨터구조를 처음 배워도 사용할 수 있나요?",
@@ -503,9 +507,9 @@ export default function LandingPage() {
               <span>CPU의 흐름이 되는 순간.</span>
             </h1>
             <p>
-              C·RISC-V 코드를 실행하며 레지스터, 메모리,
-              <br className="landing-mobile-break" /> 파이프라인의 변화를 한눈에
-              확인하세요.
+              AI가 작성한 코드의 하드웨어 병목과 의존성을 직접 검증하세요.
+              <br className="landing-mobile-break" /> C·RISC-V 코드를 실행하며 레지스터,
+              메모리, 파이프라인의 변화를 한눈에 확인합니다.
             </p>
             <div className="landing-hero-actions">
               <Link
@@ -544,16 +548,16 @@ export default function LandingPage() {
             <ProductPreview />
           </div>
           <div className="landing-technology">
-            <span>BUILT FOR UNDERSTANDING</span>
+            <span>BUILT FOR DEEP UNDERSTANDING</span>
             <div>
               <b>RISC-V</b>
-              <span>RV32IM</span>
+              <span>RV32I 37종</span>
               <i />
-              <b>C & Assembly</b>
+              <b>C ↔ ASM 1:N 매핑</b>
               <i />
-              <b>Single-cycle</b>
+              <b>Single & 5-Stage</b>
               <i />
-              <b>5-stage Pipeline</b>
+              <b>DKU SOLID-LLM 튜터</b>
             </div>
           </div>
         </section>
@@ -662,7 +666,7 @@ export default function LandingPage() {
                 ↓
               </span>
               <div className="landing-asm-result">
-                <span>RISC-V / 실행 과정 중</span>
+                <span>RISC-V / 1:N 동기화 라인 매핑</span>
                 <code>
                   <b>add</b> a5, a4, a5
                 </code>
@@ -730,6 +734,122 @@ export default function LandingPage() {
               <a className="landing-text-link" href="#preview">
                 두 실행 모드 살펴보기 <Arrow />
               </a>
+            </div>
+          </div>
+
+          {/* 03: 대화형 AI 어시스턴트 & 예제 코드 추천 */}
+          <div className="landing-feature-row">
+            <div className="landing-feature-copy">
+              <span className="landing-feature-number">
+                03 / INTERACTIVE AI ASSISTANT
+              </span>
+              <h3>
+                궁금한 개념과 예제 코드,
+                <br />
+                대화하듯 물어보세요.
+              </h3>
+              <p>
+                "포워딩이 일어나는 예제 보여줘"라고 질문하면 AI 어시스턴트가 적절한 코드를 추천하고 바로 설명해 줍니다. 클릭 한 번으로 에디터에 코드를 삽입하고 즉시 파이프라인 흐름을 관찰하세요.
+              </p>
+              <Link
+                className="landing-text-link"
+                to="/simulator"
+              >
+                AI 어시스턴트와 실습하기 <Arrow />
+              </Link>
+            </div>
+
+            {/* 챗봇 대화 일러스트 (01, 02번과 100% 동일한 디자인 톤앤매너) */}
+            <div className="landing-chat-illustration" aria-label="AI 어시스턴트와 대화 및 예제 코드 추천 일러스트">
+              <div className="landing-illustration-caption">
+                <span className="landing-tiny-dot" /> 대화형 예제 코드 추천 및 에디터 연동
+              </div>
+
+              <div className="landing-chat-dialogue">
+                {/* 1. 사용자 질문 말풍선 */}
+                <div className="landing-chat-bubble-user">
+                  데이터 포워딩을 관찰할 수 있는 간단한 어셈블리 예시 코드 보여줘.
+                </div>
+
+                {/* 2. AI 추천 및 에디터 추가 그래픽 뱃지 */}
+                <div className="landing-chat-bubble-ai">
+                  <p className="landing-chat-ai-intro">
+                    연속된 연산으로 EX/MEM 단계 포워딩이 일어나는 예제는 어떤가요?
+                  </p>
+                  <div className="landing-chat-code-card">
+                    <div><span className="cmd">addi</span> t0, zero, 10</div>
+                    <div><span className="cmd">addi</span> t1, zero, 20</div>
+                    <div><span className="cmd">add</span>  t2, t0, t1  <span className="comment"># t0, t1 바로 포워딩!</span></div>
+                  </div>
+                  {/* 버튼 모양의 일러스트 뱃지 (실제 버튼이 아님) */}
+                  <span className="landing-chat-insert-badge" aria-hidden="true">
+                    <span>＋</span> 에디터에 추가하기
+                  </span>
+                </div>
+              </div>
+
+              <span className="landing-illustration-footnote">
+                실시간 컨텍스트 질의응답
+              </span>
+            </div>
+          </div>
+
+          {/* 04: 해저드 진단 & CPI 성능 분석 */}
+          <div className="landing-feature-row landing-feature-reverse">
+            <div className="landing-hazard-illustration" aria-label="해저드 감지 및 CPI 성능 분석 일러스트">
+              <div className="landing-illustration-caption">
+                <span className="landing-tiny-dot" /> 하드웨어 제어 감지 및 실행 효율 측정
+              </div>
+
+              <div className="landing-cpi-meter">
+                <div className="landing-cpi-meter-info">
+                  <span>실시간 성능 프로파일링</span>
+                  <strong>평균 클록 사이클 (CPI)</strong>
+                </div>
+                <div className="landing-cpi-value">
+                  1.18 <small>Cycles/Inst</small>
+                </div>
+              </div>
+
+              <div className="landing-hazard-badges-grid">
+                <div className="landing-hazard-card is-forwarding">
+                  <span className="landing-hazard-tag">포워딩</span>
+                  <strong>Data Hazard</strong>
+                  <p>EX/MEM 바이패스로 딜레이 0 해소</p>
+                </div>
+                <div className="landing-hazard-card is-stall">
+                  <span className="landing-hazard-tag">스톨 삽입</span>
+                  <strong>Load-Use</strong>
+                  <p>1클록 지연 버블을 통한 하드웨어 제어</p>
+                </div>
+                <div className="landing-hazard-card is-flush">
+                  <span className="landing-hazard-tag">플러시</span>
+                  <strong>Control Hazard</strong>
+                  <p>분기 예측 실패 시 파이프라인 무효화</p>
+                </div>
+              </div>
+
+              <span className="landing-illustration-footnote">
+                하드웨어 해저드 자동 프로파일링
+              </span>
+            </div>
+            <div className="landing-feature-copy">
+              <span className="landing-feature-number">
+                04 / HAZARD & CPI PROFILING
+              </span>
+              <h3>
+                해저드 3종 자동 감지와
+                <br />
+                정량적 CPI 성능 분석.
+              </h3>
+              <p>
+                RAW 데이터 의존성 포워딩, Load-Use 스톨, 분기 예측 실패 플러시까지
+                하드웨어 제어 동작을 실시간으로 포착하고, 총 사이클 수와 CPI 지표를
+                통해 코드의 성능 효율을 수치로 평가할 수 있습니다.
+              </p>
+              <Link className="landing-text-link" to="/simulator">
+                파이프라인 진단 시작하기 <Arrow />
+              </Link>
             </div>
           </div>
           <div className="landing-detail-features">
@@ -865,7 +985,7 @@ export default function LandingPage() {
             <BrandMark />
             ArchReactor
           </Link>
-          <p>코드와 컴퓨터구조를 연결하는 시뮬레이터</p>
+          <p>코드와 컴퓨터구조를 연결하는 시뮬레이터 · 단국대학교 캡스톤 디자인 (팀 포크레인)</p>
         </div>
         <nav aria-label="하단 메뉴">
           <a
@@ -881,7 +1001,7 @@ export default function LandingPage() {
           </Link>
         </nav>
         <span className="landing-copyright">
-          © {new Date().getFullYear()} ArchReactor
+          © {new Date().getFullYear()} ArchReactor. All rights reserved.
         </span>
       </footer>
     </div>

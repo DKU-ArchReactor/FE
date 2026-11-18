@@ -4,7 +4,7 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "@/context/ThemeContext";
 import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
-import type { StageBuffer } from "@/type/simulation";
+import type { StageBuffer, CycleEvents } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
 import AsmFileUploadPopup from "./AsmFileUploadPopup";
 
@@ -26,6 +26,14 @@ type Props = {
     MEM?: StageBuffer | null;
     WB?: StageBuffer | null;
   };
+  prevStageBuffers?: {
+    IF?: StageBuffer | null;
+    ID?: StageBuffer | null;
+    EX?: StageBuffer | null;
+    MEM?: StageBuffer | null;
+    WB?: StageBuffer | null;
+  };
+  cycleEvents?: CycleEvents | null;
   mode?: "single" | "pipeline"; // 싱글 사이클 모드 vs 5단계 파이프라인 모드
   currentActiveStep?: number | null; // Single 모드에서 현재 실행 중인 어셈블리 행 인덱스 (0~17)
   activeTarget?: "c" | "asm";
@@ -42,12 +50,39 @@ const STAGES_CONFIG: {
   key: "IF" | "ID" | "EX" | "MEM" | "WB";
   name: string;
   badgeBg: string;
+  // 매핑 코드들을 위한 연한 파스텔 배경 및 테두리 스타일 (빨/주/초/파/보)
+  mappedBg: string;
 }[] = [
-    { key: "IF", name: "IF", badgeBg: "bg-[#EF4444] text-white" },
-    { key: "ID", name: "ID", badgeBg: "bg-[#F97316] text-white" },
-    { key: "EX", name: "EX", badgeBg: "bg-[#22C55E] dark:bg-[#15803D] text-white" },
-    { key: "MEM", name: "MEM", badgeBg: "bg-[#0EA5E9] text-white" },
-    { key: "WB", name: "WB", badgeBg: "bg-[#8B5CF6] text-white" },
+    {
+      key: "IF",
+      name: "IF",
+      badgeBg: "bg-[#EF4444] text-white",
+      mappedBg: "bg-red-500/10 dark:bg-red-500/20 border-red-400/60 dark:border-red-500/50 text-red-950 dark:text-red-200",
+    },
+    {
+      key: "ID",
+      name: "ID",
+      badgeBg: "bg-[#F97316] text-white",
+      mappedBg: "bg-orange-500/10 dark:bg-orange-500/20 border-orange-400/60 dark:border-orange-500/50 text-orange-950 dark:text-orange-200",
+    },
+    {
+      key: "EX",
+      name: "EX",
+      badgeBg: "bg-[#22C55E] dark:bg-[#15803D] text-white",
+      mappedBg: "bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-400/60 dark:border-emerald-500/50 text-emerald-950 dark:text-emerald-200",
+    },
+    {
+      key: "MEM",
+      name: "MEM",
+      badgeBg: "bg-[#0EA5E9] text-white",
+      mappedBg: "bg-sky-500/10 dark:bg-sky-500/20 border-sky-400/60 dark:border-sky-500/50 text-sky-950 dark:text-sky-200",
+    },
+    {
+      key: "WB",
+      name: "WB",
+      badgeBg: "bg-[#8B5CF6] text-white",
+      mappedBg: "bg-purple-500/10 dark:bg-purple-500/20 border-purple-400/60 dark:border-purple-500/50 text-purple-950 dark:text-purple-200",
+    },
   ];
 
 // 명령어(Opcode)와 피연산자(Operands) 분리 헬퍼
@@ -78,6 +113,8 @@ export default function TranslationMapping({
   executionLine,
   onSelectLine,
   stageBuffers,
+  prevStageBuffers,
+  cycleEvents,
   mode = "pipeline",
   currentActiveStep,
   activeTarget = "c",
@@ -137,22 +174,70 @@ export default function TranslationMapping({
   };
 
   // 파이프라인 스테이지별 활성 명령어 매핑 (현재 클록 사이클 기준)
+  // 스테이지 이름, 스톨(지연) 여부, 플러시(버블) 여부를 함께 기록
   const activeStagesByInst = useMemo(() => {
-    const map: Record<string, string[]> = {};
+    const map: Record<string, { stage: string; isStall: boolean; isBubble: boolean }[]> = {};
     if (!stageBuffers || mode === "single") return map;
 
+    const hasGlobalStall = Boolean(cycleEvents?.stall?.has_stall);
+    const stallStage = cycleEvents?.stall?.stage; // 예: "ID"
+
+    const hasGlobalFlush = Boolean(cycleEvents?.control_hazard?.has_flush);
+    const flushedStages = cycleEvents?.control_hazard?.flushed_stages || ["IF", "ID"];
+
+    // 1. 현재 파이프라인 버퍼에 존재하는 명령어들 매핑
     STAGES_CONFIG.forEach(({ key, name }) => {
       const buf = stageBuffers[key];
       if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
         const norm = buf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
         if (norm) {
           if (!map[norm]) map[norm] = [];
-          if (!map[norm].includes(name)) map[norm].push(name);
+          const isStalled =
+            buf.status === "stalled" ||
+            buf.status === "stall" ||
+            (hasGlobalStall && (stallStage ? stallStage === name : name === "ID"));
+
+          const isBubble =
+            buf.status === "flushed" ||
+            buf.flush_info?.is_flushed === true ||
+            (hasGlobalFlush && flushedStages.includes(name));
+
+          if (!map[norm].some((s) => s.stage === name)) {
+            map[norm].push({ stage: name, isStall: isStalled, isBubble });
+          }
         }
       }
     });
+
+    // 2. 분기 플러시(Flush)가 일어났을 때: 이전 사이클에서 IF/ID에 들어있던 명령어가 현재 버블로 변환되었을 경우
+    // 현재 버퍼의 IF/ID가 'nop' 또는 'bubble'로 바뀌었더라도, 플러시된 원래 명령어를 찾아 BBL 뱃지 추가
+    if (hasGlobalFlush && prevStageBuffers) {
+      flushedStages.forEach((stgName) => {
+        const key = stgName as "IF" | "ID" | "EX" | "MEM" | "WB";
+        const prevBuf = prevStageBuffers[key];
+        const curBuf = stageBuffers[key];
+
+        // 이전 사이클에 실제 명령어가 있었는데 이번 사이클에 버블/nop으로 대체된 경우
+        if (
+          prevBuf &&
+          prevBuf.assembly &&
+          prevBuf.assembly !== "bubble" &&
+          prevBuf.assembly !== "empty" &&
+          (!curBuf || curBuf.assembly === "bubble" || curBuf.assembly === "nop" || curBuf.status === "flushed" || curBuf.flush_info?.is_flushed)
+        ) {
+          const prevNorm = prevBuf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
+          if (prevNorm) {
+            if (!map[prevNorm]) map[prevNorm] = [];
+            if (!map[prevNorm].some((s) => s.stage === stgName && s.isBubble)) {
+              map[prevNorm].push({ stage: stgName, isStall: false, isBubble: true });
+            }
+          }
+        }
+      });
+    }
+
     return map;
-  }, [stageBuffers, mode]);
+  }, [stageBuffers, prevStageBuffers, cycleEvents, mode]);
 
   // 헬퍼: 타겟 요소(그룹 마지막 행)가 컨테이너 뷰포트 하단에 완전히 드러나도록 스크롤
   const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
@@ -257,8 +342,8 @@ export default function TranslationMapping({
         <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${activeTarget === "asm"
-                ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
-                : "bg-transparent scale-0"
+              ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
+              : "bg-transparent scale-0"
               }`}
           />
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
@@ -289,10 +374,10 @@ export default function TranslationMapping({
             onClick={() => setIsUploadPopupOpen((prev) => !prev)}
             disabled={busy || activeTarget !== "asm"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget !== "asm"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : isUploadPopupOpen
-                  ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
-                  : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+              : isUploadPopupOpen
+                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
+                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
               }`}
             title="어셈블리 파일 불러오기 및 예제 템플릿 열기"
           >
@@ -321,10 +406,10 @@ export default function TranslationMapping({
             onClick={handleSaveAsmClick}
             disabled={busy || activeTarget !== "asm" || !assembly?.trim()}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget !== "asm"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : asmSaveSuccess
-                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
-                  : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+              : asmSaveSuccess
+                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
+                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
               }`}
             title="현재 어셈블리 코드를 main.s 파일로 다운로드"
           >
@@ -354,8 +439,8 @@ export default function TranslationMapping({
             onClick={onResetAssembly}
             disabled={busy || activeTarget !== "asm"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget !== "asm"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+              : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
               }`}
             title="기본 어셈블리 템플릿으로 초기화"
           >
@@ -376,8 +461,8 @@ export default function TranslationMapping({
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
             className={`h-[22px] rounded px-2.5 text-[10.5px] font-semibold transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget === "asm"
-                ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] cursor-pointer"
-                : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
+              ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] cursor-pointer"
+              : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
               }`}
             title={activeTarget === "asm" ? "작성된 어셈블리를 하드웨어에 로드하고 시뮬레이션 준비" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
           >
@@ -470,14 +555,36 @@ export default function TranslationMapping({
             const activeStages = activeStagesByInst[normRowText] || [];
             const isCurrentSingleActive =
               mode === "single" && currentActiveStep === index;
-            // 같은 C 실행 라인에 속해 있는 형제 어셈블리 라인인지 확인
-            const isExecutionSibling =
+
+            // [싱글 모드] 같은 C 실행 라인에 속해 있는 형제 어셈블리 라인인지 확인
+            const isSingleExecutionSibling =
+              mode === "single" &&
               executionLine !== null &&
               executionLine !== undefined &&
               row.sourceLine === executionLine &&
               !isCurrentSingleActive;
 
-            // 선택 라인(파란색) 그룹
+            // [파이프라인 모드 & 싱글 모드 공통] 연속된 C 라인 청크 기준 트리 브래킷 타입 계산
+            // "start"(┌), "middle"(│), "end"(└), "single"(─), null(CRT 등 비매핑)
+            type BracketType = "start" | "middle" | "end" | "single" | null;
+            let bracketType: BracketType = null;
+
+            if (row.sourceLine !== null && row.sourceLine !== undefined) {
+              const prevSame = index > 0 && rows[index - 1]?.sourceLine === row.sourceLine;
+              const nextSame = index < rows.length - 1 && rows[index + 1]?.sourceLine === row.sourceLine;
+
+              if (!prevSame && nextSame) {
+                bracketType = "start";
+              } else if (prevSame && nextSame) {
+                bracketType = "middle";
+              } else if (prevSame && !nextSame) {
+                bracketType = "end";
+              } else {
+                bracketType = "single";
+              }
+            }
+
+            // 선택 라인(파란색/보라색) 그룹
             const isSelectedPrimary =
               selectedAsmIndex !== null && selectedAsmIndex !== undefined
                 ? selectedAsmIndex === index
@@ -487,6 +594,34 @@ export default function TranslationMapping({
             // 실행 중인 라인이면서 동시에 사용자가 선택한 라인인 경우
             const isExecutingAndSelected = isCurrentSingleActive && isSelectedPrimary;
             const isCrt = row.sourceLine === null;
+
+            // 배경 클래스 결정:
+            // 1) 사용자가 직접 선택한 라인: 보라/파랑 (최우선)
+            // 2) 실제 실행 중인 라인 (파이프라인 activeStages 또는 싱글 activeStep): 연한 녹색 하이라이트!
+            // 3) 형제 라인(매핑 코드)들은 배경색을 칠하지 않고 트리 브래킷 기호로만 관계 표현
+            let rowColorClass = "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]";
+
+            // 버블/플러시된 스테이지 여부
+            const hasEffectiveExecution = activeStages.some((s) => !s.isBubble);
+            const isPipelineExecuting = mode === "pipeline" && hasEffectiveExecution;
+            const isPipelineBubble = mode === "pipeline" && !hasEffectiveExecution && activeStages.some((s) => s.isBubble);
+            const isLineExecuting = isCurrentSingleActive || isPipelineExecuting;
+
+            if (isSelectedPrimary) {
+              rowColorClass = mode === "pipeline"
+                ? "bg-purple-100/90 dark:bg-[#2E1065] border-purple-600 dark:border-[#8B5CF6] text-purple-950 dark:text-[#E9D5FF] font-bold shadow-2xs"
+                : "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs";
+            } else if (isSelectedSibling) {
+              rowColorClass = mode === "pipeline"
+                ? "bg-purple-50/50 dark:bg-[#2E1065]/40 border-purple-300/60 dark:border-[#8B5CF6]/50 text-purple-900/80 dark:text-[#E9D5FF]/80 font-normal"
+                : "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal";
+            } else if (isLineExecuting) {
+              // 싱글 모드와 파이프라인 모드 공통: 실제 실행 중인 라인은 싱글 모드의 선명한 에메랄드 테마를 1:1 그대로 적용
+              rowColorClass = "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs";
+            } else if (isPipelineBubble || isSingleExecutionSibling) {
+              // 싱글 모드 매핑 형제 라인 디자인을 파이프라인의 버블(플러시) 라인에도 그대로 동일하게 적용!
+              rowColorClass = "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal";
+            }
 
             return (
               <div
@@ -512,40 +647,62 @@ export default function TranslationMapping({
                     event.currentTarget.click();
                   }
                 }}
-                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ar-accent)] ${isCurrentSingleActive && !isSelectedPrimary
-                  ? "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs"
-                  : isSelectedPrimary
-                    ? mode === "pipeline"
-                      ? "bg-purple-100/90 dark:bg-[#2E1065] border-purple-600 dark:border-[#8B5CF6] text-purple-950 dark:text-[#E9D5FF] font-bold shadow-2xs"
-                      : "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs"
-                    : isSelectedSibling
-                      ? mode === "pipeline"
-                        ? "bg-purple-50/50 dark:bg-[#2E1065]/40 border-purple-300/60 dark:border-[#8B5CF6]/50 text-purple-900/80 dark:text-[#E9D5FF]/80 font-normal"
-                        : "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal"
-                      : isExecutionSibling
-                        ? "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal"
-                        : activeStages.length > 0
-                          ? "bg-amber-50/70 dark:bg-[#3D2E12]/50 border-transparent"
-                          : "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
-                  }`}
+                className={`flex items-stretch transition-colors duration-100 cursor-pointer group min-h-[24px] border-l-4 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ar-accent)] ${rowColorClass}`}
               >
-                {/* 1. 화살표 / 인디케이터 */}
+                {/* 1. 화살표 / 인디케이터 (버블 라인은 화살표 없음, 유효한 실행 라인에는 초록색 ▶ 유지) */}
                 <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
                   {isExecutingAndSelected ? (
                     <div className="flex items-center gap-0.5">
                       <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
                       <span className="text-[#005FB8] dark:text-[#007ACC] text-[9px] leading-none">●</span>
                     </div>
-                  ) : isCurrentSingleActive ? (
+                  ) : isLineExecuting ? (
                     <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
                   ) : isSelectedPrimary ? (
                     <span className={`${mode === "pipeline" ? "text-purple-600 dark:text-[#A78BFA]" : "text-[#005FB8] dark:text-[#007ACC]"} text-[10px] leading-none`}>●</span>
                   ) : null}
                 </div>
 
-                {/* 2. 라인 번호 */}
+                {/* 2. CSS 기반 연속 트리 브래킷 (위아래 빈틈 없이 100% 실선 연결) */}
+                <div className="w-3.5 self-stretch shrink-0 relative select-none">
+                  {bracketType && (
+                    <div
+                      className={`absolute inset-0 pointer-events-none ${isSelectedPrimary || isSelectedSibling
+                        ? mode === "pipeline"
+                          ? "text-purple-600 dark:text-[#A78BFA]"
+                          : "text-[#005FB8] dark:text-[#007ACC]"
+                        : "text-slate-300 dark:text-[#3E4245] group-hover:text-slate-400 dark:group-hover:text-[#585C60]"
+                        }`}
+                    >
+                      {/* 그룹 시작: ┌ (위쪽 절반 비움, 아래쪽 수직선 + 중간 가로선) */}
+                      {bracketType === "start" && (
+                        <>
+                          <span className="absolute left-1/2 top-1/2 bottom-0 w-[1.5px] -translate-x-1/2 bg-current" />
+                          <span className="absolute left-1/2 top-1/2 right-0.5 h-[1.5px] -translate-y-1/2 bg-current" />
+                        </>
+                      )}
+                      {/* 그룹 중간: │ (위아래 100% 관통 수직선) */}
+                      {bracketType === "middle" && (
+                        <span className="absolute left-1/2 top-0 bottom-0 w-[1.5px] -translate-x-1/2 bg-current" />
+                      )}
+                      {/* 그룹 끝: └ (위쪽 수직선 + 중간 가로선) */}
+                      {bracketType === "end" && (
+                        <>
+                          <span className="absolute left-1/2 top-0 bottom-1/2 w-[1.5px] -translate-x-1/2 bg-current" />
+                          <span className="absolute left-1/2 top-1/2 right-0.5 h-[1.5px] -translate-y-1/2 bg-current" />
+                        </>
+                      )}
+                      {/* 1줄 단독 매핑: ─ (중간 가로 막대) */}
+                      {bracketType === "single" && (
+                        <span className="absolute left-1.5 right-0.5 top-1/2 h-[1.5px] -translate-y-1/2 bg-current" />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. 라인 번호 */}
                 <div
-                  className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${isSelectedPrimary
+                  className={`w-8 shrink-0 text-right pr-3 select-none text-[13px] flex items-center justify-end ${isSelectedPrimary
                     ? mode === "pipeline"
                       ? "text-purple-700 dark:text-[#C4B5FD] font-bold"
                       : "text-[#005FB8] dark:text-[#79C0FF] font-bold"
@@ -553,9 +710,9 @@ export default function TranslationMapping({
                       ? mode === "pipeline"
                         ? "text-purple-500 dark:text-[#C4B5FD]/70 font-medium"
                         : "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
-                      : isCurrentSingleActive
+                      : isLineExecuting
                         ? "text-emerald-700 dark:text-[#7EE787] font-bold"
-                        : isExecutionSibling
+                        : isPipelineBubble || isSingleExecutionSibling
                           ? "text-emerald-600 dark:text-[#7EE787]/70"
                           : "text-[#8C959F] dark:text-[#858585]"
                     }`}
@@ -563,8 +720,8 @@ export default function TranslationMapping({
                   {index + 1}
                 </div>
 
-                {/* 3. Opcode (CRT 비매핑 코드는 회색, C 매핑 코드는 모드별 액센트 색) */}
-                <div className="w-[52px] shrink-0 font-bold select-text">
+                {/* 4. Opcode (CRT 비매핑 코드는 회색, C 매핑 코드는 모드별 액센트 색) */}
+                <div className="w-[52px] shrink-0 font-bold select-text flex items-center">
                   <span
                     className={
                       isSelectedPrimary
@@ -575,9 +732,9 @@ export default function TranslationMapping({
                           ? mode === "pipeline"
                             ? "text-purple-700 dark:text-[#E9D5FF]/80 font-semibold"
                             : "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
-                          : isCurrentSingleActive
+                          : isLineExecuting
                             ? "text-emerald-800 dark:text-[#7EE787] font-bold"
-                            : isExecutionSibling
+                            : isPipelineBubble || isSingleExecutionSibling
                               ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
                               : isCrt
                                 ? "text-[#6E7681] dark:text-[#858585] font-semibold"
@@ -598,9 +755,9 @@ export default function TranslationMapping({
                         ? "text-slate-950 dark:text-white font-bold"
                         : isSelectedSibling
                           ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                          : isCurrentSingleActive
+                          : isLineExecuting
                             ? "text-slate-950 dark:text-white font-bold"
-                            : isExecutionSibling
+                            : isPipelineBubble || isSingleExecutionSibling
                               ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
                               : isCrt
                                 ? "text-[#6E7681]/90 dark:text-[#858585]"
@@ -610,19 +767,58 @@ export default function TranslationMapping({
                     {operands}
                   </span>
 
-                  {/* 파이프라인 스테이지 뱃지 */}
+                  {/* 파이프라인 스테이지 뱃지 (실행 라인 표시: 스톨 시 STL 뱃지, 플러시 시 BBL 뱃지 표시) */}
                   {activeStages.length > 0 && (
                     <div className="flex items-center gap-1 shrink-0 select-none">
-                      {activeStages.map((stg) => {
+                      {activeStages.map(({ stage: stg, isStall, isBubble }) => {
                         const cfg = STAGES_CONFIG.find((s) => s.name === stg);
                         return (
-                          <span
-                            key={stg}
-                            className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${cfg?.badgeBg || "bg-slate-700 text-white"
-                              }`}
-                          >
-                            {stg}
-                          </span>
+                          <div key={stg} className="flex items-center gap-1">
+                            {/* 1. 스톨 발생 시: 다이어그램 헤더와 1:1 동일한 둥근 캡슐 STL 뱃지(SVG 화살표 포함)를 왼쪽에 표시 */}
+                            {isStall && (
+                              <span
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-[#451A03] text-amber-600 dark:text-amber-300 border border-amber-400 dark:border-amber-500 text-[8.5px] font-black shadow-2xs animate-in zoom-in-95 duration-100"
+                                title="스톨(Stall): 데이터 대기(Hazard)로 인해 1클록 지연되어 이 스테이지에 정지 상태로 유지됨"
+                              >
+                                <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                                  <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-7.85-1.42 1.42L16.86 11H5v2z" />
+                                </svg>
+                                <span className="inline-block -translate-y-[0.5px]">STL</span>
+                              </span>
+                            )}
+
+                            {/* 2. 플러시(버블) 발생 시: 다이어그램 헤더와 1:1 동일한 둥근 캡슐 BBL 뱃지(구름/버블 SVG 포함) 표시 */}
+                            {isBubble && !isStall && (
+                              <span
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-[#182C3D] text-sky-500 dark:text-sky-300 border border-sky-400 dark:border-sky-400 text-[8.5px] font-black shadow-2xs animate-in zoom-in-95 duration-100"
+                                title="플러시(Bubble): 분기/점프로 인해 무효화되어 버블(NOP)로 변환됨"
+                              >
+                                <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                                  <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
+                                </svg>
+                                <span className="inline-block -translate-y-[0.5px]">BBL</span>
+                              </span>
+                            )}
+
+                            {/* 3. 스테이지 뱃지 (버블인 경우 반투명 딤 처리, 정상인 경우 선명한 솔리드) */}
+                            <span
+                              className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${isBubble
+                                  ? "bg-slate-400/60 dark:bg-slate-600/60 text-white/90 line-through decoration-white/70"
+                                  : isStall
+                                    ? `${cfg?.badgeBg || "bg-slate-700 text-white"} ring-1 ring-amber-400 ring-offset-0.5`
+                                    : cfg?.badgeBg || "bg-slate-700 text-white"
+                                }`}
+                              title={
+                                isBubble
+                                  ? `분기 예측 실패로 플러시(버블) 처리된 ${stg} 단계`
+                                  : isStall
+                                    ? `스톨로 인해 지연되어 유지 중인 ${stg} 단계`
+                                    : `${stg} 단계 실행 중`
+                              }
+                            >
+                              {stg}
+                            </span>
+                          </div>
                         );
                       })}
                     </div>
@@ -637,13 +833,13 @@ export default function TranslationMapping({
                         ? mode === "pipeline"
                           ? "bg-purple-600 text-white font-bold shadow-2xs"
                           : "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                        : isCurrentSingleActive
+                        : isLineExecuting
                           ? "bg-emerald-600 text-white font-bold shadow-2xs"
                           : isSelectedSibling
                             ? mode === "pipeline"
                               ? "bg-purple-100 dark:bg-[#2E1065] text-purple-800 dark:text-[#E9D5FF] font-semibold"
                               : "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                            : isExecutionSibling
+                            : isPipelineBubble || isSingleExecutionSibling
                               ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
                               : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
                         }`}
@@ -656,13 +852,13 @@ export default function TranslationMapping({
                         ? mode === "pipeline"
                           ? "bg-purple-600 text-white font-bold shadow-2xs"
                           : "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                        : isCurrentSingleActive
+                        : isLineExecuting
                           ? "bg-emerald-600 text-white font-bold shadow-2xs"
                           : isSelectedSibling
                             ? mode === "pipeline"
                               ? "bg-purple-100 dark:bg-[#2E1065] text-purple-800 dark:text-[#E9D5FF] font-semibold"
                               : "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                            : isExecutionSibling
+                            : isPipelineBubble || isSingleExecutionSibling
                               ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
                               : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
                         }`}
