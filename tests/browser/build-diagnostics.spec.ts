@@ -1,0 +1,20 @@
+import { test, expect } from '@playwright/test';
+test('build diagnostics show nonfatal inspection warnings, saved streams and failed inline logs', async ({page}) => {
+  await page.goto('/tests/browser/build-diagnostics.html');
+  await expect(page.getByText('컴파일 완료', {exact:true})).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('미리보기를 만들지 못했습니다');
+  await page.getByRole('button',{name:'빌드 로그 보기'}).click();
+  await expect(page.getByText('inline log',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'저장된 로그 다시 불러오기'}).click();
+  await expect(page.getByText('compiler warning',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Legacy build'}).click();
+  await page.getByRole('button',{name:'빌드 로그 보기'}).click();
+  await page.getByRole('button',{name:'저장된 로그 다시 불러오기'}).click();
+  await expect(page.getByText('old combined log',{exact:true})).toBeVisible();
+  await expect(page.getByText('compiler warning',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Failed build'}).click();
+  await expect(page.getByText('컴파일 실패',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'빌드 로그 보기'}).click();
+  await expect(page.getByText('syntax failure',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'저장된 로그 다시 불러오기'})).toHaveCount(0);
+});

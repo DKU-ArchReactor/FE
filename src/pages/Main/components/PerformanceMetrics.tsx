@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { SimulationResult } from '@/type/simulation';
 import { performanceStats } from './performanceStats';
+import TutorPerformanceSummary from './TutorPerformanceSummary';
 
 interface PerformanceMetricsProps {
   simulationData: SimulationResult | null;
@@ -11,7 +12,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
   const stats = useMemo(() => performanceStats(simulationData, currentCycle), [simulationData, currentCycle]);
 
   return (
-    <div className="w-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
+    <div className="w-full min-h-0 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 (지표 전용 퍼플 액센트 바) */}
       <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-purple-500">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -26,7 +27,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
       </div>
 
       {/* 2. 지표 카드 본문 (내부 요소가 절대 잘리지 않도록 자연스러운 높이 유지) */}
-      <div className="p-3 flex flex-col gap-2.5">
+      <div className="min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
         {/* 상단 2단 KPI 요약 카드 */}
         <div className="grid grid-cols-2 gap-2 shrink-0">
           {/* CPI 카드 */}
@@ -35,13 +36,12 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
               <span className="text-[10px] font-bold text-[var(--ar-text-muted)] uppercase tracking-wider">
                 CPI (Cycles / Inst)
               </span>
-              <span className="text-[10px]">⚡</span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
               <span className="text-2xl font-black font-mono text-[var(--ar-accent)]">
                 {simulationData ? stats.cpi : '—'}
               </span>
-              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">cycles</span>
+              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">clk/inst</span>
             </div>
             <span className="text-[9px] text-[var(--ar-text-muted)] mt-0.5">
               {stats.cpi === '—' ? '완료 명령어가 없거나 지표가 제공되지 않았습니다' : '선택 시점까지의 사이클 / 완료 명령어'}
@@ -54,7 +54,6 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
               <span className="text-[10px] font-bold text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
                 IPC (Inst / Cycle)
               </span>
-              <span className="text-[10px]">🎯</span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
               <span className="text-2xl font-black font-mono text-emerald-700 dark:text-[#7EE787]">
@@ -79,11 +78,11 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
           <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
             <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">스톨(Stall)</span>
             <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
-              {stats.stalls ?? '—'} 회
+              {stats.stalls ?? '—'} 클록
             </span>
           </div>
           <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
-            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">포워딩</span>
+            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">포워딩 입력</span>
             <span className="text-xs font-mono font-bold text-[#005FB8] dark:text-[#79C0FF]">
               {stats.forwards ?? '—'} 회
             </span>
@@ -91,24 +90,25 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
         </div>
 
         {/* 버블 비율 프로그레스 바 */}
-        <div className="p-2 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col gap-1 shrink-0">
+        {!stats.isSingle && <div className="p-2 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col gap-1 shrink-0">
           <div className="flex items-center justify-between text-[10px]">
-            <span className="font-semibold text-[#57606A] dark:text-[#858585]">파이프라인 버블 비율</span>
+            <span className="font-semibold text-[#57606A] dark:text-[#858585]">비어 있거나 취소된 단계 비율</span>
             <span className="font-mono font-bold text-[#1F2328] dark:text-[#CCCCCC]">{stats.bubbleRatio}%</span>
           </div>
           <div className="w-full h-1.5 bg-[#E1E4E8] dark:bg-[#333333] rounded-full overflow-hidden flex">
             <div
               className="h-full bg-[#005FB8] dark:bg-[#007ACC] transition-all duration-300"
               style={{ width: `${100 - stats.bubbleRatio}%` }}
-              title="유효 연산 비율"
+              title="명령어가 있는 단계 비율"
             />
             <div
               className="h-full bg-amber-500 transition-all duration-300"
               style={{ width: `${stats.bubbleRatio}%` }}
-              title="버블(대기) 비율"
+              title="빈 단계·취소된 단계 비율"
             />
           </div>
-        </div>
+        </div>}
+        <TutorPerformanceSummary bundle={simulationData?.tutor} historyIndex={stats.totalCycles - 1} />
       </div>
     </div>
   );

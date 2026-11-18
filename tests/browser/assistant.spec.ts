@@ -83,6 +83,7 @@ async function compile(page: Page) {
 async function send(page: Page, text = "왜 스톨이야?") {
   await page
     .getByPlaceholder("C 코드나 파이프라인에 대해 질문하세요...")
+    .filter({visible: true})
     .fill(text);
   await page.getByRole("button", { name: "전송", exact: true }).click();
 }
@@ -397,12 +398,10 @@ test("full workspace connects captured run to the actual assistant popup", async
   await page
     .getByTitle("C 코드 컴파일 및 어셈블리 변환", { exact: true })
     .click();
-  await expect(
-    page.getByTitle("한 단계 실행 (Step Over / Forward)", { exact: true }),
-  ).toBeEnabled();
-  await page
-    .getByTitle("한 단계 실행 (Step Over / Forward)", { exact: true })
-    .click();
+  // Desktop and mobile controls coexist; exercise the visible control.
+  const stepForward = page.getByTitle("한 단계 실행 (Step Over / Forward)", { exact: true }).filter({visible: true});
+  await expect(stepForward).toBeEnabled();
+  await stepForward.click();
   await attach(page).click();
   await page.route("**/api/v1/assistant/chat", (route) => {
     const { memory_addresses, ...reference } = route
@@ -423,6 +422,14 @@ test("full workspace connects captured run to the actual assistant popup", async
   );
   expect(pageErrors).toEqual([]);
   await page.screenshot({ path: "test-results/full-workspace.png" });
+  await page.getByTitle("창 닫기", {exact: true}).click();
+  await page.setViewportSize({width: 390, height: 844});
+  await page.getByRole('button', {name: /^ASM L\d+ /}).first().click();
+  const closeTutor = page.getByTitle('튜터 모달 닫기', {exact: true});
+  await expect(closeTutor).toBeVisible();
+  await closeTutor.click();
+  await expect(closeTutor).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
 });
 
 test("truncation and mismatched done reference never claim successful completion", async ({

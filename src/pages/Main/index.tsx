@@ -1,3 +1,4 @@
+import BuildStatusBar from "./components/BuildStatusBar";
 import type { EditorSelection } from './utils/assistantSource';
 import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
@@ -89,6 +90,7 @@ const MainPage: React.FC = () => {
   const workspaceKey = JSON.stringify([fileMgr.translationSource, customAssembly, editorTarget, auth.epoch]);
   const simSession = useSimulationSession({
     workspaceKey,
+    savedFileId: auth.authenticated ? fileMgr.savedTranslationFileId : null,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
     translationBusy: fileMgr.translationBusy,
@@ -436,6 +438,8 @@ const MainPage: React.FC = () => {
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
       />
+
+      <BuildStatusBar result={simSession.buildResult} busy={fileMgr.translationBusy} hasSimulation={!!simSession.simulationData} />
 
       {/* 2. 메인 워크스페이스 분할 레이아웃 (모바일: 상하 배치 및 세로 스크롤 / md 이상: 좌우 고정 분할) */}
       <div

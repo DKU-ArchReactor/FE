@@ -36,3 +36,11 @@ test('missing counters stay unknown; absent runs do not report activity', () => 
   assert.equal(stats({history: [{buffers: {}}]}, 0).cpi, '—');
   assert.equal(stats(null, 0).totalCycles, 0);
 });
+
+test('empty and flushed stage slots are not counted as useful pipeline occupancy', () => {
+  const current = frame(1);
+  current.buffers = {IF: {assembly: 'add a0,a1,a2', status: 'flushed'}, ID: {assembly: 'add a0,a1,a2', status: 'normal', flush_info: {is_flushed: true}},
+    EX: {assembly: 'empty', status: 'empty'}, MEM: null, WB: {assembly: 'add a0,a1,a2', status: 'normal'}};
+  assert.equal(stats({simulator: {mode: 'pipeline'}, history: [current]}, 0).bubbleRatio, 80);
+  assert.equal(stats({simulator: {mode: 'single'}, history: [current]}, 1).isSingle, true);
+});

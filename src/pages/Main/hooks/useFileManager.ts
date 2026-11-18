@@ -11,6 +11,7 @@ export function useFileManager(
   example?: { source: string; fileName: string },
   onInitialResetSimulation?: () => void
 ) {
+  const [savedTranslation, setSavedTranslation] = useState<{ id: string; content: string } | null>(null);
   const [fileId, setFileId] = useState<string | null>(initialFileId);
   const [cFileName, setCFileName] = useState<string>(example?.fileName ?? "main.c");
   const [asmFileName, setAsmFileName] = useState<string>("main.s");
@@ -55,6 +56,7 @@ export function useFileManager(
       setTranslationSource(source);
       setCFileName(fileName);
       setFileId(keepFileId);
+      setSavedTranslation(keepFileId ? { id: keepFileId, content: source } : null);
       sessionStorage.setItem(TRANSLATION_SOURCE_KEY, source);
       setTranslationAssembly("");
       setTranslationError("");
@@ -103,6 +105,7 @@ export function useFileManager(
       });
       setFileId(saved.file_id);
       setCFileName(saved.title);
+      setSavedTranslation({ id: saved.file_id, content: translationSource });
       const updatedList = await getFiles();
       setSavedFiles(updatedList);
       return true;
@@ -178,6 +181,7 @@ export function useFileManager(
 
   return {
     fileId,
+    savedTranslationFileId: savedTranslation?.id === fileId && savedTranslation.content === translationSource ? fileId : null,
     setFileId,
     cFileName,
     setCFileName,
