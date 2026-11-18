@@ -263,14 +263,8 @@ export default function TranslationEditor({
         </div>
       </header>
 
-      {/* 2단: 헤더 밑 툴바 라인 (버튼 전용 행) */}
-      <div
-        className={`shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 border-b min-w-0 transition-colors ${
-          activeTarget !== "c"
-            ? "border-[#D0D7DE] dark:border-[#2C2C2E] bg-[#E6E8EB] dark:bg-[#161618] opacity-50 pointer-events-none"
-            : "border-[#E5E5E5] dark:border-[#3E3E42] bg-[#FAFBFD] dark:bg-[#1E1E1E]"
-        }`}
-      >
+      {/* 2단: 헤더 밑 툴바 라인 (버튼 전용 행: C 모드에서는 활성화, ASM 모드에서는 ASM 에디터의 툴바와 100% 동일한 비활성화 스타일) */}
+      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] dark:bg-[#1E1E1E] border-b border-[#E5E5E5] dark:border-[#3E3E42] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           {/* 1. 불러오기 버튼 */}
           <button
@@ -368,13 +362,17 @@ export default function TranslationEditor({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 4. 컴파일 버튼 */}
+          {/* 4. 컴파일 버튼 (C 모드일 때만 활성화 & 파란색 액센트, ASM 모드일 때는 비활성화 회색 처리) */}
           <button
             type="button"
-            className="h-[22px] rounded bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold"
+            className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${
+              activeTarget === "c"
+                ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 cursor-pointer shadow-2xs"
+                : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
+            }`}
             onClick={onCompile}
-            disabled={busy || !source.trim()}
-            title="C 코드 컴파일 및 어셈블리 변환"
+            disabled={busy || !source.trim() || activeTarget !== "c"}
+            title={activeTarget === "c" ? "C 코드 컴파일 및 어셈블리 변환" : "C 코드 작성 모드를 선택한 후 실행할 수 있습니다"}
           >
             {busy ? (
               <span className="w-3 h-3 flex items-center justify-center shrink-0">
