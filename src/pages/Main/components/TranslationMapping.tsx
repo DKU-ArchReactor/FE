@@ -668,10 +668,10 @@ export default function TranslationMapping({
                   {bracketType && (
                     <div
                       className={`absolute inset-0 pointer-events-none ${isSelectedPrimary || isSelectedSibling
-                          ? mode === "pipeline"
-                            ? "text-purple-600 dark:text-[#A78BFA]"
-                            : "text-[#005FB8] dark:text-[#007ACC]"
-                          : "text-slate-300 dark:text-[#3E4245] group-hover:text-slate-400 dark:group-hover:text-[#585C60]"
+                        ? mode === "pipeline"
+                          ? "text-purple-600 dark:text-[#A78BFA]"
+                          : "text-[#005FB8] dark:text-[#007ACC]"
+                        : "text-slate-300 dark:text-[#3E4245] group-hover:text-slate-400 dark:group-hover:text-[#585C60]"
                         }`}
                     >
                       {/* 그룹 시작: ┌ (위쪽 절반 비움, 아래쪽 수직선 + 중간 가로선) */}
@@ -802,13 +802,12 @@ export default function TranslationMapping({
 
                             {/* 3. 스테이지 뱃지 (버블인 경우 반투명 딤 처리, 정상인 경우 선명한 솔리드) */}
                             <span
-                              className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${
-                                isBubble
+                              className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${isBubble
                                   ? "bg-slate-400/60 dark:bg-slate-600/60 text-white/90 line-through decoration-white/70"
                                   : isStall
                                     ? `${cfg?.badgeBg || "bg-slate-700 text-white"} ring-1 ring-amber-400 ring-offset-0.5`
                                     : cfg?.badgeBg || "bg-slate-700 text-white"
-                              }`}
+                                }`}
                               title={
                                 isBubble
                                   ? `분기 예측 실패로 플러시(버블) 처리된 ${stg} 단계`

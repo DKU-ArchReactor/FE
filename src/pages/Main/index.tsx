@@ -1,7 +1,7 @@
 import type { EditorSelection } from './utils/assistantSource';
 import { useAuthSession } from '@/api/authSession';
-import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
-import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
 import PanelRenderer from "./components/PanelRenderer";
 import SlidingViewportTrack from "./components/SlidingViewportTrack";
@@ -33,21 +33,13 @@ const DEFAULT_CUSTOM_ASSEMBLY = [
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const navigate = useNavigate();
   const initialFileId =
     searchParams.get("fileId") ||
     (location.state as { fileId?: string } | null)?.fileId ||
     null;
 
-  // 1. 라우트 및 뷰포트 상태
-  const isManagementPath = location.pathname === "/management";
-  const isPipelinePath = location.pathname === "/pipeline";
-
-  const rightViewportIndex = useMemo(() => {
-    if (isManagementPath) return 2;
-    if (isPipelinePath) return 1;
-    return 0;
-  }, [isManagementPath, isPipelinePath]);
+  // 1. 뷰포트 상태 (로컬 상태로 관리하여 URL 변경 및 히스토리 스택 누적 방지)
+  const [rightViewportIndex, setRightViewportIndex] = useState(0);
 
   // 2. 파일 및 소스 코드 상태 훅
   const resetSimulationRef = useRef<(() => void) | null>(null);
@@ -209,13 +201,11 @@ const MainPage: React.FC = () => {
   const canGoNextViewport = rightViewportIndex < 2;
 
   const handleGoPrevViewport = () => {
-    if (rightViewportIndex === 2) navigate("/pipeline");
-    else if (rightViewportIndex === 1) navigate("/simulator");
+    setRightViewportIndex((prev) => Math.max(0, prev - 1));
   };
 
   const handleGoNextViewport = () => {
-    if (rightViewportIndex === 0) navigate("/pipeline");
-    else if (rightViewportIndex === 1) navigate("/management");
+    setRightViewportIndex((prev) => Math.min(2, prev + 1));
   };
 
   const renderPanel = (panelKey: PanelKey, onCloseTutor?: () => void) => (
@@ -311,9 +301,9 @@ const MainPage: React.FC = () => {
     ? playback.totalCycles
     : Math.max(0, playback.totalCycles - 1);
 
-  const handleMobileViewportSelect = (path: string) => {
+  const handleMobileViewportSelect = (index: number) => {
     setIsMobileAssistantViewport(false);
-    navigate(path);
+    setRightViewportIndex(index);
     requestAnimationFrame(() => {
       mainWorkspaceRef.current?.scrollTo({
         top: mainWorkspaceRef.current.scrollHeight,
@@ -451,7 +441,7 @@ const MainPage: React.FC = () => {
         {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) */}
         <div
           ref={leftPaneContainerRef}
-          className="flex flex-col w-full md:w-[var(--left-pane-w)] h-[520px] md:h-full shrink-0 md:shrink min-h-0 overflow-hidden md:pr-1"
+          className="flex flex-col w-full md:w-[var(--left-pane-w)] h-[520px] md:h-full shrink-0 md:shrink min-h-0 overflow-hidden md:pr-1.5"
           style={{ "--left-pane-w": `${leftPaneWidth}%` } as React.CSSProperties}
         >
           {/* 상단: C 소스 + ASM (모바일: 세로 1:1 배치 & 전체 높이 / md 이상: 가로 분할 & 비율 높이) */}
@@ -499,8 +489,7 @@ const MainPage: React.FC = () => {
               </div>
 
               <div
-                className="flex flex-col w-full md:w-[var(--asm-col-w)] flex-1 md:flex-none md:h-full min-h-0 overflow-hidden p-[1.5px]"
-                style={{ "--asm-col-w": `${100 - leftCodeColRatio}%` } as React.CSSProperties}
+                className="flex flex-col w-full md:flex-1 md:h-full min-h-0 overflow-hidden p-[1.5px]"
               >
                 {renderPanel("source")}
               </div>
@@ -561,7 +550,7 @@ const MainPage: React.FC = () => {
             setLeftPaneWidth(50);
           }}
           title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 50:50 기본 리셋)"
-          className="hidden md:flex w-3 -mx-0.5 relative items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[var(--ar-accent)]/10 rounded-md transition-colors"
+          className="hidden md:flex w-2.5 relative items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[var(--ar-accent)]/10 rounded-md transition-colors"
         >
           <div
             className={`w-[4px] rounded-full transition-all duration-200 ${
@@ -804,7 +793,7 @@ const MainPage: React.FC = () => {
         <nav className="grid grid-cols-4 h-12 border-t border-[var(--ar-border)] bg-[var(--ar-header-bg)] font-sans">
           <button
             type="button"
-            onClick={() => handleMobileViewportSelect("/simulator")}
+            onClick={() => handleMobileViewportSelect(0)}
             className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
               !isMobileAssistantViewport && rightViewportIndex === 0
                 ? simSession.isSingleEngine
@@ -821,7 +810,7 @@ const MainPage: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => handleMobileViewportSelect("/pipeline")}
+            onClick={() => handleMobileViewportSelect(1)}
             className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
               !isMobileAssistantViewport && rightViewportIndex === 1
                 ? simSession.isSingleEngine
@@ -838,7 +827,7 @@ const MainPage: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => handleMobileViewportSelect("/management")}
+            onClick={() => handleMobileViewportSelect(2)}
             className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
               !isMobileAssistantViewport && rightViewportIndex === 2
                 ? simSession.isSingleEngine

@@ -39,7 +39,7 @@ const NINE_LAYERS: LayerDef[] = [
   {
     id: "layer-2-buf-if-id",
     type: "buffer",
-    bufferName: "IF / ID PIPELINE REGISTER",
+    bufferName: "IF / ID BUFFER",
     colors: {
       badgeBg: "",
       badgeText: "",
@@ -60,7 +60,7 @@ const NINE_LAYERS: LayerDef[] = [
   {
     id: "layer-4-buf-id-ex",
     type: "buffer",
-    bufferName: "ID / EX PIPELINE REGISTER",
+    bufferName: "ID / EX BUFFER",
     colors: {
       badgeBg: "",
       badgeText: "",
@@ -81,7 +81,7 @@ const NINE_LAYERS: LayerDef[] = [
   {
     id: "layer-6-buf-ex-mem",
     type: "buffer",
-    bufferName: "EX / MEM PIPELINE REGISTER",
+    bufferName: "EX / MEM BUFFER",
     colors: {
       badgeBg: "",
       badgeText: "",
@@ -102,7 +102,7 @@ const NINE_LAYERS: LayerDef[] = [
   {
     id: "layer-8-buf-mem-wb",
     type: "buffer",
-    bufferName: "MEM / WB PIPELINE REGISTER",
+    bufferName: "MEM / WB BUFFER",
     colors: {
       badgeBg: "",
       badgeText: "",
@@ -176,7 +176,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[11px] font-bold text-purple-500">◆</span>
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
-            PIPELINE DATAPATH (9×3 GRID)
+            PIPELINE DATAPATH
           </h3>
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(CLK:{clock ?? 0})</span>
         </div>
@@ -202,61 +202,53 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       </div>
 
       {/* 
-        ★ 9개 층 그리드:
-        - 1열: 105px (가로 테두리 없음, 내부 색상 없음, 컴팩트하고 균형잡힌 스테이지 뱃지)
-        - 2열: 1fr (p-0)
-        - 3열: 240px
+        9개 층 3열 그리드:
+        - 세로 전체를 100% 꽉 채우도록 비율(fr)과 버퍼 고정 높이(18px) 결합: 아래 여백 제거
+        - 경계선(border) 전부 제거하여 시원하고 깔끔한 오픈형 레이아웃
       */}
-      <div
-        className="flex-1 min-h-0 w-full overflow-hidden p-0 grid grid-cols-[105px_1fr_240px] gap-0 items-stretch"
-        style={{
-          gridTemplateRows: "3fr 0.4fr 3fr 0.4fr 3fr 0.4fr 2fr 0.4fr 2fr",
-        }}
-      >
+      <div className="flex-1 min-h-0 w-full overflow-auto p-0 custom-scrollbar">
+        <div
+          className="w-full min-w-[720px] min-h-[750px] h-full grid grid-cols-[105px_minmax(420px,1fr)_220px] gap-0 items-stretch"
+          style={{
+            gridTemplateRows: "3fr 18px 3fr 18px 3fr 18px 2fr 18px 2fr",
+          }}
+        >
         {NINE_LAYERS.map((layer, rowIndex) => {
           const isBuffer = layer.type === "buffer";
-          const isLastRow = rowIndex === NINE_LAYERS.length - 1;
           const buf = getStageBuffer(layer.key);
           const rawAsm = buf?.assembly?.trim();
           const hasInst = Boolean(rawAsm && rawAsm !== "empty" && rawAsm !== "bubble");
 
-          // 1열은 가로 테두리 없음(border-b 제거). 2열과 3열만 가로 테두리 적용
-          const borderBottom = isLastRow ? "" : "border-b border-[var(--ar-border)]";
-
-          // ─────────────────────────────────────────────────────────────
-          // 짝수행 (버퍼 행)
-          // ─────────────────────────────────────────────────────────────
+          // 짝수행 (버퍼 레지스터 행)
           if (isBuffer) {
             return (
               <React.Fragment key={layer.id}>
-                {/* 1열: 가로 테두리 X, 배경색 X (우측 세로 경계선 border-r만 유지) */}
-                <div className="border-r border-[var(--ar-border)] min-h-0" />
+                {/* 1열: 비움 (경계선 없음) */}
+                <div className="min-h-0" />
 
-                {/* 2열: 내부 여백 p-0으로 꽉 찬 파스텔톤 노란 버퍼 바 */}
+                {/* 2열: 버퍼 레지스터 바 (경계선 제거) */}
                 <div
-                  className={`border-r ${borderBottom} bg-[var(--ar-panel-bg)]/40 p-0 flex items-stretch justify-center min-h-0`}
+                  className="bg-transparent p-0 flex items-stretch justify-center min-h-0"
                 >
-                  <div className="w-full h-full rounded-md bg-amber-100/85 dark:bg-amber-950/50 flex items-center justify-center">
-                    <span className="text-[10px] font-bold font-mono text-amber-900 dark:text-amber-200 tracking-wider">
+                  <div className="w-full h-full bg-amber-100/90 dark:bg-amber-950/60 flex items-center justify-center rounded-xs">
+                    <span className="text-[9.5px] font-bold font-mono text-amber-900 dark:text-amber-200 tracking-wider leading-none">
                       {layer.bufferName}
                     </span>
                   </div>
                 </div>
 
                 {/* 3열: 비움 */}
-                <div className={`${borderBottom} bg-[var(--ar-panel-bg)]/40 min-h-0`} />
+                <div className="min-h-0" />
               </React.Fragment>
             );
           }
 
-          // ─────────────────────────────────────────────────────────────
           // 홀수행 (스테이지 행)
-          // ─────────────────────────────────────────────────────────────
           return (
             <React.Fragment key={layer.id}>
-              {/* 1열: 가로 테두리 없음, 내부 배경색 없음, 비율에 맞춘 컴팩트한 크기 통일 */}
+              {/* 1열: 스테이지명 뱃지 (경계선 제거) */}
               <div
-                className="border-r border-[var(--ar-border)] px-1 py-1 flex items-center justify-center min-h-0 overflow-hidden"
+                className="px-1 py-1 flex items-center justify-center min-h-0 overflow-hidden"
               >
                 <div
                   className={`w-[78px] h-[32px] flex flex-col items-center justify-center text-center rounded-[5px] ${layer.colors.badgeBg} ${layer.colors.badgeText} select-none shadow-2xs shrink-0`}
@@ -270,96 +262,436 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 </div>
               </div>
 
-              {/* 2열: 중앙 회로도 영역 (p-0) */}
+              {/* 2열: 요소 및 다이어그램 (경계선 제거, 바닥 0px까지 꽉 채워 버퍼에 맞닿음) */}
               <div
-                className={`border-r ${borderBottom} bg-[var(--ar-panel-bg)] p-0 flex items-center justify-center min-h-0 overflow-hidden relative`}
+                className="bg-transparent p-0 flex items-stretch justify-center min-h-0 overflow-hidden relative"
               >
                 {layer.key === "IF" ? (
-                  /* 2열 전체 높이를 100% 활용하여 버퍼에 완벽하게 직결되는 순수 HTML 와이어프레임 */
-                  <div className="w-full h-full p-2 flex flex-col justify-between relative select-none">
-                    {/* 상단: Next PC 루프선 영역 + PC & PC+4 행 */}
-                    <div className="w-full flex flex-col items-center pt-1">
-                      {/* 점선 Next PC 피드백 바 */}
-                      <div className="w-[320px] flex items-center justify-between text-[10px] font-mono text-black mb-1">
-                        <div className="flex items-center gap-1">
-                          <span>▼</span>
-                          <span className="h-[1px] w-32 border-b border-dashed border-black"></span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="h-[1px] w-24 border-b border-dashed border-black"></span>
-                          <span>Next PC</span>
-                        </div>
-                      </div>
+                  <svg
+                    viewBox="0 0 500 180"
+                    preserveAspectRatio="none"
+                    className="w-full h-full select-none block font-sans"
+                  >
+                    <defs>
+                      <marker
+                        id="arr-pipe"
+                        viewBox="0 0 10 10"
+                        refX="8"
+                        refY="5"
+                        markerWidth="6"
+                        markerHeight="6"
+                        orient="auto"
+                      >
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="currentColor" className="text-slate-700 dark:text-slate-300" />
+                      </marker>
+                      <marker
+                        id="arr-nextpc"
+                        viewBox="0 0 10 10"
+                        refX="8"
+                        refY="5"
+                        markerWidth="6"
+                        markerHeight="6"
+                        orient="auto"
+                      >
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#94A3B8" />
+                      </marker>
+                    </defs>
 
-                      {/* PC 레지스터 & PC + 4 가산기 */}
-                      <div className="flex items-center justify-center gap-3 w-full">
-                        {/* PC 레지스터 (라운드 박스) */}
-                        <div className="w-[140px] h-[38px] rounded-md border border-black flex flex-col items-center justify-center bg-transparent shrink-0">
-                          <span className="text-[12px] font-bold font-sans leading-none mb-0.5">PC</span>
-                          <span className="text-[11px] font-mono font-bold leading-none">
-                            {buf?.pc ?? "0x00010000"}
-                          </span>
-                        </div>
+                    {/* Next PC 회귀 점선 */}
+                    <path
+                      d="M 440 12 L 440 24 L 180 24 L 180 34"
+                      fill="none"
+                      stroke="#94A3B8"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 3"
+                      markerEnd="url(#arr-nextpc)"
+                    />
+                    <text x="445" y="20" className="text-[9px] font-mono fill-neutral-500">
+                      Next PC
+                    </text>
 
-                        {/* PC ➔ Adder 화살표 */}
-                        <div className="flex items-center text-black text-[12px] font-mono">
-                          ──►
-                        </div>
+                    {/* PC 박스 */}
+                    <g>
+                      <rect
+                        x="110"
+                        y="34"
+                        width="140"
+                        height="44"
+                        rx="8"
+                        className="fill-rose-50 dark:fill-rose-950/60 stroke-rose-400 dark:stroke-rose-600"
+                        strokeWidth="2"
+                      />
+                      <text x="180" y="61" textAnchor="middle" className="text-[14px] font-bold fill-rose-950 dark:fill-rose-100 font-sans tracking-wide">
+                        PC
+                      </text>
+                    </g>
 
-                        {/* PC + 4 가산기 (라운드 박스) */}
-                        <div className="w-[80px] h-[34px] rounded-md border border-black flex items-center justify-center bg-transparent shrink-0">
-                          <span className="text-[12px] font-bold font-sans">PC + 4</span>
-                        </div>
-                      </div>
-                    </div>
+                    {/* PC -> PC+4 화살표 */}
+                    <path
+                      d="M 250 56 L 320 56"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
 
-                    {/* PC ➔ Instruction Memory 연결 화살표 */}
-                    <div className="w-full flex justify-center items-center py-0.5">
-                      <div className="flex flex-col items-center text-black text-[11px] leading-none">
-                        <span className="h-2 w-[1px] bg-black"></span>
-                        <span>▼</span>
-                      </div>
-                    </div>
+                    {/* PC + 4 가산기 (모던 사다리꼴) */}
+                    <polygon
+                      points="330,36 410,36 396,76 344,76"
+                      className="fill-white dark:fill-neutral-900 stroke-slate-500 dark:stroke-slate-400"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                    />
+                    <text x="370" y="60" textAnchor="middle" className="text-[12px] font-bold fill-slate-800 dark:fill-slate-200 font-sans">
+                      PC + 4
+                    </text>
 
-                    {/* 부품 2: Instruction Memory (라운드 박스) */}
-                    <div className="w-full flex justify-center">
-                      <div className="w-[320px] h-[48px] rounded-md border border-black flex flex-col items-center justify-center bg-transparent">
-                        <span className="text-[13px] font-bold font-sans leading-tight">
-                          Instruction Memory
-                        </span>
-                        <span className="text-[10px] font-mono text-neutral-600 leading-tight">
-                          Read Inst [31:0] @ PC
-                        </span>
-                      </div>
-                    </div>
+                    {/* PC -> Instruction Memory 화살표 */}
+                    <path
+                      d="M 180 78 L 180 102"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
 
-                    {/* Instruction Memory ➔ IF/ID 버퍼 직하강 화살표 (바닥 0px까지 꽉 채움) */}
-                    <div className="w-full flex-1 flex flex-col items-center justify-end pb-0">
-                      <span className="w-[1px] flex-1 bg-black min-h-[8px]"></span>
-                      <span className="text-black text-[11px] leading-none mb-[-2px]">▼</span>
-                    </div>
-                  </div>
+                    {/* Instruction Memory 박스 */}
+                    <g>
+                      <rect
+                        x="50"
+                        y="102"
+                        width="260"
+                        height="46"
+                        rx="8"
+                        className="fill-blue-50 dark:fill-blue-950/50 stroke-blue-400 dark:stroke-blue-600"
+                        strokeWidth="2"
+                      />
+                      <text x="180" y="130" textAnchor="middle" className="text-[14px] font-bold fill-blue-950 dark:fill-blue-100 font-sans tracking-wide">
+                        Instruction Memory
+                      </text>
+                    </g>
+
+                    {/* Instruction Memory -> 바닥 버퍼 직결 화살표 */}
+                    <path
+                      d="M 180 148 L 180 178"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="2.2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                  </svg>
+                ) : layer.key === "ID" ? (
+                  /* ══════════════════════════════════════════════════════════════
+                      2. ID Stage: Registers / Imm Gen / Control Unit
+                  ══════════════════════════════════════════════════════════════ */
+                  <svg
+                    viewBox="0 0 500 180"
+                    preserveAspectRatio="none"
+                    className="w-full h-full select-none block font-sans"
+                  >
+                    {/* 상단 버퍼에서 들어오는 입력선 */}
+                    <path
+                      d="M 220 0 L 220 28"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="2"
+                    />
+                    {/* 분기선 (Registers & Imm Gen으로 분기) */}
+                    <path
+                      d="M 115 28 L 330 28"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M 115 28 L 115 48"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="1.8"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                    <path
+                      d="M 330 28 L 330 48"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="1.8"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* 1. Registers (Register File) 박스 */}
+                    <g>
+                      <rect
+                        x="30"
+                        y="44"
+                        width="170"
+                        height="86"
+                        rx="8"
+                        className="fill-emerald-50 dark:fill-emerald-950/50 stroke-emerald-500 dark:stroke-emerald-600"
+                        strokeWidth="2"
+                      />
+                      <text x="115" y="92" textAnchor="middle" className="text-[14px] font-bold fill-emerald-950 dark:fill-emerald-100 font-sans tracking-wide">
+                        Registers
+                      </text>
+                    </g>
+
+                    {/* 2. Imm Gen 박스 */}
+                    <g>
+                      <rect
+                        x="260"
+                        y="44"
+                        width="140"
+                        height="86"
+                        rx="8"
+                        className="fill-sky-50 dark:fill-sky-950/50 stroke-sky-500 dark:stroke-sky-600"
+                        strokeWidth="2"
+                      />
+                      <text x="330" y="92" textAnchor="middle" className="text-[14px] font-bold fill-sky-950 dark:fill-sky-100 font-sans tracking-wide">
+                        Imm Gen
+                      </text>
+                    </g>
+
+                    {/* 바닥 ID/EX 버퍼로 향하는 출력 화살표들 (y=178 바닥 직결) */}
+                    <path
+                      d="M 85 128 L 85 178"
+                      fill="none"
+                      className="stroke-emerald-600 dark:stroke-emerald-400"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                    <path
+                      d="M 145 128 L 145 178"
+                      fill="none"
+                      className="stroke-emerald-600 dark:stroke-emerald-400"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                    <path
+                      d="M 330 128 L 330 178"
+                      fill="none"
+                      className="stroke-sky-600 dark:stroke-sky-400"
+                      strokeWidth="2"
+                      strokeDasharray="4 3"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                  </svg>
+                ) : layer.key === "EX" ? (
+                  /* ══════════════════════════════════════════════════════════════
+                      3. EX Stage: ALU / ALUSrc MUX / Branch Add
+                  ══════════════════════════════════════════════════════════════ */
+                  <svg
+                    viewBox="0 0 500 180"
+                    preserveAspectRatio="none"
+                    className="w-full h-full select-none block font-sans"
+                  >
+                    {/* ID/EX 버퍼에서 내려오는 Operand A (rs1) 입력 */}
+                    <path
+                      d="M 85 0 L 85 24 L 140 24 L 140 38"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* ALUSrc MUX (사다리꼴) */}
+                    <polygon
+                      points="265,30 315,30 305,68 275,68"
+                      className="fill-sky-50 dark:fill-sky-950/60 stroke-sky-500 dark:stroke-sky-600"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                    />
+                    <text x="290" y="52" textAnchor="middle" className="text-[10px] font-bold fill-sky-900 dark:fill-sky-100 font-sans">
+                      MUX
+                    </text>
+
+                    {/* ID/EX 버퍼에서 내려와 MUX로 들어가는 입력 2개 */}
+                    <path
+                      d="M 145 0 L 145 18 L 280 18 L 280 30"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="1.5"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                    <path
+                      d="M 300 0 L 300 30"
+                      fill="none"
+                      className="stroke-sky-600 dark:stroke-sky-400"
+                      strokeWidth="1.8"
+                      strokeDasharray="4 3"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* MUX -> ALU Operand B 화살표 (위에서 아래로 꽂힘) */}
+                    <path
+                      d="M 290 68 L 290 24 L 240 24 L 240 38"
+                      fill="none"
+                      className="stroke-slate-700 dark:stroke-slate-300"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* ALU (올려주신 이미지 실루엣: 가로로 넉넉하고 완만한 V홈 사다리꼴 + 다른 요소들과 통일된 파스텔 톤앤매너) */}
+                    <polygon
+                      points="105,40 172,40 190,58 208,40 275,40 252,116 128,116"
+                      className="fill-amber-50 dark:fill-amber-950/50 stroke-amber-500 dark:stroke-amber-600"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                    <text x="190" y="90" textAnchor="middle" className="text-[17px] font-bold font-sans fill-amber-950 dark:fill-amber-100 tracking-wider">
+                      ALU
+                    </text>
+
+                    {/* 우측 Branch Add (가산기 사다리꼴) */}
+                    <polygon
+                      points="370,48 440,48 428,88 382,88"
+                      className="fill-white dark:fill-neutral-900 stroke-slate-500 dark:stroke-slate-400"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                    />
+                    <text x="405" y="72" textAnchor="middle" className="text-[11px] font-bold fill-slate-800 dark:fill-slate-200 font-sans">
+                      Branch Add
+                    </text>
+
+                    {/* ALU Result -> EX/MEM 버퍼 직결 화살표 (y=178 바닥 밀착) */}
+                    <path
+                      d="M 190 116 L 190 178"
+                      fill="none"
+                      className="stroke-amber-600 dark:stroke-amber-400"
+                      strokeWidth="2.2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* Branch Target -> EX/MEM 버퍼 직결 화살표 */}
+                    <path
+                      d="M 405 92 L 405 178"
+                      fill="none"
+                      stroke="#94A3B8"
+                      strokeWidth="1.6"
+                      strokeDasharray="4 3"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                  </svg>
+                ) : layer.key === "MEM" ? (
+                  /* ══════════════════════════════════════════════════════════════
+                      4. MEM Stage: Data Memory
+                  ══════════════════════════════════════════════════════════════ */
+                  <svg
+                    viewBox="0 0 500 120"
+                    preserveAspectRatio="none"
+                    className="w-full h-full select-none block font-sans"
+                  >
+                    {/* EX/MEM 버퍼에서 내려오는 ALU Result 화살표 */}
+                    <path
+                      d="M 190 0 L 190 28"
+                      fill="none"
+                      className="stroke-amber-600 dark:stroke-amber-400"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* ALU Result Bypass 선 (좌측으로 우회하여 MEM/WB 버퍼로 직통) */}
+                    <path
+                      d="M 190 18 L 90 18 L 90 118"
+                      fill="none"
+                      className="stroke-amber-600 dark:stroke-amber-400"
+                      strokeWidth="1.8"
+                      strokeDasharray="4 3"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                    <text x="96" y="65" className="text-[9px] font-mono fill-amber-700 dark:fill-amber-300">
+                      ALU Bypass
+                    </text>
+
+                    {/* Data Memory 박스 */}
+                    <g>
+                      <rect
+                        x="150"
+                        y="24"
+                        width="240"
+                        height="60"
+                        rx="8"
+                        className="fill-sky-50 dark:fill-sky-950/50 stroke-sky-500 dark:stroke-sky-600"
+                        strokeWidth="2"
+                      />
+                      <text x="270" y="59" textAnchor="middle" className="text-[14px] font-bold fill-sky-950 dark:fill-sky-100 font-sans tracking-wide">
+                        Data Memory
+                      </text>
+                    </g>
+
+                    {/* Data Memory -> MEM/WB 버퍼 직결 화살표 (y=118 바닥 밀착) */}
+                    <path
+                      d="M 270 84 L 270 118"
+                      fill="none"
+                      className="stroke-sky-600 dark:stroke-sky-400"
+                      strokeWidth="2.2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                  </svg>
                 ) : (
-                  <span className="font-semibold text-[11px] text-[var(--ar-text-muted)]">
-                    [Row {rowIndex + 1} 중앙] {layer.key} 회로 부품
-                  </span>
+                  /* ══════════════════════════════════════════════════════════════
+                      5. WB Stage: MemtoReg MUX
+                  ══════════════════════════════════════════════════════════════ */
+                  <svg
+                    viewBox="0 0 500 120"
+                    preserveAspectRatio="none"
+                    className="w-full h-full select-none block font-sans"
+                  >
+                    {/* MEM/WB 버퍼에서 내려오는 두 입력선 (Bypass vs Read Data) */}
+                    <path
+                      d="M 90 0 L 90 32 L 200 32 L 200 44"
+                      fill="none"
+                      className="stroke-amber-600 dark:stroke-amber-400"
+                      strokeWidth="1.8"
+                      strokeDasharray="4 3"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                    <path
+                      d="M 270 0 L 270 44"
+                      fill="none"
+                      className="stroke-sky-600 dark:stroke-sky-400"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+
+                    {/* MemtoReg MUX (사다리꼴) */}
+                    <polygon
+                      points="170,44 300,44 270,84 200,84"
+                      className="fill-purple-50 dark:fill-purple-950/60 stroke-purple-500 dark:stroke-purple-600"
+                      strokeWidth="1.8"
+                    />
+                    <text x="235" y="68" textAnchor="middle" className="text-[12px] font-bold fill-purple-950 dark:fill-purple-100 font-sans">
+                      MemtoReg MUX
+                    </text>
+
+                    {/* MUX 출력 -> Register File Write-Back 피드백 버스 화살표 */}
+                    <path
+                      d="M 235 84 L 235 106 L 25 106"
+                      fill="none"
+                      className="stroke-purple-600 dark:stroke-purple-400"
+                      strokeWidth="2"
+                      markerEnd="url(#arr-pipe)"
+                    />
+                    <text x="130" y="100" className="text-[9.5px] font-mono font-bold fill-purple-700 dark:fill-purple-300">
+                      Write Data to rd
+                    </text>
+                  </svg>
                 )}
               </div>
 
-              {/* 3열: 우측 해저드/동작 설명 영역 */}
+              {/* 3열: 스테이지별 명령어 및 정보 (경계선 제거) */}
               <div
-                className={`${borderBottom} bg-[var(--ar-panel-bg)] px-3 py-1 flex flex-col justify-center text-[10px] leading-relaxed min-h-0 overflow-hidden`}
+                className="bg-transparent px-3 py-1 flex flex-col justify-center text-[10px] leading-relaxed min-h-0 overflow-hidden font-mono"
               >
                 <span className="font-sans font-semibold text-[var(--ar-text-primary)] mb-0.5">
-                  [Row {rowIndex + 1} 우측] {layer.key} 상태
+                  {layer.key} Stage
                 </span>
-                <span className="text-[var(--ar-text-muted)] truncate">
-                  {hasInst ? `명령어: ${rawAsm}` : "대기 상태 (Idle / Bubble)"}
+                <span className="text-[var(--ar-text-muted)] truncate font-mono">
+                  {hasInst ? rawAsm : "bubble"}
                 </span>
               </div>
             </React.Fragment>
           );
         })}
+        </div>
       </div>
     </div>
   );
