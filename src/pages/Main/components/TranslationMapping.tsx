@@ -617,23 +617,19 @@ export default function TranslationMapping({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 어셈블리 시뮬레이션 버튼 (C 에디터 컴파일 버튼과 동일한 h-[22px], 반응형 쐐기 번개 도형) */}
+          {/* 어셈블리 시뮬레이션 버튼 (C 에디터 컴파일 버튼과 100% 동일한 클래스, 색상, 이펙트, 구조) */}
           <button
             type="button"
+            className="h-[22px] rounded bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold"
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
-            className={`h-[22px] rounded px-2.5 text-[10.5px] font-semibold transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget === "asm"
-              ? "bg-amber-600 hover:bg-amber-700 text-white cursor-pointer shadow-2xs"
-              : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
-              }`}
-            title={activeTarget === "asm" ? "작성된 어셈블리를 하드웨어에 로드하고 시뮬레이션 준비" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
+            title="어셈블리 빌드 및 시뮬레이션 준비"
           >
             {busy ? (
               <span className="w-3 h-3 flex items-center justify-center shrink-0">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               </span>
             ) : (
-              /* 좁아졌을 때 나타나는 단색 번개 쐐기형 기하 도형 아이콘 */
               <svg
                 className="w-3 h-3 fill-current inline @[200px]:hidden shrink-0"
                 viewBox="0 0 24 24"
