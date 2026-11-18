@@ -231,12 +231,12 @@ export default function TranslationEditor({
       }`}
       aria-label="Translation C 편집기"
     >
-      {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명) */}
+      {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명, 우측 상태 문구) */}
       <header
-        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] ${
-          activeTarget !== "c"
-            ? "bg-[#F1F5F9] dark:bg-[#1A1A1C]"
-            : "bg-[var(--ar-header-bg)]"
+        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors ${
+          activeTarget === "c"
+            ? "border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] bg-[var(--ar-header-bg)]"
+            : "border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] bg-[var(--ar-header-bg)]"
         }`}
       >
         <div className="flex items-center gap-1.5 min-w-0">
@@ -247,17 +247,18 @@ export default function TranslationEditor({
                 : "bg-transparent scale-0"
             }`}
           />
-          <h3
-            className={`font-sans text-[11px] font-semibold uppercase tracking-wide truncate whitespace-nowrap transition-colors ${
-              activeTarget !== "c"
-                ? "text-[var(--ar-text-muted)]"
-                : "text-[var(--ar-text-primary)]"
-            }`}
-          >
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
             C SOURCE CODE
           </h3>
           <span className="text-[10px] font-mono truncate text-[var(--ar-text-muted)]">
             ({fileName})
+          </span>
+        </div>
+
+        {/* C 에디터 상태 문구 (우측 정렬: ASM 모드일 때와 동일한 톤앤매너) */}
+        <div className="flex items-center shrink-0 ml-2">
+          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
+            {activeTarget === "c" ? "C 소스 직접 작성" : "C 소스 읽기 전용"}
           </span>
         </div>
       </header>
