@@ -213,7 +213,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             gridTemplateRows: "3fr 18px 3fr 18px 3fr 18px 2fr 18px 2fr",
           }}
         >
-        {NINE_LAYERS.map((layer, rowIndex) => {
+        {NINE_LAYERS.map((layer) => {
           const isBuffer = layer.type === "buffer";
           const buf = getStageBuffer(layer.key);
           const rawAsm = buf?.assembly?.trim();
@@ -226,12 +226,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 {/* 1열: 비움 (경계선 없음) */}
                 <div className="min-h-0" />
 
-                {/* 2열: 버퍼 레지스터 바 (경계선 제거) */}
+                {/* 2열: 버퍼 레지스터 바 (다른 컴포넌트들과 통일된 라운딩, 테두리, 산세리프 톤앤매너) */}
                 <div
-                  className="bg-transparent p-0 flex items-stretch justify-center min-h-0"
+                  className="bg-transparent px-2 py-0.5 flex items-stretch justify-center min-h-0"
                 >
-                  <div className="w-full h-full bg-amber-100/90 dark:bg-amber-950/60 flex items-center justify-center rounded-xs">
-                    <span className="text-[9.5px] font-bold font-mono text-amber-900 dark:text-amber-200 tracking-wider leading-none">
+                  <div className="w-full h-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 flex items-center justify-center rounded-md shadow-2xs">
+                    <span className="text-[10px] font-bold font-sans text-slate-700 dark:text-slate-200 tracking-wider leading-none">
                       {layer.bufferName}
                     </span>
                   </div>
