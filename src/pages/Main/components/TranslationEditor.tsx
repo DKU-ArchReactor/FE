@@ -403,21 +403,7 @@ export default function TranslationEditor({
         onOpenSavedFile={onOpenSavedFile}
       />
 
-      <div
-        className={`min-h-0 flex-1 relative transition-all duration-200 ${
-          activeTarget !== "c"
-            ? "bg-[#EBECEF] dark:bg-[#141415] opacity-65 grayscale-[35%]"
-            : "bg-white dark:bg-[#1E1E1E]"
-        }`}
-      >
-        {activeTarget !== "c" && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none select-none">
-            <div className="px-3.5 py-1.5 rounded-full bg-[#24292F]/85 dark:bg-[#252528]/95 text-white dark:text-[#E0E0E0] text-[11px] font-medium backdrop-blur-xs shadow-lg border border-black/10 dark:border-white/10 flex items-center gap-1.5 animate-fadeIn">
-              <span>🔒</span>
-              <span>어셈블리 작성 모드 (C 코드 읽기 전용)</span>
-            </div>
-          </div>
-        )}
+      <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
         <Editor
           height="100%"
           language="c"
