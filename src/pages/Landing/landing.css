@@ -74,39 +74,60 @@
 .landing-brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #005fb8 !important;
-  letter-spacing: -0.45px;
-  font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   white-space: nowrap;
+  transition: color 0.15s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+@media (min-width: 768px) {
+  .landing-brand {
+    gap: 8px;
+  }
+}
+.landing-brand:hover {
+  color: #004c99 !important;
 }
 .landing-brand-text {
   position: relative;
   display: inline-flex;
   align-items: center;
-  line-height: 1;
+  user-select: none;
+}
+.landing-brand-title {
   font-family: 'Bricolage Grotesque', sans-serif;
   font-weight: 900;
-  font-size: 19px;
-  letter-spacing: -0.02em;
+  font-size: 17px;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+@media (min-width: 768px) {
+  .landing-brand-title {
+    font-size: 20px;
+  }
 }
 .landing-brand-badge {
-  font-size: 10px;
-  font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: #8c959f;
+  font-size: 9px;
+  font-weight: 700;
+  color: #9ca3af;
   letter-spacing: 0.05em;
   position: relative;
   top: -6px;
-  margin-left: 3px;
+  margin-left: 4px;
+}
+@media (min-width: 768px) {
+  .landing-brand-badge {
+    font-size: 10px;
+    margin-left: 6px;
+  }
 }
 .landing-mark {
-  width: 28px;
-  height: 28px;
   object-fit: contain;
   transform-origin: center center;
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform;
 }
 .landing-brand:hover .landing-mark {
