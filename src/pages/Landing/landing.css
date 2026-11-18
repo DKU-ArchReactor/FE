@@ -81,6 +81,22 @@
   font-weight: 800;
   white-space: nowrap;
 }
+.landing-brand-text {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+.landing-brand-badge {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #8c959f;
+  letter-spacing: 0.05em;
+  position: relative;
+  top: -6px;
+  margin-left: 3px;
+}
 .landing-mark {
   width: 28px;
   height: 28px;

@@ -455,7 +455,10 @@ export default function LandingPage() {
         <div className="landing-nav-wrap">
           <Link to="/" className="landing-brand" aria-label="ArchReactor 홈">
             <BrandMark />
-            ArchReactor
+            <span className="landing-brand-text">
+              ArchReactor
+              <span className="landing-brand-badge">RV32I</span>
+            </span>
           </Link>
           <nav
             className={`landing-nav ${menuOpen ? "is-open" : ""}`}
