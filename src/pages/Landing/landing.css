@@ -969,6 +969,195 @@
   padding-top: 45px;
   border-top: 1px solid #e9eef5;
 }
+@media (max-width: 900px) {
+  .landing-detail-features {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+/* 03: AI Chatbot Illustration (100% Unified with 01 & 02 style) */
+.landing-chat-illustration {
+  background: #f4f7fc;
+  border: 1px solid #e9eef7;
+  border-radius: 17px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+}
+.landing-chat-dialogue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.landing-chat-bubble-user {
+  align-self: flex-end;
+  background: #5077d8;
+  color: #ffffff;
+  padding: 9px 13px;
+  border-radius: 12px 12px 2px 12px;
+  font-size: 10px;
+  line-height: 1.45;
+  max-width: 82%;
+  box-shadow: 0 4px 14px rgba(80, 119, 216, 0.15);
+}
+.landing-chat-bubble-ai {
+  align-self: flex-start;
+  background: #ffffff;
+  border: 1px solid #dce7f6;
+  padding: 12px 15px;
+  border-radius: 2px 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 95%;
+  box-shadow: 0 6px 20px rgba(96, 127, 173, 0.05);
+}
+.landing-chat-ai-intro {
+  font-size: 10px;
+  color: #677b99;
+  line-height: 1.4;
+  margin: 0;
+}
+.landing-chat-code-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: Consolas, monospace;
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: #576579;
+}
+.landing-chat-code-card .cmd {
+  color: #4f75e8;
+  font-weight: 600;
+}
+.landing-chat-code-card .comment {
+  color: #94a3b8;
+  font-style: italic;
+}
+/* 버튼 모양의 그래픽 뱃지 (실제 clickable 버튼이 아닌 일러스트 요소) */
+.landing-chat-insert-badge {
+  align-self: flex-start;
+  background: #edf4ff;
+  border: 1px solid #c9ddfb;
+  color: #3b6fb6;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+.landing-chat-insert-badge > span {
+  font-weight: 700;
+  font-size: 10px;
+}
+
+/* 04: Hazard & CPI Illustration (100% Unified with 01 & 02 style) */
+.landing-hazard-illustration {
+  background: #f5f8fd;
+  border: 1px solid #e8eef8;
+  border-radius: 17px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+}
+.landing-cpi-meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #dce7f6;
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 20px rgba(96, 127, 173, 0.05);
+}
+.landing-cpi-meter-info span {
+  display: block;
+  font-size: 8px;
+  color: #9cabc0;
+  margin-bottom: 2px;
+}
+.landing-cpi-meter-info strong {
+  font-size: 11px;
+  font-weight: 600;
+  color: #677b99;
+}
+.landing-cpi-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #4f75e8;
+  font-family: monospace;
+}
+.landing-cpi-value small {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9cabc0;
+  margin-left: 2px;
+}
+.landing-hazard-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.landing-hazard-card {
+  background: #ffffff;
+  border: 1px solid #e4ebf5;
+  border-radius: 6px;
+  padding: 9px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: 0 4px 12px rgba(96, 127, 173, 0.04);
+}
+.landing-hazard-card.is-forwarding {
+  border-color: #cdddf6;
+  background: #f4f8fe;
+}
+.landing-hazard-card.is-stall {
+  border-color: #fcedd8;
+  background: #fdf8f0;
+}
+.landing-hazard-card.is-flush {
+  border-color: #f7e0e7;
+  background: #fbf3f6;
+}
+.landing-hazard-tag {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  display: inline-block;
+  margin: 0 auto;
+}
+.is-forwarding .landing-hazard-tag {
+  background: #e4edfc;
+  color: #5077d8;
+}
+.is-stall .landing-hazard-tag {
+  background: #fcf0dc;
+  color: #c79753;
+}
+.is-flush .landing-hazard-tag {
+  background: #f6e9ee;
+  color: #bd8a9d;
+}
+.landing-hazard-card strong {
+  font-size: 9.5px;
+  color: #576579;
+}
+.landing-hazard-card p {
+  font-size: 7.5px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.35;
+}
 .landing-detail-icon {
   display: inline-flex;
   align-items: center;
@@ -1169,6 +1358,55 @@
   width: 4px;
   height: 4px;
 }
+/* Compact Problem Statement Banner */
+.landing-problem-banner {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 32px 36px;
+  margin: 50px auto 70px;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+}
+@media (max-width: 768px) {
+  .landing-problem-banner {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 24px 20px;
+    margin: 40px auto 50px;
+  }
+}
+.landing-problem-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.landing-problem-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6366f1;
+}
+.landing-problem-item h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.4;
+  letter-spacing: -0.3px;
+}
+.landing-problem-item p {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0;
+  word-break: keep-all;
+}
+
 .landing-footer {
   max-width: 1192px;
   padding: 35px 28px 40px;
@@ -1183,6 +1421,11 @@
 }
 .landing-footer .landing-brand {
   font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #1e293b;
 }
 .landing-footer .landing-mark {
   width: 26px;
@@ -1205,6 +1448,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  text-decoration: none;
+  color: #8593a6;
+  transition: color 0.15s ease;
+}
+.landing-footer nav a:hover {
+  color: #1d4ed8;
 }
 .landing-footer nav svg {
   width: 12px;

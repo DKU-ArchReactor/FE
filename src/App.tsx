@@ -24,8 +24,14 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route element={<Layout />}>
           <Route path="/simulator" element={<MainPage />} />
-          <Route path="/pipeline" element={<MainPage />} />
-          <Route path="/management" element={<MainPage />} />
+          <Route
+            path="/pipeline"
+            element={<Navigate to="/simulator" replace />}
+          />
+          <Route
+            path="/management"
+            element={<Navigate to="/simulator" replace />}
+          />
           <Route
             path="/c-to-asm"
             element={<Navigate to="/simulator" replace />}

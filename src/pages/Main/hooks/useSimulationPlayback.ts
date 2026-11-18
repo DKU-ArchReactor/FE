@@ -38,8 +38,8 @@ export function useSimulationPlayback({
     setPlaybackFeedback({ type, id: Date.now() });
   };
 
-  // Single-Cycle 모드 전용: Step 0 (실행 시작 전 대기 상태) 초기 스냅샷
-  const initialSingleData: CycleHistoryItem | null = useMemo(() => {
+  // Single-Cycle 및 Pipeline 모드 공통: Step 0 / Cycle 0 (실행 시작 전 대기 상태) 초기 스냅샷
+  const initialResetData: CycleHistoryItem | null = useMemo(() => {
     if (!simulationData || !historyList.length) return null;
     const entryPc = simulationData.program?.entry_point || "0x00010000";
     const initialRegs: Record<string, string> = {
@@ -55,18 +55,14 @@ export function useSimulationPlayback({
     return {
       clock: 0,
       buffers: {
-        IF: {
-          pc: entryPc,
-          assembly: "empty",
-          status: "empty",
-        },
+        IF: null,
         ID: null,
         EX: null,
         MEM: null,
         WB: null,
       },
       stage_activity: {
-        IF: { pc: entryPc, assembly: "empty", status: "empty" },
+        IF: { assembly: "empty", status: "empty" },
         ID: { assembly: "empty", status: "empty" },
         EX: { assembly: "empty", status: "empty" },
         MEM: { assembly: "empty", status: "empty" },
@@ -129,32 +125,28 @@ export function useSimulationPlayback({
     };
   }, [simulationData, historyList.length]);
 
-  const activeCycleIndex = isSingleEngine
-    ? (currentCycle > 0 ? currentCycle - 1 : 0)
-    : Math.min(currentCycle, Math.max(0, historyList.length - 1));
+  const activeCycleIndex = currentCycle > 0 ? currentCycle - 1 : 0;
 
-  const currentData: CycleHistoryItem | null = isSingleEngine
-    ? (currentCycle === 0
-        ? initialSingleData
-        : historyList[Math.min(currentCycle - 1, historyList.length - 1)] ?? null)
-    : (historyList[activeCycleIndex] ?? null);
+  const currentData: CycleHistoryItem | null =
+    currentCycle === 0
+      ? initialResetData
+      : (historyList[Math.min(currentCycle - 1, historyList.length - 1)] ?? null);
 
-  const prevData: CycleHistoryItem | null = isSingleEngine
-    ? (currentCycle === 0
-        ? null
-        : currentCycle === 1
-        ? initialSingleData
-        : historyList[Math.min(currentCycle - 2, historyList.length - 1)] ?? null)
-    : (activeCycleIndex > 0 ? historyList[activeCycleIndex - 1] ?? null : null);
+  const prevData: CycleHistoryItem | null =
+    currentCycle === 0
+      ? null
+      : currentCycle === 1
+      ? initialResetData
+      : (historyList[Math.min(currentCycle - 2, historyList.length - 1)] ?? null);
 
   // Single 모드 또는 Pipeline 모드에서 현재 활성 실행 중인 어셈블리 행 계산
   const currentActiveRow = (() => {
     if (!currentData || !mappedAssemblyRows.length) return null;
 
-    if (isSingleEngine) {
-      // Step 0: 실행 전 초기 대기 상태이므로 실행 포커스 없음
-      if (currentCycle === 0) return null;
+    // Cycle 0: 실행 전 초기 대기 상태이므로 실행 포커스 없음
+    if (currentCycle === 0) return null;
 
+    if (isSingleEngine) {
       // Step 1일 때 historyList[0], Step 2일 때 historyList[1], ...
       const stepIdx = Math.min(currentCycle - 1, historyList.length - 1);
       const stepData = historyList[stepIdx];
@@ -247,7 +239,7 @@ export function useSimulationPlayback({
 
       timerRef.current = window.setInterval(() => {
         setCurrentCycle((prev) => {
-          const maxLimit = isSingleEngine ? totalCycles : Math.max(0, totalCycles - 1);
+          const maxLimit = totalCycles;
           if (prev >= maxLimit) {
             setIsPlaying(false);
             return prev;
@@ -287,13 +279,13 @@ export function useSimulationPlayback({
       return false;
     });
     onClearSelection();
-    const maxLimit = isSingleEngine ? totalCycles : Math.max(0, totalCycles - 1);
+    const maxLimit = totalCycles;
     setCurrentCycle((prev) => Math.min(maxLimit, prev + 1));
   };
 
   const handleTogglePlay = () => {
     const currentPos = currentCycle;
-    const maxPos = isSingleEngine ? totalCycles : Math.max(0, totalCycles - 1);
+    const maxPos = totalCycles;
 
     onClearSelection();
 
