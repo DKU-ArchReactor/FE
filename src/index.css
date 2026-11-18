@@ -400,29 +400,56 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* ======================================================== */
 /* Monaco Editor ASM 직접 작성 모드 전용 하이라이트 스타일   */
-/* (앰버/인디고 테마: 하드웨어 어셈블리 고유 감성)           */
+/* (선택 라인은 C 에디터의 싱글/파이프라인 포커싱 색상과 100% 통일) */
 /* ======================================================== */
 .monaco-selected-asm-line {
-  background-color: #fffbeb !important; /* amber-50 */
+  background-color: #eff6ff !important; /* bg-blue-50 (싱글 사이클 기본) */
 }
+html.mode-pipeline .monaco-selected-asm-line {
+  background-color: #f5f3ff !important; /* bg-purple-50 (파이프라인) */
+}
+
 .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
-  background-color: #fffbeb !important;
-  box-shadow: inset 4px 0 0 0 #d97706 !important; /* amber-600 */
+  background-color: #eff6ff !important;
+  box-shadow: inset 4px 0 0 0 #2563eb !important; /* 맨 왼쪽 4px 파란 바 */
 }
+html.mode-pipeline .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
+  background-color: #f5f3ff !important;
+  box-shadow: inset 4px 0 0 0 #7c3aed !important; /* 맨 왼쪽 4px 보라색 바 */
+}
+
 .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
-  color: #b45309 !important; /* amber-700 */
+  color: #1d4ed8 !important; /* blue-700 진한 파란색 */
+  font-weight: 700 !important;
+}
+html.mode-pipeline .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
+  color: #6d28d9 !important; /* purple-700 진한 보라색 */
   font-weight: 700 !important;
 }
 
+/* Dark mode Monaco Line Highlights (C 에디터와 1:1 일치) */
 html.dark .monaco-selected-asm-line {
-  background-color: #451a03 !important; /* amber-950/70 */
+  background-color: #04395e !important;
 }
+html.dark.mode-pipeline .monaco-selected-asm-line {
+  background-color: #2e1065 !important; /* purple-950/80 */
+}
+
 html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
-  background-color: #451a03 !important;
-  box-shadow: inset 4px 0 0 0 #f59e0b !important; /* amber-500 */
+  background-color: #04395e !important;
+  box-shadow: inset 4px 0 0 0 #007acc !important;
 }
+html.dark.mode-pipeline .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
+  background-color: #2e1065 !important;
+  box-shadow: inset 4px 0 0 0 #8b5cf6 !important; /* 보라색 액센트 바 */
+}
+
 html.dark .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
-  color: #fcd34d !important; /* amber-300 */
+  color: #9cdcfe !important;
+  font-weight: 700 !important;
+}
+html.dark.mode-pipeline .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
+  color: #c4b5fd !important; /* purple-300 */
   font-weight: 700 !important;
 }
 
@@ -451,28 +478,28 @@ html.dark .monaco-editor .line-numbers.monaco-executing-asm-linenumber {
   font-weight: 700 !important;
 }
 
-/* 실행 중이면서 선택된 어셈블리 라인 */
+/* 실행 중이면서 선택된 어셈블리 라인 (C 에디터와 동일한 시안/하늘색 하이브리드) */
 .monaco-executing-selected-asm-line {
-  background-color: #fef3c7 !important; /* amber-100 */
+  background-color: #ecfeff !important; /* cyan-50 */
 }
 .monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-asm-linenumber) {
-  background-color: #fef3c7 !important;
-  box-shadow: inset 4px 0 0 0 #b45309 !important;
+  background-color: #ecfeff !important;
+  box-shadow: inset 4px 0 0 0 #0891b2 !important; /* cyan-600 */
 }
 .monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber {
-  color: #92400e !important;
+  color: #0e7490 !important; /* cyan-700 */
   font-weight: 700 !important;
 }
 
 html.dark .monaco-executing-selected-asm-line {
-  background-color: #78350f !important;
+  background-color: #0e3a47 !important;
 }
 html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-asm-linenumber) {
-  background-color: #78350f !important;
-  box-shadow: inset 4px 0 0 0 #fbbf24 !important;
+  background-color: #0e3a47 !important;
+  box-shadow: inset 4px 0 0 0 #007acc !important;
 }
 html.dark .monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber {
-  color: #fde68a !important;
+  color: #4fc1ff !important;
   font-weight: 700 !important;
 }
 
