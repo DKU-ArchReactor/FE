@@ -12,7 +12,9 @@ interface SlidingViewportTrackProps {
   onSlotResizeStart: (secIdx: number, slotIdx: number, topRatio: number, btmRatio: number, e: React.MouseEvent) => void;
   onPairReset?: (secIdx: number, slotIdx: number) => void;
   onSlotReset?: (secIdx: number, slotIdx: number) => void;
+  mobileLeadSection?: React.ReactNode;
   mobileExtraSection?: React.ReactNode;
+  mobileViewportIndex?: number;
 }
 
 export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
@@ -26,16 +28,29 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
   onSlotResizeStart,
   onPairReset,
   onSlotReset,
+  mobileLeadSection,
   mobileExtraSection,
+  mobileViewportIndex,
 }) => {
+  const effectiveMobileIndex = mobileViewportIndex ?? rightViewportIndex;
+
   return (
     <div ref={containerRef} className="flex-1 h-full min-w-0 overflow-hidden relative">
       <div
-        className="flex h-full w-full transition-transform duration-500 ease-in-out"
-        style={{
-          transform: `translate3d(-${rightViewportIndex * 100}%, 0, 0)`,
-        }}
+        className="flex h-full w-full transition-transform duration-500 ease-in-out translate-x-[var(--mobile-tx)] md:translate-x-[var(--desktop-tx)]"
+        style={
+          {
+            "--mobile-tx": `-${effectiveMobileIndex * 100}%`,
+            "--desktop-tx": `-${rightViewportIndex * 100}%`,
+          } as React.CSSProperties
+        }
       >
+        {mobileLeadSection && (
+          <div className="flex md:hidden h-full min-h-0 shrink-0 w-full overflow-hidden flex-col gap-1.5">
+            {mobileLeadSection}
+          </div>
+        )}
+
         {sections.map((section, secIdx) => {
           return (
             <div

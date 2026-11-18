@@ -1,4 +1,3 @@
-import BuildStatusBar from "./components/BuildStatusBar";
 import type { EditorSelection } from './utils/assistantSource';
 import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useCallback, useEffect } from "react";
@@ -56,6 +55,7 @@ const MainPage: React.FC = () => {
   const [sourceSelection, setSourceSelection] = useState<EditorSelection | null>(null);
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
+  const [isMobileCodeView, setIsMobileCodeView] = useState(true);
   const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
   const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
   const aiPopupOpenRef = useRef(isAiPopupOpen);
@@ -303,26 +303,21 @@ const MainPage: React.FC = () => {
     ? playback.totalCycles
     : Math.max(0, playback.totalCycles - 1);
 
-  const handleMobileViewportSelect = (index: number) => {
-    setIsMobileAssistantViewport(false);
-    setRightViewportIndex(index);
-    requestAnimationFrame(() => {
-      mainWorkspaceRef.current?.scrollTo({
-        top: mainWorkspaceRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    });
+const handleMobileCodeSelect = () => {
+  setIsMobileCodeView(true);
+  setIsMobileAssistantViewport(false);
+};
+
+const handleMobileViewportSelect = (index: number) => {
+  setIsMobileCodeView(false);
+  setIsMobileAssistantViewport(false);
+  setRightViewportIndex(index);
   };
 
   const handleMobileAssistantSelect = () => {
     setAssistantHint(null);
+    setIsMobileCodeView(false);
     setIsMobileAssistantViewport(true);
-    requestAnimationFrame(() => {
-      mainWorkspaceRef.current?.scrollTo({
-        top: mainWorkspaceRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    });
   };
 
   return (
@@ -429,12 +424,10 @@ const MainPage: React.FC = () => {
         anchorRef={aiButtonRef}
       />
 
-      <BuildStatusBar result={simSession.buildResult} busy={fileMgr.translationBusy} hasSimulation={!!simSession.simulationData} />
-
-      {/* 2. 메인 워크스페이스 분할 레이아웃 (모바일: 상하 배치 및 세로 스크롤 / md 이상: 좌우 고정 분할) */}
+      {/* 2. 메인 워크스페이스 분할 레이아웃 (모바일: 탭별 100% 풀화면 전환 / md 이상: 좌우 고정 분할) */}
       <div
         ref={mainWorkspaceRef}
-        className={`flex-1 flex flex-col md:flex-row gap-3 md:gap-0 px-3 pb-2 md:px-0 md:pb-0 w-full min-h-0 overflow-y-auto md:overflow-hidden items-stretch custom-scrollbar ${
+        className={`flex-1 flex flex-col md:flex-row px-3 pb-2 md:px-0 md:pb-0 w-full min-h-0 overflow-hidden items-stretch ${
           resizingLeftPane ||
           resizingLeftVertical ||
           resizingLeftCodeCol
@@ -442,10 +435,10 @@ const MainPage: React.FC = () => {
             : ""
         }`}
       >
-        {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) */}
+        {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) (데스크톱 전용, 모바일에서는 슬라이딩 트랙 0번 슬라이드로 동작) */}
         <div
           ref={leftPaneContainerRef}
-          className="flex flex-col w-full md:w-[var(--left-pane-w)] h-[520px] md:h-full shrink-0 md:shrink min-h-0 overflow-hidden md:pr-1.5"
+className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:flex-none h-full min-h-0 overflow-hidden md:pr-1.5"
           style={{ "--left-pane-w": `${leftPaneWidth}%` } as React.CSSProperties}
         >
           {/* 상단: C 소스 + ASM (모바일: 세로 1:1 배치 & 전체 높이 / md 이상: 가로 분할 & 비율 높이) */}
@@ -565,8 +558,8 @@ const MainPage: React.FC = () => {
           />
         </div>
 
-        {/* 우측 슬라이딩 뷰포트 영역 (모바일: 하단 전체 폭 배치 / md 이상: 우측 배치) */}
-        <div className="w-full md:flex-1 flex h-[560px] md:h-full shrink-0 md:shrink min-w-0 overflow-hidden relative items-stretch md:pl-1">
+        {/* 슬라이딩 뷰포트 영역 (모바일: 5개 탭 전체 슬라이드 트랙 / md 이상: 우측 3개 뷰포트 트랙) */}
+        <div className="flex w-full flex-1 h-full min-w-0 min-h-0 overflow-hidden relative items-stretch md:pl-1">
           {canGoPrevViewport && (
             <div className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 mr-1">
               <button
@@ -594,7 +587,10 @@ const MainPage: React.FC = () => {
 
           <SlidingViewportTrack
             sections={sections}
-            rightViewportIndex={isMobileAssistantViewport ? 3 : rightViewportIndex}
+            rightViewportIndex={rightViewportIndex}
+            mobileViewportIndex={
+              isMobileCodeView ? 0 : isMobileAssistantViewport ? 4 : rightViewportIndex + 1
+            }
             containerRef={containerRef}
             renderPanel={renderPanel}
             resizingPair={resizingPair}
@@ -603,6 +599,16 @@ const MainPage: React.FC = () => {
             onSlotResizeStart={handleSlotResizeStart}
             onPairReset={handlePairReset}
             onSlotReset={handleSlotReset}
+            mobileLeadSection={
+              <>
+                <div className="flex flex-col w-full flex-1 min-h-0 overflow-hidden p-[1.5px]">
+                  {renderPanel("cSource")}
+                </div>
+                <div className="flex flex-col w-full flex-1 min-h-0 overflow-hidden p-[1.5px]">
+                  {renderPanel("source")}
+                </div>
+              </>
+            }
             mobileExtraSection={
               <AiAssistantPopup
                 key={`mobile-${auth.epoch}`}
@@ -793,13 +799,30 @@ const MainPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3-2. 바닥 밀착 4버튼 바텀바 (하단 뷰포트 화면 전환 4탭) */}
-        <nav className="grid grid-cols-4 h-12 border-t border-[var(--ar-border)] bg-[var(--ar-header-bg)] font-sans">
+        {/* 3-2. 바닥 밀착 5버튼 바텀바 (코드 + 뷰포트 3종 + 어시스턴트) */}
+        <nav className="grid grid-cols-5 h-12 border-t border-[var(--ar-border)] bg-[var(--ar-header-bg)] font-sans">
           <button
             type="button"
-            onClick={() => handleMobileViewportSelect(0)}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              !isMobileAssistantViewport && rightViewportIndex === 0
+            onClick={handleMobileCodeSelect}
+            className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+              isMobileCodeView
+                ? simSession.isSingleEngine
+                  ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
+                  : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
+                : "text-[#57606A] dark:text-[#858585]"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            <span className="truncate">코드</span>
+          </button>
+
+          <button
+            type="button"
+onClick={() => handleMobileViewportSelect(0)}
+className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+  !isMobileCodeView && !isMobileAssistantViewport && rightViewportIndex === 0
                 ? simSession.isSingleEngine
                   ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
                   : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
@@ -809,14 +832,14 @@ const MainPage: React.FC = () => {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
-            <span>레지스터·메모리</span>
+            <span className="truncate">레지스터·메모리</span>
           </button>
 
           <button
             type="button"
-            onClick={() => handleMobileViewportSelect(1)}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              !isMobileAssistantViewport && rightViewportIndex === 1
+onClick={() => handleMobileViewportSelect(1)}
+className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+  !isMobileCodeView && !isMobileAssistantViewport && rightViewportIndex === 1
                 ? simSession.isSingleEngine
                   ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
                   : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
@@ -826,14 +849,13 @@ const MainPage: React.FC = () => {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <span>분석·지표</span>
+            <span className="truncate">분석·지표</span>
           </button>
 
           <button
-            type="button"
-            onClick={() => handleMobileViewportSelect(2)}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              !isMobileAssistantViewport && rightViewportIndex === 2
+            type="button" onClick={() => handleMobileViewportSelect(2)}
+className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+  !isMobileCodeView && !isMobileAssistantViewport && rightViewportIndex === 2
                 ? simSession.isSingleEngine
                   ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
                   : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
@@ -843,14 +865,14 @@ const MainPage: React.FC = () => {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span>데이터패스</span>
+            <span className="truncate">데이터패스</span>
           </button>
 
           <button
             type="button"
             onClick={handleMobileAssistantSelect}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-              isMobileAssistantViewport
+            className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+              !isMobileCodeView && isMobileAssistantViewport
                 ? simSession.isSingleEngine
                   ? "text-[#005FB8] dark:text-[#38BDF8] bg-[#005FB8]/8 dark:bg-[#007ACC]/15 font-bold"
                   : "text-[#7C3AED] dark:text-[#C084FC] bg-[#7C3AED]/8 dark:bg-[#8B5CF6]/15 font-bold"
@@ -864,7 +886,7 @@ const MainPage: React.FC = () => {
                 d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
               />
             </svg>
-            <span>어시스턴트</span>
+            <span className="truncate">어시스턴트</span>
           </button>
         </nav>
       </div>
