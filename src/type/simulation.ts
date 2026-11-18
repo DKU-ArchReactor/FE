@@ -1,5 +1,3 @@
-import type { ExecutionDescriptor } from '@/api/assistant';
-import type { TutorBundle } from "@/pages/Main/utils/tutorAnalysis";
 export interface StageBuffer {
   pc?: string;
   raw_instruction?: string;
@@ -213,7 +211,6 @@ export interface CycleHistoryItem {
 }
 
 export interface SimulationRunRequest {
-  capture_assistant_context?: boolean;
   build_id?: string;
   simulation_token?: string;
   mode?: string;
@@ -221,8 +218,6 @@ export interface SimulationRunRequest {
 }
 
 export interface SimulationResult {
-  assistant_context?: ExecutionDescriptor;
-  tutor?: TutorBundle;
   schema_version: string;
   simulator: {
     mode: string;

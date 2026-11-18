@@ -1,4 +1,3 @@
-import { seedTutor } from "@/pages/Main/utils/tutorAnalysis";
 import apiConfig from "@/api/config";
 import type { SimulationRunRequest, SimulationResult, CycleHistoryItem } from "@/type/simulation";
 
@@ -50,7 +49,6 @@ export const runSimulation = async (
   const payload: SimulationRunRequest = {
     mode: data.mode ?? "pipeline",
     max_cycles: data.max_cycles ?? 2000,
-    capture_assistant_context: !!data.build_id && !!localStorage.getItem("access_token"),
     ...(data.build_id
       ? { build_id: data.build_id }
       : { simulation_token: data.simulation_token }),
@@ -58,8 +56,6 @@ export const runSimulation = async (
 
   const response = await apiConfig.post("/api/v1/simulation/run", payload);
 
-  const tutor = response.data?.tutor;
-  seedTutor(tutor);
   let resultData = response.data;
 
   const fetchJsonFromUrl = async (rawUrl: string) => {
@@ -102,7 +98,6 @@ export const runSimulation = async (
     }
   }
 
-  const normalized = normalizeSimulationResult(resultData as SimulationResult);
-  return { ...normalized, tutor, assistant_context: response.data?.assistant_context };
+  return normalizeSimulationResult(resultData as SimulationResult);
 };
 

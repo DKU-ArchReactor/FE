@@ -1,4 +1,3 @@
-import type { BuildCompileResponse } from "@/type/build";
 import { compileCode } from "@/api/build";
 import { runSimulation } from "@/api/simulation";
 import type { SimulationResult } from "@/type/simulation";
@@ -69,16 +68,14 @@ export interface TranslationCompileResult {
 
 export async function compileTranslation(
   source: string,
-  preferredMode: "single" | "pipeline" = "single",
-  onCompiled?: (result: BuildCompileResponse) => void,
-  fileId?: string | null
+  preferredMode: "single" | "pipeline" = "single"
 ): Promise<TranslationCompileResult> {
   const result = await compileCode({
-    ...(fileId ? { file_id: fileId } : { content: source, lang: "c" }),
+    content: source,
+    lang: "c",
     compile_profile: "rv32im",
     compiler_opt: "-O0 -g",
   });
-  onCompiled?.(result);
   if (result.status !== "success") {
     throw new Error(result.log || "컴파일에 실패했습니다.");
   }
@@ -86,7 +83,7 @@ export async function compileTranslation(
   // 1. Single과 Pipeline 모드를 백그라운드 병렬(Promise.all)로 동시 실행하여 즉시 캐싱
   let singleResult: SimulationResult | null = null;
   let pipelineResult: SimulationResult | null = null;
-  let assembly = result.analysis?.instructions.map(row => row.assembly).join("\n") ?? "";
+  let assembly = "";
 
   // 어셈블리 텍스트 가져오기 (선택적 / 폴백 지원)
   if (result.assembly_url) {
@@ -119,7 +116,7 @@ export async function compileTranslation(
     }
   }
 
-  const activeResult = preferredMode === "single" ? singleResult : pipelineResult;
+  const activeResult = preferredMode === "single" ? (singleResult ?? pipelineResult) : (pipelineResult ?? singleResult);
 
   // S3 assembly_url이 없으면(단일 패스 컴파일), 상단 code_mapping에서 어셈블리 텍스트를 자동 생성
   if (!assembly && activeResult) {
@@ -141,8 +138,7 @@ export async function compileTranslation(
 
 export async function compileAssemblyDirectly(
   assemblySource: string,
-  preferredMode: "single" | "pipeline" = "single",
-  onCompiled?: (result: BuildCompileResponse) => void
+  preferredMode: "single" | "pipeline" = "single"
 ): Promise<TranslationCompileResult> {
   const result = await compileCode({
     content: assemblySource,
@@ -150,7 +146,6 @@ export async function compileAssemblyDirectly(
     compile_profile: "rv32im",
     compiler_opt: "",
   });
-  onCompiled?.(result);
   if (result.status !== "success") {
     throw new Error(result.log || "어셈블리 빌드에 실패했습니다.");
   }
@@ -176,7 +171,7 @@ export async function compileAssemblyDirectly(
     }
   }
 
-  const activeResult = preferredMode === "single" ? singleResult : pipelineResult;
+  const activeResult = preferredMode === "single" ? (singleResult ?? pipelineResult) : (pipelineResult ?? singleResult);
 
   return {
     assembly: assemblySource,
