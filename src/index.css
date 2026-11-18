@@ -397,3 +397,35 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   transform-origin: top left;
   animation: uploadPopupDropFromButton 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ======================================================== */
+/* ArchReactor 브랜드 로고 인터랙티브 틸트 & 젤리 호버 효과 */
+/* ======================================================== */
+@keyframes logoWobble {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  22% {
+    transform: scale(1.1) rotate(-8deg);
+  }
+  48% {
+    transform: scale(1.1) rotate(6deg);
+  }
+  74% {
+    transform: scale(1.08) rotate(-3deg);
+  }
+  100% {
+    transform: scale(1.08) rotate(0deg);
+  }
+}
+
+.ar-logo-wobble {
+  transform-origin: center center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+.group:hover .ar-logo-wobble,
+.landing-brand:hover .ar-logo-wobble {
+  animation: logoWobble 0.46s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}

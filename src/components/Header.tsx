@@ -47,7 +47,7 @@ const Header = () => {
             onClick={() => navigate("/")}
             title="ArchReactor - RISC-V Pipeline Visualizer"
           >
-            <ArchLogo className="w-[22px] h-[22px] md:w-[27px] md:h-[27px] text-current transition-colors duration-150 drop-shadow-xs shrink-0" />
+            <ArchLogo className="w-[22px] h-[22px] md:w-[27px] md:h-[27px] text-current transition-colors duration-150 drop-shadow-xs shrink-0 ar-logo-wobble" />
             
             <div className="relative inline-flex items-center select-none">
               <span 
