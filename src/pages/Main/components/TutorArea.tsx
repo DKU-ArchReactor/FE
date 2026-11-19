@@ -115,14 +115,22 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   }, [cLines, selectedTranslationLine]);
 
   const [retryVersion, setRetryVersion] = useState(0);
-  const asmExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => effectiveRows.flatMap(row => [
-    {kind: 'asm' as const, text: row.text},
-    ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
-  ]), [effectiveRows]);
-  const cExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() =>
-    selectedCLineText !== null && selectedTranslationLine
-      ? [{kind: 'c', text: selectedCLineText, line: selectedTranslationLine}] : [],
-  [selectedCLineText, selectedTranslationLine]);
+  const isSimulationReady = Boolean(simulationData);
+
+  const asmExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
+    if (!isSimulationReady) return [];
+    return effectiveRows.flatMap(row => [
+      {kind: 'asm' as const, text: row.text},
+      ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
+    ]);
+  }, [effectiveRows, isSimulationReady]);
+
+  const cExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
+    if (!isSimulationReady) return [];
+    return selectedCLineText !== null && selectedTranslationLine
+      ? [{kind: 'c', text: selectedCLineText, line: selectedTranslationLine}] : [];
+  }, [selectedCLineText, selectedTranslationLine, isSimulationReady]);
+
   const asmExplanationError = useTutorExplanations(asmExplanationItems, retryVersion);
   const cExplanationError = useTutorExplanations(cExplanationItems, retryVersion);
   const explanationError = asmExplanationError || cExplanationError;
@@ -199,9 +207,25 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           상세 실행 해설이 제공되지 않았습니다. 현재는 기본 명령어 설명을 표시합니다.
         </p>}
         {/* ========================================================= */}
-        {/* 모드 0: CRT (C Runtime 부트스트랩) 코드가 선택되었을 때 */}
+        {/* 컴파일/어셈블 전: 대기 화면 표시 (유효성 검증 완료 전 튜터 비활성화) */}
         {/* ========================================================= */}
-        {activeTarget !== "asm" && isCrtSelected && selectedRow ? (
+        {!isSimulationReady ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42] my-auto">
+            <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
+              💡
+            </div>
+            <strong className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+              {activeTarget === "asm"
+                ? "어셈블리 코드를 작성하고 [시뮬레이션]을 실행하세요"
+                : "C 코드를 작성하고 [컴파일]을 실행하세요"}
+            </strong>
+            <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1.5 max-w-xs leading-relaxed">
+              {activeTarget === "asm"
+                ? "컴파일 및 어셈블 검증이 완료된 코드에 한해 하드웨어 동작과 명령어 해설이 이곳에 제공됩니다."
+                : "정상적으로 컴파일된 코드에 한해 라인별 문법 해설과 파이프라인 하드웨어 동작 풀이가 이곳에 제공됩니다."}
+            </span>
+          </div>
+        ) : activeTarget !== "asm" && isCrtSelected && selectedRow ? (
           <div className="flex flex-col gap-3">
             <div className="rounded-xl border border-slate-300 dark:border-[#3E3E42] bg-slate-50/70 dark:bg-[#252526]/60 p-3.5 flex flex-col gap-3 shadow-2xs">
               {/* 상단 뱃지 및 제목 */}

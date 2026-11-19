@@ -46,6 +46,7 @@ type Props = {
   onOpenSavedFile?: (fileId: string) => void;
   savedFiles?: FileSummary[];
   currentFileId?: string | null;
+  isSimulated?: boolean;
 };
 
 const STAGES_CONFIG: {
@@ -127,6 +128,7 @@ export default function TranslationMapping({
   onOpenSavedFile,
   savedFiles = [],
   currentFileId,
+  isSimulated = false,
 }: Props) {
   const { theme } = useTheme();
   const trackSelection = useAssistantSelection('asm', onSourceSelection);
@@ -159,6 +161,12 @@ export default function TranslationMapping({
   }, [selectedAsmIndex]);
 
   useEffect(() => {
+    if (editorRef.current && monacoRef.current) {
+      monacoRef.current.editor.setTheme(theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light");
+    }
+  }, [theme]);
+
+  useEffect(() => {
     activeTargetRef.current = activeTarget;
   }, [activeTarget]);
 
@@ -172,11 +180,66 @@ export default function TranslationMapping({
       editorRef.current = editorInstance;
       monacoRef.current = monacoInstance;
 
-      // 1. RISC-V 커스텀 언어 등록 (중복 등록 방지)
+      // 1. RISC-V 커스텀 언어 등록 및 어셈블리 전용 정갈한 테마 등록
       if (!monacoInstance.languages.getLanguages().some((l: { id: string }) => l.id === RISCV_LANGUAGE_ID)) {
         monacoInstance.languages.register({ id: RISCV_LANGUAGE_ID });
         monacoInstance.languages.setMonarchTokensProvider(RISCV_LANGUAGE_ID, riscvLanguageDef);
+
+        // 라이트 모드 테마: Opcode는 보라색 볼드, 나머지는 정갈한 어두운 텍스트
+        monacoInstance.editor.defineTheme("riscv-asm-theme-light", {
+          base: "vs",
+          inherit: false,
+          rules: [
+            { token: "keyword", foreground: "6D28D9", fontStyle: "bold" }, // 보라색 bold (어셈블리 매핑 Opcode와 100% 동일)
+            { token: "keyword.directive", foreground: "6E7681", fontStyle: "italic" },
+            { token: "type.identifier", foreground: "1F2328", fontStyle: "bold" }, // 라벨
+            { token: "variable.predefined", foreground: "24292F" }, // 레지스터 (피연산자와 같은 톤)
+            { token: "identifier", foreground: "24292F" },
+            { token: "number", foreground: "24292F" },
+            { token: "number.hex", foreground: "24292F" },
+            { token: "comment", foreground: "8C959F", fontStyle: "italic" },
+            { token: "string", foreground: "24292F" },
+          ],
+          colors: {
+            "editor.background": "#FFFFFF",
+            "editor.foreground": "#24292F",
+            "editorLineNumber.foreground": "#8C959F",
+            "editorLineNumber.activeForeground": "#8C959F", // 라인번호 강조 끄고 일정하게 유지
+            "editorGutter.background": "#FFFFFF",
+            "editor.lineHighlightBackground": "#00000000", // 현재줄 박스/배경 없음
+            "editor.lineHighlightBorder": "#00000000",
+          },
+        });
+
+        // 다크 모드 테마
+        monacoInstance.editor.defineTheme("riscv-asm-theme-dark", {
+          base: "vs-dark",
+          inherit: false,
+          rules: [
+            { token: "keyword", foreground: "A78BFA", fontStyle: "bold" },
+            { token: "keyword.directive", foreground: "858585", fontStyle: "italic" },
+            { token: "type.identifier", foreground: "E9D5FF", fontStyle: "bold" },
+            { token: "variable.predefined", foreground: "CCCCCC" },
+            { token: "identifier", foreground: "CCCCCC" },
+            { token: "number", foreground: "CCCCCC" },
+            { token: "number.hex", foreground: "CCCCCC" },
+            { token: "comment", foreground: "6E7681", fontStyle: "italic" },
+            { token: "string", foreground: "CCCCCC" },
+          ],
+          colors: {
+            "editor.background": "#1E1E1E",
+            "editor.foreground": "#CCCCCC",
+            "editorLineNumber.foreground": "#858585",
+            "editorLineNumber.activeForeground": "#858585",
+            "editorGutter.background": "#1E1E1E",
+            "editor.lineHighlightBackground": "#00000000",
+            "editor.lineHighlightBorder": "#00000000",
+          },
+        });
       }
+
+      // 테마를 확실하게 설정
+      monacoInstance.editor.setTheme(theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light");
 
       // 2. 어시스턴트 소스 트래킹 연결
       trackSelection(editorInstance);
@@ -239,9 +302,15 @@ export default function TranslationMapping({
     [trackSelection]
   );
 
-  // ASM Monaco Editor 라인 하이라이트(Decoration) 갱신 (선택 행 + CPU 실행 중인 행)
+  // ASM Monaco Editor 라인 하이라이트(Decoration) 갱신 (어셈블/시뮬레이션 완료 시에만 실행 요소 활성화)
   useEffect(() => {
     if (!editorRef.current || !monacoRef.current || activeTarget !== "asm") return;
+
+    // 어셈블 전 작성 중일 때는 일체의 실행/선택 장식 없이 라인번호와 텍스트만 깔끔하게 유지
+    if (!isSimulated) {
+      decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
+      return;
+    }
 
     const newDecorations: editor.IModelDeltaDecoration[] = [];
 
@@ -277,7 +346,7 @@ export default function TranslationMapping({
       });
     }
 
-    // 2. 사용자가 수동 선택한 라인 (앰버/골드 테마)
+    // 2. 사용자가 수동 선택한 라인 (시뮬레이션 완료 후 튜터 연동 시)
     if (selectedAsmIndex !== null && selectedAsmIndex !== undefined && selectedAsmIndex >= 0) {
       const selectedLineNumber = selectedAsmIndex + 1;
       if (selectedLineNumber !== executingLine) {
@@ -296,7 +365,7 @@ export default function TranslationMapping({
       decorationsRef.current,
       newDecorations
     );
-  }, [selectedAsmIndex, currentActiveStep, stageBuffers, mode, activeTarget, rows]);
+  }, [selectedAsmIndex, currentActiveStep, stageBuffers, mode, activeTarget, rows, isSimulated]);
 
   // ASM 서버 저장 핸들러 (C 에디터와 1:1 동일)
   const handleSaveAsmClick = async () => {
@@ -658,17 +727,18 @@ export default function TranslationMapping({
 
       {/* 본문: ASM 직접 작성 모드일 때는 Monaco Editor, C 모드일 때는 매핑 뷰 */}
       {activeTarget === "asm" ? (
-        <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
+        <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E] asm-monaco-container">
           <Editor
             onMount={handleEditorMount}
             height="100%"
             language={RISCV_LANGUAGE_ID}
-            theme={theme === "dark" ? "vs-dark" : "vs"}
+            theme={theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light"}
             value={assembly}
             onChange={(val) => onAssemblyChange?.(val ?? "")}
             options={{
               automaticLayout: true,
               fontSize: 13,
+              lineHeight: 24,
               fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace",
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
@@ -677,9 +747,21 @@ export default function TranslationMapping({
               insertSpaces: true,
               lineNumbers: "on",
               lineNumbersMinChars: 3,
-              padding: { top: 8, bottom: 8 },
+              glyphMargin: true,
+              folding: false,
+              lineDecorationsWidth: 22,
+              padding: { top: 4, bottom: 4 },
               readOnly: busy,
               stickyScroll: { enabled: false },
+              renderLineHighlight: "none",
+              overviewRulerBorder: false,
+              hideCursorInOverviewRuler: true,
+              renderWhitespace: "none",
+              guides: {
+                indentation: false,
+                highlightActiveIndentation: false,
+                bracketPairs: false,
+              },
             }}
           />
         </div>

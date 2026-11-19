@@ -19,14 +19,11 @@ import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
 import { getLearningExample } from "@/data/learningExamples";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
-  "# RISC-V 32IM 어셈블리 직접 작성",
-  ".globl main",
-  "main:",
-  "    addi t0, zero, 5     # t0 = 5",
-  "    addi t1, zero, 10    # t1 = 10",
-  "    add  t2, t0, t1      # t2 = t0 + t1 (15)",
-  "    slli a0, t2, 2       # a0 = t2 << 2 (반환값: 60)",
-  "    ret",
+  "addi t0, zero, 5",
+  "addi t1, zero, 10",
+  "add  t2, t0, t1",
+  "slli a0, t2, 2",
+  "ret",
   "",
 ].join("\n");
 

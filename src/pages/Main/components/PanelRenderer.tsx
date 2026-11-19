@@ -170,6 +170,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           onOpenSavedFile={onOpenSavedAssemblyFile}
           savedFiles={savedFiles}
           currentFileId={fileId}
+          isSimulated={Boolean(simulationData)}
         />
       );
 
