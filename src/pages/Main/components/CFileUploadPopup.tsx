@@ -2,15 +2,75 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import type { FileSummary } from "@/type/file";
 import { getFileById } from "@/api/file";
 
+const C_TEMPLATES = [
+  {
+    title: "기본 산술 연산 (Basic Arithmetic)",
+    desc: "변수 선언 및 덧셈 연산과 레지스터 반환 과정",
+    fileName: "addition.c",
+    code: `int main(void) {
+    int a = 5;
+    int b = 3;
+    int sum = a + b;
+    return sum;
+}
+`,
+  },
+  {
+    title: "반복문과 누적 합 (Loop & Sum)",
+    desc: "for 반복문을 사용한 1부터 4까지의 누적 합 계산",
+    fileName: "loop.c",
+    code: `int main(void) {
+    int sum = 0;
+    for (int i = 1; i <= 4; i++) {
+        sum += i;
+    }
+    return sum;
+}
+`,
+  },
+  {
+    title: "배열과 메모리 접근 (Array & Memory)",
+    desc: "전역 배열 메모리로부터 값을 로드하여 연산",
+    fileName: "memory.c",
+    code: `volatile int values[2] = {12, 30};
+
+int main(void) {
+    int first = values[0];
+    int second = values[1];
+    return first + second;
+}
+`,
+  },
+  {
+    title: "조건 분기문 (Branch & If-Else)",
+    desc: "if-else 조건 분기에 따른 분기 명령어 생성 과정",
+    fileName: "condition.c",
+    code: `int main(void) {
+    int a = 10;
+    int b = 20;
+    int max;
+    if (a > b) {
+        max = a;
+    } else {
+        max = b;
+    }
+    return max;
+}
+`,
+  },
+];
+
 interface CFileUploadPopupProps {
   isOpen: boolean;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onFile: (file: File) => void;
+  onSelectExample?: (code: string, fileName?: string) => void;
   savedFiles: FileSummary[];
   isLoggedIn: boolean;
   currentFileId?: string | null;
   onOpenSavedFile?: (fileId: string) => void;
+  mode?: "single" | "pipeline";
 }
 
 export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
@@ -18,11 +78,14 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
   onClose,
   anchorRef,
   onFile,
+  onSelectExample,
   savedFiles,
   isLoggedIn,
   currentFileId,
   onOpenSavedFile,
+  mode = "pipeline",
 }) => {
+  const isPipeline = mode === "pipeline";
   const popupRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -145,14 +208,14 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
         left: `${popupPos.left}px`,
         width: "360px",
       }}
-      className="fixed z-50 rounded-xl overflow-hidden shadow-2xl border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC] upload-popup-drop-anim flex flex-col max-h-[470px] select-none"
+      className="fixed z-50 rounded-xl overflow-hidden shadow-2xl border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC] upload-popup-drop-anim flex flex-col max-h-[520px] select-none"
     >
       {/* 팝업 헤더 */}
       <div className="px-3.5 py-2 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F6F8FA] dark:bg-[#252526] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs">📂</span>
           <span className="text-xs font-bold text-[#1F2328] dark:text-[#CCCCCC]">
-            파일 업로드 및 불러오기
+            C 소스 불러오기 및 예제
           </span>
         </div>
         <button
@@ -183,7 +246,11 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
           onClick={() => fileInputRef.current?.click()}
           className={`rounded-lg border-2 border-dashed p-3.5 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all duration-150 ${
             isDragOver
-              ? "border-[#005FB8] dark:border-[#007ACC] bg-blue-50/70 dark:bg-[#007ACC]/10 text-[#005FB8] dark:text-[#79C0FF] scale-[1.01]"
+              ? isPipeline
+                ? "border-[#7C3AED] dark:border-[#8B5CF6] bg-purple-50/70 dark:bg-[#7C3AED]/10 text-[#7C3AED] dark:text-[#C084FC] scale-[1.01]"
+                : "border-[#005FB8] dark:border-[#007ACC] bg-blue-50/70 dark:bg-[#007ACC]/10 text-[#005FB8] dark:text-[#79C0FF] scale-[1.01]"
+              : isPipeline
+              ? "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] text-[#57606A] dark:text-[#858585] hover:border-[#7C3AED] dark:hover:border-[#8B5CF6] hover:text-[#7C3AED] dark:hover:text-[#C084FC] hover:bg-purple-50/30 dark:hover:bg-[#2D2D2D]"
               : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] text-[#57606A] dark:text-[#858585] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-slate-50 dark:hover:bg-[#2D2D2D]"
           }`}
         >
@@ -221,13 +288,13 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
         />
       </div>
 
-      {/* 2. 하단 섹션: 저장된 파일 목록 */}
-      <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#252526]">
+      {/* 2. 중간 섹션: 저장된 파일 목록 */}
+      <div className="flex flex-col min-h-0 bg-white dark:bg-[#252526] border-b border-[#E5E5E5] dark:border-[#3E3E42]">
         <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#1E1E1E] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs">📂</span>
+            <span className="text-xs">💾</span>
             <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-              저장된 파일 목록
+              저장된 C 파일 목록
             </span>
             <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585]">
               ({isLoggedIn ? savedFiles.length : 0})
@@ -240,9 +307,9 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-1.5 space-y-1 min-h-[120px] max-h-56 divide-y divide-[#F0F0F0] dark:divide-[#333333]/50 [scrollbar-width:thin]">
+        <div className="overflow-y-auto p-1.5 space-y-1 max-h-36 divide-y divide-[#F0F0F0] dark:divide-[#333333]/50 [scrollbar-width:thin]">
           {!isLoggedIn ? (
-            <div className="py-6 px-4 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col gap-1 items-center justify-center">
+            <div className="py-4 px-3 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col gap-0.5 items-center justify-center">
               <span className="font-medium text-[#1F2328] dark:text-[#CCCCCC]">
                 로그인이 필요합니다
               </span>
@@ -251,7 +318,7 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
               </span>
             </div>
           ) : savedFiles.length === 0 ? (
-            <div className="py-6 px-4 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col items-center justify-center">
+            <div className="py-4 px-3 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col items-center justify-center">
               저장된 파일이 없습니다
             </div>
           ) : (
@@ -274,7 +341,9 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
                   title="클릭하여 C 소스 코드에 열기"
                   className={`w-full px-2.5 py-1.5 rounded text-left transition-colors flex items-center justify-between gap-2 cursor-pointer group/row ${
                     isSelected
-                      ? "bg-blue-50 dark:bg-[#04395E] text-[#005FB8] dark:text-[#9CDCFE] font-semibold"
+                      ? isPipeline
+                        ? "bg-purple-50 dark:bg-purple-950/50 text-[#7C3AED] dark:text-[#C084FC] font-semibold"
+                        : "bg-blue-50 dark:bg-[#04395E] text-[#005FB8] dark:text-[#9CDCFE] font-semibold"
                       : "hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
                   }`}
                 >
@@ -297,7 +366,13 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
                       </span>
                     )}
                     {isSelected && (
-                      <span className="text-[9.5px] font-bold text-[#005FB8] dark:text-[#79C0FF]">
+                      <span
+                        className={`text-[9.5px] font-bold ${
+                          isPipeline
+                            ? "text-[#7C3AED] dark:text-[#C084FC]"
+                            : "text-[#005FB8] dark:text-[#79C0FF]"
+                        }`}
+                      >
                         열림
                       </span>
                     )}
@@ -306,7 +381,11 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
                       type="button"
                       onClick={(e) => handleDownloadSavedFile(e, f)}
                       title={`'${f.title}' 파일 로컬 다운로드`}
-                      className="p-1 rounded text-[#8C959F] dark:text-[#6E7681] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer ml-0.5"
+                      className={`p-1 rounded text-[#8C959F] dark:text-[#6E7681] hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer ml-0.5 ${
+                        isPipeline
+                          ? "hover:text-[#7C3AED] dark:hover:text-[#C084FC]"
+                          : "hover:text-[#005FB8] dark:hover:text-[#79C0FF]"
+                      }`}
                     >
                       <svg
                         className="w-3.5 h-3.5"
@@ -327,6 +406,55 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
               );
             })
           )}
+        </div>
+      </div>
+
+      {/* 3. 하단 섹션: ArchReactor C 예제 템플릿 목록 */}
+      <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#252526]">
+        <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#1E1E1E] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs">📜</span>
+            <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+              C 언어 예제 템플릿
+            </span>
+          </div>
+          <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+            클릭하여 열기
+          </span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-1.5 space-y-1 min-h-[120px] max-h-56 divide-y divide-[#F0F0F0] dark:divide-[#333333]/50 [scrollbar-width:thin]">
+          {C_TEMPLATES.map((tmpl, idx) => (
+            <div
+              key={idx}
+              onClick={() => {
+                if (onSelectExample) {
+                  onSelectExample(tmpl.code, tmpl.fileName);
+                } else {
+                  onFile(new File([tmpl.code], tmpl.fileName, { type: "text/x-c" }));
+                }
+                onClose();
+              }}
+              title="클릭하여 C 에디터에 예제 코드 로드"
+              className="w-full px-2.5 py-2 rounded text-left transition-colors flex flex-col gap-0.5 cursor-pointer hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E] group/row"
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-xs font-semibold group-hover/row:underline ${
+                    isPipeline
+                      ? "text-[#7C3AED] dark:text-[#C084FC]"
+                      : "text-[#005FB8] dark:text-[#79C0FF]"
+                  }`}
+                >
+                  {tmpl.title}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">로드 ➔</span>
+              </div>
+              <span className="text-[10.5px] text-[#57606A] dark:text-[#858585] leading-snug">
+                {tmpl.desc}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

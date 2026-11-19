@@ -5,7 +5,7 @@ export const RISCV_LANGUAGE_ID = "riscv";
 export const riscvLanguageDef: languages.IMonarchLanguage = {
   defaultToken: "",
   tokenPostfix: ".riscv",
-  ignoreCase: false,
+  ignoreCase: true,
 
   keywords: [
     // ALU instructions
@@ -59,7 +59,7 @@ export const riscvLanguageDef: languages.IMonarchLanguage = {
       }],
 
       // Instructions
-      [/\b[a-z][a-z0-9_.]*\b/, {
+      [/\b[a-zA-Z][a-zA-Z0-9_.]*\b/, {
         cases: {
           "@keywords": "keyword",
           "@default": "identifier",

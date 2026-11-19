@@ -12,7 +12,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
   const stats = useMemo(() => performanceStats(simulationData, currentCycle), [simulationData, currentCycle]);
 
   return (
-    <div className="w-full min-h-0 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
+    <div className="w-full max-h-full min-h-0 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 (지표 전용 퍼플 액센트 바) */}
       <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-purple-500">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -26,8 +26,8 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
         </span>
       </div>
 
-      {/* 2. 지표 카드 본문 (내부 요소가 절대 잘리지 않도록 자연스러운 높이 유지) */}
-      <div className="min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
+      {/* 2. 지표 카드 본문 (펼쳤을 때 최대 높이 초과 시 스크롤바 생성) */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 [scrollbar-gutter:stable]">
         {/* 상단 2단 KPI 요약 카드 */}
         <div className="grid grid-cols-2 gap-2 shrink-0">
           {/* CPI 카드 */}

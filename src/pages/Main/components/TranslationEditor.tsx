@@ -26,6 +26,7 @@ type Props = {
   onOpenSavedFile?: (fileId: string) => void;
   onSave?: (fileName?: string) => Promise<boolean> | boolean | void;
   activeTarget?: "c" | "asm";
+  mode?: "single" | "pipeline";
 };
 
 export default function TranslationEditor({
@@ -47,6 +48,7 @@ export default function TranslationEditor({
   onOpenSavedFile,
   onSave,
   activeTarget = "c",
+  mode = "pipeline",
 }: Props) {
   const { theme } = useTheme();
   const trackSelection = useAssistantSelection('c', onSourceSelection);
@@ -272,11 +274,13 @@ export default function TranslationEditor({
             type="button"
             onClick={() => setIsUploadPopupOpen((prev) => !prev)}
             disabled={busy || activeTarget !== "c"}
-            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 focus:outline-none ${
               activeTarget !== "c"
                 ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
                 : isUploadPopupOpen
-                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
+                ? mode === "pipeline"
+                  ? "border-[#7C3AED] dark:border-[#8B5CF6] bg-[#7C3AED] dark:bg-[#8B5CF6] text-white cursor-pointer font-semibold"
+                  : "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] text-white cursor-pointer font-semibold"
                 : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
             }`}
             title="파일 불러오기 및 예제 열기"
@@ -397,10 +401,14 @@ export default function TranslationEditor({
         onClose={() => setIsUploadPopupOpen(false)}
         anchorRef={uploadButtonRef}
         onFile={onFile}
+        onSelectExample={(code, tmplFileName) => {
+          onFile(new File([code], tmplFileName || "example.c", { type: "text/x-c" }));
+        }}
         savedFiles={savedFiles}
         isLoggedIn={isLoggedIn}
         currentFileId={currentFileId}
         onOpenSavedFile={onOpenSavedFile}
+        mode={mode}
       />
 
       {/* 본문: C 모드일 때는 Monaco Editor, ASM 모드일 때는 비활성화 안내 뷰 (코드는 상태에 온전히 보존됨) */}
@@ -447,7 +455,7 @@ export default function TranslationEditor({
         </div>
       )}
 
-      {error && (
+      {activeTarget === "c" && error && (
         <pre
           role="alert"
           className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 dark:text-rose-300 font-mono"

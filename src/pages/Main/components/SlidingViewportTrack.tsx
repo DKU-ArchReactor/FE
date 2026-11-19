@@ -65,6 +65,11 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                     slot.type === "single" &&
                     slot.panel === "metrics";
 
+                  const isTimingDiagram =
+                    section.id === "sec-5" &&
+                    slot.type === "single" &&
+                    slot.panel === "multiCycle";
+
                   const defaultRatio =
                     section.slots.length === 2 &&
                     slot.type === "single" &&
@@ -78,12 +83,16 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                       <div
                         className={
                           isMetricsFixed
-                            ? "shrink-0 min-h-fit flex w-full"
+                            ? "shrink min-h-0 flex flex-col w-full overflow-hidden"
+                            : isTimingDiagram
+                            ? "min-h-0 overflow-hidden flex flex-col"
                             : "min-h-0 overflow-hidden flex"
                         }
                         style={
                           isMetricsFixed
-                            ? { flex: "0 0 auto" }
+                            ? { flex: "0 1 auto", maxHeight: "min(60%, calc(100% - 40vh))" }
+                            : isTimingDiagram
+                            ? { flex: `${flexVal} 1 0%`, minHeight: "max(40%, 40vh)" }
                             : { flex: `${flexVal} 1 0%` }
                         }
                       >
@@ -92,7 +101,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                           <div
                             className={
                               isMetricsFixed
-                                ? "w-full flex flex-col p-[1.5px]"
+                                ? "w-full max-h-full flex flex-col min-h-0 overflow-hidden p-[1.5px]"
                                 : "w-full h-full flex flex-col min-h-0 overflow-hidden p-[1.5px]"
                             }
                           >
@@ -155,7 +164,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                       </div>
 
                       {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
-                      {slotIdx < section.slots.length - 1 && (
+                      {slotIdx < section.slots.length - 1 && section.id !== "sec-5" && (
                         <div
                           onMouseDown={(e) => {
                             if (e.detail === 2) {
@@ -164,11 +173,10 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                               onSlotReset?.(secIdx, slotIdx);
                               return;
                             }
-                            const isSecTiming = section.id === "sec-5";
-                            const topSlot = isSecTiming ? section.slots[0] : section.slots[slotIdx];
-                            const btmSlot = isSecTiming ? section.slots[2] : section.slots[slotIdx + 1];
-                            const topRatio = topSlot?.flexRatio ?? (isSecTiming ? 1.8 : 1);
-                            const btmRatio = btmSlot?.flexRatio ?? (isSecTiming ? 1.0 : 1);
+                            const topSlot = section.slots[slotIdx];
+                            const btmSlot = section.slots[slotIdx + 1];
+                            const topRatio = topSlot?.flexRatio ?? 1;
+                            const btmRatio = btmSlot?.flexRatio ?? 1;
                             onSlotResizeStart(
                               secIdx,
                               slotIdx,
@@ -182,11 +190,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                             e.stopPropagation();
                             onSlotReset?.(secIdx, slotIdx);
                           }}
-                          title={
-                            section.id === "sec-5"
-                              ? "위아래로 드래그하여 다이어그램과 해저드 영역 높이 조절 (더블클릭: 기본 위치 리셋)"
-                              : "위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 기본 리셋)"
-                          }
+                          title="위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 기본 리셋)"
                           className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
                         >
                           <div

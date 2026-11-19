@@ -44,6 +44,7 @@ interface PanelRendererProps {
   customAssembly: string;
   translationBusy: boolean;
   translationError: string;
+  asmError?: string;
   translationSelectedLine: number | null;
   translationSelectedAsmIndex: number | null;
 
@@ -92,6 +93,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   customAssembly,
   translationBusy,
   translationError,
+  asmError = "",
   translationSelectedLine,
   translationSelectedAsmIndex,
 
@@ -135,6 +137,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           onOpenSavedFile={onOpenSavedFileInEditor}
           onSave={onSaveTranslationFile}
           activeTarget={editorTarget}
+          mode={simulationMode}
         />
       );
 
@@ -146,7 +149,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           assembly={editorTarget === "asm" ? customAssembly : translationAssembly}
           mappedRows={editorTarget === "asm" ? undefined : mappedAssemblyRows}
           busy={translationBusy}
-          error={translationError}
+          error={asmError}
           selectedLine={translationSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           executionLine={activeExecutionCLine}
