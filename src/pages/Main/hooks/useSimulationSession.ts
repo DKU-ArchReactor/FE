@@ -1,3 +1,4 @@
+import type { BuildCompileResponse } from "@/type/build";
 import { getAuthSession } from '@/api/authSession';
 import { RequestGeneration } from '../utils/assistantContext';
 import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
@@ -37,6 +38,7 @@ type UseSimulationSessionParams = {
   editorTarget?: SimulationTarget;
   cWorkspaceKey?: string;
   asmWorkspaceKey?: string;
+  savedFileId?: string | null;
   translationSource: string;
   translationAssembly: string;
   translationBusy: boolean;
@@ -58,6 +60,7 @@ export function useSimulationSession({
   editorTarget = "c",
   cWorkspaceKey,
   asmWorkspaceKey,
+  savedFileId,
   translationSource,
   translationAssembly,
   translationBusy,
@@ -65,6 +68,7 @@ export function useSimulationSession({
   setTranslationError,
   setTranslationAssembly,
 }: UseSimulationSessionParams) {
+  const [buildResult, setBuildResult] = useState<BuildCompileResponse | null>(null);
   const requests = useRef(new RequestGeneration());
 
   // C 모드와 ASM 모드의 시뮬레이션 상태를 각각 독립적으로 캐싱
@@ -83,12 +87,13 @@ export function useSimulationSession({
   const simulationEngineMode = currentSession.simulationEngineMode;
   const isSingleEngine = simulationEngineMode === "single";
 
+  const isCurrentWorkspaceReady = currentSession.resultWorkspace === activeWorkspaceKey;
   const simulationData =
-    currentSession.resultWorkspace === activeWorkspaceKey
+    !translationBusy && isCurrentWorkspaceReady
       ? currentSession.simulationCache[simulationEngineMode]
       : null;
 
-  const loadingMessage = null;
+  const loadingMessage = translationBusy ? "컴파일 및 시뮬레이션 데이터를 불러오는 중입니다..." : null;
   const activeBuildId = currentSession.activeBuildId;
   const activeSimulationToken = currentSession.activeSimulationToken;
 
@@ -100,15 +105,20 @@ export function useSimulationSession({
 
   // 어셈블리 행 파싱: 백엔드가 시뮬레이션 로그에 직접 주입한 source_line 매핑을 단일 진실 원천으로 사용
   const mappedAssemblyRows = useMemo(() => {
+    if (translationBusy) return [];
     const fromSim = extractAssemblyFromSimulation(simulationData);
     if (fromSim.length > 0) return fromSim;
+    if (isCurrentWorkspaceReady && buildResult?.analysis?.instructions.length) {
+      return buildResult.analysis.instructions.map(item => ({ pc: item.pc, text: item.assembly, sourceLine: item.source_line, isRuntime: false }));
+    }
     if (!translationAssembly) return [];
     return mapAssembly(translationAssembly, 1000);
-  }, [simulationData, translationAssembly]);
+  }, [translationBusy, simulationData, translationAssembly, buildResult, isCurrentWorkspaceReady]);
 
   const clearSimulationCache = (target?: SimulationTarget) => {
     requests.current.invalidate();
     setTranslationBusy(false);
+    setBuildResult(null);
     if (target) {
       setSessions((prev) => ({
         ...prev,
@@ -201,6 +211,9 @@ export function useSimulationSession({
   ) => {
     if (!translationSource.trim() || translationBusy) return;
     const request = beginRequest();
+    let compiledResult: BuildCompileResponse | null = null;
+    setBuildResult(null);
+    setTranslationAssembly("");
     setSessions((prev) => ({
       ...prev,
       c: {
@@ -221,10 +234,17 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-      } = await compileTranslation(translationSource, sessions.c.simulationEngineMode, request);
+      } = await compileTranslation(translationSource, sessions.c.simulationEngineMode, {
+        ...request,
+        fileId: request.capture ? savedFileId : null,
+        onCompiled: (result) => {
+          if (request.isCurrent()) compiledResult = result;
+        },
+      });
       if (!request.isCurrent()) return;
 
       const targetKey = cWorkspaceKey ?? workspaceKey;
+      if (compiledResult) setBuildResult(compiledResult);
       setSessions((prev) => ({
         ...prev,
         c: {
@@ -250,6 +270,17 @@ export function useSimulationSession({
       }
     } catch (error) {
       if (!request.isCurrent()) return;
+      if (compiledResult) {
+        const targetKey = cWorkspaceKey ?? workspaceKey;
+        setBuildResult(compiledResult);
+        setSessions((prev) => ({
+          ...prev,
+          c: {
+            ...prev.c,
+            resultWorkspace: targetKey,
+          },
+        }));
+      }
       setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
     } finally {
       if (request.isCurrent()) setTranslationBusy(false);
@@ -267,6 +298,9 @@ export function useSimulationSession({
     if (!codeToSimulate.trim() || translationBusy) return;
 
     const request = beginRequest();
+    let compiledResult: BuildCompileResponse | null = null;
+    setBuildResult(null);
+    setTranslationAssembly("");
     setSessions((prev) => ({
       ...prev,
       asm: {
@@ -279,7 +313,6 @@ export function useSimulationSession({
     }));
     setTranslationBusy(true);
     setTranslationError("");
-    setTranslationAssembly(codeToSimulate);
 
     try {
       const {
@@ -289,10 +322,16 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-      } = await compileAssemblyDirectly(codeToSimulate, sessions.asm.simulationEngineMode, request);
+        } = await compileAssemblyDirectly(codeToSimulate, sessions.asm.simulationEngineMode, {
+        ...request,
+        onCompiled: (result) => {
+          if (request.isCurrent()) compiledResult = result;
+        },
+      });
       if (!request.isCurrent()) return;
 
       const targetKey = asmWorkspaceKey ?? workspaceKey;
+      if (compiledResult) setBuildResult(compiledResult);
       setSessions((prev) => ({
         ...prev,
         asm: {
@@ -318,9 +357,18 @@ export function useSimulationSession({
       }
     } catch (err) {
       if (!request.isCurrent()) return;
-      setTranslationError(
-        err instanceof Error ? err.message : "어셈블리 시뮬레이션 요청에 실패했습니다."
-      );
+      if (compiledResult) {
+        const targetKey = asmWorkspaceKey ?? workspaceKey;
+        setBuildResult(compiledResult);
+        setSessions((prev) => ({
+          ...prev,
+          asm: {
+            ...prev.asm,
+            resultWorkspace: targetKey,
+          },
+        }));
+      }
+      setTranslationError(err instanceof Error ? err.message : "어셈블리 시뮬레이션 요청에 실패했습니다.");
     } finally {
       if (request.isCurrent()) setTranslationBusy(false);
     }
@@ -352,6 +400,7 @@ export function useSimulationSession({
 
     // 캐시가 아직 비어있을 때만 네트워크 호출
     if (activeBuildId || activeSimulationToken) {
+      setTranslationBusy(true);
       try {
         const targetToken = activeBuildId
           ? { build_id: activeBuildId }
@@ -383,13 +432,15 @@ export function useSimulationSession({
           callbacks.onSimulationComplete(simResult);
         }
       } catch {
-        if (request.isCurrent())
-          setTranslationError("시뮬레이션 모드 전환에 실패했습니다. 다시 실행해 주세요.");
+        if (request.isCurrent()) setTranslationError("시뮬레이션 모드 전환에 실패했습니다. 다시 실행해 주세요.");
+      } finally {
+        if (request.isCurrent()) setTranslationBusy(false);
       }
     }
   };
 
   return {
+    buildResult: currentSession.resultWorkspace === activeWorkspaceKey ? buildResult : null,
     simulationEngineMode,
     simulationData,
     loadingMessage,

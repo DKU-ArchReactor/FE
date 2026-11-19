@@ -56,17 +56,20 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   activeTarget = "c",
   onClose,
 }) => {
+  const isCompiled = Boolean(simulationData);
+
   // 1. C 소스 코드 라인별 배열
   const cLines = useMemo(() => {
     return (translationSource || "").split(/\r?\n/);
   }, [translationSource]);
 
-  // 2. 어셈블리 파싱 및 C 라인 매핑 결과 (시뮬레이션에서 주입된 mappedRows 우선 사용)
+  // 2. 어셈블리 파싱 및 C 라인 매핑 결과 (컴파일/어셈블 완료 시에만 활성화)
   const effectiveRows: MappedAssemblyRow[] = useMemo(() => {
+    if (!isCompiled) return [];
     if (propMappedRows && propMappedRows.length > 0) return propMappedRows;
     if (!translationAssembly) return [];
     return mapAssembly(translationAssembly, cLines.length);
-  }, [propMappedRows, translationAssembly, cLines.length]);
+  }, [isCompiled, propMappedRows, translationAssembly, cLines.length]);
 
   const historyPositions = useMemo(() => {
     const positions = new Map<CycleHistoryItem, number>();
@@ -108,34 +111,41 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     ? selectedRow ? [{...selectedRow, asmIndex: (selectedAsmIndex ?? 0) + 1}] : []
     : mappedAsmForSelectedLine;
 
-  // 4. 선택된 C 라인 텍스트 및 분석
+  // 4. 선택된 C / ASM 라인 텍스트 및 분석
+  const asmLines = useMemo(() => {
+    return (translationAssembly || "").split(/\r?\n/);
+  }, [translationAssembly]);
+
+  const selectedAsmLineText = useMemo(() => {
+    if (activeTarget !== "asm" || !selectedTranslationLine || selectedTranslationLine <= 0) return null;
+    return asmLines[selectedTranslationLine - 1] ?? "";
+  }, [activeTarget, asmLines, selectedTranslationLine]);
+
   const selectedCLineText = useMemo(() => {
     if (!selectedTranslationLine || selectedTranslationLine <= 0) return null;
     return cLines[selectedTranslationLine - 1] ?? "";
   }, [cLines, selectedTranslationLine]);
 
   const [retryVersion, setRetryVersion] = useState(0);
-  const isSimulationReady = Boolean(simulationData);
 
   const asmExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
-    if (!isSimulationReady) return [];
+    if (!isCompiled) return [];
     return effectiveRows.flatMap(row => [
       {kind: 'asm' as const, text: row.text},
       ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
     ]);
-  }, [effectiveRows, isSimulationReady]);
+  }, [effectiveRows, isCompiled]);
 
   const cExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
-    if (!isSimulationReady) return [];
+    if (!isCompiled) return [];
     return selectedCLineText !== null && selectedTranslationLine
       ? [{kind: 'c', text: selectedCLineText, line: selectedTranslationLine}] : [];
-  }, [selectedCLineText, selectedTranslationLine, isSimulationReady]);
-
+  }, [selectedCLineText, selectedTranslationLine, isCompiled]);
   const asmExplanationError = useTutorExplanations(asmExplanationItems, retryVersion);
   const cExplanationError = useTutorExplanations(cExplanationItems, retryVersion);
   const explanationError = asmExplanationError || cExplanationError;
 
-  const cLineAnalysis = selectedTranslationLine && selectedCLineText !== null
+  const cLineAnalysis = isCompiled && selectedTranslationLine && selectedCLineText !== null
     ? analyzeCLine(selectedCLineText, selectedTranslationLine) : null;
   const lineExplanation = simulationData?.tutor?.line_explanations?.find(
     item => item.source_line === selectedTranslationLine,
@@ -209,7 +219,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         {/* ========================================================= */}
         {/* 컴파일/어셈블 전: 대기 화면 표시 (유효성 검증 완료 전 튜터 비활성화) */}
         {/* ========================================================= */}
-        {!isSimulationReady ? (
+        {!isCompiled ? (
           <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42] my-auto">
             <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
               💡
@@ -291,8 +301,54 @@ const TutorArea: React.FC<TutorAreaProps> = ({
               })()}
             </div>
           </div>
-        ) : (activeTarget === "asm" && selectedRow) || (activeTarget !== "asm" && selectedTranslationLine && cLineAnalysis) ? (
+        ) : isCompiled && ((activeTarget === "asm" && (selectedRow || (selectedTranslationLine && selectedAsmLineText !== null))) || (activeTarget !== "asm" && selectedTranslationLine && cLineAnalysis)) ? (
           <div className="flex flex-col gap-3">
+            {/* 1-A. ASM 직접 작성 모드에서 비명령어 줄(라벨/지시어/주석/빈 줄)을 선택했을 때의 상단 카드 */}
+            {activeTarget === "asm" && !selectedRow && selectedTranslationLine && selectedAsmLineText !== null && (() => {
+              const trimmed = selectedAsmLineText.trim();
+              const noComment = trimmed.replace(/#.*/, "").trim();
+              const isCommentOnly = trimmed.startsWith("#");
+              const isDirective = noComment.startsWith(".");
+              const isLabel = /^[.$\w]+:$/.test(noComment);
+              const badgeText = !trimmed
+                ? "빈 줄"
+                : isCommentOnly
+                ? "주석"
+                : isDirective
+                ? "어셈블러 지시어"
+                : isLabel
+                ? "심볼 라벨"
+                : "어셈블리 구문";
+              const descText = !trimmed
+                ? "실행 명령어가 없는 공백 줄입니다."
+                : isCommentOnly
+                ? "코드 설명을 위한 주석이며 CPU가 실행하는 기계어로 변환되지 않습니다."
+                : isDirective
+                ? "어셈블러에게 섹션 배치나 심볼 공개 범위(.globl 등)를 지시하는 메타 명령어입니다."
+                : isLabel
+                ? "분기(branch)나 점프(jal/call) 명령어가 이동할 목표 코드 주소를 가리키는 이름표입니다."
+                : "선택한 어셈블리 줄입니다.";
+
+              return (
+                <div className="rounded-md border border-[var(--ar-border)] border-l-2 border-l-[var(--ar-accent)] bg-[var(--ar-panel-bg)] p-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-mono font-semibold text-[var(--ar-accent)]">
+                      ASM: L{selectedTranslationLine}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-medium shrink-0 bg-slate-100 dark:bg-[#252526] text-slate-700 dark:text-[#CCCCCC] border border-slate-200 dark:border-[#333333]">
+                      {badgeText}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[13px] leading-6 px-3 py-2 rounded-md bg-[var(--ar-header-bg)] border border-[var(--ar-border)] text-[var(--ar-text-primary)] whitespace-pre-wrap break-all">
+                    {trimmed || <span className="text-slate-400 dark:text-[#858585] italic">빈 줄</span>}
+                  </div>
+                  <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">
+                    {descText}
+                  </p>
+                </div>
+              );
+            })()}
+
             {/* 1. 선택한 C 언어 라인 및 구문 역할 해설 (상단 헤더형 카드) */}
             {activeTarget !== 'asm' && cLineAnalysis && <div className="rounded-md border border-[var(--ar-border)] border-l-2 border-l-[var(--ar-accent)] bg-[var(--ar-panel-bg)] p-4 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">

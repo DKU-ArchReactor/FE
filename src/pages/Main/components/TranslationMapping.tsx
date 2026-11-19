@@ -1,6 +1,6 @@
 import { useAssistantSelection } from '../hooks/useAssistantSelection';
 import type { EditorSelection } from '../utils/assistantSource';
-import { useMemo, useEffect, useRef, useState, useCallback } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useTheme } from "@/context/ThemeContext";
@@ -20,7 +20,7 @@ type Props = {
   selectedLine?: number | null;
   selectedAsmIndex?: number | null;
   executionLine?: number | null;
-  onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
+  onSelectLine?: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
     ID?: StageBuffer | null;
@@ -144,228 +144,247 @@ export default function TranslationMapping({
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [asmSaveSuccess, setAsmSaveSuccess] = useState(false);
 
-  const [isSaving, setIsSaving] = useState(false);
-  const isLoggedIn = !!localStorage.getItem("access_token");
-
-  // Monaco Editor 참조 및 데코레이션 (ASM 에디터 인터랙션 전용)
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
-  const decorationsRef = useRef<string[]>([]);
-  const selectedAsmIndexRef = useRef<number | null | undefined>(selectedAsmIndex);
+  const asmEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const asmMonacoRef = useRef<Parameters<OnMount>[1] | null>(null);
+  const asmDecorationsRef = useRef<string[]>([]);
+  const selectedLineRef = useRef<number | null | undefined>(selectedLine);
   const activeTargetRef = useRef<"c" | "asm">(activeTarget);
+  const assemblyRef = useRef<string>(assembly);
+  const rowsRef = useRef<MappedAssemblyRow[]>(rows);
   const onSelectLineRef = useRef<Props["onSelectLine"]>(onSelectLine);
   const lastMouseSelectTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    selectedAsmIndexRef.current = selectedAsmIndex;
-  }, [selectedAsmIndex]);
-
-  useEffect(() => {
-    if (editorRef.current && monacoRef.current) {
-      monacoRef.current.editor.setTheme(theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light");
-    }
-  }, [theme]);
+    selectedLineRef.current = selectedLine;
+  }, [selectedLine]);
 
   useEffect(() => {
     activeTargetRef.current = activeTarget;
   }, [activeTarget]);
 
   useEffect(() => {
+    assemblyRef.current = assembly;
+  }, [assembly]);
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+
+  useEffect(() => {
     onSelectLineRef.current = onSelectLine;
   }, [onSelectLine]);
 
-  // ASM Monaco Editor 마운트 핸들러 (RISC-V 언어 등록 및 클릭/터치 이벤트 리스너)
-  const handleEditorMount: OnMount = useCallback(
-    (editorInstance, monacoInstance) => {
-      editorRef.current = editorInstance;
-      monacoRef.current = monacoInstance;
-
-      // 1. RISC-V 커스텀 언어 등록 및 어셈블리 전용 정갈한 테마 등록
-      if (!monacoInstance.languages.getLanguages().some((l: { id: string }) => l.id === RISCV_LANGUAGE_ID)) {
-        monacoInstance.languages.register({ id: RISCV_LANGUAGE_ID });
-        monacoInstance.languages.setMonarchTokensProvider(RISCV_LANGUAGE_ID, riscvLanguageDef);
-
-        // 라이트 모드 테마: Opcode는 보라색 볼드, 나머지는 정갈한 어두운 텍스트
-        monacoInstance.editor.defineTheme("riscv-asm-theme-light", {
-          base: "vs",
-          inherit: false,
-          rules: [
-            { token: "keyword", foreground: "6D28D9", fontStyle: "bold" }, // 보라색 bold (어셈블리 매핑 Opcode와 100% 동일)
-            { token: "keyword.directive", foreground: "6E7681", fontStyle: "italic" },
-            { token: "type.identifier", foreground: "1F2328", fontStyle: "bold" }, // 라벨
-            { token: "variable.predefined", foreground: "24292F" }, // 레지스터 (피연산자와 같은 톤)
-            { token: "identifier", foreground: "24292F" },
-            { token: "number", foreground: "24292F" },
-            { token: "number.hex", foreground: "24292F" },
-            { token: "comment", foreground: "8C959F", fontStyle: "italic" },
-            { token: "string", foreground: "24292F" },
-          ],
-          colors: {
-            "editor.background": "#FFFFFF",
-            "editor.foreground": "#24292F",
-            "editorLineNumber.foreground": "#8C959F",
-            "editorLineNumber.activeForeground": "#8C959F", // 라인번호 강조 끄고 일정하게 유지
-            "editorGutter.background": "#FFFFFF",
-            "editor.lineHighlightBackground": "#00000000", // 현재줄 박스/배경 없음
-            "editor.lineHighlightBorder": "#00000000",
-          },
-        });
-
-        // 다크 모드 테마
-        monacoInstance.editor.defineTheme("riscv-asm-theme-dark", {
-          base: "vs-dark",
-          inherit: false,
-          rules: [
-            { token: "keyword", foreground: "A78BFA", fontStyle: "bold" },
-            { token: "keyword.directive", foreground: "858585", fontStyle: "italic" },
-            { token: "type.identifier", foreground: "E9D5FF", fontStyle: "bold" },
-            { token: "variable.predefined", foreground: "CCCCCC" },
-            { token: "identifier", foreground: "CCCCCC" },
-            { token: "number", foreground: "CCCCCC" },
-            { token: "number.hex", foreground: "CCCCCC" },
-            { token: "comment", foreground: "6E7681", fontStyle: "italic" },
-            { token: "string", foreground: "CCCCCC" },
-          ],
-          colors: {
-            "editor.background": "#1E1E1E",
-            "editor.foreground": "#CCCCCC",
-            "editorLineNumber.foreground": "#858585",
-            "editorLineNumber.activeForeground": "#858585",
-            "editorGutter.background": "#1E1E1E",
-            "editor.lineHighlightBackground": "#00000000",
-            "editor.lineHighlightBorder": "#00000000",
-          },
-        });
+  const resolveAsmRowIndex = (lineNum: number): number | null => {
+    const lines = (assemblyRef.current || "").split(/\r?\n/);
+    const rawTarget = (lines[lineNum - 1] ?? "").replace(/#.*/, "").trim();
+    if (!rawTarget || rawTarget.startsWith(".") || /^[.$\w]+:$/.test(rawTarget)) {
+      return null;
+    }
+    let execIdx = -1;
+    for (let i = 0; i < Math.min(lineNum, lines.length); i++) {
+      const clean = lines[i].replace(/#.*/, "").trim();
+      if (!clean || clean.startsWith(".") || /^[.$\w]+:$/.test(clean)) continue;
+      if (/^[a-zA-Z][\w.]*\s*[^=]*$/.test(clean)) {
+        execIdx++;
       }
+    }
+    const currentRows = rowsRef.current;
+    if (execIdx >= 0 && execIdx < currentRows.length) return execIdx;
+    const normTarget = rawTarget.replace(/\s+/g, " ").trim().toLowerCase();
+    const byText = currentRows.findIndex(
+      (r) => r.text.replace(/\s+/g, " ").trim().toLowerCase() === normTarget
+    );
+    return byText >= 0 ? byText : execIdx >= 0 ? execIdx : null;
+  };
 
-      // 테마를 확실하게 설정
-      monacoInstance.editor.setTheme(theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light");
-
-      // 2. 어시스턴트 소스 트래킹 연결
-      trackSelection(editorInstance);
-
-      // 3. 에디터 마우스 클릭 리스너 (줄 번호 클릭 또는 라인 클릭 시 튜터 연동)
-      editorInstance.onMouseDown((e) => {
-        if (activeTargetRef.current !== "asm") return;
-
-        const isLineNumberClick =
-          e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
-          e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
-          Boolean(e.target.element?.closest(".line-numbers"));
-
-        const clickedLineNumber = e.target.position?.lineNumber;
-        if (clickedLineNumber) {
-          lastMouseSelectTimeRef.current = Date.now();
-          const zeroBasedIndex = clickedLineNumber - 1;
-          const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-
-          if (selectedAsmIndexRef.current === zeroBasedIndex && (!isMobile || !isLineNumberClick)) {
-            // 토글 해제
-            onSelectLineRef.current?.(null, null);
-          } else {
-            // 해당 어셈블리 행 선택 -> 튜터 연동 (C sourceLine은 null 전달)
-            onSelectLineRef.current?.(null, zeroBasedIndex);
-          }
-        }
-      });
-
-      // 4. 모바일 터치 줄 번호 탭 이벤트 보장
-      const domNode = editorInstance.getDomNode();
-      domNode?.addEventListener("click", (evt) => {
-        if (activeTargetRef.current !== "asm") return;
-        if (Date.now() - lastMouseSelectTimeRef.current < 80) return;
-        const lineNumEl = (evt.target as HTMLElement | null)?.closest(".line-numbers");
-        if (lineNumEl) {
-          const parsed = parseInt((lineNumEl.textContent || "").trim(), 10);
-          if (!Number.isNaN(parsed) && parsed > 0) {
-            onSelectLineRef.current?.(null, parsed - 1);
-          }
-        }
-      });
-
-      // 5. 커서 이동 이벤트 연동
-      editorInstance.onDidChangeCursorPosition((e) => {
-        if (activeTargetRef.current !== "asm") return;
-        if (
-          e.reason === monacoInstance.editor.CursorChangeReason.Explicit &&
-          e.source !== "keyboard" &&
-          e.source !== "modelChange" &&
-          Date.now() - lastMouseSelectTimeRef.current > 80
-        ) {
-          const line = e.position.lineNumber;
-          if (line) {
-            onSelectLineRef.current?.(null, line - 1);
-          }
-        }
-      });
-    },
-    [trackSelection]
-  );
-
-  // ASM Monaco Editor 라인 하이라이트(Decoration) 갱신 (어셈블/시뮬레이션 완료 시에만 실행 요소 활성화)
   useEffect(() => {
-    if (!editorRef.current || !monacoRef.current || activeTarget !== "asm") return;
+    if (asmEditorRef.current && asmMonacoRef.current) {
+      asmMonacoRef.current.editor.setTheme(theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light");
+    }
+  }, [theme]);
 
-    // 어셈블 전 작성 중일 때는 일체의 실행/선택 장식 없이 라인번호와 텍스트만 깔끔하게 유지
-    if (!isSimulated) {
-      decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
+  const handleAsmEditorMount: OnMount = (editorInstance, monacoInstance) => {
+    trackSelection(editorInstance);
+    asmEditorRef.current = editorInstance;
+    asmMonacoRef.current = monacoInstance;
+
+    // 1. RISC-V 커스텀 언어 등록 및 어셈블리 전용 정갈한 테마 등록
+    if (!monacoInstance.languages.getLanguages().some((l: { id: string }) => l.id === RISCV_LANGUAGE_ID)) {
+      monacoInstance.languages.register({ id: RISCV_LANGUAGE_ID });
+      monacoInstance.languages.setMonarchTokensProvider(RISCV_LANGUAGE_ID, riscvLanguageDef);
+
+      monacoInstance.editor.defineTheme("riscv-asm-theme-light", {
+        base: "vs",
+        inherit: false,
+        rules: [
+          { token: "keyword", foreground: "6D28D9", fontStyle: "bold" },
+          { token: "keyword.directive", foreground: "6E7681", fontStyle: "italic" },
+          { token: "type.identifier", foreground: "1F2328", fontStyle: "bold" },
+          { token: "variable.predefined", foreground: "24292F" },
+          { token: "identifier", foreground: "24292F" },
+          { token: "number", foreground: "24292F" },
+          { token: "number.hex", foreground: "24292F" },
+          { token: "comment", foreground: "8C959F", fontStyle: "italic" },
+          { token: "string", foreground: "24292F" },
+        ],
+        colors: {
+          "editor.background": "#FFFFFF",
+          "editor.foreground": "#24292F",
+          "editorLineNumber.foreground": "#8C959F",
+          "editorLineNumber.activeForeground": "#8C959F",
+          "editorGutter.background": "#FFFFFF",
+          "editor.lineHighlightBackground": "#00000000",
+          "editor.lineHighlightBorder": "#00000000",
+        },
+      });
+
+      monacoInstance.editor.defineTheme("riscv-asm-theme-dark", {
+        base: "vs-dark",
+        inherit: false,
+        rules: [
+          { token: "keyword", foreground: "A78BFA", fontStyle: "bold" },
+          { token: "keyword.directive", foreground: "858585", fontStyle: "italic" },
+          { token: "type.identifier", foreground: "E9D5FF", fontStyle: "bold" },
+          { token: "variable.predefined", foreground: "CCCCCC" },
+          { token: "identifier", foreground: "CCCCCC" },
+          { token: "number", foreground: "CCCCCC" },
+          { token: "number.hex", foreground: "CCCCCC" },
+          { token: "comment", foreground: "6E7681", fontStyle: "italic" },
+          { token: "string", foreground: "CCCCCC" },
+        ],
+        colors: {
+          "editor.background": "#1E1E1E",
+          "editor.foreground": "#CCCCCC",
+          "editorLineNumber.foreground": "#858585",
+          "editorLineNumber.activeForeground": "#858585",
+          "editorGutter.background": "#1E1E1E",
+          "editor.lineHighlightBackground": "#00000000",
+          "editor.lineHighlightBorder": "#00000000",
+        },
+      });
+    }
+
+    monacoInstance.editor.setTheme(theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light");
+
+    editorInstance.onMouseDown((e) => {
+      if (activeTargetRef.current !== "asm") return;
+
+      const isLineNumberClick =
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+        Boolean(e.target.element?.closest(".line-numbers"));
+
+      const clickedLine = e.target.position?.lineNumber;
+      if (clickedLine) {
+        lastMouseSelectTimeRef.current = Date.now();
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        if (selectedLineRef.current === clickedLine && (!isMobile || !isLineNumberClick)) {
+          onSelectLineRef.current?.(null, null, false);
+        } else {
+          const asmIdx = resolveAsmRowIndex(clickedLine);
+          onSelectLineRef.current?.(clickedLine, asmIdx, isLineNumberClick);
+        }
+      }
+    });
+
+    const domNode = editorInstance.getDomNode();
+    domNode?.addEventListener("click", (evt) => {
+      if (activeTargetRef.current !== "asm") return;
+      if (Date.now() - lastMouseSelectTimeRef.current < 80) return;
+      const lineNumEl = (evt.target as HTMLElement | null)?.closest(".line-numbers");
+      if (lineNumEl) {
+        const parsed = parseInt((lineNumEl.textContent || "").trim(), 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          const asmIdx = resolveAsmRowIndex(parsed);
+          onSelectLineRef.current?.(parsed, asmIdx, true);
+        }
+      }
+    });
+
+    editorInstance.onDidChangeCursorPosition((e) => {
+      if (activeTargetRef.current !== "asm") return;
+      if (
+        e.reason === monacoInstance.editor.CursorChangeReason.Explicit &&
+        e.source !== "keyboard" &&
+        e.source !== "modelChange" &&
+        Date.now() - lastMouseSelectTimeRef.current > 80
+      ) {
+        const line = e.position.lineNumber;
+        if (line) {
+          const asmIdx = resolveAsmRowIndex(line);
+          onSelectLineRef.current?.(line, asmIdx, false);
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!asmEditorRef.current || !asmMonacoRef.current) return;
+    if (activeTarget !== "asm") {
+      asmDecorationsRef.current = asmEditorRef.current.deltaDecorations(
+        asmDecorationsRef.current,
+        []
+      );
       return;
     }
 
     const newDecorations: editor.IModelDeltaDecoration[] = [];
 
-    // 1. 현재 CPU 실행 중인 라인 (Single 모드: currentActiveStep / Pipeline 모드: stageBuffers)
+    // 1. 현재 CPU 실행 중인 라인 (시뮬레이션 완료 후 재생 시)
     let executingLine: number | null = null;
-    if (mode === "single" && currentActiveStep !== null && currentActiveStep !== undefined && currentActiveStep >= 0) {
-      executingLine = currentActiveStep + 1;
-    } else if (mode === "pipeline" && stageBuffers) {
-      // EX -> ID -> WB 순으로 우선 표시할 스테이지 감지
-      const activeStage = stageBuffers.EX || stageBuffers.ID || stageBuffers.WB;
-      if (activeStage?.assembly) {
-        const norm = activeStage.assembly.trim().toLowerCase();
-        const foundIdx = rows.findIndex((r) => r.text.trim().toLowerCase() === norm);
-        if (foundIdx >= 0) {
-          executingLine = foundIdx + 1;
+    if (isSimulated) {
+      if (mode === "single" && currentActiveStep !== null && currentActiveStep !== undefined && currentActiveStep >= 0) {
+        executingLine = currentActiveStep + 1;
+      } else if (mode === "pipeline" && stageBuffers) {
+        const activeStage = stageBuffers.EX || stageBuffers.ID || stageBuffers.WB;
+        if (activeStage?.assembly) {
+          const norm = activeStage.assembly.trim().toLowerCase();
+          const foundIdx = rows.findIndex((r) => r.text.trim().toLowerCase() === norm);
+          if (foundIdx >= 0) {
+            executingLine = foundIdx + 1;
+          }
         }
       }
-    }
 
-    if (executingLine && executingLine > 0) {
-      const isAlsoSelected = selectedAsmIndex !== null && selectedAsmIndex !== undefined && selectedAsmIndex + 1 === executingLine;
-      newDecorations.push({
-        range: new monacoRef.current.Range(executingLine, 1, executingLine, 1),
-        options: {
-          isWholeLine: true,
-          className: isAlsoSelected
-            ? "monaco-executing-selected-asm-line"
-            : "monaco-executing-asm-line",
-          lineNumberClassName: isAlsoSelected
-            ? "monaco-executing-selected-asm-linenumber"
-            : "monaco-executing-asm-linenumber",
-        },
-      });
-    }
-
-    // 2. 사용자가 수동 선택한 라인 (시뮬레이션 완료 후 튜터 연동 시)
-    if (selectedAsmIndex !== null && selectedAsmIndex !== undefined && selectedAsmIndex >= 0) {
-      const selectedLineNumber = selectedAsmIndex + 1;
-      if (selectedLineNumber !== executingLine) {
+      if (executingLine && executingLine > 0) {
+        const isAlsoSelected = selectedLine === executingLine;
         newDecorations.push({
-          range: new monacoRef.current.Range(selectedLineNumber, 1, selectedLineNumber, 1),
+          range: new asmMonacoRef.current.Range(executingLine, 1, executingLine, 1),
           options: {
             isWholeLine: true,
-            className: "monaco-selected-asm-line",
-            lineNumberClassName: "monaco-selected-asm-linenumber",
+            className: isAlsoSelected
+              ? "monaco-executing-selected-asm-line"
+              : "monaco-executing-asm-line",
+            lineNumberClassName: isAlsoSelected
+              ? "monaco-executing-selected-asm-linenumber"
+              : "monaco-executing-asm-linenumber",
           },
         });
       }
     }
 
-    decorationsRef.current = editorRef.current.deltaDecorations(
-      decorationsRef.current,
+    // 2. 사용자가 선택한 라인 (줄 번호 클릭 또는 라인 클릭)
+    if (selectedLine && selectedLine > 0 && selectedLine !== executingLine) {
+      newDecorations.push({
+        range: new asmMonacoRef.current.Range(selectedLine, 1, selectedLine, 1),
+        options: {
+          isWholeLine: true,
+          className: "monaco-selected-asm-line",
+          lineNumberClassName: "monaco-selected-asm-linenumber",
+        },
+      });
+    }
+
+    asmDecorationsRef.current = asmEditorRef.current.deltaDecorations(
+      asmDecorationsRef.current,
       newDecorations
     );
-  }, [selectedAsmIndex, currentActiveStep, stageBuffers, mode, activeTarget, rows, isSimulated]);
+  }, [selectedLine, currentActiveStep, stageBuffers, mode, activeTarget, rows, isSimulated]);
+
+  const [isSaving, setIsSaving] = useState(false);
+  const isLoggedIn = !!localStorage.getItem("access_token");
+
+
 
   // ASM 서버 저장 핸들러 (C 에디터와 1:1 동일)
   const handleSaveAsmClick = async () => {
@@ -729,7 +748,7 @@ export default function TranslationMapping({
       {activeTarget === "asm" ? (
         <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E] asm-monaco-container">
           <Editor
-            onMount={handleEditorMount}
+            onMount={handleAsmEditorMount}
             height="100%"
             language={RISCV_LANGUAGE_ID}
             theme={theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light"}
@@ -765,11 +784,15 @@ export default function TranslationMapping({
             }}
           />
         </div>
-      ) : !assembly && rows.length === 0 ? (
+      ) : busy || (!assembly && rows.length === 0) ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E]">
-          <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
-            📜
-          </div>
+          {busy ? (
+            <div className="w-7 h-7 border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin mb-3" />
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
+              📜
+            </div>
+          )}
           <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
             {busy
               ? "컴파일 및 어셈블리 매핑 중…"
