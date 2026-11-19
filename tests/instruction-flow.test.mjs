@@ -6,7 +6,7 @@ import ts from 'typescript';
 const source = readFileSync(new URL('../src/pages/Main/utils/instructionFlow.ts', import.meta.url), 'utf8');
 const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
-const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline,instructionFlowDuration} = exports;
+const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline,instructionFlowDuration,placeFlowLabel} = exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
   global_result: {registers: {x10: '0x0000000C'}, metrics: {accumulated_instructions: 1}},
@@ -142,19 +142,20 @@ test('packet geometry advances along the same orthogonal wire and clamps endpoin
 });
 
 
-test('long returns cannot travel faster than the reference register input and memory steps retain reading time',()=>{
+test('short connections stay readable and long returns use a bounded quicker schedule',()=>{
   const current=frame();
   for(const op of ['add','lw','sw','bne','ecall']) {
     const flow=buildInstructionFlow(item(op,['x11','x12'],['x10']),current,null,simulation(current));
     const transfers=instructionTransfers(flow);
     const timeline=transferTimeline(transfers,instructionPaths(flow),9000);
     for(const entry of timeline) {
-      assert.ok(entry.duration>=1600-1e-9);
-      if(entry.motion.route) assert.ok(entry.motion.distance/entry.travel <= 195/1400+1e-9);
+      assert.ok(entry.duration>=840-1e-9);
+      assert.ok(entry.duration<=2040);
+      if(entry.motion.route) assert.ok(entry.travel>=1050-1e-9);
     }
     assert.ok(Math.abs(instructionFlowDuration(flow,9000)-timeline.at(-1).start-timeline.at(-1).duration)<1e-9);
     const input=timeline[transfers.findIndex(transfer=>transfer.id==='input-a')];
-    if(input&&!flow.pcRelative) assert.equal(input.duration,1600);
+    if(input&&!flow.pcRelative) assert.ok(input.duration>=1200&&input.duration<1400);
     for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') assert.equal(timeline[index].travel,0);
   }
 });
@@ -180,4 +181,31 @@ test('immediate formats receive instruction bits before their immediate reaches 
   assert.equal(transfers[decode].source,'memory');
   const normal=instructionTransfers(buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current)));
   assert.ok(!normal.some(value=>value.id==='decode-immediate'));
+});
+
+
+test('a data label moves clear of a device instead of disappearing at a MUX',()=>{
+  const obstacle={x:410,y:520,w:60,h:32};
+  const box=placeFlowLabel({x:440,y:536},140,[obstacle],780);
+  assert.ok(box.x+box.w<=obstacle.x||box.x>=obstacle.x+obstacle.w||box.y+box.h<=obstacle.y||box.y>=obstacle.y+obstacle.h);
+  assert.ok(box.x>=0&&box.x+box.w<=780);
+});
+
+test('ALU input B goes through both sides of the input MUX',()=>{
+  const current=frame();
+  const transfers=instructionTransfers(buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current)));
+  const input=transfers.findIndex(value=>value.id==='input-b');
+  assert.equal(transfers[input].target,'operand-mux');
+  assert.equal(transfers[input+1].id,'mux-to-alu');
+  assert.equal(transfers[input+1].source,'operand-mux');
+  assert.equal(transfers[input+1].value,transfers[input].value);
+});
+
+
+test('a short input MUX link has real travel distance instead of a stationary midpoint',()=>{
+  const current=frame();
+  const flow=buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current));
+  const transfers=instructionTransfers(flow);
+  const timeline=transferTimeline(transfers,instructionPaths(flow),9000);
+  assert.ok(timeline[transfers.findIndex(value=>value.id==='mux-to-alu')].motion.distance>20);
 });

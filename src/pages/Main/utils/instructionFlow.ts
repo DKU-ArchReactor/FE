@@ -96,7 +96,7 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
     taken: control?.taken, error: error?.has_error ? error : undefined, steps};
 }
 
-export type TransferUnit = FlowUnit | 'immediate' | 'mux';
+export type TransferUnit = FlowUnit | 'immediate' | 'mux' | 'operand-mux';
 export interface InstructionTransfer {
   id: string; source: TransferUnit; target: TransferUnit; title: string;
   kind: 'address' | 'data' | 'control'; systemBus?: boolean; value?: string | null; detail: string;
@@ -131,7 +131,8 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
     'decode-immediate':'M515 290H550V335H440V380',
     'read-control':'M580 420H550V345H225V380',
     'input-a':flow.pcRelative?'M260 167H38V550H290V570':'M145 490V540H290V570',
-    'input-b':flow.usesImmediate?'M440 470V570':'M240 490V510H440V570',
+    'input-b':flow.usesImmediate?'M440 470V502':'M240 490V500H440V502',
+    'mux-to-alu':'M440 534V570',
     'memory-address':'M360 680V730',
     'memory-control':'M760 420H770V775H500',
     'store-data':'M140 490V775H220',
@@ -148,29 +149,39 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
 export function transferMotion(transfer:InstructionTransfer,path?:string) {
   const value=transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
   const width=Math.max(56,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?18:11),28));
-  const commands=path?.match(/[MHV]/g)??[];
   const route=path&&transfer.kind!=='control'?compileTransferRoute(path):undefined;
-  const startPadding=commands[1]==='H'?width/2+4:15;
-  const endPadding=commands.at(-1)==='H'?width/2+4:15;
+  // The value label can sit off the wire, so short MUX links need only a small port inset.
+  const startPadding=route?Math.min(6,route.total*.1):0;
+  const endPadding=startPadding;
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
   return {value,width,route,startPadding,endPadding,distance};
 }
-// Use register -> ALU as the reference motion. Short connections retain reading time;
-// long return paths get more travel time instead of crossing the diagram in one flash.
-// Canonical geometry keeps timing identical between the playback hook and every viewport.
+// Keep short connections readable, but cap long returns instead of making one
+// instruction take tens of seconds. The CPU playback uses this same schedule.
 export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,pace:number) {
-  const base=singleTransferDuration(pace);
+  const base=singleTransferDuration(pace)*.75;
   let start=0;
   return transfers.map(transfer=>{
     const motion=transferMotion(transfer,paths[transfer.id]);
-    const minimum=base*(transfer.id==='decode-immediate'||transfer.id==='memory-address'||transfer.id==='load-data'?1.2:1);
+    const minimum=base*(transfer.id==='decode-immediate'?1.1:1);
     const lead=motion.route?minimum*.05:0;
-    const travel=motion.route?Math.max(minimum*.875,base*.875*motion.distance/195):0;
-    const duration=motion.route?lead+travel+minimum*.075:minimum;
+    const travel=motion.route?Math.max(minimum*.875,Math.min(base*1.5,base*.875*motion.distance/195)):0;
+    const duration=motion.route?lead+travel+minimum*.075:base*(transfer.kind==='control'?.9:.8);
     const entry={start,duration,lead,travel,motion};
     start+=duration;
     return entry;
   });
+}
+export type FlowLabelBox={x:number;y:number;w:number;h:number};
+export function placeFlowLabel(point:{x:number;y:number},width:number,obstacles:FlowLabelBox[],viewWidth:number):FlowLabelBox {
+  const offsets=[[0,0],[0,-42],[0,42],[-width/2-22,0],[width/2+22,0],[0,-76],[0,76],[-width/2-22,-42],[width/2+22,-42],[-width/2-22,42],[width/2+22,42],[0,-112],[0,112]];
+  for(const obstacle of obstacles) {
+    offsets.push([obstacle.x-width/2-point.x-10,0],[obstacle.x+obstacle.w+width/2-point.x+10,0],[0,obstacle.y-point.y-26],[0,obstacle.y+obstacle.h-point.y+26]);
+  }
+  const boxes=offsets.map(([dx,dy])=>({x:Math.max(8,Math.min(viewWidth-width-8,point.x-width/2+dx)),y:Math.max(122,Math.min(910,point.y-16+dy)),w:width,h:32}));
+  boxes.sort((a,b)=>(a.x+a.w/2-point.x)**2+(a.y+a.h/2-point.y)**2-((b.x+b.w/2-point.x)**2+(b.y+b.h/2-point.y)**2));
+  const overlaps=(a:FlowLabelBox,b:FlowLabelBox)=>a.x<b.x+b.w+5&&a.x+a.w>b.x-5&&a.y<b.y+b.h+5&&a.y+a.h>b.y-5;
+  return boxes.find(box=>obstacles.every(obstacle=>!overlaps(box,obstacle)))??boxes[0];
 }
 export function instructionFlowDuration(flow:ReturnType<typeof buildInstructionFlow>,pace:number) {
   return transferTimeline(instructionTransfers(flow),instructionPaths(flow),pace).reduce((sum,entry)=>sum+entry.duration,0);
@@ -182,10 +193,11 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
   ];
   if (flow.system) result.push({id:'environment',source:'cu',target:'cu',title:'CU · 실행 환경 요청',kind:'control',value:'ECALL',detail:'일반 메모리 전송이 아닌 실행 환경 서비스 요청'});
   else {
-    if(flow.registerInputs.length) result.push({id:'read-control',source:'cu',target:'registers',title:'CU → 레지스터 · 읽기 선택',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'읽을 레지스터 번호를 지정하는 제어 신호 · 연산 데이터가 아닙니다'});
     if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'memory',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:flow.raw,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
+    if(flow.registerInputs.length) result.push({id:'read-control',source:'cu',target:'registers',title:'CU → 레지스터 · 읽기 선택',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'읽을 레지스터 번호를 지정하는 제어 신호 · 연산 데이터가 아닙니다'});
     if(flow.pcRelative || flow.registerInputs.length) result.push({id:'input-a',source:flow.pcRelative?'pc':'registers',target:'alu',title:`${flow.pcRelative?'PC':'레지스터'} → ALU`,kind:'data',value:flow.input1,detail:'ALU 입력 A'});
-    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'alu',title:`${flow.usesImmediate?'즉치값 생성기':'레지스터'} → ALU`,kind:'data',value:flow.amount!=null?String(flow.amount):flow.input2,detail:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
+    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'operand-mux',title:`${flow.usesImmediate?'\uC989\uCE58\uAC12 \uC0DD\uC131\uAE30':'\uB808\uC9C0\uC2A4\uD130'} \u2192 \uC785\uB825 MUX`,kind:'data',value:flow.amount!=null?String(flow.amount):flow.input2,detail:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
+    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'mux-to-alu',source:'operand-mux',target:'alu',title:'\uC785\uB825 MUX \u2192 ALU',kind:'data',value:flow.amount!=null?String(flow.amount):flow.input2,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 ALU \uC785\uB825 B\uB85C \uC804\uB2EC'});
     result.push({id:'calculate',source:'alu',target:'alu',title:flow.load||flow.store?'ALU · 메모리 주소 계산':flow.branch?'ALU · 분기 조건 비교':flow.jump?'이동할 주소 선택':`ALU · ${flow.op.toUpperCase()} 연산`,kind:'data',value:flow.branch?(flow.taken==null?undefined:flow.taken?'조건 성립':'조건 불성립'):flow.jump?flow.nextPc:flow.result,detail:flow.load||flow.store?'기준 주소 + 바이트 오프셋':flow.branch?'부호 해석과 분기 조건은 명령어에 따라 다릅니다':'관찰된 연산 결과'});
     if(flow.load||flow.store) {
       result.push({id:'memory-address',source:'alu',target:'memory',title:'ALU → 메모리',kind:'address',systemBus:true,value:flow.address,detail:'데이터를 읽거나 쓸 주소'});

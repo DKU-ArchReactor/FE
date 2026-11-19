@@ -5,6 +5,7 @@ import {
   instructionPaths,
   pointOnTransfer,
   transferMotion,
+  placeFlowLabel,
   type TransferUnit,
   type InstructionTransfer,
   type buildInstructionFlow,
@@ -21,6 +22,7 @@ const NODES = {
   cu: "#a45de4",
   immediate: "#009dd8",
   mux: "#9860dc",
+  "operand-mux": "#009dd8",
 };
 const short = (value?: string | null) => displayValue(value).split(" · ")[0];
 
@@ -148,31 +150,17 @@ export default function InstructionFlowDiagram({
       { ...box, x: sx(box.x), w: sx(box.w) },
     ]),
   ) as Record<keyof typeof baseBoxes, Box>;
-  const packetBox = point
-    ? {
-        x: Math.max(
-          8,
-          Math.min(viewWidth - packetWidth - 8, point.x - packetWidth / 2),
-        ),
-        y: point.y - 14,
-        w: packetWidth,
-        h: 28,
-      }
-    : undefined;
   const obstacles = [
     ...Object.values(boxes),
     { x: sx(290), y: 860, w: sx(160), h: 48 },
-    { x: sx(410), y: 520, w: sx(60), h: 32 },
+    { x: sx(410), y: 502, w: sx(60), h: 32 },
+    ...(flow.registerInputs.length
+      ? [{ x: sx(60), y: 338, w: sx(230), h: 30 }]
+      : []),
   ];
-  const packetVisible =
-    packetBox &&
-    !obstacles.some(
-      (box) =>
-        packetBox.x < box.x + box.w + 2 &&
-        packetBox.x + packetBox.w > box.x - 2 &&
-        packetBox.y < box.y + box.h + 2 &&
-        packetBox.y + packetBox.h > box.y - 2,
-    );
+  const packetBox = point
+    ? placeFlowLabel(point, packetWidth, obstacles, viewWidth)
+    : undefined;
   const node = (
     unit: TransferUnit,
     box: Box,
@@ -214,7 +202,7 @@ export default function InstructionFlowDiagram({
           }
         }}
         data-flow-active={active}
-        opacity={active ? 1 : 0.42}
+        opacity={active ? 1 : 0.62}
         className="cursor-pointer outline-none focus-visible:drop-shadow-md"
       >
         {unit === "registers" && (
@@ -304,8 +292,9 @@ export default function InstructionFlowDiagram({
           <text
             x={box.x + 10}
             y={box.y + 24}
-            fontSize="10"
-            fill="var(--ar-text-muted)"
+            fontSize="15"
+            fontWeight="750"
+            fill="var(--ar-text-primary)"
           >
             32비트
           </text>
@@ -322,9 +311,8 @@ export default function InstructionFlowDiagram({
           x={box.x + box.w / 2}
           y={box.y + (shape ? 42 : 25)}
           textAnchor="middle"
-          fontSize="19"
-          fontWeight="750"
-          className="font-mono"
+          fontSize="22"
+          fontWeight="800"
           fill="var(--ar-text-primary)"
         >
           {title}
@@ -334,8 +322,8 @@ export default function InstructionFlowDiagram({
             x={shape ? box.x + 45 : box.x + box.w - 12}
             y={box.y + (shape ? 29 : 24)}
             textAnchor={shape ? "start" : "end"}
-            fontSize="11"
-            fontWeight="600"
+            fontSize="16"
+            fontWeight="750"
             fill={color}
           >
             {status}
@@ -354,9 +342,9 @@ export default function InstructionFlowDiagram({
               {unit !== "registers" && (
                 <rect
                   x={box.x + inset}
-                  y={baseline - 14}
+                  y={baseline - 16}
                   width={box.w - inset * 2}
-                  height="17"
+                  height="19"
                   rx="3"
                   fill={active ? "var(--ar-panel-bg)" : "var(--ar-header-bg)"}
                   stroke={selected ? color : "var(--ar-border)"}
@@ -367,9 +355,8 @@ export default function InstructionFlowDiagram({
                 x={box.x + box.w / 2}
                 y={baseline}
                 textAnchor="middle"
-                fontSize={unit === "cu" || unit === "immediate" ? 15 : 16}
-                fontWeight={selected ? 750 : 550}
-                className="font-mono"
+                fontSize="18"
+                fontWeight={selected ? 800 : 650}
                 fill={selected ? color : "var(--ar-text-primary)"}
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
@@ -392,7 +379,7 @@ export default function InstructionFlowDiagram({
     wires.push({ key: "read-control", kind: "control" }, { key: "input-a" });
   else if (flow.pcRelative) wires.push({ key: "input-a" });
   if (flow.usesImmediate || flow.registerInputs.length > 1)
-    wires.push({ key: "input-b" });
+    wires.push({ key: "input-b" }, { key: "mux-to-alu" });
   if (flow.load || flow.store)
     wires.push(
       { key: "memory-address", system: true, kind: "address" },
@@ -425,7 +412,7 @@ export default function InstructionFlowDiagram({
         ]
       : [
           `A: ${reached("input-a") || (!flow.pcRelative && !flow.registerInputs.length) ? short(flow.input1) : "입력 대기"}`,
-          `B: ${reached("input-b") ? (flow.amount != null ? `${flow.amount}비트 이동` : short(flow.input2)) : "입력 대기"}`,
+          `B: ${reached("mux-to-alu") ? (flow.amount != null ? `${flow.amount}비트 이동` : short(flow.input2)) : "입력 대기"}`,
           flow.branch
             ? arrived.includes("calculate") || transfer.id === "calculate"
               ? flow.taken == null
@@ -532,6 +519,17 @@ export default function InstructionFlowDiagram({
             opacity=".18"
           />
         )}
+        {point && packetBox && (
+          <g className="flow-data-guide" aria-hidden="true">
+            <path
+              d={`M${point.x} ${point.y}L${Math.max(packetBox.x, Math.min(packetBox.x + packetBox.w, point.x))} ${Math.max(packetBox.y, Math.min(packetBox.y + packetBox.h, point.y))}`}
+              stroke={color}
+              strokeWidth="1.6"
+              fill="none"
+            />
+            <circle cx={point.x} cy={point.y} r="4" fill={color} />
+          </g>
+        )}
         {node("pc", boxes.pc, "PC", [flow.pc ?? "미제공"])}
         {node(
           "memory",
@@ -557,19 +555,29 @@ export default function InstructionFlowDiagram({
         ])}
         <g
           aria-label="ALU 입력 선택"
-          opacity={transfer.id === "input-b" ? 1 : 0.42}
+          data-flow-active={
+            transfer.source === "operand-mux" ||
+            transfer.target === "operand-mux"
+          }
+          opacity={
+            transfer.source === "operand-mux" ||
+            transfer.target === "operand-mux"
+              ? 1
+              : 0.62
+          }
         >
           <path
-            d={scalePath("M410 520H470L458 552H422Z")}
+            d={scalePath("M410 502H470L458 534H422Z")}
             fill="var(--ar-panel-bg)"
             stroke="#009dd8"
             strokeWidth="1.6"
           />
           <text
             x={sx(440)}
-            y="541"
+            y="523"
             textAnchor="middle"
-            fontSize="13"
+            fontSize="17"
+            fontWeight="750"
             fill="var(--ar-text-primary)"
           >
             MUX
@@ -666,8 +674,12 @@ export default function InstructionFlowDiagram({
             메모리 연결의 버스 역할을 설명한 개념도입니다.
           </text>
         </g>
-        {transfer.id === "read-control" && (
-          <g data-control-selection="true" aria-label="Read select">
+        {flow.registerInputs.length > 0 && (
+          <g
+            data-control-selection="true"
+            opacity={transfer.id === "read-control" ? 1 : 0.65}
+            aria-label="Read select"
+          >
             <rect
               x={sx(60)}
               y="338"
@@ -681,9 +693,8 @@ export default function InstructionFlowDiagram({
             <text
               x={sx(72)}
               y="358"
-              fontSize="15"
-              className="font-mono"
-              fontWeight="650"
+              fontSize="18"
+              fontWeight="750"
               fill={COLORS.control}
             >
               Read select:{" "}
@@ -720,43 +731,39 @@ export default function InstructionFlowDiagram({
             {transfer.detail}
           </text>
         </g>
-        {point &&
-          packetBox &&
-          progress > 0 &&
-          progress < 1 &&
-          packetVisible && (
-            <g
-              className="flow-data-word flow-packet"
-              data-moving-value={packetValue}
-              data-packet-x={point.x}
-              data-packet-y={point.y}
-              aria-label={`이동 중인 값 ${packetValue}`}
+        {point && packetBox && (
+          <g
+            className="flow-data-word flow-packet"
+            data-moving-value={packetValue}
+            data-packet-x={point.x}
+            data-packet-y={point.y}
+            aria-label={`이동 중인 값 ${packetValue}`}
+          >
+            <rect
+              x={packetBox.x}
+              y={packetBox.y}
+              width={packetBox.w}
+              height={packetBox.h}
+              rx="6"
+              fill={color}
+              stroke="var(--ar-panel-bg)"
+              strokeWidth="1"
+              style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
+            />
+            <text
+              x={packetBox.x + packetBox.w / 2}
+              y={packetBox.y + 23}
+              textAnchor="middle"
+              fontSize="19"
+              fontWeight="750"
+              className="font-mono"
+              fill="#fff"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              <rect
-                x={packetBox.x}
-                y={packetBox.y}
-                width={packetBox.w}
-                height={packetBox.h}
-                rx="6"
-                fill={color}
-                stroke="var(--ar-panel-bg)"
-                strokeWidth="1"
-                style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
-              />
-              <text
-                x={packetBox.x + packetBox.w / 2}
-                y={packetBox.y + 20}
-                textAnchor="middle"
-                fontSize="17"
-                fontWeight="600"
-                className="font-mono"
-                fill="#fff"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                {packetValue}
-              </text>
-            </g>
-          )}
+              {packetValue}
+            </text>
+          </g>
+        )}
       </svg>
     </div>
   );

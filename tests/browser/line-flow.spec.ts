@@ -80,6 +80,7 @@ test('the prominent payload identifies each operand and result without moving or
   await expect(payload).toContainText('7 · 0x00000007');
   await expect(payload).toContainText('입력 B');
   await page.getByRole('button',{name:'다음 흐름',exact:true}).click();
+  await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
   await expect(payload).toContainText('18 · 0x00000012');
   await expect(page.locator('[data-flow-node="alu"]')).toContainText('처리 중');
 });
@@ -203,13 +204,13 @@ test('Imm Gen receives instruction bits before exposing the decoded immediate',a
   const immediate=page.locator('[data-flow-node="immediate"]');
   await expect(page.locator('[data-circuit-wire="decode-immediate"]')).toBeVisible();
   await expect(immediate).toContainText('\uBA85\uB839\uC5B4 \uD574\uC11D \uB300\uAE30');
-  for(let i=0;i<3;i++) await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
+  for(let i=0;i<2;i++) await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
   await expect(page.locator('[data-transfer="decode-immediate"]')).toBeVisible();
   await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
-  await page.clock.runFor(1100);
+  await page.clock.runFor(700);
   await expect(page.locator('[data-transfer="decode-immediate"]')).toBeVisible();
-  await page.clock.runFor(1000);
-  await expect(page.locator('[data-transfer="input-a"]')).toBeVisible();
+  await page.clock.runFor(900);
+  await expect(page.locator('[data-transfer="read-control"]')).toBeVisible();
   await expect(immediate).toContainText('-4');
 });
 
@@ -239,7 +240,7 @@ test('focus follows memory -> MUX -> registers, and control selection names the 
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');
   await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
   const next=page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true});
-  for(let i=0;i<2;i++) await next.click();
+  for(let i=0;i<3;i++) await next.click();
   await expect(page.locator('[data-control-selection]')).toContainText('Read select: x8');
   const legendAboveRegisters=await page.locator('svg[data-layout]').evaluate(svg=>{
     const register=svg.querySelector('[data-flow-node="registers"]') as SVGGraphicsElement;
@@ -256,4 +257,42 @@ test('focus follows memory -> MUX -> registers, and control selection names the 
   await expect(page.locator('[data-transfer="writeback"]')).toBeVisible();
   await expect(registers).toHaveAttribute('data-flow-active','true');
   await expect(page.locator('[data-flow-node="memory"]')).toHaveAttribute('data-flow-active','false');
+});
+
+
+test('data labels stay visible on both sides of MUXes and beside memory throughout a transfer',async ({page})=>{
+  await frozenTime(page);await page.setViewportSize({width:1400,height:900});
+  const observed=new Set<string>();
+  for(const size of [{width:1400,height:900},{width:700,height:1000}]) for(const op of ['add','lw']) {
+    await page.setViewportSize(size);
+    await page.goto(`/tests/browser/line-flow.html?geometry=${op}`);
+    await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+    const next=page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true});
+    while(true) {
+      const id=await page.locator('[data-transfer]').getAttribute('data-transfer')??'';
+      if(['decode-immediate','input-b','mux-to-alu','result-to-mux','load-data','writeback'].includes(id)) {
+        observed.add(id);
+        await expect(page.locator('.flow-data-word')).toBeVisible();
+        const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+        await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
+        for(const fraction of [.5,.46]) {
+          await page.clock.runFor(duration*fraction);
+          await expect(page.locator(`[data-transfer="${id}"]`)).toBeVisible();
+          await expect(page.locator('.flow-data-word')).toBeVisible();
+          expect(await page.locator('svg[data-layout]').evaluate(svg=>{
+            const label=svg.querySelector<SVGGraphicsElement>('.flow-data-word')!.getBBox();
+            const obstacles=[...svg.querySelectorAll<SVGGraphicsElement>('[data-flow-node]')].map(node=>({x:Number(node.dataset.x),y:Number(node.dataset.y),width:Number(node.dataset.width),height:Number(node.dataset.height)}));
+            for(const selector of ['[aria-label="\uAE30\uB85D\uAC12 \uC120\uD0DD"]','[aria-label="ALU \uC785\uB825 \uC120\uD0DD"]','[data-control-selection]']) {
+              const node=svg.querySelector<SVGGraphicsElement>(selector);if(node)obstacles.push(node.getBBox());
+            }
+            return obstacles.filter(box=>!(label.x+label.width<=box.x||label.x>=box.x+box.width||label.y+label.height<=box.y||label.y>=box.y+box.height)).map(box=>({label:{x:label.x,y:label.y,w:label.width,h:label.height},box:{x:box.x,y:box.y,w:box.width,h:box.height}}));
+          }),`${op} ${id}: label covers device`).toEqual([]);
+        }
+        await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+      }
+      if(!await next.isEnabled()) break;
+      await next.click();
+    }
+  }
+  expect([...observed].sort()).toEqual(['decode-immediate','input-b','load-data','mux-to-alu','result-to-mux','writeback'].sort());
 });
