@@ -7,6 +7,7 @@ import SingleInstructionFlow from './SingleInstructionFlow';
 import './TutorTypography.css';
 
 export interface InstructionLessonContext {
+  isPlaying?: boolean;
   flowDurationMs?: number;
   onPausePlayback?: () => void;
   source?: string;
@@ -46,6 +47,6 @@ export default function InstructionLesson({currentData, prevData, simulationData
       <span className="text-[10px] text-[var(--ar-text-muted)]">{flow.actual ? `CORE clock ${currentData?.clock}` : '선택 명령어 · 실행값 미표시'}</span>
       {!flow.actual && target != null && context?.onJumpToCycle && <button type="button" className="rounded bg-[var(--ar-accent)] px-2 py-1 text-[11px] text-white" onClick={() => context.onJumpToCycle?.(target + 1)}>이 명령어의 실행 시점으로 이동</button>}
     </div>
-    <SingleInstructionFlow key={`${row.pc}-${flow.historyIndex}-${context?.flowDurationMs}`} flow={flow} duration={context?.flowDurationMs} onPause={context?.onPausePlayback}/>
+    <SingleInstructionFlow key={`${row.pc}-${flow.historyIndex}-${context?.flowDurationMs}`} flow={flow} duration={context?.flowDurationMs} onPause={context?.onPausePlayback} isPlaying={context?.isPlaying}/>
   </div>;
 }

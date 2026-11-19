@@ -1,4 +1,3 @@
 @media (prefers-reduced-motion: reduce) {
   .flow-packet { display: none; }
-  .flow-travel { stroke-dashoffset: 0 !important; opacity: 1 !important; }
 }

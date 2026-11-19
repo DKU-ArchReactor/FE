@@ -6,7 +6,7 @@ import ts from 'typescript';
 const source = readFileSync(new URL('../src/pages/Main/utils/instructionFlow.ts', import.meta.url), 'utf8');
 const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
-const {buildInstructionFlow} = exports;
+const {buildInstructionFlow,instructionTransfers,transferPoint} = exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
   global_result: {registers: {x10: '0x0000000C'}, metrics: {accumulated_instructions: 1}},
@@ -93,4 +93,47 @@ test('branch keeps comparison inputs separate from its PC offset and has no regi
   assert.equal(flow.usesImmediate, false); // ALU compares registers; offset is a separate PC input.
   assert.equal(flow.writeValue, undefined);
   assert.ok(!flow.steps.at(-1).routes.includes('writeback'));
+});
+
+test('transfer payloads preserve operands, computed result and architectural writeback separately',()=>{
+  const current=frame();
+  const transfers=instructionTransfers(buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current)));
+  const byId=Object.fromEntries(transfers.map(value=>[value.id,value]));
+  assert.equal(byId['input-a'].value,'0x00000005');
+  assert.equal(byId['input-b'].value,'0x00000007');
+  assert.equal(byId.calculate.value,'0x0000000C');
+  assert.equal(byId.writeback.value,'0x0000000C');
+  assert.equal(byId['input-a'].systemBus,undefined);
+  assert.equal(byId['fetch-address'].systemBus,true);
+});
+
+test('memory transfers do not invent successful reads after a fault or write x0',()=>{
+  const current=frame('lw');current.datapath.data_memory={address:'0x2000',read_data:'0xFFFFFFFE'};
+  let transfers=instructionTransfers(buildInstructionFlow(item('lw',['x11'],[]),current,null,simulation(current)));
+  assert.ok(transfers.some(value=>value.id==='discard-load'&&value.value==='0xFFFFFFFE'));
+  assert.ok(transfers.every(value=>value.id!=='load-data'&&value.id!=='writeback'));
+  current.cycle_events.runtime_error={has_error:true};
+  transfers=instructionTransfers(buildInstructionFlow(item('lw',['x11'],['x10']),current,null,simulation(current)));
+  assert.ok(transfers.every(value=>value.id!=='load-data'&&value.id!=='discard-load'&&value.id!=='writeback'));
+});
+
+test('store, ECALL, jump and shift transfers keep their distinct meanings',()=>{
+  const current=frame();current.datapath.alu.input_2='0x00000402';
+  const shift=instructionTransfers(buildInstructionFlow(item('srai',['x11'],['x10']),current,null,simulation(current)));
+  assert.equal(shift.find(value=>value.id==='input-b').value,'2');
+  const system=instructionTransfers(buildInstructionFlow(item('ecall',[],[]),current,null,simulation(current)));
+  assert.ok(system.some(value=>value.id==='environment'));
+  assert.ok(system.every(value=>value.id!=='memory-address'&&value.id!=='calculate'));
+  const jump=instructionTransfers(buildInstructionFlow(item('jal',[],['x1']),current,null,simulation(current)));
+  assert.equal(jump.find(value=>value.id==='writeback').source,'pc');
+  const store=instructionTransfers(buildInstructionFlow(item('sw',['x11','x12'],[]),current,null,simulation(current)));
+  assert.ok(store.some(value=>value.id==='store-data'&&value.source==='registers'&&value.target==='memory'));
+  assert.ok(store.every(value=>value.id!=='writeback'));
+});
+
+test('packet geometry advances along the same orthogonal wire and clamps endpoints',()=>{
+  const point=(progress)=>JSON.parse(JSON.stringify(transferPoint('M10 20H30V60',progress)));
+  assert.deepEqual(point(-1),{x:10,y:20});
+  assert.deepEqual(point(.5),{x:30,y:30});
+  assert.deepEqual(point(2),{x:30,y:60});
 });
