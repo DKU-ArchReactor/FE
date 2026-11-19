@@ -29,7 +29,7 @@ test('the vertical circuit and memory-bus role labels fit without scrolling at d
       const left=Math.min(...boxes.map(box=>box.x)),right=Math.max(...boxes.map(box=>box.x+box.width));
       return (right-left)*Math.min(rect.width/view.width,rect.height/view.height)/rect.width;
     });
-    expect(spacing).toBeGreaterThan(.9);
+    expect(spacing).toBeGreaterThan(.82);
     await expect(svg.locator('[data-flow-node="registers"]')).toHaveAttribute('data-hardware-shape','register-file');
     await expect(svg.locator('[data-flow-node="memory"]')).toHaveAttribute('data-hardware-shape','chip');
     await expect(svg.locator('[data-system-bus-label="address"]')).toContainText('Address Bus');
@@ -46,8 +46,9 @@ test('the moving data word carries the real operand and freezes intact when paus
   await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(150);
   const word=page.locator('[data-moving-value="11"]');
   await expect(word).toBeVisible();await expect(word).toContainText('11');
-  const before=await word.getAttribute('data-packet-x');
-  await page.clock.runFor(150);expect(await word.getAttribute('data-packet-x')).not.toBe(before);
+  const coordinate=()=>word.evaluate(node=>({x:node.getAttribute('data-packet-x'),y:node.getAttribute('data-packet-y')}));
+  const before=await coordinate();
+  await page.clock.runFor(150);expect(await coordinate()).not.toEqual(before);
   await page.getByRole('button',{name:'흐름 일시정지',exact:true}).click();
   const frozen=await word.getAttribute('data-packet-x');await page.clock.runFor(1000);
   expect(await word.getAttribute('data-packet-x')).toBe(frozen);
@@ -243,7 +244,7 @@ test('focus follows memory -> MUX -> registers, and control selection names the 
   await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
   const next=page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true});
   for(let i=0;i<3;i++) await next.click();
-  await expect(page.locator('[data-control-selection]')).toContainText('Read select: x8');
+  await expect(page.locator('[data-control-selection]')).toContainText('Read: x8');
   const legendAboveRegisters=await page.locator('svg[data-layout]').evaluate(svg=>{
     const register=svg.querySelector('[data-flow-node="registers"]') as SVGGraphicsElement;
     return [...svg.querySelectorAll<SVGGraphicsElement>('[data-system-bus-label]')].every(label=>label.getBBox().y+label.getBBox().height<register.getBBox().y);
@@ -285,7 +286,7 @@ test('data labels stay visible on both sides of MUXes and beside memory througho
             const label=svg.querySelector<SVGGraphicsElement>('.flow-data-word')!.getBBox();
             const obstacles=[...svg.querySelectorAll<SVGGraphicsElement>('[data-flow-node]')].map(node=>({x:Number(node.dataset.x),y:Number(node.dataset.y),width:Number(node.dataset.width),height:Number(node.dataset.height)}));
             for(const selector of ['[aria-label="\uAE30\uB85D\uAC12 \uC120\uD0DD"]','[aria-label="ALU \uC785\uB825 \uC120\uD0DD"]','[data-control-selection]']) {
-              const node=svg.querySelector<SVGGraphicsElement>(selector);if(node)obstacles.push(node.getBBox());
+              const node=svg.querySelector<SVGGraphicsElement>(selector);if(node&&node.getAttribute('data-flow-active')!=='true')obstacles.push(node.getBBox());
             }
             return obstacles.filter(box=>!(label.x+label.width<=box.x||label.x>=box.x+box.width||label.y+label.height<=box.y||label.y>=box.y+box.height)).map(box=>({label:{x:label.x,y:label.y,w:label.width,h:label.height},box:{x:box.x,y:box.y,w:box.width,h:box.height}}));
           }),`${op} ${id}: label covers device`).toEqual([]);
@@ -300,20 +301,55 @@ test('data labels stay visible on both sides of MUXes and beside memory througho
 });
 
 
-test('short immediate and MUX links show their value on the first frame without relocating the text mid-transfer',async ({page})=>{
-  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');
-  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
-  for(const id of ['decode-immediate','input-b','mux-to-alu']) {
-    while(await page.locator('[data-transfer]').getAttribute('data-transfer')!==id)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
-    const word=page.locator('.flow-data-word');
-    await expect(word).toBeVisible();await expect(page.locator('[data-flow-marker]')).toBeVisible();
-    const box=await word.locator('rect').evaluate(rect=>({x:rect.getAttribute('x'),y:rect.getAttribute('y')}));
-    const startY=await word.getAttribute('data-packet-y');
-    const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
-    await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();await page.clock.runFor(duration*.5);
-    await expect(word).toBeVisible();await expect(page.locator('[data-flow-marker]')).toBeVisible();
-    expect(await word.locator('rect').evaluate(rect=>({x:rect.getAttribute('x'),y:rect.getAttribute('y')}))).toEqual(box);
-    expect(await word.getAttribute('data-packet-y')).not.toBe(startY);
+
+
+test('the value stays centered on its moving wire position without jumps or clipping',async ({page})=>{
+  await frozenTime(page);
+  for(const size of [{width:1400,height:900},{width:700,height:1000}]) for(const op of ['lw','jal']) {
+    await page.setViewportSize(size);await page.goto(`/tests/browser/line-flow.html?geometry=${op}`);
     await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+    const next=page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true});
+    for(const id of op==='lw'?['fetch-address','decode-immediate','input-b','mux-to-alu','load-data','writeback']:['fetch-address','input-a','result-to-mux','writeback']) {
+      while(await page.locator('[data-transfer]').getAttribute('data-transfer')!==id)await next.click();
+      const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+      let previous:{x:number;y:number}|undefined;
+      await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
+      for(let sample=0;sample<13;sample++) {
+        if(sample)await page.clock.runFor(duration/16);
+        const geometry=await page.locator('svg[data-layout]').evaluate(svg=>{
+          const word=svg.querySelector<SVGGraphicsElement>('.flow-data-word')!;
+          const box=word.querySelector('rect')!.getBBox();
+          const x=Number(word.dataset.packetX),y=Number(word.dataset.packetY);
+          const path=svg.querySelector<SVGPathElement>('[data-flow-route] path')!;
+          const view=(svg as SVGSVGElement).viewBox.baseVal;
+          return {x,y,error:Math.hypot(box.x+box.width/2-x,box.y+box.height/2-y),length:path.getTotalLength(),inside:box.x>=0&&box.x+box.width<=view.width&&box.y>=0&&box.y+box.height<=view.height};
+        });
+        expect(geometry.error,`${size.width} ${id}: value detached from its wire`).toBeLessThan(.01);
+        expect(geometry.inside,`${id}: packet clipped`).toBe(true);
+        if(previous)expect(Math.hypot(geometry.x-previous.x,geometry.y-previous.y),`${id}: teleport between samples`).toBeLessThanOrEqual(geometry.length/12+2);
+        previous=geometry;
+      }
+      await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+    }
+  }
+});
+
+
+test('consecutive MUX transfers carry the same value across the stage boundary without teleporting',async ({page})=>{
+  await frozenTime(page);
+  for(const op of ['add','lw']) {
+    await page.goto(`/tests/browser/line-flow.html?geometry=${op}`);
+    await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+    for(const [before,after] of [['input-b','mux-to-alu'],[op==='lw'?'load-data':'result-to-mux','writeback']]) {
+      while(await page.locator('[data-transfer]').getAttribute('data-transfer')!==before)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
+      const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+      await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();await page.clock.runFor(duration-25);
+      const read=()=>page.locator('.flow-data-word').evaluate(word=>({x:Number(word.dataset.packetX),y:Number(word.dataset.packetY),value:word.textContent}));
+      const a=await read();await page.clock.runFor(65);const b=await read();
+      await expect(page.locator(`[data-transfer="${after}"]`)).toBeVisible();
+      expect(b.value).toBe(a.value);
+      expect(Math.hypot(b.x-a.x,b.y-a.y)).toBeLessThan(5);
+      await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+    }
   }
 });

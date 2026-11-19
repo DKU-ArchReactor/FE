@@ -4,7 +4,6 @@
 .dark .ar-single-flow-diagram { --ar-flow-wire: #91a7c0; }
 @media (prefers-reduced-motion: reduce) {
   .flow-token { display: none; }
-  .flow-data-guide { display: none; }
   .flow-control-trail { display: none; }
   .flow-data-trail { display: none; }
   .flow-packet { display: none; }

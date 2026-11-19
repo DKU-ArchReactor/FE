@@ -5,7 +5,6 @@ import {
   instructionPaths,
   pointOnTransfer,
   transferMotion,
-  placeFlowLabel,
   type TransferUnit,
   type InstructionTransfer,
   type buildInstructionFlow,
@@ -136,13 +135,13 @@ export default function InstructionFlowDiagram({
           : "";
   };
   const baseBoxes = {
-    pc: { x: 260, y: 132, w: 200, h: 70 },
+    pc: { x: 260, y: 132, w: 200, h: 60 },
     instruction: { x: 205, y: 245, w: 310, h: 76 },
-    registers: { x: 55, y: 380, w: 250, h: 110 },
-    immediate: { x: 350, y: 380, w: 180, h: 90 },
+    registers: { x: 180, y: 380, w: 210, h: 110 },
+    immediate: { x: 400, y: 380, w: 160, h: 70 },
     cu: { x: 580, y: 365, w: 180, h: 108 },
-    alu: { x: 220, y: 570, w: 280, h: 110 },
-    memory: { x: 220, y: 730, w: 280, h: 90 },
+    alu: { x: 220, y: 594, w: 280, h: 110 },
+    memory: { x: 220, y: 754, w: 280, h: 90 },
   } satisfies Record<string, Box>;
   const boxes = Object.fromEntries(
     Object.entries(baseBoxes).map(([key, box]) => [
@@ -150,24 +149,8 @@ export default function InstructionFlowDiagram({
       { ...box, x: sx(box.x), w: sx(box.w) },
     ]),
   ) as Record<keyof typeof baseBoxes, Box>;
-  const obstacles = [
-    ...Object.values(boxes),
-    { x: sx(388), y: 208, w: sx(150), h: 28 },
-    { x: sx(55), y: 198, w: sx(140), h: 90 },
-    { x: sx(290), y: 860, w: sx(160), h: 48 },
-    { x: sx(410), y: 502, w: sx(60), h: 32 },
-    ...(flow.registerInputs.length
-      ? [{ x: sx(60), y: 338, w: sx(230), h: 30 }]
-      : []),
-  ];
-  // Short links use a stable callout so routing around a MUX cannot make text jump
-  // between opposite sides of the wire. The marker still follows the real path.
-  const labelAnchor =
-    route && ["decode-immediate", "input-b", "mux-to-alu"].includes(transfer.id)
-      ? pointOnTransfer(route, 0.5, startPadding, endPadding)
-      : point;
-  const packetBox = labelAnchor
-    ? placeFlowLabel(labelAnchor, packetWidth, obstacles, viewWidth)
+  const packetBox = point
+    ? { x: point.x - packetWidth / 2, y: point.y - 14, w: packetWidth, h: 28 }
     : undefined;
   const node = (
     unit: TransferUnit,
@@ -181,7 +164,7 @@ export default function InstructionFlowDiagram({
     const stroke = active ? color : NODES[unit];
     const shape =
       unit === "alu"
-        ? scalePath("M220 570H337L360 590L383 570H500L456 680H264Z")
+        ? scalePath("M220 594H337L360 614L383 594H500L456 704H264Z")
         : undefined;
     return (
       <g
@@ -360,6 +343,9 @@ export default function InstructionFlowDiagram({
                 />
               )}
               <text
+                data-control-selection={
+                  unit === "cu" && line.startsWith("Read:") ? "true" : undefined
+                }
                 x={box.x + box.w / 2}
                 y={baseline}
                 textAnchor="middle"
@@ -531,16 +517,6 @@ export default function InstructionFlowDiagram({
             opacity=".18"
           />
         )}
-        {point && packetBox && (
-          <g className="flow-data-guide" aria-hidden="true">
-            <path
-              d={`M${point.x} ${point.y}L${Math.max(packetBox.x, Math.min(packetBox.x + packetBox.w, point.x))} ${Math.max(packetBox.y, Math.min(packetBox.y + packetBox.h, point.y))}`}
-              stroke={color}
-              strokeWidth="1.6"
-              fill="none"
-            />
-          </g>
-        )}
         {node("pc", boxes.pc, "PC", [flow.pc ?? "미제공"])}
         {node(
           "memory",
@@ -556,10 +532,14 @@ export default function InstructionFlowDiagram({
               ? String(flow.amount ?? flow.immediate ?? "미제공")
               : "명령어 해석 대기"
             : "사용 안 함",
-          "즉치값 생성",
         ])}
         {node("cu", boxes.cu, "CU", [
           `해석: ${flow.op.toUpperCase()}`,
+          ...(flow.registerInputs.length
+            ? [
+                `Read: ${flow.registerInputs.map((value) => value.name).join(", ")}`,
+              ]
+            : []),
           flow.controlSignals
             ? `기록: ${flow.controlSignals.reg_write ? "켜짐" : "꺼짐"}`
             : "신호 미제공",
@@ -584,9 +564,19 @@ export default function InstructionFlowDiagram({
             strokeWidth="1.6"
           />
           <text
-            x={sx(440)}
+            x={
+              transfer.source === "operand-mux" ||
+              transfer.target === "operand-mux"
+                ? sx(480)
+                : sx(440)
+            }
             y="523"
-            textAnchor="middle"
+            textAnchor={
+              transfer.source === "operand-mux" ||
+              transfer.target === "operand-mux"
+                ? "start"
+                : "middle"
+            }
             fontSize="17"
             fontWeight="750"
             fill="var(--ar-text-primary)"
@@ -609,7 +599,7 @@ export default function InstructionFlowDiagram({
             연산 결과·메모리 값·복귀 주소 중 명령어에 맞는 값을 선택합니다.
           </title>
           <path
-            d={scalePath("M290 860H450L422 908H318Z")}
+            d={scalePath("M290 884H450L422 932H318Z")}
             fill="var(--ar-panel-bg)"
             stroke={
               transfer.source === "mux" || transfer.target === "mux"
@@ -619,9 +609,17 @@ export default function InstructionFlowDiagram({
             strokeWidth="2"
           />
           <text
-            x={sx(370)}
-            y="879"
-            textAnchor="middle"
+            x={
+              transfer.source === "mux" || transfer.target === "mux"
+                ? sx(470)
+                : sx(370)
+            }
+            y="903"
+            textAnchor={
+              transfer.source === "mux" || transfer.target === "mux"
+                ? "start"
+                : "middle"
+            }
             fontSize="16"
             fontWeight="700"
             className="font-mono"
@@ -630,9 +628,17 @@ export default function InstructionFlowDiagram({
             기록값 MUX
           </text>
           <text
-            x={sx(370)}
-            y="900"
-            textAnchor="middle"
+            x={
+              transfer.source === "mux" || transfer.target === "mux"
+                ? sx(470)
+                : sx(370)
+            }
+            y="924"
+            textAnchor={
+              transfer.source === "mux" || transfer.target === "mux"
+                ? "start"
+                : "middle"
+            }
             fontSize="13"
             fontWeight="650"
             className="font-mono"
@@ -645,17 +651,19 @@ export default function InstructionFlowDiagram({
         </g>
         <g data-text-layer="true">
           <g data-instruction-address-label="true">
-            <title>PC가 명령어 메모리에 전달하는, 읽을 명령어의 주소입니다.</title>
+            <title>
+              PC가 명령어 메모리에 전달하는, 읽을 명령어의 주소입니다.
+            </title>
             <rect
-              x={sx(388)}
+              x={sx(360) + 96}
               y="208"
-              width={sx(150)}
+              width={160}
               height="28"
               rx="5"
               fill="var(--ar-panel-bg)"
             />
             <text
-              x={sx(400)}
+              x={sx(360) + 108}
               y="227"
               fontSize="16"
               fontWeight="650"
@@ -668,68 +676,14 @@ export default function InstructionFlowDiagram({
             명령어
           </text>
           {(flow.load || flow.store) && (
-            <text x={sx(460)} y="707" fontSize="14" fill={COLORS.address}>
+            <text x={sx(460)} y="731" fontSize="14" fill={COLORS.address}>
               데이터 주소
             </text>
           )}
-          <g aria-label="메모리 연결: 시스템 버스의 주소·데이터·제어 역할">
-            {(["address", "data", "control"] as const).map((kind, i) => (
-              <g key={kind} data-system-bus-label={kind}>
-                <path
-                  d={`M${sx(55)} ${212 + i * 30}H${sx(78)}`}
-                  stroke={COLORS[kind]}
-                  strokeWidth={kind === "control" ? 2 : 5}
-                  strokeDasharray={kind === "control" ? "5 3" : undefined}
-                />
-                <text
-                  x={sx(87)}
-                  y={217 + i * 30}
-                  fontSize="14"
-                  fontWeight="600"
-                  className="font-mono"
-                  fill={COLORS[kind]}
-                >
-                  {kind === "address"
-                    ? "Address Bus"
-                    : kind === "data"
-                      ? "Data Bus"
-                      : "Control Bus"}
-                </text>
-              </g>
-            ))}
-          </g>
           <text x={sx(32)} y="963" fontSize="11" fill="var(--ar-text-muted)">
             메모리 연결의 버스 역할을 설명한 개념도입니다.
           </text>
         </g>
-        {flow.registerInputs.length > 0 && (
-          <g
-            data-control-selection="true"
-            opacity={transfer.id === "read-control" ? 1 : 0.65}
-            aria-label="Read select"
-          >
-            <rect
-              x={sx(60)}
-              y="338"
-              width={sx(230)}
-              height="30"
-              rx="6"
-              fill="var(--ar-panel-bg)"
-              stroke={COLORS.control}
-              strokeWidth="1.5"
-            />
-            <text
-              x={sx(72)}
-              y="358"
-              fontSize="18"
-              fontWeight="750"
-              fill={COLORS.control}
-            >
-              Read select:{" "}
-              {flow.registerInputs.map((value) => value.name).join(", ")}
-            </text>
-          </g>
-        )}
         <g aria-label="현재 이동 데이터" data-transfer={transfer.id}>
           <rect
             x={sx(16)}
@@ -759,15 +713,35 @@ export default function InstructionFlowDiagram({
             {transfer.detail}
           </text>
         </g>
+        <g aria-label="메모리 연결: 시스템 버스의 주소·데이터·제어 역할">
+          {(["address", "data", "control"] as const).map((kind, i) => (
+            <g key={kind} data-system-bus-label={kind}>
+              <path
+                d={`M${viewWidth - 154} ${28 + i * 24}H${viewWidth - 132}`}
+                stroke={COLORS[kind]}
+                strokeWidth={kind === "control" ? 2 : 5}
+                strokeDasharray={kind === "control" ? "5 3" : undefined}
+              />
+              <text
+                x={viewWidth - 122}
+                y={33 + i * 24}
+                fontSize="14"
+                fontWeight="600"
+                className="font-mono"
+                fill={COLORS[kind]}
+              >
+                {kind === "address"
+                  ? "Address Bus"
+                  : kind === "data"
+                    ? "Data Bus"
+                    : "Control Bus"}
+              </text>
+            </g>
+          ))}
+        </g>
+
         {point && packetBox && (
           <g className="flow-token">
-            <circle
-              data-flow-marker="true"
-              cx={point.x}
-              cy={point.y}
-              r="4"
-              fill={color}
-            />
             <g
               className={
                 transfer.kind === "control"
@@ -781,6 +755,7 @@ export default function InstructionFlowDiagram({
               aria-label={`${transfer.kind === "control" ? "제어 신호" : "이동 중인 값"} ${packetValue}`}
             >
               <rect
+                data-flow-marker="true"
                 x={packetBox.x}
                 y={packetBox.y}
                 width={packetBox.w}
@@ -800,9 +775,9 @@ export default function InstructionFlowDiagram({
               />
               <text
                 x={packetBox.x + packetBox.w / 2}
-                y={packetBox.y + 23}
+                y={packetBox.y + 21}
                 textAnchor="middle"
-                fontSize="19"
+                fontSize="18"
                 fontWeight="750"
                 className="font-mono"
                 fill={transfer.kind === "control" ? color : "#fff"}

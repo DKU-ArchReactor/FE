@@ -126,19 +126,19 @@ export function transferPoint(path:string, progress:number, startPadding=0, endP
 }
 export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1):Record<string,string> {
   const paths:Record<string,string>={
-    'fetch-address':'M360 202V245',
+    'fetch-address':'M360 192V245',
     'fetch-instruction':'M515 273H670V365',
-    'decode-immediate':'M515 290H550V335H440V380',
-    'read-control':'M580 420H550V345H225V380',
-    'input-a':flow.pcRelative?'M260 167H38V550H290V570':'M145 490V540H290V570',
-    'input-b':flow.usesImmediate?'M440 470V502':'M240 490V500H440V502',
-    'mux-to-alu':'M440 534V570',
-    'memory-address':'M360 680V730',
-    'memory-control':'M760 420H770V775H500',
-    'store-data':'M140 490V775H220',
-    'load-data':'M360 820V838H370V860',
-    'result-to-mux':flow.jump?'M460 167H748V838H420V860':'M300 680V700H190V838H330V860',
-    writeback:'M370 908H24V435H55',
+    'decode-immediate':'M515 290H610V340H480V380',
+    'read-control':'M670 365V350H280V380',
+    'input-a':flow.pcRelative?'M260 167H90V550H290V594':'M230 490V550H290V594',
+    'input-b':flow.usesImmediate?'M440 450V518':'M330 490V518H440',
+    'mux-to-alu':'M440 518V594',
+    'memory-address':'M360 704V754',
+    'memory-control':'M670 473V740H660V799H500',
+    'store-data':'M225 490V550H130V799H220',
+    'load-data':'M360 844V862H370V908',
+    'result-to-mux':flow.jump?'M260 167H90V724H130V862H370V908':'M300 704V724H130V862H370V908',
+    writeback:'M370 908V932H90V435H180',
     'next-pc':'M700 365V167H460',
   };
   return Object.fromEntries(Object.entries(paths).map(([key,path])=>[key,path.replace(/([MHV])([^MHV]+)/g,(_,command:string,coordinates:string)=>{
@@ -150,9 +150,12 @@ export function transferMotion(transfer:InstructionTransfer,path?:string) {
   const value=transfer.kind==='control'?(transfer.id==='read-control'?`Read ${[...(transfer.value??'').matchAll(/\bx\d+\b/g)].map(match=>match[0]).join(', ')||transfer.value||'\uC81C\uC5B4'}`:transfer.value??'\uC81C\uC5B4 \uC2E0\uD638'):transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
   const width=Math.max(56,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?18:11),28));
   const route=path?compileTransferRoute(path):undefined;
-  // The value label can sit off the wire, so short MUX links need only a small port inset.
-  const startPadding=route?Math.min(6,route.total*.1):0;
-  const endPadding=startPadding;
+  // The packet stays centered on the actual wire. Reserve its footprint at ports,
+  // but join consecutive MUX transfers at the device center without a position jump.
+  const commands=path?.match(/[MHV]/g)??[];
+  const portPadding=(horizontal:boolean)=>horizontal?width/2+6:18;
+  const startPadding=route?(transfer.source==='mux'||transfer.source==='operand-mux'?0:portPadding(commands[1]==='H')):0;
+  const endPadding=route?(transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
   return {value,width,route,startPadding,endPadding,distance};
 }
@@ -171,18 +174,6 @@ export function transferTimeline(transfers:InstructionTransfer[],paths:Record<st
     start+=duration;
     return entry;
   });
-}
-export type FlowLabelBox={x:number;y:number;w:number;h:number};
-export function placeFlowLabel(point:{x:number;y:number},width:number,obstacles:FlowLabelBox[],viewWidth:number):FlowLabelBox {
-  const offsets=[[0,0],[0,-42],[0,42],[-width/2-22,0],[width/2+22,0],[0,-76],[0,76],[-width/2-22,-42],[width/2+22,-42],[-width/2-22,42],[width/2+22,42],[0,-112],[0,112]];
-  for(const obstacle of obstacles) {
-    for(const dy of [-12,12]) offsets.push([obstacle.x-width/2-point.x-10,dy],[obstacle.x+obstacle.w+width/2-point.x+10,dy]);
-    offsets.push([obstacle.x-width/2-point.x-10,0],[obstacle.x+obstacle.w+width/2-point.x+10,0],[0,obstacle.y-point.y-26],[0,obstacle.y+obstacle.h-point.y+26]);
-  }
-  const boxes=offsets.map(([dx,dy])=>({x:Math.max(8,Math.min(viewWidth-width-8,point.x-width/2+dx)),y:Math.max(122,Math.min(910,point.y-16+dy)),w:width,h:32}));
-  boxes.sort((a,b)=>(a.x+a.w/2-point.x)**2+(a.y+a.h/2-point.y)**2-((b.x+b.w/2-point.x)**2+(b.y+b.h/2-point.y)**2));
-  const overlaps=(a:FlowLabelBox,b:FlowLabelBox)=>a.x<b.x+b.w+5&&a.x+a.w>b.x-5&&a.y<b.y+b.h+5&&a.y+a.h>b.y-5;
-  return boxes.find(box=>obstacles.every(obstacle=>!overlaps(box,obstacle)))??boxes[0];
 }
 export function instructionFlowDuration(flow:ReturnType<typeof buildInstructionFlow>,pace:number) {
   return transferTimeline(instructionTransfers(flow),instructionPaths(flow),pace).reduce((sum,entry)=>sum+entry.duration,0);
