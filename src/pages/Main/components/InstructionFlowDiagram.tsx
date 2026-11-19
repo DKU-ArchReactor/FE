@@ -7,6 +7,7 @@ import {
   instructionPaths,
   pointOnTransfer,
   transferMotion,
+  instructionTransfers,
   type TransferUnit,
   type InstructionTransfer,
   type buildInstructionFlow,
@@ -16,17 +17,17 @@ type Flow = ReturnType<typeof buildInstructionFlow>;
 type Box = { x: number; y: number; w: number; h: number };
 const COLORS = { address: "#bc700a", data: "#087fce", control: "#8951ce" };
 const BOXES: Record<TransferUnit, Box> = {
-  pc: { x: 55, y: 165, w: 160, h: 80 },
-  decoder: { x: 300, y: 165, w: 450, h: 130 },
-  cu: { x: 580, y: 340, w: 245, h: 135 },
-  registers: { x: 55, y: 340, w: 260, h: 155 },
-  immediate: { x: 360, y: 340, w: 180, h: 100 },
-  "operand-mux": { x: 350, y: 515, w: 180, h: 80 },
-  alu: { x: 585, y: 520, w: 240, h: 140 },
-  mux: { x: 350, y: 660, w: 180, h: 85 },
-  "pc-select": { x: 55, y: 640, w: 205, h: 135 },
-  "instruction-memory": { x: 1050, y: 165, w: 300, h: 145 },
-  memory: { x: 1050, y: 510, w: 300, h: 200 },
+  pc: { x: 55, y: 175, w: 190, h: 105 },
+  decoder: { x: 335, y: 175, w: 490, h: 145 },
+  registers: { x: 55, y: 390, w: 280, h: 190 },
+  immediate: { x: 415, y: 390, w: 190, h: 115 },
+  cu: { x: 690, y: 390, w: 270, h: 160 },
+  "operand-mux": { x: 420, y: 625, w: 210, h: 100 },
+  alu: { x: 710, y: 625, w: 250, h: 175 },
+  mux: { x: 420, y: 865, w: 210, h: 100 },
+  "pc-select": { x: 55, y: 865, w: 240, h: 160 },
+  "instruction-memory": { x: 1200, y: 230, w: 320, h: 210 },
+  memory: { x: 1200, y: 705, w: 320, h: 210 },
 };
 const TITLES: Record<TransferUnit, string> = {
   pc: "PC",
@@ -55,6 +56,15 @@ const ROLES: Record<TransferUnit, string> = {
   memory: "주소를 받아 데이터를 읽거나 저장",
 };
 const short = (value?: string | null) => displayValue(value).split(" · ")[0];
+const AUXILIARY_CONNECTIONS = new Set([
+  "pc-input",
+  "pc-control",
+  "next-pc",
+  "result-link",
+  "pc-immediate",
+  "pc-alu",
+  "branch-decision",
+]);
 // Fixed physical-model connections: instructions select paths, never change the topology.
 const WIRES: { key: string; kind: keyof typeof COLORS; system?: boolean }[] = [
   { key: "fetch-address", kind: "address", system: true },
@@ -105,12 +115,58 @@ export default function InstructionFlowDiagram({
 }) {
   const id = useId().replace(/:/g, "");
   const area = useRef<HTMLDivElement>(null);
-  const [compact, setCompact] = useState(false);
+  const [{ compact, verticalScale }, setCanvas] = useState({
+    compact: false,
+    verticalScale: 1,
+  });
+  const sy = (value: number) => value * verticalScale;
+  const [allConnections, setAllConnections] = useState(
+    () => sessionStorage.getItem("single-all-connections") === "true",
+  );
+  const usedPaths = useMemo(
+    () =>
+      new Set(
+        instructionTransfers(flow).map((t) => {
+          if (t.id === "input-a")
+            return flow.pcRelative ? "input-a-pc" : "input-a-register";
+          if (t.id === "input-b")
+            return flow.usesImmediate
+              ? "input-b-immediate"
+              : "input-b-register";
+          if (t.id === "result-to-mux")
+            return flow.jump ? "result-link" : "result-alu";
+          return t.id;
+        }),
+      ),
+    [flow],
+  );
+  const toggleConnections = () =>
+    setAllConnections((previous) => {
+      sessionStorage.setItem("single-all-connections", String(!previous));
+      return !previous;
+    });
+  const showWire = (key: string) =>
+    allConnections || (usedPaths.has(key) && !AUXILIARY_CONNECTIONS.has(key));
   useLayoutEffect(() => {
     const element = area.current;
     if (!element) return;
     const measure = (width: number, height: number) => {
-      if (width && height) setCompact(width / height < 1.25);
+      if (!width || !height) return;
+      const compact = width / height < 1.25;
+      const verticalScale = Math.min(
+        1.35,
+        Math.max(
+          1,
+          (height * (compact ? 1380 : 1740)) /
+            (width * (compact ? 1460 : 1120)),
+        ),
+      );
+      setCanvas((previous) =>
+        previous.compact === compact &&
+        Math.abs(previous.verticalScale - verticalScale) < 0.001
+          ? previous
+          : { compact, verticalScale },
+      );
     };
     const bounds = element.getBoundingClientRect();
     measure(bounds.width, bounds.height);
@@ -120,16 +176,27 @@ export default function InstructionFlowDiagram({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const boxes = compact
+  const baseBoxes = compact
     ? {
         ...BOXES,
-        "instruction-memory": { ...BOXES["instruction-memory"], x: 55, y: 930 },
-        memory: { ...BOXES.memory, x: 550, y: 930 },
+        "instruction-memory": {
+          ...BOXES["instruction-memory"],
+          x: 55,
+          y: 1165,
+          w: 330,
+        },
+        memory: { ...BOXES.memory, x: 675, y: 1165, w: 330 },
       }
     : BOXES;
+  const boxes = Object.fromEntries(
+    Object.entries(baseBoxes).map(([key, box]) => [
+      key,
+      { ...box, y: sy(box.y), h: sy(box.h) },
+    ]),
+  ) as Record<TransferUnit, Box>;
   const paths = useMemo(
-    () => instructionPaths(flow, 1, compact),
-    [flow, compact],
+    () => instructionPaths(flow, 1, compact, verticalScale),
+    [flow, compact, verticalScale],
   );
   const path = paths[transfer.id];
   const motion = useMemo(
@@ -238,8 +305,9 @@ export default function InstructionFlowDiagram({
     ],
     "instruction-memory": [
       `주소 ${flow.pc ?? "미제공"}`,
-      `명령 ${flow.op.toUpperCase()}`,
+      `${flow.op.toUpperCase()} · 32비트 명령어`,
       flow.raw ?? "기계어 미제공",
+      "해독 회로에 명령어 전달",
     ],
     memory:
       flow.load || flow.store
@@ -255,7 +323,12 @@ export default function InstructionFlowDiagram({
                   : "0 확장 후 32비트 기록"
                 : "32비트 데이터 경로",
           ]
-        : ["이번 명령어는 접근 안 함", "계산 명령은 레지스터 사용"],
+        : [
+            "이번 명령어는 접근 안 함",
+            "메모리 읽기·쓰기 없음",
+            "계산 명령은 레지스터 사용",
+            "Load / Store에서 사용",
+          ],
   };
   const node = (unit: TransferUnit) => {
     const b = boxes[unit],
@@ -279,7 +352,7 @@ export default function InstructionFlowDiagram({
     const shape = mux
       ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
       : unit === "alu"
-        ? `M${b.x} ${b.y}H${b.x + 95}L${b.x + 120} ${b.y + 15}L${b.x + 145} ${b.y}H${b.x + b.w}L${b.x + b.w - 24} ${b.y + b.h}H${b.x + 24}Z`
+        ? `M${b.x} ${b.y}H${b.x + 95}L${b.x + 120} ${b.y + sy(15)}L${b.x + 145} ${b.y}H${b.x + b.w}L${b.x + b.w - 24} ${b.y + b.h}H${b.x + 24}Z`
         : undefined;
     const fill = active
       ? `color-mix(in srgb, ${color} 8%, var(--ar-panel-bg))`
@@ -320,7 +393,7 @@ export default function InstructionFlowDiagram({
         {unit === "registers" && (
           <rect
             x={b.x + 5}
-            y={b.y - 5}
+            y={b.y - sy(5)}
             width={b.w}
             height={b.h}
             rx="8"
@@ -349,9 +422,9 @@ export default function InstructionFlowDiagram({
         )}
         <text
           x={b.x + b.w / 2}
-          y={b.y + (mux ? 21 : 27)}
+          y={b.y + sy(unit === "alu" ? 47 : mux ? 27 : 32)}
           textAnchor="middle"
-          fontSize={mux ? 18 : 22}
+          fontSize={mux ? 22 : 25}
           fontWeight="800"
           fill="var(--ar-text-primary)"
         >
@@ -361,15 +434,15 @@ export default function InstructionFlowDiagram({
           <g data-device-status={status}>
             <rect
               x={b.x + b.w - 58}
-              y={b.y - 19}
+              y={b.y - sy(19)}
               width="58"
-              height="23"
+              height={sy(23)}
               rx="5"
               fill={color}
             />
             <text
               x={b.x + b.w - 29}
-              y={b.y - 3}
+              y={b.y - sy(3)}
               textAnchor="middle"
               fontSize="14"
               fontWeight="750"
@@ -382,9 +455,9 @@ export default function InstructionFlowDiagram({
         {!mux && (
           <text
             x={b.x + b.w / 2}
-            y={b.y + 48}
+            y={b.y + sy(unit === "alu" ? 73 : 60)}
             textAnchor="middle"
-            fontSize={unit === "immediate" ? 13 : 15}
+            fontSize={unit === "immediate" ? 15 : 17}
             fill="var(--ar-text-muted)"
           >
             {ROLES[unit]}
@@ -393,7 +466,7 @@ export default function InstructionFlowDiagram({
         {unit === "registers" && (
           <text
             x={b.x + 14}
-            y={b.y + 72}
+            y={b.y + sy(86)}
             fontSize="13"
             fontWeight="700"
             fill={stroke}
@@ -404,8 +477,16 @@ export default function InstructionFlowDiagram({
         {lines[unit].map((line, i) => {
           const baseline =
             b.y +
-            (unit === "registers" ? 95 : mux ? 43 : unit === "pc" ? 69 : 75) +
-            i * (mux ? 21 : 23);
+            sy(
+              (unit === "registers"
+                ? 114
+                : unit === "alu"
+                  ? 104
+                  : mux
+                    ? 56
+                    : 90) +
+                i * 26,
+            );
           const overlap =
             packet &&
             packet.x < b.x + b.w &&
@@ -419,7 +500,7 @@ export default function InstructionFlowDiagram({
               y={baseline}
               textAnchor="middle"
               fontSize={
-                unit === "cu" || unit === "pc-select" ? 16 : mux ? 15 : 18
+                unit === "cu" || unit === "pc-select" ? 20 : mux ? 18 : 23
               }
               fontWeight="650"
               opacity={overlap ? 0 : 1}
@@ -434,7 +515,7 @@ export default function InstructionFlowDiagram({
           <g data-instruction-fields="true">
             <text
               x={b.x + b.w / 2}
-              y={b.y + 99}
+              y={b.y + sy(112)}
               textAnchor="middle"
               fontSize="15"
               fontWeight="700"
@@ -446,7 +527,7 @@ export default function InstructionFlowDiagram({
             </text>
             <text
               x={b.x + b.w / 2}
-              y={b.y + 121}
+              y={b.y + sy(137)}
               textAnchor="middle"
               fontSize="17"
               fontWeight="700"
@@ -475,7 +556,9 @@ export default function InstructionFlowDiagram({
   return (
     <div ref={area} className="h-full min-h-0 w-full min-w-0 overflow-hidden">
       <svg
-        viewBox={compact ? "-120 0 1120 1220" : "-80 0 1480 880"}
+        viewBox={
+          compact ? `-160 0 1380 ${sy(1460)}` : `-160 0 1740 ${sy(1120)}`
+        }
         preserveAspectRatio="xMidYMin meet"
         className="ar-single-flow-diagram block h-full w-full font-sans"
         role="group"
@@ -501,10 +584,10 @@ export default function InstructionFlowDiagram({
           ))}
         </defs>
         <rect
-          x="16"
-          y="120"
-          width="850"
-          height="698"
+          x="-110"
+          y={sy(130)}
+          width="1176"
+          height={sy(920)}
           rx="16"
           fill="var(--ar-header-bg)"
           stroke="var(--ar-border)"
@@ -512,8 +595,8 @@ export default function InstructionFlowDiagram({
           data-hardware-region="cpu"
         />
         <text
-          x="35"
-          y="147"
+          x="-90"
+          y={sy(157)}
           fontSize="20"
           fontWeight="800"
           fill="var(--ar-text-primary)"
@@ -521,10 +604,10 @@ export default function InstructionFlowDiagram({
           CPU · 칩 내부 장치
         </text>
         <rect
-          x={compact ? 16 : 1030}
-          y={compact ? 890 : 120}
-          width={compact ? 850 : 345}
-          height={compact ? 285 : 698}
+          x={compact ? 16 : 1180}
+          y={sy(compact ? 1120 : 130)}
+          width={compact ? 1050 : 365}
+          height={sy(compact ? 285 : 920)}
           rx="16"
           fill="var(--ar-header-bg)"
           stroke="var(--ar-border)"
@@ -532,25 +615,28 @@ export default function InstructionFlowDiagram({
           data-hardware-region="memory"
         />
         <text
-          x={compact ? 35 : 1050}
-          y={compact ? 917 : 147}
+          x={compact ? 35 : 1200}
+          y={sy(compact ? 1147 : 157)}
           fontSize="20"
           fontWeight="800"
           fill="var(--ar-text-primary)"
         >
-          메모리 · CPU 밖의 논리 영역
+          메모리 · CPU 외부
         </text>
         {WIRES.map((wire) => (
           <g
             key={wire.key}
             data-circuit-wire={wire.key}
             data-memory-connection={wire.system || undefined}
+            data-wire-visible={showWire(wire.key)}
+            opacity={showWire(wire.key) ? 1 : 0}
+            aria-hidden="true"
           >
             <path
               d={paths[wire.key]}
               fill="none"
               stroke={COLORS[wire.kind]}
-              strokeOpacity=".25"
+              strokeOpacity={allConnections ? 0.32 : 0.19}
               strokeWidth={wire.system ? 5 : 2.5}
               strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
               strokeLinejoin="round"
@@ -583,8 +669,8 @@ export default function InstructionFlowDiagram({
           aria-label="CPU와 메모리를 연결하는 주소·데이터·제어 경로"
         >
           <text
-            x={compact ? 35 : 1050}
-            y={compact ? 845 : 365}
+            x={compact ? 35 : 1200}
+            y={sy(compact ? 1080 : 515)}
             fontSize="19"
             fontWeight="800"
             fill="var(--ar-text-primary)"
@@ -596,16 +682,16 @@ export default function InstructionFlowDiagram({
               <path
                 d={
                   compact
-                    ? `M${35 + i * 280} 866h28`
-                    : `M1055 ${393 + i * 34}H1090`
+                    ? `M${35 + i * 340} ${sy(1100)}h28`
+                    : `M1205 ${sy(550 + i * 36)}H1240`
                 }
                 stroke={COLORS[kind]}
                 strokeWidth={kind === "control" ? 2.5 : 5}
                 strokeDasharray={kind === "control" ? "5 4" : undefined}
               />
               <text
-                x={compact ? 75 + i * 280 : 1105}
-                y={compact ? 871 : 399 + i * 34}
+                x={compact ? 75 + i * 340 : 1255}
+                y={sy(compact ? 1106 : 556 + i * 36)}
                 fontSize={compact ? 15 : 17}
                 fontWeight="700"
                 fill={COLORS[kind]}
@@ -622,20 +708,20 @@ export default function InstructionFlowDiagram({
         <g aria-label="현재 장치 동작" data-transfer={transfer.id}>
           <rect
             x="16"
-            y="10"
-            width={compact ? 930 : 1359}
-            height="94"
+            y={sy(10)}
+            width={compact ? 1140 : 1528}
+            height={sy(94)}
             rx="12"
             fill="var(--ar-header-bg)"
             stroke={color}
             strokeWidth="1.5"
           />
-          <text x="36" y="36" fontSize="19" fontWeight="800" fill={color}>
+          <text x="36" y={sy(36)} fontSize="19" fontWeight="800" fill={color}>
             {index + 1} / {count} · {transfer.title}
           </text>
           <text
             x="36"
-            y="67"
+            y={sy(67)}
             fontSize="23"
             fontWeight="750"
             fill="var(--ar-text-primary)"
@@ -649,33 +735,59 @@ export default function InstructionFlowDiagram({
                 ? transfer.value
                 : displayValue(transfer.value)}
           </text>
-          <text x="36" y="91" fontSize="16" fill="var(--ar-text-muted)">
+          <text x="36" y={sy(91)} fontSize="16" fill="var(--ar-text-muted)">
             {transfer.detail}
           </text>
-          <text
-            x={compact ? 924 : 1352}
-            y="35"
-            textAnchor="end"
-            fontSize="16"
-            fontWeight="700"
-            fill={color}
-            visibility={compact ? "hidden" : "visible"}
+          <g
+            role="button"
+            tabIndex={0}
+            aria-label="전체 연결 표시 전환"
+            aria-pressed={allConnections}
+            data-connection-toggle="true"
+            onClick={toggleConnections}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleConnections();
+              }
+            }}
+            className="cursor-pointer outline-none focus-visible:drop-shadow-md"
           >
-            {TITLES[transfer.target]}
-          </text>
+            <rect
+              x={compact ? 905 : 1300}
+              y={sy(47)}
+              width="220"
+              height={sy(34)}
+              rx="7"
+              fill="var(--ar-panel-bg)"
+              stroke="var(--ar-border)"
+            />
+            <text
+              x={compact ? 1015 : 1410}
+              y={sy(70)}
+              textAnchor="middle"
+              fontSize="18"
+              fontWeight="700"
+              fill="var(--ar-text-primary)"
+            >
+              {allConnections
+                ? "\uC8FC\uC694 \uC5F0\uACB0\uB9CC \uBCF4\uAE30"
+                : "\uC804\uCCB4 \uC5F0\uACB0 \uBCF4\uAE30"}
+            </text>
+          </g>
         </g>
         <text
           x="28"
-          y={compact ? 1195 : 844}
+          y={sy(compact ? 1430 : 1085)}
           fontSize="15"
           fill="var(--ar-text-muted)"
         >
-          하버드형 교육 모델 · 명령어/데이터 경로 분리 · 해독·주소 계산 회로는
-          기능별로 묶어 표시
+          하버드형 교육 모델 · 주요 연결 표시 · 전체 연결 보기로 보조 배선 확인
         </text>
         <text
           x="28"
-          y={compact ? 1218 : 868}
+          y={sy(compact ? 1455 : 1110)}
+          data-diagram-bottom="true"
           fontSize="15"
           fill="var(--ar-text-muted)"
         >

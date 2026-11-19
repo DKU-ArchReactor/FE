@@ -45,6 +45,24 @@ test('all device boxes and all available wires stay identical across instruction
   }
 });
 
+test('memory panels match, available height is used, and extra wiring stays optional and persistent',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
+  for(const size of [{width:1400,height:900},{width:760,height:1000}]) {
+    await page.setViewportSize(size);await page.clock.runFor(32);
+    const geometry=await page.locator('svg[data-layout]').evaluate(svg=>{
+      const first=svg.querySelector<SVGGElement>('[data-flow-node="instruction-memory"]')!,second=svg.querySelector<SVGGElement>('[data-flow-node="memory"]')!;
+      return {equalSize:first.dataset.width===second.dataset.width&&first.dataset.height===second.dataset.height,
+        bottomGap:svg.getBoundingClientRect().bottom-svg.querySelector('[data-diagram-bottom]')!.getBoundingClientRect().bottom};
+    });expect(geometry.equalSize).toBe(true);expect(geometry.bottomGap).toBeLessThan(24);
+  }
+  const all=page.locator('[data-circuit-wire]'),visible=page.locator('[data-wire-visible="true"]');
+  expect(await visible.count()).toBeLessThan(await all.count());
+  const toggle=page.locator('[data-connection-toggle]');await toggle.focus();await toggle.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-pressed','true');expect(await visible.count()).toBe(await all.count());
+  await page.getByRole('button',{name:'next clock',exact:true}).click();await expect(page.locator('[data-connection-toggle]')).toHaveAttribute('aria-pressed','true');
+  await page.locator('[data-connection-toggle]').click();expect(await visible.count()).toBeLessThan(await all.count());
+});
+
 test('a load decodes its actual encoded fields, selects registers by fields and sends opcode to CU',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
   const fields=page.locator('[data-instruction-fields]');await expect(fields).toContainText('I형');await expect(fields).toContainText('opcode 0000011');
@@ -60,8 +78,8 @@ test('actual operands and results remain visible as device inputs and outputs',a
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
   await seek(page,'input-a');await expect(page.locator('[data-transfer-value]')).toHaveText('11 · 0x0000000B');
   await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(300);
-  const word=page.locator('[data-moving-value="11"]');await expect(word).toBeVisible();const before=await word.getAttribute('data-packet-x');
-  await page.clock.runFor(150);expect(await word.getAttribute('data-packet-x')).not.toBe(before);await pause(page);
+  const word=page.locator('[data-moving-value="11"]');await expect(word).toBeVisible();const before=await word.evaluate(p=>[p.getAttribute('data-packet-x'),p.getAttribute('data-packet-y')]);
+  await page.clock.runFor(150);expect(await word.evaluate(p=>[p.getAttribute('data-packet-x'),p.getAttribute('data-packet-y')])).not.toEqual(before);await pause(page);
   await seek(page,'input-b');await expect(page.locator('[data-transfer-value]')).toHaveText('7 · 0x00000007');
   await seek(page,'calculate');await expect(page.locator('[data-transfer-value]')).toHaveText('18 · 0x00000012');
   await expect(page.locator('[data-flow-node="alu"]')).toContainText('조건 비교');

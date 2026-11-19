@@ -148,50 +148,50 @@ export function pointOnTransfer(route:TransferRoute, progress:number, startPaddi
 export function transferPoint(path:string, progress:number, startPadding=0, endPadding=0) {
   return pointOnTransfer(compileTransferRoute(path),progress,startPadding,endPadding);
 }
-export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1,compact=false):Record<string,string> {
+export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1,compact=false,verticalScale=1):Record<string,string> {
   const paths:Record<string,string>={
-    'fetch-address':'M215 205H255V156H1010V185H1050',
-    'fetch-instruction':'M1050 235H750V230',
-    'decode-control':'M705 295V340',
-    'decode-immediate':'M450 295V340',
-    'read-control':'M320 295V318H180V340',
-    'input-a-register':'M315 435H335V480H650V520',
-    'input-a-pc':'M135 245V305H850V500H650V520',
-    'input-b-register':'M315 465H335V555H440',
-    'input-b-immediate':'M450 440V490H440V555',
-    'mux-to-alu':'M440 555H560V610H585',
-    'memory-address':'M825 575H940V540H1050',
-    'memory-control':'M825 395H980V605H1050',
-    'store-data':'M180 495V615H285V790H1010V665H1050',
-    'load-data':'M1050 690H960V775H550V710H440',
-    'result-alu':'M705 660V760H550V710H440',
-    'result-link':'M260 690H290V805H550V710H440',
-    'writeback':'M440 710H325V485H315',
-    'pc-input':'M135 245V280H30V695H55',
-    'pc-immediate':'M360 405H340V600H275V675H260',
-    'pc-alu':'M705 660V755H275V695H260',
-    'pc-control':'M580 410H560V630H150V640',
-    'branch-decision':'M705 520V485H800V460',
-    'alu-select-control':'M705 460V520',
-    'operand-select-control':'M580 430H550V505H505V515',
-    'register-write-control':'M580 385H550V315H280V340',
-    'write-select-control':'M825 430H845V735H530',
-    'next-pc':'M55 715H20V205H55',
+    'fetch-address':'M245 220H285V150H1150V250H1200',
+    'fetch-instruction':'M1200 330H860V265H825',
+    'decode-control':'M780 320V355H825V390',
+    'decode-immediate':'M540 320V365H510V390',
+    'read-control':'M380 320V350H195V390',
+    'input-a-register':'M335 480H375V590H770V625',
+    'input-a-pc':'M150 265V340H1030V585H770V625',
+    'input-b-register':'M335 520H390V700H525',
+    'input-b-immediate':'M510 505V575H525V700',
+    'mux-to-alu':'M525 700H650V735H710',
+    'memory-address':'M960 680H1135V745H1200',
+    'memory-control':'M960 450H1165V805H1200',
+    'store-data':'M195 560V800H335V1030H1100V865H1200',
+    'load-data':'M1200 885H1135V1015H675V940H525',
+    'result-alu':'M835 790V990H675V940H525',
+    'result-link':'M295 925H345V1040H675V940H525',
+    'writeback':'M525 940H355V540H335',
+    'pc-input':'M150 265V340H-40V925H55',
+    'pc-immediate':'M415 445H365V815H320V895H295',
+    'pc-alu':'M835 790V1000H320V925H295',
+    'pc-control':'M690 480H655V815H175V865',
+    'branch-decision':'M835 625V575H900V540',
+    'alu-select-control':'M825 540V590H835V625',
+    'operand-select-control':'M690 505H650V605H595V625',
+    'register-write-control':'M690 420H645V335H300V390',
+    'write-select-control':'M960 505H1040V950H630',
+    'next-pc':'M55 950H-75V220H55',
   };
   paths['input-a']=paths[flow.pcRelative?'input-a-pc':'input-a-register'];
   paths['input-b']=paths[flow.usesImmediate?'input-b-immediate':'input-b-register'];
   paths['result-to-mux']=paths[flow.jump?'result-link':'result-alu'];
   if(compact) Object.assign(paths, {
-    'fetch-address':'M55 205H-20V975H55',
-    'fetch-instruction':'M55 1030H-45V310H770V230H750',
-    'memory-address':'M825 575H890V975H850',
-    'memory-control':'M825 395H920V1025H850',
-    'store-data':'M180 495V615H285V805H950V1090H850',
-    'load-data':'M550 1070H455V828H550V710H440',
+    'fetch-address':'M55 220H-40V1210H55',
+    'fetch-instruction':'M55 1295H-75V370H860V265H825',
+    'memory-address':'M960 680H1090V1210H1005',
+    'memory-control':'M960 450H1100V1270H1005',
+    'store-data':'M195 560V800H335V1040H1130V1330H1005',
+    'load-data':'M1005 1350H1055V1015H675V940H525',
   });
   return Object.fromEntries(Object.entries(paths).map(([key,path])=>[key,path.replace(/([MHV])([^MHV]+)/g,(_,command:string,coordinates:string)=>{
     const values=coordinates.trim().split(/[ ,]+/).map(Number);
-    return command+(command==='V'?values[0]:command==='H'?values[0]*scale:`${values[0]*scale} ${values[1]}`);
+    return command+(command==='V'?values[0]*verticalScale:command==='H'?values[0]*scale:`${values[0]*scale} ${values[1]*verticalScale}`);
   })]));
 }
 export function transferMotion(transfer:InstructionTransfer,path?:string) {
