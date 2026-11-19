@@ -220,6 +220,7 @@ const MainPage: React.FC = () => {
       prevData={playback.prevData}
       currentCycle={playback.currentCycle}
       playSpeed={playback.playSpeed}
+      onPausePlayback={() => playback.setIsPlaying(false)}
       loadingMessage={simSession.loadingMessage}
       simulationMode={simSession.simulationEngineMode}
       isSingleEngine={simSession.isSingleEngine}

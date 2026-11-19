@@ -27,6 +27,7 @@ interface PanelRendererProps {
   prevData: CycleHistoryItem | null;
   currentCycle: number;
   playSpeed: number;
+  onPausePlayback?: () => void;
   loadingMessage: string | null;
   simulationMode: "single" | "pipeline";
   isSingleEngine: boolean;
@@ -76,6 +77,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   prevData,
   currentCycle,
   playSpeed,
+  onPausePlayback,
   loadingMessage,
   simulationMode,
   isSingleEngine,
@@ -177,12 +179,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       return (
         <TutorArea
           onSelectAsm={(line, index) => onSelectTranslationLine(line, index, false)}
-          onJumpToCycle={cycle => {
-            onJumpToCycle(cycle);
-            if (translationSelectedAsmIndex != null) {
-              onSelectTranslationLine(translationSelectedLine, translationSelectedAsmIndex, Boolean(onCloseTutor));
-            }
-          }}
           simulationData={simulationData}
           currentCycleData={currentData}
           loadingMessage={loadingMessage}
@@ -207,7 +203,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "pipeline":
       return (
         <PipelineVisualizer
-          lessonContext={{source: editorTarget === 'c' ? translationSource : undefined,
+          lessonContext={{flowDurationMs: playSpeed, onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
             rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
             selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
             onSelectAsm: (line, index) => onSelectTranslationLine(line, index, false), onJumpToCycle}}

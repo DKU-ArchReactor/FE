@@ -43,7 +43,7 @@ export function TutorHarness() {
   const [sourceLine, setSourceLine] = useState(1);
   const [target, setTarget] = useState<'c' | 'asm'>('c');
   const [selected, setSelected] = useState(true);
-  const [asmIndex, setAsmIndex] = useState(0);
+  const [asmIndex, setAsmIndex] = useState<number | null>(0);
   const [followStep, setFollowStep] = useState<number | null>(null);
   const [pipeline, setPipeline] = useState(false);
   const followed = followStep == null ? simulation : {...simulation, history: followHistory,
@@ -55,11 +55,12 @@ export function TutorHarness() {
     <button onClick={() => setSelected(!selected)}>toggle selection</button>
     <button onClick={() => setAsmIndex(1)}>select second ASM</button>
     <button onClick={() => setAsmIndex(2)}>select unmapped ASM</button>
-    <button onClick={() => setSourceLine(2)}>select second C line</button>
+    <button onClick={() => {setSourceLine(2); setAsmIndex(null);}}>select second C line</button>
     <button onClick={() => {setSelected(false); setFollowStep(0);}}>follow first step</button>
     <button onClick={() => {setSelected(false); setFollowStep(1);}}>follow next step</button>
     <button onClick={() => setPipeline(!pipeline)}>toggle pipeline focus</button>
     <TutorArea simulationData={data as SimulationResult} currentCycleData={displayed} translationSource={'int x = 3;\nreturn x;'}
+      onSelectAsm={(line, index) => {setSourceLine(line ?? 0); setAsmIndex(index); setSelected(true);}}
       mappedRows={mappedRows}
       isUserSelected={selected}
       selectedTranslationLine={selected ? sourceLine : null} selectedAsmIndex={selected ? asmIndex : null} activeTarget={target} />

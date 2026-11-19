@@ -81,3 +81,16 @@ test('SRAI masks the encoded input, ECALL skips ALU and JAL separates link data'
   assert.ok(jump.steps.at(-1).routes.includes('link'));
   assert.ok(!jump.steps.at(-1).routes.includes('writeback'));
 });
+
+test('branch keeps comparison inputs separate from its PC offset and has no register result', () => {
+  const current = frame('bne');
+  current.datapath.immediate = {dec: -8, value: '0xFFFFFFF8'};
+  current.cycle_events.control_hazard = {taken: true};
+  const flow = buildInstructionFlow(item('bne', ['x11', 'x12'], []), current, null, simulation(current));
+  assert.equal(flow.immediate, -8);
+  assert.equal(flow.taken, true);
+  assert.equal(flow.branch, true);
+  assert.equal(flow.usesImmediate, false); // ALU compares registers; offset is a separate PC input.
+  assert.equal(flow.writeValue, undefined);
+  assert.ok(!flow.steps.at(-1).routes.includes('writeback'));
+});

@@ -38,6 +38,7 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
   const branch = /^(beq|bne|blt|bltu|bge|bgeu)$/.test(op);
   const jump = op === 'jal' || op === 'jalr';
   const system = op === 'ecall';
+  const pcRelative = op === 'auipc' || op === 'jal';
   const usesImmediate = /^(addi|andi|ori|xori|slli|srli|srai|slti|sltiu|lb|lbu|lh|lhu|lw|sb|sh|sw|lui|auipc|jalr|jal)$/.test(op);
   const width = /^(lb|lbu|sb)$/.test(op) ? 8 : /^(lh|lhu|sh)$/.test(op) ? 16 : 32;
   const writes = item?.explanation.writes ?? [];
@@ -68,6 +69,7 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
   const amount = shift && input2 && /^0x[\da-f]+$/i.test(input2) ? Number.parseInt(input2, 16) & 31 : undefined;
   const control = actual ? frame?.cycle_events.control_hazard : undefined;
   const nextPc = dp?.next_pc ?? (actual ? frame?.global_result.current_pc : undefined);
+  const immediate = dp?.immediate?.dec ?? dp?.immediate?.decimal ?? item?.instruction_format?.immediate;
   const steps: FlowStep[] = [
     {id: 'decode', title: '명령어 해석', units: ['cu', 'memory'], routes: ['fetch'],
       description: `PC ${item?.pc ?? '미확인'}의 ${op || '선택한 명령어'}를 해석합니다. ${item?.instruction_format ? `${item.instruction_format.name}형의 필드가 입력·목적지·즉치값을 구분합니다.` : '명령어의 입력·목적지와 필요한 동작을 구분합니다.'}`},
@@ -76,7 +78,7 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
         : `${item?.explanation.reads == null ? '레지스터 입력 정보가 제공되지 않았습니다.' : reads.length ? `${reads.join(', ')}의 값을 읽습니다.` : '일반 입력 레지스터를 읽지 않습니다.'} ${item?.explanation.operands ?? ''}`},
   ];
   if (!system) steps.push({id: 'execute', title: load || store ? '접근 주소 계산' : branch ? '조건 비교' : jump ? '이동 위치 결정' : 'ALU 연산',
-    units: ['cu', 'alu', ...(reads.length ? ['registers' as const] : []), ...(jump ? ['pc' as const] : [])], routes: ['alu-control', ...(reads.length ? ['operands'] : []), ...(usesImmediate ? ['immediate'] : [])],
+    units: ['cu', 'alu', ...(reads.length ? ['registers' as const] : []), ...(jump ? ['pc' as const] : [])], routes: ['alu-control', ...(reads.length ? ['operands'] : []), ...(usesImmediate ? ['immediate'] : []), ...(pcRelative ? ['pc-input'] : [])],
     description: jump ? `${item?.explanation.operation ?? '점프 목적지와 복귀 주소를 구분합니다.'} ALU의 일반 결과와 PC + 4 링크 값을 혼동하지 않습니다.`
       : `${item?.explanation.operation ?? item?.explanation.summary ?? ''}${amount != null ? ` 실제 시프트 크기는 ${amount}비트입니다.` : ''}${actual && result != null && !jump ? ` 관찰된 결과: ${displayValue(result)}.` : ''}`});
   if (load || store) steps.push({id: 'memory', title: load ? '데이터 읽기' : '데이터 저장', units: ['cu', 'memory', 'alu', ...(store ? ['registers' as const] : [])],
@@ -87,5 +89,5 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
     description: `${writes.length > 0 ? `${writes.join(', ')}에 ${actual ? completed ? displayValue(writeValue) : '완료가 확인되지 않아 기록값을 표시하지 않습니다' : '결과를 기록합니다'}. ` : '일반 레지스터 결과 기록은 없습니다. '}${actual ? `다음 PC ${nextPc ?? '미제공'}.` : '실제 다음 PC는 실행한 클록에서 확인합니다.'}${branch && control?.taken != null ? ` 분기 ${control.taken ? '성립' : '불성립'}.` : ''}`});
   return {actual, historyIndex, completed, op, load, store, branch, jump, system, usesImmediate, width, registerInputs, writes,
     input1, input2, result, address, memoryValue, writeValue, controlSignals: dp?.control_signals,
-    nextPc, amount, error: error?.has_error ? error : undefined, steps};
+    nextPc, amount, immediate, pcRelative, pc: item?.pc, taken: control?.taken, error: error?.has_error ? error : undefined, steps};
 }

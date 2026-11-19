@@ -148,8 +148,8 @@ const TutorTeaching = memo(function TutorTeaching({teaching}: {teaching: TutorIn
   </>;
 });
 
-export function TutorInstructionEvidence({ item, bundle, historyIndex, focused = false }: {
-  item?: TutorInstruction; bundle?: TutorBundle; historyIndex?: number; focused?: boolean;
+export function TutorInstructionEvidence({ item, bundle, historyIndex, focused = false, runtimeOnly = false }: {
+  item?: TutorInstruction; bundle?: TutorBundle; historyIndex?: number; focused?: boolean; runtimeOnly?: boolean;
 }) {
   if (!item) return null;
   const observations = new Map<string, Observation>();
@@ -192,7 +192,7 @@ export function TutorInstructionEvidence({ item, bundle, historyIndex, focused =
           <div className="space-y-2 pt-2">{hazardRecords.slice(-5).map(record => <p key={`${record.history_index}-${record.kind}`}><span className="font-mono text-[11px]">Step {record.history_index + 1} · </span><TutorText text={record.detail} /></p>)}</div>
           {hazardRecords.length > 5 && <p className="pt-2 text-xs">최근 5건의 원인을 표시합니다.</p>}
         </details>}
-        <TutorTeaching teaching={item.teaching} />
+        {!runtimeOnly && <TutorTeaching teaching={item.teaching} />}
     <details className="border-t border-[var(--ar-border)] pt-2">
     <summary className="cursor-pointer py-1 text-xs font-semibold text-[var(--ar-text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]">매핑·레지스터 정보</summary>
     <div className="space-y-2 pt-2 text-xs leading-6">
