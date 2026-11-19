@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId } from "react";
 import {
   displayValue,
   registerLabel,
@@ -11,6 +11,14 @@ import {
 type Flow = ReturnType<typeof buildInstructionFlow>;
 type Box = { x: number; y: number; w: number; h: number };
 const COLORS = { address: "#d17a09", data: "#087fce", control: "#9860dc" };
+const NODES = {
+  pc: "#ec5478",
+  registers: "#00a981",
+  alu: "#ed9300",
+  memory: "#009dd8",
+  cu: "#a45de4",
+  immediate: "#009dd8",
+};
 const short = (value?: string | null) => displayValue(value).split(" · ")[0];
 
 export default function InstructionFlowDiagram({
@@ -30,145 +38,131 @@ export default function InstructionFlowDiagram({
   arrived: string[];
   onUnit: (unit: TransferUnit) => void;
 }) {
-  const container = useRef<HTMLDivElement>(null);
-  const [wide, setWide] = useState(false);
   const id = useId().replace(/:/g, "");
-  useEffect(() => {
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0].contentRect;
-      setWide(rect.width / Math.max(1, rect.height) > 1.25);
-    });
-    if (container.current) observer.observe(container.current);
-    return () => observer.disconnect();
-  }, []);
-  const boxes: Record<TransferUnit, Box> = wide
-    ? {
-        pc: { x: 32, y: 198, w: 156, h: 82 },
-        immediate: { x: 205, y: 198, w: 122, h: 82 },
-        cu: { x: 346, y: 198, w: 224, h: 82 },
-        registers: { x: 32, y: 354, w: 250, h: 128 },
-        alu: { x: 346, y: 354, w: 224, h: 128 },
-        memory: { x: 766, y: 198, w: 198, h: 284 },
-      }
-    : {
-        pc: { x: 32, y: 195, w: 140, h: 80 },
-        immediate: { x: 190, y: 195, w: 120, h: 80 },
-        cu: { x: 328, y: 195, w: 300, h: 80 },
-        registers: { x: 32, y: 320, w: 260, h: 110 },
-        alu: { x: 328, y: 320, w: 300, h: 110 },
-        memory: { x: 16, y: 630, w: 628, h: 112 },
-      };
-  const paths: Record<string, string> = wide
-    ? {
-        "fetch-address": "M110 198V184H600V258H766",
-        "fetch-instruction": "M766 338H610V300H458V280",
-        "read-control": "M346 240H334V320H157V354",
-        "input-a": flow.pcRelative
-          ? "M110 280V304H334V340H390V354"
-          : "M282 397H346",
-        "input-b": flow.usesImmediate ? "M266 280V318H430V354" : "M282 447H346",
-        "memory-address": "M458 482V510H620V258H766",
-        "memory-control": "M570 240H590V418H766",
-        "store-data": "M157 482V498H610V338H766",
-        "load-data": "M766 338H610V498H24V418H32",
-        writeback: flow.jump
-          ? "M110 280V320H157V354"
-          : "M458 482V510H24V418H32",
-        "next-pc": "M458 198V184H110V198",
-      }
-    : {
-        "fetch-address": "M32 235H24V456H110V630",
-        "fetch-instruction": "M330 630V470H636V288H478V275",
-        "read-control": "M328 235H318V300H162V320",
-        "input-a": flow.pcRelative
-          ? "M102 275V294H304V306H380V320"
-          : "M292 354H328",
-        "input-b": flow.usesImmediate ? "M250 275V294H400V320" : "M292 400H328",
-        "memory-address": "M468 430V456H110V630",
-        "memory-control": "M628 235H636V464H550V630",
-        "store-data": "M162 430V464H330V630",
-        "load-data": "M330 630V470H24V375H32",
-        writeback: flow.jump
-          ? "M102 275V300H162V320"
-          : "M468 430V442H24V375H32",
-        "next-pc": "M478 195V184H102V195",
-      };
+  const paths: Record<string, string> = {
+    "fetch-address": "M360 202V235",
+    "fetch-instruction": "M515 273H670V365",
+    "read-control": "M580 420H550V345H225V380",
+    "input-a": flow.pcRelative
+      ? "M260 167H38V550H290V570"
+      : "M145 490V540H290V570",
+    "input-b": flow.usesImmediate ? "M440 470V570" : "M240 490V510H440V570",
+    "memory-address": "M360 680V730",
+    "memory-control": "M760 420H770V775H500",
+    "store-data": "M140 490V775H220",
+    "load-data": "M360 820V908H24V435H55",
+    writeback: flow.jump
+      ? "M460 167H748V838H420V882H370V908H24V435H55"
+      : "M300 680V700H190V838H330V882H370V908H24V435H55",
+    "next-pc": "M700 365V167H460",
+  };
+  const isFetch =
+    transfer.id === "fetch-address" || transfer.id === "fetch-instruction";
+  const reached = (key: string) =>
+    arrived.includes(key) || (transfer.id === key && progress >= 0.95);
   const path = paths[transfer.id];
-  // A single React clock drives line, packet, payload and Pause; no independent SVG timers.
   const point = path ? transferPoint(path, progress) : undefined;
   const color = COLORS[transfer.kind];
-  const reached = (id: string) =>
-    arrived.includes(id) || (transfer.id === id && progress >= 0.95);
   const payload =
     transfer.value == null
       ? "미제공"
       : transfer.kind === "address" || transfer.id === "fetch-instruction"
         ? transfer.value
         : displayValue(transfer.value);
-  const sourceTag = (unit: TransferUnit) =>
-    transfer.source === unit && transfer.target === unit
+  const tag = (unit: TransferUnit, instructionMemory = false) => {
+    if (unit === "memory" && instructionMemory !== isFetch) return "";
+    return transfer.source === unit && transfer.target === unit
       ? "처리 중"
       : transfer.source === unit
         ? "출발"
         : transfer.target === unit
           ? "도착"
           : "";
-  const node = (unit: TransferUnit, title: string, lines: string[]) => {
-    const box = boxes[unit],
-      tag = sourceTag(unit),
-      active = Boolean(tag);
+  };
+  const boxes = {
+    pc: { x: 260, y: 132, w: 200, h: 70 },
+    instruction: { x: 205, y: 235, w: 310, h: 76 },
+    registers: { x: 55, y: 380, w: 250, h: 110 },
+    immediate: { x: 350, y: 380, w: 180, h: 90 },
+    cu: { x: 580, y: 365, w: 180, h: 108 },
+    alu: { x: 220, y: 570, w: 280, h: 110 },
+    memory: { x: 220, y: 730, w: 280, h: 90 },
+  } satisfies Record<string, Box>;
+  const node = (
+    unit: TransferUnit,
+    box: Box,
+    title: string,
+    lines: string[],
+    instructionMemory = false,
+  ) => {
+    const status = tag(unit, instructionMemory),
+      active = Boolean(status);
+    const stroke = active ? color : NODES[unit];
+    const shape =
+      unit === "alu"
+        ? "M220 570H337L360 590L383 570H500L456 680H264Z"
+        : undefined;
     return (
       <g
-        key={unit}
         role="button"
         tabIndex={0}
-        data-flow-node={unit}
+        data-flow-node={instructionMemory ? "instruction-memory" : unit}
         data-x={box.x}
         data-y={box.y}
         data-width={box.w}
         data-height={box.h}
         aria-label={`${title} 흐름 선택`}
-        onClick={() => onUnit(unit)}
+        onClick={() => onUnit(instructionMemory ? "cu" : unit)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            onUnit(unit);
+            onUnit(instructionMemory ? "cu" : unit);
           }
         }}
         className="cursor-pointer outline-none focus-visible:drop-shadow-md"
       >
-        <rect
-          x={box.x}
-          y={box.y}
-          width={box.w}
-          height={box.h}
-          rx="12"
-          fill={active ? "var(--ar-header-bg)" : "var(--ar-panel-bg)"}
-          stroke={active ? color : "var(--ar-border)"}
-          strokeWidth={active ? 3.5 : 1.5}
-        />
+        {shape ? (
+          <path
+            d={shape}
+            fill={active ? "var(--ar-header-bg)" : "var(--ar-panel-bg)"}
+            stroke={stroke}
+            strokeWidth={active ? 3 : 1.8}
+          />
+        ) : (
+          <rect
+            x={box.x}
+            y={box.y}
+            width={box.w}
+            height={box.h}
+            rx="10"
+            fill={active ? "var(--ar-header-bg)" : "var(--ar-panel-bg)"}
+            stroke={stroke}
+            strokeWidth={active ? 3 : 1.8}
+          />
+        )}
         <text
-          x={box.x + 14}
-          y={box.y + 25}
-          fontSize={unit === "immediate" ? 16 : 20}
+          x={box.x + box.w / 2}
+          y={box.y + (shape ? 42 : 25)}
+          textAnchor="middle"
+          fontSize="19"
           fontWeight="650"
           fill="var(--ar-text-primary)"
         >
           {title}
         </text>
-        {tag && (
+        {status && (
           <text
-            x={box.x + box.w - 12}
-            y={box.y + 24}
+            x={box.x + box.w - (shape ? 24 : 12)}
+            y={box.y + (shape ? 34 : 24)}
             textAnchor="end"
-            fontSize="12"
-            fontWeight="650"
+            fontSize="11"
+            fontWeight="600"
             fill={color}
           >
-            {tag}
+            {status}
           </text>
         )}
-        {lines.map((line, i) => {
+        {lines.filter(Boolean).map((line, i) => {
           const selected =
             active &&
             transfer.value != null &&
@@ -177,12 +171,13 @@ export default function InstructionFlowDiagram({
           return (
             <text
               key={i}
-              x={box.x + 14}
-              y={box.y + 49 + i * (box.h > 100 ? 23 : 19)}
-              fontSize={unit === "cu" || unit === "immediate" ? 14 : 16}
-              className={unit === "cu" ? "" : "font-mono"}
+              x={box.x + box.w / 2}
+              y={box.y + (shape ? 62 : 49) + i * (shape ? 18 : 22)}
+              textAnchor="middle"
+              fontSize={unit === "cu" || unit === "immediate" ? 14 : 15}
               fontWeight={selected ? 700 : 400}
               fill={selected ? color : "var(--ar-text-primary)"}
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {line}
             </text>
@@ -191,6 +186,28 @@ export default function InstructionFlowDiagram({
       </g>
     );
   };
+  const wires: { key: string; system?: boolean; kind?: keyof typeof COLORS }[] =
+    [
+      { key: "fetch-address", system: true, kind: "address" },
+      { key: "fetch-instruction", system: true, kind: "data" },
+      { key: "next-pc", kind: "control" },
+    ];
+  if (flow.registerInputs.length)
+    wires.push({ key: "read-control", kind: "control" }, { key: "input-a" });
+  else if (flow.pcRelative) wires.push({ key: "input-a" });
+  if (flow.usesImmediate || flow.registerInputs.length > 1)
+    wires.push({ key: "input-b" });
+  if (flow.load || flow.store)
+    wires.push(
+      { key: "memory-address", system: true, kind: "address" },
+      { key: "memory-control", system: true, kind: "control" },
+    );
+  if (flow.store && !flow.error)
+    wires.push({ key: "store-data", system: true });
+  if (flow.load && flow.writes.length && !flow.error)
+    wires.push({ key: "load-data", system: true });
+  if (!flow.load && !flow.store && flow.writes.length)
+    wires.push({ key: "writeback" });
   const regLines = flow.registerInputs.map(
     (value) => `${registerLabel(value.name)}: ${short(value.value)}`,
   );
@@ -203,348 +220,258 @@ export default function InstructionFlowDiagram({
     );
   const aluLines = flow.system
     ? ["일반 ALU 연산 없음"]
-    : flow.branch
+    : flow.jump
       ? [
-          `A: ${short(flow.input1)}`,
-          `B: ${short(flow.input2)}`,
-          flow.taken == null
-            ? "분기 판정 미제공"
-            : flow.taken
-              ? "분기 조건 성립"
-              : "분기 조건 불성립",
+          `이동: ${flow.nextPc ?? "미제공"}`,
+          `복귀: ${flow.writeValue ?? "미제공"}`,
         ]
-      : flow.jump
-        ? [
-            `이동: ${flow.nextPc ?? "미제공"}`,
-            `복귀: ${flow.writeValue ?? "미제공"}`,
-          ]
-        : [
-            `A: ${reached("input-a") || (!flow.pcRelative && !flow.registerInputs.length) ? short(flow.input1) : "입력 대기"}`,
-            `B: ${reached("input-b") ? (flow.amount != null ? `${flow.amount}비트 이동` : short(flow.input2)) : "입력 대기"}`,
-            `결과: ${arrived.includes("calculate") || transfer.id === "calculate" ? short(flow.result) : "연산 대기"}`,
-          ];
-  const mem = boxes.memory;
-  const nodeGroups = (
-    <>
-      {node("pc", "PC", [flow.pc ?? "미제공"])}
-      {node("immediate", "즉치값", [
+      : [
+          `A: ${reached("input-a") || (!flow.pcRelative && !flow.registerInputs.length) ? short(flow.input1) : "입력 대기"}`,
+          `B: ${reached("input-b") ? (flow.amount != null ? `${flow.amount}비트 이동` : short(flow.input2)) : "입력 대기"}`,
+          flow.branch
+            ? arrived.includes("calculate") || transfer.id === "calculate"
+              ? flow.taken == null
+                ? "분기 판정 미제공"
+                : flow.taken
+                  ? "분기 조건 성립"
+                  : "분기 조건 불성립"
+              : "조건 비교 대기"
+            : `결과: ${arrived.includes("calculate") || transfer.id === "calculate" ? short(flow.result) : "연산 대기"}`,
+        ];
+  const memoryLines =
+    flow.load || flow.store
+      ? [
+          `${reached("memory-address") ? (flow.address ?? "주소 미제공") : "주소 전달 대기"} · ${flow.width / 8}B ${flow.load ? "읽기" : "쓰기"}`,
+          `값: ${reached("load-data") || reached("store-data") || transfer.id === "discard-load" ? short(flow.memoryValue) : "전달 대기"}`,
+        ]
+      : ["데이터 접근 없음"];
+  return (
+    <svg
+      viewBox="0 0 780 970"
+      preserveAspectRatio="xMidYMin meet"
+      className="block h-full min-h-0 w-full font-sans"
+      role="group"
+      aria-label="데이터가 이동하는 싱글 사이클 경로"
+      data-layout="vertical-datapath"
+    >
+      <defs>
+        {Object.entries(COLORS).map(([kind, stroke]) => (
+          <marker
+            key={kind}
+            id={`${id}-${kind}`}
+            viewBox="0 0 12 12"
+            refX="10"
+            refY="6"
+            markerWidth="10"
+            markerHeight="10"
+            markerUnits="userSpaceOnUse"
+            orient="auto"
+          >
+            <path d="M0 0L11 6L0 12z" fill={stroke} />
+          </marker>
+        ))}
+      </defs>
+      {wires.map((wire) => (
+        <g
+          key={wire.key}
+          data-circuit-wire={wire.key}
+          data-memory-connection={wire.system || undefined}
+        >
+          {wire.system && wire.kind !== "control" && (
+            <path
+              d={paths[wire.key]}
+              fill="none"
+              stroke="var(--ar-border)"
+              strokeWidth="8"
+              strokeLinejoin="round"
+            />
+          )}
+          <path
+            d={paths[wire.key]}
+            fill="none"
+            stroke="var(--ar-border)"
+            strokeWidth={wire.kind === "control" ? 1.8 : wire.system ? 4 : 2.5}
+            strokeDasharray={wire.kind === "control" ? "6 4" : undefined}
+            strokeLinejoin="round"
+            markerEnd={`url(#${id}-${wire.kind ?? "data"})`}
+          />
+        </g>
+      ))}
+      {path && (
+        <g data-flow-route={transfer.id} data-active="true">
+          <path
+            d={path}
+            fill="none"
+            stroke="var(--ar-panel-bg)"
+            strokeWidth="10"
+            strokeLinejoin="round"
+          />
+          <path
+            d={path}
+            fill="none"
+            stroke={color}
+            strokeWidth={
+              transfer.kind === "control" ? 2.5 : transfer.systemBus ? 6 : 3
+            }
+            strokeDasharray={transfer.kind === "control" ? "6 4" : undefined}
+            strokeLinejoin="round"
+            markerEnd={`url(#${id}-${transfer.kind})`}
+          />
+        </g>
+      )}
+      {point && progress > 0 && progress < 1 && (
+        <circle
+          className="flow-packet"
+          data-packet-x={point.x}
+          data-packet-y={point.y}
+          cx={point.x}
+          cy={point.y}
+          r="6"
+          fill={color}
+          stroke="var(--ar-panel-bg)"
+          strokeWidth="2"
+        />
+      )}
+      {node("pc", boxes.pc, "PC", [flow.pc ?? "미제공"])}
+      {node(
+        "memory",
+        boxes.instruction,
+        "Instruction Memory",
+        [flow.op.toUpperCase()],
+        true,
+      )}
+      {node("registers", boxes.registers, "레지스터", regLines)}
+      {node("immediate", boxes.immediate, "Imm Gen", [
         flow.usesImmediate || flow.branch
           ? String(flow.amount ?? flow.immediate ?? "미제공")
           : "사용 안 함",
+        "즉치값 생성",
       ])}
-      {node("cu", "CU · 제어 장치", [
+      {node("cu", boxes.cu, "CU", [
         `해석: ${flow.op.toUpperCase()}`,
         flow.controlSignals
-          ? `레지스터 기록: ${flow.controlSignals.reg_write ? "켜짐" : "꺼짐"}`
-          : "제어 신호 미제공",
+          ? `기록: ${flow.controlSignals.reg_write ? "켜짐" : "꺼짐"}`
+          : "신호 미제공",
       ])}
-      {node("registers", "레지스터", regLines)}
-      {node("alu", "ALU", aluLines)}
-      <g
-        role="button"
-        tabIndex={0}
-        aria-label="메모리 흐름 선택"
-        onClick={() => onUnit("memory")}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onUnit("memory");
-          }
-        }}
-        className="cursor-pointer outline-none focus-visible:drop-shadow-md"
-        data-flow-node="memory"
-        data-x={mem.x}
-        data-y={mem.y}
-        data-width={mem.w}
-        data-height={mem.h}
-      >
-        <rect
-          x={mem.x}
-          y={mem.y}
-          width={mem.w}
-          height={mem.h}
-          rx="12"
-          fill={
-            sourceTag("memory") ? "var(--ar-header-bg)" : "var(--ar-panel-bg)"
-          }
-          stroke={sourceTag("memory") ? color : "var(--ar-border)"}
-          strokeWidth={sourceTag("memory") ? 3.5 : 1.5}
+      <g aria-label="ALU 입력 선택">
+        <path
+          d="M410 520H470L458 552H422Z"
+          fill="var(--ar-panel-bg)"
+          stroke="#009dd8"
+          strokeWidth="1.6"
         />
         <text
-          x={mem.x + 16}
-          y={mem.y + 28}
-          fontSize="22"
-          fontWeight="650"
+          x="440"
+          y="541"
+          textAnchor="middle"
+          fontSize="13"
           fill="var(--ar-text-primary)"
         >
-          메모리
+          MUX
         </text>
-        {sourceTag("memory") && (
-          <text
-            x={mem.x + mem.w - 12}
-            y={mem.y + 25}
-            textAnchor="end"
-            fontSize="12"
-            fill={color}
-          >
-            {sourceTag("memory")}
-          </text>
-        )}
+      </g>
+      {node("alu", boxes.alu, "ALU", aluLines)}
+      {node("memory", boxes.memory, "Data Memory", memoryLines)}
+      <g aria-label="기록값 선택">
+        <title>
+          연산 결과·메모리 값·복귀 주소 중 명령어에 맞는 값을 선택합니다.
+        </title>
+        <path
+          d="M290 860H450L422 908H318Z"
+          fill="var(--ar-panel-bg)"
+          stroke={
+            transfer.id === "writeback" || transfer.id === "load-data"
+              ? color
+              : "#9860dc"
+          }
+          strokeWidth="2"
+        />
         <text
-          x={wide ? mem.x + 16 : mem.x + 190}
-          y={wide ? mem.y + 73 : mem.y + 27}
+          x="370"
+          y="885"
+          textAnchor="middle"
           fontSize="14"
-          fill="var(--ar-text-muted)"
-        >
-          명령어 읽기
-        </text>
-        <text
-          x={wide ? mem.x + 16 : mem.x + 190}
-          y={wide ? mem.y + 98 : mem.y + 56}
-          fontSize="18"
           fontWeight="600"
           fill="var(--ar-text-primary)"
         >
-          {flow.op.toUpperCase()}
+          기록값 MUX
         </text>
-        <text
-          x={wide ? mem.x + 16 : mem.x + 390}
-          y={wide ? mem.y + 157 : mem.y + 27}
-          fontSize="14"
-          fill="var(--ar-text-muted)"
-        >
-          {flow.load || flow.store
-            ? `${flow.width / 8}바이트 ${flow.load ? "읽기" : "쓰기"}`
-            : "데이터 접근 없음"}
+      </g>
+      <g data-text-layer="true">
+        <text x="390" y="223" fontSize="14" fill={COLORS.address}>
+          명령어 주소
+        </text>
+        <text x="690" y="340" fontSize="13" fill={COLORS.data}>
+          명령어
+        </text>
+        <text x="250" y="531" fontSize="14" fill="var(--ar-text-muted)">
+          A
+        </text>
+        <text x="465" y="558" fontSize="14" fill="var(--ar-text-muted)">
+          B
         </text>
         {(flow.load || flow.store) && (
-          <>
-            <text
-              x={wide ? mem.x + 16 : mem.x + 390}
-              y={wide ? mem.y + 186 : mem.y + 55}
-              fontSize="16"
-              className="font-mono"
-              fill="var(--ar-text-primary)"
-            >
-              {reached("memory-address")
-                ? (flow.address ?? "주소 미제공")
-                : "주소 전달 대기"}
-            </text>
-            <text
-              x={wide ? mem.x + 16 : mem.x + 390}
-              y={wide ? mem.y + 214 : mem.y + 81}
-              fontSize="16"
-              className="font-mono"
-              fill="var(--ar-text-primary)"
-            >
-              값:{" "}
-              {reached("load-data") ||
-              reached("store-data") ||
-              transfer.id === "discard-load"
-                ? short(flow.memoryValue)
-                : "전달 대기"}
-            </text>
-          </>
-        )}
-      </g>
-    </>
-  );
-  return (
-    <div
-      ref={container}
-      className="h-full min-h-0 w-full min-w-0 overflow-hidden"
-    >
-      <svg
-        viewBox={wide ? "0 0 980 610" : "0 0 660 780"}
-        preserveAspectRatio="xMidYMin meet"
-        className="block h-full w-full font-sans"
-        role="group"
-        aria-label="데이터가 이동하는 싱글 사이클 경로"
-      >
-        <defs>
-          {Object.entries(COLORS).map(([kind, stroke]) => (
-            <marker
-              key={kind}
-              id={`${id}-${kind}`}
-              viewBox="0 0 12 12"
-              refX="10"
-              refY="6"
-              markerWidth="11"
-              markerHeight="11"
-              markerUnits="userSpaceOnUse"
-              orient="auto-start-reverse"
-            >
-              <path d="M0 0L11 6L0 12z" fill={stroke} />
-            </marker>
-          ))}
-        </defs>
-        <rect
-          x="16"
-          y={wide ? 148 : 146}
-          width={wide ? 570 : 628}
-          height={wide ? 380 : 304}
-          rx="16"
-          fill="none"
-          stroke="var(--ar-border)"
-        />
-        <text
-          x="32"
-          y={wide ? 172 : 170}
-          fontSize="17"
-          fontWeight="600"
-          fill="var(--ar-text-muted)"
-        >
-          CPU 내부 데이터 경로
-        </text>
-        <path
-          d={wide ? "M282 397H346M282 447H346" : "M292 354H328M292 400H328"}
-          stroke="var(--ar-border)"
-          strokeWidth="2"
-          fill="none"
-        />
-        <g
-          aria-label="시스템 버스: 주소 버스, 데이터 버스, 제어 버스"
-          data-system-buses="true"
-        >
-          {(["address", "data", "control"] as const).map((kind, i) => {
-            const d = wide
-              ? `M600 ${258 + i * 80}H766`
-              : `M${110 + i * 220} 470V630`;
-            const selected = transfer.systemBus && transfer.kind === kind;
-            return (
-              <g
-                key={kind}
-                data-system-bus={kind}
-                data-active={Boolean(selected)}
-              >
-                <path
-                  d={d}
-                  fill="none"
-                  stroke={COLORS[kind]}
-                  strokeWidth={selected ? 9 : 5}
-                  opacity={selected ? 1 : 0.3}
-                  markerEnd={`url(#${id}-${kind})`}
-                  markerStart={
-                    kind === "data" ? `url(#${id}-${kind})` : undefined
-                  }
-                />
-              </g>
-            );
-          })}
-        </g>
-        {path && (
-          <g data-flow-route={transfer.id} data-active="true">
-            <path
-              d={path}
-              fill="none"
-              stroke="var(--ar-panel-bg)"
-              strokeWidth="10"
-              strokeLinejoin="round"
-            />
-            <path
-              d={path}
-              fill="none"
-              stroke={color}
-              strokeWidth="3"
-              strokeDasharray={transfer.kind === "control" ? "7 4" : undefined}
-              strokeLinejoin="round"
-              markerEnd={`url(#${id}-${transfer.kind})`}
-            />
-          </g>
-        )}
-        {point && progress > 0 && progress < 1 && (
-          <circle
-            className="flow-packet"
-            data-packet-x={point.x}
-            data-packet-y={point.y}
-            cx={point.x}
-            cy={point.y}
-            r="7"
-            fill={color}
-            stroke="var(--ar-panel-bg)"
-            strokeWidth="2"
-          />
-        )}
-        {nodeGroups}
-        <g data-text-layer="true">
-          <text
-            x={wide ? 626 : 20}
-            y={wide ? 183 : 494}
-            fontSize="13"
-            fontWeight="650"
-            fill="var(--ar-text-muted)"
-          >
-            시스템 버스
+          <text x="390" y="709" fontSize="14" fill={COLORS.address}>
+            데이터 주소
           </text>
+        )}
+        {flow.store && (
+          <text x="155" y="710" fontSize="13" fill={COLORS.data}>
+            저장 데이터
+          </text>
+        )}
+        <g aria-label="메모리 연결: 시스템 버스의 주소·데이터·제어 역할">
           {(["address", "data", "control"] as const).map((kind, i) => (
             <g key={kind} data-system-bus-label={kind}>
-              <text
-                x={wide ? 682 : 133 + i * 220}
-                y={wide ? 240 + i * 80 : 520}
-                textAnchor={wide ? "middle" : "start"}
-                fontSize="16"
-                fontWeight={
-                  transfer.systemBus && transfer.kind === kind ? 700 : 500
-                }
-                fill={COLORS[kind]}
-              >
+              <path
+                d={`M${220 + i * 150} 937h24`}
+                stroke={COLORS[kind]}
+                strokeWidth={kind === "control" ? 2 : 5}
+                strokeDasharray={kind === "control" ? "5 3" : undefined}
+              />
+              <text x={252 + i * 150} y="941" fontSize="13" fill={COLORS[kind]}>
                 {kind === "address"
-                  ? "주소 버스"
+                  ? "주소"
                   : kind === "data"
-                    ? "데이터 버스"
-                    : "제어 버스"}
+                    ? "데이터"
+                    : "제어"}
               </text>
-              {!wide && (
-                <text
-                  x={133 + i * 220}
-                  y="543"
-                  fontSize="14"
-                  fill="var(--ar-text-muted)"
-                >
-                  {kind === "control" ? "읽기 / 쓰기" : "32비트"}
-                </text>
-              )}
             </g>
           ))}
         </g>
-        <g aria-label="현재 이동 데이터" data-transfer={transfer.id}>
-          <rect
-            x="16"
-            y="12"
-            width={wide ? 948 : 628}
-            height="116"
-            rx="14"
-            fill="var(--ar-header-bg)"
-            stroke={color}
-            strokeWidth="2"
-          />
-          <text x="32" y="39" fontSize="18" fontWeight="650" fill={color}>
-            {index + 1} / {count} · {transfer.title}
-          </text>
-          <text
-            x="32"
-            y="77"
-            fontSize="26"
-            className="font-mono"
-            fontWeight="700"
-            fill="var(--ar-text-primary)"
-            data-transfer-value="true"
-          >
-            {payload}
-          </text>
-          <text x="32" y="105" fontSize="15" fill="var(--ar-text-muted)">
-            {transfer.detail}
-          </text>
-        </g>
-        <text
-          x="24"
-          y={wide ? 589 : 765}
-          fontSize="12"
-          fill="var(--ar-text-muted)"
-        >
-          CPU–메모리 연결의 버스 역할을 설명한 개념도입니다.
+        <text x="32" y="963" fontSize="11" fill="var(--ar-text-muted)">
+          메모리 연결의 버스 역할을 설명한 개념도입니다.
         </text>
-      </svg>
-    </div>
+      </g>
+      <g aria-label="현재 이동 데이터" data-transfer={transfer.id}>
+        <rect
+          x="16"
+          y="10"
+          width="748"
+          height="104"
+          rx="12"
+          fill="var(--ar-header-bg)"
+          stroke={color}
+          strokeWidth="1.8"
+        />
+        <text x="32" y="36" fontSize="18" fontWeight="650" fill={color}>
+          {index + 1} / {count} · {transfer.title}
+        </text>
+        <text
+          x="32"
+          y="72"
+          fontSize="25"
+          fontWeight="700"
+          className="font-mono"
+          fill="var(--ar-text-primary)"
+          data-transfer-value="true"
+        >
+          {payload}
+        </text>
+        <text x="32" y="99" fontSize="14" fill="var(--ar-text-muted)">
+          {transfer.detail}
+        </text>
+      </g>
+    </svg>
   );
 }

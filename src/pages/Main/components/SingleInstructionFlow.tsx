@@ -66,6 +66,10 @@ export default function SingleInstructionFlow({
     });
   };
   const chooseUnit = (unit: TransferUnit) => {
+    if (unit === "memory" && (flow.load || flow.store)) {
+      seek(transfers.findIndex((value) => value.id === "memory-address"));
+      return;
+    }
     const target = transfers.findIndex(
       (value) => value.target === unit || value.source === unit,
     );

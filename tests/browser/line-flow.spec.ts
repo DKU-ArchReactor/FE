@@ -5,7 +5,7 @@ async function frozenTime(page:Page) {
   await page.clock.install({time:start});await page.clock.pauseAt(new Date(start.getTime()+1000));
 }
 
-test('system buses and the whole diagram fit without scrolling at desktop and mobile sizes',async ({page})=>{
+test('the vertical circuit and memory-bus role labels fit without scrolling at desktop and mobile sizes',async ({page})=>{
   await frozenTime(page);
   await page.goto('/tests/browser/line-flow.html');
   for(const size of [{width:1400,height:900},{width:760,height:1000},{width:390,height:844},{width:844,height:390}]) {
@@ -17,10 +17,14 @@ test('system buses and the whole diagram fit without scrolling at desktop and mo
       return Array.from(region.querySelectorAll<HTMLElement>('*')).filter(node=>getComputedStyle(node).overflowY==='auto'||getComputedStyle(node).overflowX==='auto').map(node=>({x:node.scrollWidth-node.clientWidth,y:node.scrollHeight-node.clientHeight}));
     });
     expect(bounds).toEqual([]);
-    await expect(svg.locator('[data-system-bus]')).toHaveCount(3);
-    await expect(svg.locator('[data-system-bus-label="address"]')).toContainText('주소 버스');
-    await expect(svg.locator('[data-system-bus-label="data"]')).toContainText('데이터 버스');
-    await expect(svg.locator('[data-system-bus-label="control"]')).toContainText('제어 버스');
+    await expect(svg).toHaveAttribute('data-layout','vertical-datapath');
+    await expect(svg.getByRole('button',{name:'Instruction Memory 흐름 선택'})).toBeVisible();
+    await expect(svg.getByRole('button',{name:'Data Memory 흐름 선택'})).toBeVisible();
+    await expect(svg.getByLabel('ALU 입력 선택')).toBeVisible();
+    await expect(svg.getByLabel('기록값 선택')).toBeVisible();
+    await expect(svg.locator('[data-system-bus-label="address"]')).toContainText('주소');
+    await expect(svg.locator('[data-system-bus-label="data"]')).toContainText('데이터');
+    await expect(svg.locator('[data-system-bus-label="control"]')).toContainText('제어');
   }
 });
 
