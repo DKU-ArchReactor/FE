@@ -1,6 +1,7 @@
 .ar-single-flow-diagram { --ar-flow-wire: #758aa2; }
 .dark .ar-single-flow-diagram { --ar-flow-wire: #91a7c0; }
 @media (prefers-reduced-motion: reduce) {
+  .flow-data-trail { display: none; }
   .flow-packet { display: none; }
   .flow-data-word { display: none; }
 }

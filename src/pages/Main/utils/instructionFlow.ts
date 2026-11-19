@@ -100,14 +100,18 @@ export interface InstructionTransfer {
   id: string; source: TransferUnit; target: TransferUnit; title: string;
   kind: 'address' | 'data' | 'control'; systemBus?: boolean; value?: string | null; detail: string;
 }
-export function transferPoint(path:string, progress:number, startPadding=0, endPadding=0) {
+export type TransferRoute = { points: {x:number;y:number}[]; lengths:number[]; total:number };
+export function compileTransferRoute(path:string):TransferRoute {
   const points:{x:number;y:number}[]=[];
   for(const match of path.matchAll(/([MHV])([^MHV]+)/g)) {
     const numbers=match[2].trim().split(/[ ,]+/).map(Number),previous=points.at(-1)??{x:0,y:0};
     points.push(match[1]==='M'?{x:numbers[0],y:numbers[1]}:match[1]==='H'?{x:numbers[0],y:previous.y}:{x:previous.x,y:numbers[0]});
   }
   const lengths=points.slice(1).map((point,index)=>Math.abs(point.x-points[index].x)+Math.abs(point.y-points[index].y));
-  const total=lengths.reduce((sum,length)=>sum+length,0);
+  return {points,lengths,total:lengths.reduce((sum,length)=>sum+length,0)};
+}
+export function pointOnTransfer(route:TransferRoute, progress:number, startPadding=0, endPadding=0) {
+  const {points,lengths,total}=route;
   const start=Math.min(startPadding,total/2),end=Math.min(endPadding,total/2);
   let remaining=start+Math.max(0,total-start-end)*Math.max(0,Math.min(1,progress));
   for(let i=0;i<lengths.length;i++) {
@@ -115,6 +119,54 @@ export function transferPoint(path:string, progress:number, startPadding=0, endP
     remaining-=lengths[i];
   }
   return points.at(-1);
+}
+export function transferPoint(path:string, progress:number, startPadding=0, endPadding=0) {
+  return pointOnTransfer(compileTransferRoute(path),progress,startPadding,endPadding);
+}
+export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1):Record<string,string> {
+  const paths:Record<string,string>={
+    'fetch-address':'M360 202V245',
+    'fetch-instruction':'M515 273H670V365',
+    'read-control':'M580 420H550V345H225V380',
+    'input-a':flow.pcRelative?'M260 167H38V550H290V570':'M145 490V540H290V570',
+    'input-b':flow.usesImmediate?'M440 470V570':'M240 490V510H440V570',
+    'memory-address':'M360 680V730',
+    'memory-control':'M760 420H770V775H500',
+    'store-data':'M140 490V775H220',
+    'load-data':'M360 820V908H24V435H55',
+    writeback:flow.jump?'M460 167H748V838H420V882H370V908H24V435H55':'M300 680V700H190V838H330V882H370V908H24V435H55',
+    'next-pc':'M700 365V167H460',
+  };
+  return Object.fromEntries(Object.entries(paths).map(([key,path])=>[key,path.replace(/([MHV])([^MHV]+)/g,(_,command:string,coordinates:string)=>{
+    const values=coordinates.trim().split(/[ ,]+/).map(Number);
+    return command+(command==='V'?values[0]:command==='H'?values[0]*scale:`${values[0]*scale} ${values[1]}`);
+  })]));
+}
+export function transferMotion(transfer:InstructionTransfer,path?:string) {
+  const value=transfer.kind==='address'||transfer.id==='fetch-instruction'?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
+  const width=Math.max(56,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?18:11),28));
+  const commands=path?.match(/[MHV]/g)??[];
+  const route=path&&transfer.kind!=='control'?compileTransferRoute(path):undefined;
+  const startPadding=commands[1]==='H'?width/2+4:15;
+  const endPadding=commands.at(-1)==='H'?width/2+4:15;
+  const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
+  return {value,width,route,startPadding,endPadding,distance};
+}
+// Keep the CPU clock duration unchanged; divide its visual travel budget by wire length.
+// Controls are asserted states, not travelling data. Processing steps get a readable hold.
+export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,duration:number) {
+  const motions=transfers.map(transfer=>transferMotion(transfer,paths[transfer.id]));
+  const pace=duration/9000;
+  const holds=motions.map(motion=>(motion.route?200:600)*pace);
+  const distance=motions.reduce((sum,motion)=>sum+motion.distance,0);
+  const budget=Math.max(0,duration-holds.reduce((sum,hold)=>sum+hold,0));
+  let start=0;
+  return motions.map((motion,index)=>{
+    const travel=distance?budget*motion.distance/distance:0;
+    const entry={start,duration:holds[index]+travel,lead:motion.route?80*pace:0,travel,motion};
+    start+=entry.duration;
+    return entry;
+  });
 }
 export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlow>): InstructionTransfer[] {
   const result: InstructionTransfer[] = [
@@ -138,6 +190,6 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
       }
     } else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'writeback',source:flow.jump?'pc':'alu',target:'registers',title:`${flow.jump?'복귀 주소':'ALU 결과'} → ${flow.writes.map(registerLabel).join(', ')}`,kind:'data',value:flow.writeValue,detail:flow.jump?'PC + 4를 링크 레지스터에 기록':'목적지 레지스터에 결과 기록'});
   }
-  if(!flow.actual||flow.completed) result.push({id:'next-pc',source:'cu',target:'pc',title:'다음 PC 선택',kind:'address',value:flow.nextPc,detail:'다음에 실행할 명령어의 주소'});
+  if(!flow.actual||flow.completed) result.push({id:'next-pc',source:'cu',target:'pc',title:'PC 주소 갱신',kind:'address',value:flow.nextPc,detail:'다음에 실행할 명령어의 주소'});
   return result;
 }

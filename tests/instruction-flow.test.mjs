@@ -6,7 +6,7 @@ import ts from 'typescript';
 const source = readFileSync(new URL('../src/pages/Main/utils/instructionFlow.ts', import.meta.url), 'utf8');
 const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
-const {buildInstructionFlow,instructionTransfers,transferPoint} = exports;
+const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline} = exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
   global_result: {registers: {x10: '0x0000000C'}, metrics: {accumulated_instructions: 1}},
@@ -138,4 +138,23 @@ test('packet geometry advances along the same orthogonal wire and clamps endpoin
   assert.deepEqual(point(2),{x:30,y:60});
   assert.deepEqual(JSON.parse(JSON.stringify(transferPoint('M0 0H100',0,20,20))),{x:20,y:0});
   assert.deepEqual(JSON.parse(JSON.stringify(transferPoint('M0 0H100',1,20,20))),{x:80,y:0});
+});
+
+
+test('travel time is proportional to visible wire distance, with stationary controls and a preserved clock budget',()=>{
+  const current=frame();
+  const flow=buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current));
+  const transfers=instructionTransfers(flow);
+  for(const scale of [1,2.7]) {
+    const timeline=transferTimeline(transfers,instructionPaths(flow,scale),9000);
+    const moving=timeline.filter(entry=>entry.motion.distance>0);
+    const speed=moving[0].motion.distance/moving[0].travel;
+    for(const entry of moving) assert.ok(Math.abs(entry.motion.distance/entry.travel-speed)<1e-9);
+    for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') {
+      assert.equal(timeline[index].motion.route,undefined);
+      assert.equal(timeline[index].travel,0);
+      assert.equal(timeline[index].duration,600);
+    }
+    assert.ok(Math.abs(timeline.at(-1).start+timeline.at(-1).duration-9000)<1e-9);
+  }
 });

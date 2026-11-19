@@ -31,9 +31,9 @@ test('the vertical circuit and memory-bus role labels fit without scrolling at d
     expect(spacing).toBeGreaterThan(.9);
     await expect(svg.locator('[data-flow-node="registers"]')).toHaveAttribute('data-hardware-shape','register-file');
     await expect(svg.locator('[data-flow-node="memory"]')).toHaveAttribute('data-hardware-shape','chip');
-    await expect(svg.locator('[data-system-bus-label="address"]')).toContainText('주소');
-    await expect(svg.locator('[data-system-bus-label="data"]')).toContainText('데이터');
-    await expect(svg.locator('[data-system-bus-label="control"]')).toContainText('제어');
+    await expect(svg.locator('[data-system-bus-label="address"]')).toContainText('Address Bus');
+    await expect(svg.locator('[data-system-bus-label="data"]')).toContainText('Data Bus');
+    await expect(svg.locator('[data-system-bus-label="control"]')).toContainText('Control Bus');
   }
 });
 
@@ -198,4 +198,18 @@ test('node text, payloads and system-bus labels remain readable in every transfe
       await page.getByRole('button',{name:'다음 흐름',exact:true}).click();await check();
     }
   }
+});
+
+
+test('register selection asserts control without a travelling data packet',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html');
+  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  for(let i=0;i<2;i++)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
+  await expect(page.locator('[data-transfer="read-control"]')).toBeVisible();
+  await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
+  await page.clock.runFor(300);
+  await page.setViewportSize({width:760,height:1000});await page.clock.runFor(32);
+  await expect(page.locator('[data-transfer="read-control"]')).toBeVisible();
+  await expect(page.locator('.flow-packet,.flow-data-word,.flow-data-trail')).toHaveCount(0);
+  await expect(page.locator('[data-flow-node="registers"]')).toContainText('\uB3C4\uCC29');
 });

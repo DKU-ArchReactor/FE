@@ -1,8 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   displayValue,
   registerLabel,
-  transferPoint,
+  instructionPaths,
+  pointOnTransfer,
+  transferMotion,
   type TransferUnit,
   type InstructionTransfer,
   type buildInstructionFlow,
@@ -29,6 +31,7 @@ export default function InstructionFlowDiagram({
   count,
   arrived,
   onUnit,
+  onScale,
 }: {
   flow: Flow;
   transfer: InstructionTransfer;
@@ -37,6 +40,7 @@ export default function InstructionFlowDiagram({
   count: number;
   arrived: string[];
   onUnit: (unit: TransferUnit) => void;
+  onScale: (scale: number) => void;
 }) {
   const id = useId().replace(/:/g, "");
   const area = useRef<HTMLDivElement>(null);
@@ -55,6 +59,7 @@ export default function InstructionFlowDiagram({
     return () => observer.disconnect();
   }, []);
   const scale = viewWidth / 780;
+  useEffect(() => onScale(scale), [onScale, scale]);
   const sx = (value: number) => value * scale;
   const scalePath = (value: string) =>
     value.replace(
@@ -71,52 +76,42 @@ export default function InstructionFlowDiagram({
         );
       },
     );
-  const paths: Record<string, string> = {
-    "fetch-address": "M360 202V245",
-    "fetch-instruction": "M515 273H670V365",
-    "read-control": "M580 420H550V345H225V380",
-    "input-a": flow.pcRelative
-      ? "M260 167H38V550H290V570"
-      : "M145 490V540H290V570",
-    "input-b": flow.usesImmediate ? "M440 470V570" : "M240 490V510H440V570",
-    "memory-address": "M360 680V730",
-    "memory-control": "M760 420H770V775H500",
-    "store-data": "M140 490V775H220",
-    "load-data": "M360 820V908H24V435H55",
-    writeback: flow.jump
-      ? "M460 167H748V838H420V882H370V908H24V435H55"
-      : "M300 680V700H190V838H330V882H370V908H24V435H55",
-    "next-pc": "M700 365V167H460",
-  };
+  const paths = useMemo(() => instructionPaths(flow, scale), [flow, scale]);
   const isFetch =
     transfer.id === "fetch-address" || transfer.id === "fetch-instruction";
   const reached = (key: string) =>
     arrived.includes(key) || (transfer.id === key && progress >= 0.95);
-  const path = paths[transfer.id] ? scalePath(paths[transfer.id]) : undefined;
-  const packetValue =
-    transfer.kind === "control"
-      ? transfer.id === "memory-control"
-        ? (transfer.value ?? "미제공")
-        : "선택"
-      : transfer.id === "fetch-instruction" || transfer.kind === "address"
-        ? (transfer.value ?? "미제공")
-        : short(transfer.value);
-  const packetWidth = Math.max(
-    56,
-    [...packetValue].reduce(
-      (sum, char) => sum + (char.charCodeAt(0) > 255 ? 18 : 11),
-      28,
-    ),
+  const path = paths[transfer.id];
+  const motion = useMemo(
+    () => transferMotion(transfer, path),
+    [transfer, path],
   );
-  const commands = path?.match(/[MHV]/g) ?? [];
-  const point = path
-    ? transferPoint(
-        path,
-        progress,
-        commands[1] === "H" ? packetWidth / 2 + 4 : 15,
-        commands.at(-1) === "H" ? packetWidth / 2 + 4 : 15,
-      )
+  const {
+    value: packetValue,
+    width: packetWidth,
+    route,
+    startPadding,
+    endPadding,
+  } = motion;
+  const point = route
+    ? pointOnTransfer(route, progress, startPadding, endPadding)
     : undefined;
+  // A short trail shares the same clock as the data value, including Pause and seek.
+  const trail =
+    route && point && progress > 0 && progress < 1
+      ? Array.from({ length: 7 }, (_, index) => {
+          const tail = pointOnTransfer(
+            route,
+            Math.max(
+              0,
+              progress - ((6 - index) * 7) / Math.max(1, motion.distance),
+            ),
+            startPadding,
+            endPadding,
+          )!;
+          return `${index ? "L" : "M"}${tail.x} ${tail.y}`;
+        }).join(" ")
+      : undefined;
   const color = COLORS[transfer.kind];
   const payload =
     transfer.value == null
@@ -449,7 +444,7 @@ export default function InstructionFlowDiagram({
           >
             {wire.system && wire.kind !== "control" && (
               <path
-                d={scalePath(paths[wire.key])}
+                d={paths[wire.key]}
                 fill="none"
                 stroke="var(--ar-flow-wire)"
                 strokeWidth="8"
@@ -457,7 +452,7 @@ export default function InstructionFlowDiagram({
               />
             )}
             <path
-              d={scalePath(paths[wire.key])}
+              d={paths[wire.key]}
               fill="none"
               stroke={
                 wire.kind === "control" ? "#9973bd" : "var(--ar-flow-wire)"
@@ -493,6 +488,17 @@ export default function InstructionFlowDiagram({
             />
           </g>
         )}
+        {trail && (
+          <path
+            className="flow-data-trail"
+            d={trail}
+            fill="none"
+            stroke={color}
+            strokeWidth="9"
+            strokeLinecap="round"
+            opacity=".24"
+          />
+        )}
         {point && progress > 0 && progress < 1 && (
           <circle
             className="flow-packet"
@@ -500,7 +506,7 @@ export default function InstructionFlowDiagram({
             data-packet-y={point.y}
             cx={point.x}
             cy={point.y}
-            r="6"
+            r="4"
             fill={color}
             stroke="var(--ar-panel-bg)"
             strokeWidth="2"
@@ -599,10 +605,10 @@ export default function InstructionFlowDiagram({
                   fill={COLORS[kind]}
                 >
                   {kind === "address"
-                    ? "주소"
+                    ? "Address Bus"
                     : kind === "data"
-                      ? "데이터"
-                      : "제어"}
+                      ? "Data Bus"
+                      : "Control Bus"}
                 </text>
               </g>
             ))}
@@ -657,13 +663,18 @@ export default function InstructionFlowDiagram({
                 y={packetBox.y}
                 width={packetBox.w}
                 height={packetBox.h}
-                rx="4"
+                rx="10"
                 fill="var(--ar-panel-bg)"
                 stroke={color}
-                strokeWidth="2"
+                strokeWidth="1.5"
+                style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
               />
-              <path
-                d={`M${packetBox.x + 6} ${packetBox.y + 6}h3v3h-3zM${packetBox.x + 6} ${packetBox.y + 13}h3v3h-3z`}
+              <rect
+                x={packetBox.x + 5}
+                y={packetBox.y + 7}
+                width="3"
+                height="14"
+                rx="1.5"
                 fill={color}
               />
               <text

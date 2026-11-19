@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   instructionTransfers,
+  instructionPaths,
+  transferTimeline,
   singleFlowDuration,
   type TransferUnit,
   type buildInstructionFlow,
@@ -20,6 +22,12 @@ export default function SingleInstructionFlow({
   isPlaying?: boolean;
 }) {
   const transfers = useMemo(() => instructionTransfers(flow), [flow]);
+  const [scale, setScale] = useState(1);
+  const paths = useMemo(() => instructionPaths(flow, scale), [flow, scale]);
+  const timeline = useMemo(
+    () => transferTimeline(transfers, paths, duration),
+    [transfers, paths, duration],
+  );
   const [clock, setClock] = useState({
     elapsed: 0,
     running: flow.actual && (isPlaying ?? true),
@@ -51,30 +59,72 @@ export default function SingleInstructionFlow({
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [clock.running, duration]);
-  const portion = duration / transfers.length;
-  const index = Math.max(
-    0,
-    Math.min(transfers.length - 1, Math.floor(clock.elapsed / portion)),
+  const activeIndex = timeline.findIndex(
+    (entry) => clock.elapsed < entry.start + entry.duration,
   );
-  const progress = Math.min(1, (clock.elapsed - index * portion) / portion);
-  const seek = (target: number) => {
-    onPause?.();
-    setClock({
-      elapsed: Math.max(0, Math.min(transfers.length - 1, target)) * portion,
-      running: false,
-      globalPlaying: false,
-    });
-  };
-  const chooseUnit = (unit: TransferUnit) => {
-    if (unit === "memory" && (flow.load || flow.store)) {
-      seek(transfers.findIndex((value) => value.id === "memory-address"));
-      return;
-    }
-    const target = transfers.findIndex(
-      (value) => value.target === unit || value.source === unit,
-    );
-    seek(target < 0 ? 0 : target);
-  };
+  const index = activeIndex < 0 ? timeline.length - 1 : activeIndex;
+  const entry = timeline[index];
+  const progress = entry.travel
+    ? Math.max(
+        0,
+        Math.min(1, (clock.elapsed - entry.start - entry.lead) / entry.travel),
+      )
+    : Math.min(1, (clock.elapsed - entry.start) / entry.duration);
+  const arrived = useMemo(
+    () => transfers.slice(0, index).map((value) => value.id),
+    [transfers, index],
+  );
+  const seek = useCallback(
+    (target: number) => {
+      onPause?.();
+      setClock({
+        elapsed:
+          timeline[Math.max(0, Math.min(transfers.length - 1, target))].start,
+        running: false,
+        globalPlaying: false,
+      });
+    },
+    [onPause, timeline, transfers.length],
+  );
+  const chooseUnit = useCallback(
+    (unit: TransferUnit) => {
+      if (unit === "memory" && (flow.load || flow.store)) {
+        seek(transfers.findIndex((value) => value.id === "memory-address"));
+        return;
+      }
+      const target = transfers.findIndex(
+        (value) => value.target === unit || value.source === unit,
+      );
+      seek(target < 0 ? 0 : target);
+    },
+    [flow.load, flow.store, seek, transfers],
+  );
+  const resize = useCallback(
+    (nextScale: number) => {
+      if (nextScale === scale) return;
+      const next = transferTimeline(
+        transfers,
+        instructionPaths(flow, nextScale),
+        duration,
+      );
+      setClock((value) => {
+        const found = timeline.findIndex(
+          (entry) => value.elapsed < entry.start + entry.duration,
+        );
+        const index = found < 0 ? timeline.length - 1 : found;
+        const fraction = Math.min(
+          1,
+          (value.elapsed - timeline[index].start) / timeline[index].duration,
+        );
+        return {
+          ...value,
+          elapsed: next[index].start + fraction * next[index].duration,
+        };
+      });
+      setScale(nextScale);
+    },
+    [duration, flow, scale, timeline, transfers],
+  );
   const toggle = () => {
     onPause?.();
     setClock((value) => ({
@@ -155,7 +205,8 @@ export default function SingleInstructionFlow({
           progress={progress}
           index={index}
           count={transfers.length}
-          arrived={transfers.slice(0, index).map((value) => value.id)}
+          arrived={arrived}
+          onScale={resize}
           onUnit={chooseUnit}
         />
       </div>
