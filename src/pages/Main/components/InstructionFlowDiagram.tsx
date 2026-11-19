@@ -73,5 +73,9 @@ export default function InstructionFlowDiagram({flow, step, onUnit, duration = 3
     {node('memory', 225, 540, 265, 68, 'Data Memory · 데이터 메모리', [flow.load || flow.store ? `${flow.address ?? '미제공'} · ${flow.width / 8} byte ${flow.load ? '읽기' : '쓰기'}` : '이 명령어는 데이터 접근 없음', flow.load || flow.store ? `값 ${short(flow.memoryValue)}` : ''])}
     {node('registers', 270, 665, 140, 43, '기록값 MUX', [], 'M270 665H410L385 708H295Z')}
     <text x="420" y="720" fontSize="11" fill="var(--ar-text-muted)">{flow.writes.length ? `${flow.writes.map(registerLabel).join(', ')} ← ${short(flow.writeValue)}` : '일반 레지스터 기록 없음'}</text>
+    <g aria-label="범례: 파란 실선은 데이터, 보라 점선은 제어 신호">
+      <path d="M440 770H470" stroke="#007cc2" strokeWidth="2"/><text x="478" y="774" fontSize="11" fill="var(--ar-text-muted)">데이터</text>
+      <path d="M540 770H570" stroke="#a45de4" strokeWidth="2" strokeDasharray="4 4"/><text x="578" y="774" fontSize="11" fill="var(--ar-text-muted)">제어 신호</text>
+    </g>
   </svg>;
 }

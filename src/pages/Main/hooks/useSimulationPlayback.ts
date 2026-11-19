@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
+import {singleFlowDuration} from '../utils/instructionFlow';
 
 interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;
@@ -246,7 +247,7 @@ export function useSimulationPlayback({
           }
           return prev + 1;
         });
-      }, playSpeed);
+      }, isSingleEngine ? singleFlowDuration(playSpeed) : playSpeed);
     } else {
       if (timerRef.current !== null) {
         clearInterval(timerRef.current);
@@ -290,10 +291,11 @@ export function useSimulationPlayback({
     onClearSelection();
 
     if (currentPos >= maxPos) {
-      setCurrentCycle(0);
+      setCurrentCycle(isSingleEngine && maxPos > 0 ? 1 : 0);
       setIsPlaying(true);
       triggerPlaybackFeedback("play");
     } else {
+      if (isSingleEngine && !isPlaying && currentPos === 0 && maxPos > 0) setCurrentCycle(1);
       setIsPlaying((prev) => {
         const nextState = !prev;
         triggerPlaybackFeedback(nextState ? "play" : "pause");
@@ -311,7 +313,7 @@ export function useSimulationPlayback({
 
   const handleResetAndPlay = () => {
     onClearSelection();
-    setCurrentCycle(0);
+    setCurrentCycle(isSingleEngine && totalCycles > 0 ? 1 : 0);
     setIsPlaying(true);
     triggerPlaybackFeedback("play");
   };

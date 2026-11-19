@@ -1,7 +1,8 @@
-import {StrictMode, useState} from 'react';
+import {StrictMode, useState, useCallback} from 'react';
 import {createRoot} from 'react-dom/client';
 import {SingleCycleDatapath} from '../../src/pages/Main/components/SingleCycleDatapath';
 import TutorArea from '../../src/pages/Main/components/TutorArea';
+import {useSimulationPlayback} from '../../src/pages/Main/hooks/useSimulationPlayback';
 import type {SimulationResult} from '../../src/type/simulation';
 import fixture from './fixtures/line-flow.json';
 import '../../src/index.css';
@@ -31,4 +32,11 @@ export function LineFlowHarness() {
       : <SingleCycleDatapath {...props} lessonContext={props.context}/>}
   </main>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><LineFlowHarness/></StrictMode>);
+function PlaybackTimingHarness() {
+  const clear = useCallback(() => {}, []);
+  const single = new URLSearchParams(location.search).get('mode') !== 'pipeline';
+  const playback = useSimulationPlayback({simulationData: run, mappedAssemblyRows: rows, isSingleEngine: single,
+    editorTarget: 'c', translationSelectedLine: null, onClearSelection: clear});
+  return <><button onClick={playback.handleTogglePlay}>play</button><button onClick={() => playback.setPlaySpeed(500)}>2x</button><output data-testid="timing-clock">{playback.currentCycle}</output></>;
+}
+createRoot(document.getElementById('root')!).render(<StrictMode>{new URLSearchParams(location.search).has('timing') ? <PlaybackTimingHarness/> : <LineFlowHarness/>}</StrictMode>);

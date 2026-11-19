@@ -1,14 +1,16 @@
 import {test,expect} from '@playwright/test';
 
-test('mapped ASM choices use only the selected clock values',async ({page})=>{
+test('diagram fills the panel and values follow the observed clock without duplicated explanations',async ({page})=>{
   await page.goto('/tests/browser/line-flow.html');
-  await expect(page.getByRole('region',{name:'입력과 기록 결과'})).toContainText('18 · 0x00000012');
-  const choices=page.locator('[aria-label="선택 C 줄의 ASM 명령어"] button');
-  await expect(choices).toHaveCount(4);
-  await choices.first().click();
-  await expect(page.getByRole('region',{name:'입력과 기록 결과'})).not.toContainText('18 ·');
-  await page.getByRole('button',{name:'이 명령어의 실행 시점으로 이동'}).click();
-  await expect(page.getByRole('region',{name:'입력과 기록 결과'})).toContainText('11 ·');
+  const diagram=page.getByRole('group',{name:'데이터가 이동하는 싱글 사이클 경로'});
+  await expect(diagram).toContainText('결과 18');
+  await expect(page.getByRole('region',{name:'입력과 기록 결과'})).toHaveCount(0);
+  await expect(page.getByRole('region',{name:'현재 동작 상세'})).toHaveCount(0);
+  await page.getByRole('button',{name:'previous clock'}).click();
+  await expect(diagram).toContainText('값 7');
+  await expect(diagram).not.toContainText('결과 18');
+  const bounds=await diagram.evaluate(element=>{const panel=element.closest('section')!;return {height:element.getBoundingClientRect().height,panel:panel.getBoundingClientRect().height};});
+  expect(bounds.height).toBeGreaterThan(bounds.panel * .75);
 });
 
 test('data moves along a path before the next path starts; replay keeps the CPU clock',async ({page})=>{
@@ -25,7 +27,7 @@ test('data moves along a path before the next path starts; replay keeps the CPU 
   expect(later.matrix).not.toBe(early.matrix);
   expect(early.nextOpacity).toBe('0');
   await expect(page.getByText(/CORE clock 12/)).toBeVisible();
-  await page.getByRole('button',{name:/3\. ALU 연산/}).click();
+  await page.getByRole('button',{name:'ALU · 연산 / 주소 계산 설명 보기'}).click();
   await expect(page.locator('[data-flow-route="operands"]')).toHaveAttribute('data-active','true');
   await expect(page.locator('[data-flow-route="load"]')).toHaveCount(0);
 });
@@ -35,9 +37,7 @@ test('store keeps memory and register writeback distinct',async ({page})=>{
   await page.getByRole('button',{name:'next clock'}).click();
   await expect(page.locator('[data-flow-route="store"]')).toHaveAttribute('data-active','true');
   await expect(page.locator('[data-flow-route="record"]')).toHaveCount(0);
-  await expect(page.getByRole('region',{name:'입력과 기록 결과'})).toContainText('쓰기');
-  await page.getByText('CU가 선택한 제어 신호',{exact:true}).click();
-  await expect(page.locator('dl')).toContainText('mem_write1');
+  await expect(page.getByRole('group',{name:'데이터가 이동하는 싱글 사이클 경로'})).toContainText('4 byte 쓰기');
 });
 
 test('tutor pagination shows encoded format without an integrated window and stays bounded',async ({page})=>{
@@ -62,9 +62,28 @@ test('the old overview is still available and diagram blocks work with keyboard'
   await page.goto('/tests/browser/line-flow.html');
   const alu=page.getByRole('button',{name:'ALU · 연산 / 주소 계산 설명 보기'});
   await alu.focus();await alu.press('Enter');
-  await expect(page.getByRole('region',{name:'현재 동작 상세'})).toContainText('ALU 연산');
+  await expect(page.getByText('3 / 4 · ALU 연산',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'전체 상태',exact:true}).click();
   await expect(page.getByRole('group',{name:'데이터가 이동하는 싱글 사이클 경로'})).toHaveCount(0);
   await page.getByRole('button',{name:'명령어 흐름',exact:true}).click();
   await expect(page.getByRole('group',{name:'데이터가 이동하는 싱글 사이클 경로'})).toBeVisible();
+});
+
+test('single playback waits for the complete slow flow; pipeline timing stays unchanged',async ({page})=>{
+  const start = new Date('2026-11-19T00:00:00Z');
+  await page.clock.install({time:start});
+  await page.clock.pauseAt(new Date(start.getTime()+1000));
+  await page.goto('/tests/browser/line-flow.html?timing=1');
+  await page.getByRole('button',{name:'play',exact:true}).click();
+  await expect(page.getByTestId('timing-clock')).toHaveText('1');
+  await page.clock.runFor(11999);
+  await expect(page.getByTestId('timing-clock')).toHaveText('1');
+  await page.clock.runFor(1);
+  await expect(page.getByTestId('timing-clock')).toHaveText('2');
+  await page.goto('/tests/browser/line-flow.html?timing=1&mode=pipeline');
+  await page.getByRole('button',{name:'play',exact:true}).click();
+  await page.clock.runFor(999);
+  await expect(page.getByTestId('timing-clock')).toHaveText('0');
+  await page.clock.runFor(1);
+  await expect(page.getByTestId('timing-clock')).toHaveText('1');
 });

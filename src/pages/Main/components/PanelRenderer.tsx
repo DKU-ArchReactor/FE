@@ -16,6 +16,7 @@ import TranslationMapping from "./TranslationMapping";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
+import {singleFlowDuration} from '../utils/instructionFlow';
 
 const EMPTY_REGISTERS: Record<string, string> = {};
 
@@ -203,7 +204,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "pipeline":
       return (
         <PipelineVisualizer
-          lessonContext={{flowDurationMs: playSpeed, onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
+          lessonContext={{flowDurationMs: singleFlowDuration(playSpeed), onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
             rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
             selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
             onSelectAsm: (line, index) => onSelectTranslationLine(line, index, false), onJumpToCycle}}

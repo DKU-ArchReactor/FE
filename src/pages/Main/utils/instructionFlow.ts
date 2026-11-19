@@ -2,6 +2,8 @@ import type {CycleHistoryItem, SimulationResult, StageBuffer} from '@/type/simul
 import type {TutorInstruction} from './tutorAnalysis';
 
 export type FlowUnit = 'cu' | 'registers' | 'alu' | 'memory' | 'pc';
+// Presentation time only: one observed CPU clock must outlast its complete flow animation.
+export const singleFlowDuration = (playSpeed: number) => Math.max(6000, playSpeed * 12);
 export interface FlowStep {id: string; title: string; description: string; units: FlowUnit[]; routes: string[]}
 const ABI_NAMES = ['zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2', 's0', 's1', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 't3', 't4', 't5', 't6'];
 export function registerLabel(name: string) {
