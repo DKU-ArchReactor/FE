@@ -258,7 +258,7 @@ export default function TranslationEditor({
         {/* C 에디터 상태 문구 (우측 정렬: ASM 모드일 때와 동일한 톤앤매너) */}
         <div className="flex items-center shrink-0 ml-2">
           <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
-            {activeTarget === "c" ? "C 소스 직접 작성" : "C 소스 읽기 전용"}
+            {activeTarget === "c" ? "C 소스 직접 작성" : "ASM 모드 활성화됨"}
           </span>
         </div>
       </header>
@@ -403,34 +403,49 @@ export default function TranslationEditor({
         onOpenSavedFile={onOpenSavedFile}
       />
 
-      <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
-        <Editor
-          height="100%"
-          language="c"
-          theme={theme === "dark" ? "vs-dark" : "vs"}
-          value={source}
-          onChange={(value) => onChange(value ?? "")}
-          onMount={handleEditorMount}
-          options={{
-            automaticLayout: true,
-            fontSize: 13,
-            fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace",
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            wordWrap: "off",
-            tabSize: 4,
-            insertSpaces: true,
-            lineNumbers: "on",
-            lineNumbersMinChars: 3,
-            glyphMargin: false,
-            folding: false,
-            lineDecorationsWidth: 16,
-            padding: { top: 8, bottom: 8 },
-            readOnly: busy || activeTarget !== "c",
-            stickyScroll: { enabled: false },
-          }}
-        />
-      </div>
+      {/* 본문: C 모드일 때는 Monaco Editor, ASM 모드일 때는 비활성화 안내 뷰 (코드는 상태에 온전히 보존됨) */}
+      {activeTarget === "c" ? (
+        <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
+          <Editor
+            height="100%"
+            language="c"
+            theme={theme === "dark" ? "vs-dark" : "vs"}
+            value={source}
+            onChange={(value) => onChange(value ?? "")}
+            onMount={handleEditorMount}
+            options={{
+              automaticLayout: true,
+              fontSize: 13,
+              fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace",
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              wordWrap: "off",
+              tabSize: 4,
+              insertSpaces: true,
+              lineNumbers: "on",
+              lineNumbersMinChars: 3,
+              glyphMargin: false,
+              folding: false,
+              lineDecorationsWidth: 16,
+              padding: { top: 8, bottom: 8 },
+              readOnly: busy,
+              stickyScroll: { enabled: false },
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] select-none">
+          <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
+            🔒
+          </div>
+          <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+            현재 어셈블리(ASM) 직접 작성 모드가 활성화되어 있습니다.
+          </p>
+          <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
+            작성해둔 C 코드는 안전하게 보관되어 있습니다. 상단 툴바에서 C 모드로 전환하면 언제든 다시 편집할 수 있습니다.
+          </span>
+        </div>
+      )}
 
       {error && (
         <pre
