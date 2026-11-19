@@ -1689,62 +1689,6 @@
     "schema_version": "1.0",
     "asm_instructions": [
       {
-        "instruction_format": {
-          "name": "I",
-          "word": "0xFEC42703",
-          "width_bits": 32,
-          "description": "12비트 즉치 필드와 기준 레지스터를 사용합니다. 산술·로드·간접 점프·SYSTEM은 같은 비트 배치를 서로 다르게 해석합니다.",
-          "fields": [
-            {
-              "name": "imm[11:0]",
-              "high": 31,
-              "low": 20,
-              "width": 12,
-              "value": 4076,
-              "binary": "111111101100",
-              "role": "즉치값을 구성하는 비트 조각"
-            },
-            {
-              "name": "rs1",
-              "high": 19,
-              "low": 15,
-              "width": 5,
-              "value": 8,
-              "binary": "01000",
-              "role": "첫 번째 입력 레지스터 번호"
-            },
-            {
-              "name": "funct3",
-              "high": 14,
-              "low": 12,
-              "width": 3,
-              "value": 2,
-              "binary": "010",
-              "role": "같은 종류 안에서 연산을 구분"
-            },
-            {
-              "name": "rd",
-              "high": 11,
-              "low": 7,
-              "width": 5,
-              "value": 14,
-              "binary": "01110",
-              "role": "결과를 받을 레지스터 번호"
-            },
-            {
-              "name": "opcode",
-              "high": 6,
-              "low": 0,
-              "width": 7,
-              "value": 3,
-              "binary": "0000011",
-              "role": "명령어 종류를 고르는 기본 코드"
-            }
-          ],
-          "immediate": -20,
-          "basis": "machine_code",
-          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
-        },
         "pc": "0x00010034",
         "raw_instruction": "0xFEC42703",
         "text": "lw a4, -20(s0)",
@@ -1856,62 +1800,6 @@
         }
       },
       {
-        "instruction_format": {
-          "name": "I",
-          "word": "0xFE842783",
-          "width_bits": 32,
-          "description": "12비트 즉치 필드와 기준 레지스터를 사용합니다. 산술·로드·간접 점프·SYSTEM은 같은 비트 배치를 서로 다르게 해석합니다.",
-          "fields": [
-            {
-              "name": "imm[11:0]",
-              "high": 31,
-              "low": 20,
-              "width": 12,
-              "value": 4072,
-              "binary": "111111101000",
-              "role": "즉치값을 구성하는 비트 조각"
-            },
-            {
-              "name": "rs1",
-              "high": 19,
-              "low": 15,
-              "width": 5,
-              "value": 8,
-              "binary": "01000",
-              "role": "첫 번째 입력 레지스터 번호"
-            },
-            {
-              "name": "funct3",
-              "high": 14,
-              "low": 12,
-              "width": 3,
-              "value": 2,
-              "binary": "010",
-              "role": "같은 종류 안에서 연산을 구분"
-            },
-            {
-              "name": "rd",
-              "high": 11,
-              "low": 7,
-              "width": 5,
-              "value": 15,
-              "binary": "01111",
-              "role": "결과를 받을 레지스터 번호"
-            },
-            {
-              "name": "opcode",
-              "high": 6,
-              "low": 0,
-              "width": 7,
-              "value": 3,
-              "binary": "0000011",
-              "role": "명령어 종류를 고르는 기본 코드"
-            }
-          ],
-          "immediate": -24,
-          "basis": "machine_code",
-          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
-        },
         "pc": "0x00010038",
         "raw_instruction": "0xFE842783",
         "text": "lw a5, -24(s0)",
@@ -2023,71 +1911,6 @@
         }
       },
       {
-        "instruction_format": {
-          "name": "R",
-          "word": "0x00F707B3",
-          "width_bits": 32,
-          "description": "레지스터 두 개를 입력으로 사용하고 결과를 목적지 레지스터에 기록합니다. M 확장도 같은 R형 배치를 사용합니다.",
-          "fields": [
-            {
-              "name": "funct7",
-              "high": 31,
-              "low": 25,
-              "width": 7,
-              "value": 0,
-              "binary": "0000000",
-              "role": "연산을 더 구체적으로 구분"
-            },
-            {
-              "name": "rs2",
-              "high": 24,
-              "low": 20,
-              "width": 5,
-              "value": 15,
-              "binary": "01111",
-              "role": "두 번째 입력 레지스터 번호"
-            },
-            {
-              "name": "rs1",
-              "high": 19,
-              "low": 15,
-              "width": 5,
-              "value": 14,
-              "binary": "01110",
-              "role": "첫 번째 입력 레지스터 번호"
-            },
-            {
-              "name": "funct3",
-              "high": 14,
-              "low": 12,
-              "width": 3,
-              "value": 0,
-              "binary": "000",
-              "role": "같은 종류 안에서 연산을 구분"
-            },
-            {
-              "name": "rd",
-              "high": 11,
-              "low": 7,
-              "width": 5,
-              "value": 15,
-              "binary": "01111",
-              "role": "결과를 받을 레지스터 번호"
-            },
-            {
-              "name": "opcode",
-              "high": 6,
-              "low": 0,
-              "width": 7,
-              "value": 51,
-              "binary": "0110011",
-              "role": "명령어 종류를 고르는 기본 코드"
-            }
-          ],
-          "immediate": null,
-          "basis": "machine_code",
-          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
-        },
         "pc": "0x0001003C",
         "raw_instruction": "0x00F707B3",
         "text": "add a5, a4, a5",
@@ -2192,71 +2015,6 @@
         }
       },
       {
-        "instruction_format": {
-          "name": "S",
-          "word": "0xFEF42223",
-          "width_bits": 32,
-          "description": "rs2의 데이터를 rs1 + 부호 확장 오프셋 주소에 저장합니다. rd 필드는 없고 즉치값이 두 구간으로 나뉩니다.",
-          "fields": [
-            {
-              "name": "imm[11:5]",
-              "high": 31,
-              "low": 25,
-              "width": 7,
-              "value": 127,
-              "binary": "1111111",
-              "role": "즉치값을 구성하는 비트 조각"
-            },
-            {
-              "name": "rs2",
-              "high": 24,
-              "low": 20,
-              "width": 5,
-              "value": 15,
-              "binary": "01111",
-              "role": "두 번째 입력 레지스터 번호"
-            },
-            {
-              "name": "rs1",
-              "high": 19,
-              "low": 15,
-              "width": 5,
-              "value": 8,
-              "binary": "01000",
-              "role": "첫 번째 입력 레지스터 번호"
-            },
-            {
-              "name": "funct3",
-              "high": 14,
-              "low": 12,
-              "width": 3,
-              "value": 2,
-              "binary": "010",
-              "role": "같은 종류 안에서 연산을 구분"
-            },
-            {
-              "name": "imm[4:0]",
-              "high": 11,
-              "low": 7,
-              "width": 5,
-              "value": 4,
-              "binary": "00100",
-              "role": "즉치값을 구성하는 비트 조각"
-            },
-            {
-              "name": "opcode",
-              "high": 6,
-              "low": 0,
-              "width": 7,
-              "value": 35,
-              "binary": "0100011",
-              "role": "명령어 종류를 고르는 기본 코드"
-            }
-          ],
-          "immediate": -28,
-          "basis": "machine_code",
-          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
-        },
         "pc": "0x00010040",
         "raw_instruction": "0xFEF42223",
         "text": "sw a5, -28(s0)",

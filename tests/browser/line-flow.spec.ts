@@ -141,24 +141,6 @@ test('load/store use the correct system bus direction and store has no register 
   }
 });
 
-test('tutor pagination shows encoded format without an integrated window and stays bounded',async ({page})=>{
-  await page.goto('/tests/browser/line-flow.html');
-  await page.getByRole('button',{name:'show tutor'}).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  const select=page.getByRole('combobox',{name:'설명 페이지 선택'});
-  const value=await select.locator('option').filter({hasText:'R형 포맷'}).getAttribute('value');
-  await select.selectOption(value!);
-  await expect(page.getByRole('region',{name:'현재 설명 페이지'})).toContainText('funct7');
-  await page.setViewportSize({width:390,height:844});
-  await page.evaluate(()=>document.documentElement.classList.add('dark'));
-  const panel=page.getByRole('region',{name:'튜터 해설 패널'});
-  expect(await panel.evaluate(element=>element.scrollHeight-element.clientHeight)).toBeLessThanOrEqual(1);
-  await expect(page.getByRole('button',{name:'다음 설명',exact:true})).toBeInViewport();
-  await page.getByRole('button',{name:'다음 명령어',exact:true}).click();
-  await expect(panel.locator('[data-asm-index="3"]')).toBeVisible();
-  await expect(select).toHaveValue('0');
-});
-
 test('node text, payloads and system-bus labels remain readable in every transfer layout',async ({page})=>{
   await frozenTime(page);
   for(const op of ['add','lw','sw','bne','jal','ecall']) for(const size of [{width:1400,height:900},{width:700,height:1000}]) {

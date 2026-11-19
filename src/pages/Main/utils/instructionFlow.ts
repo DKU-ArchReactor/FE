@@ -72,10 +72,10 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
   const amount = shift && input2 && /^0x[\da-f]+$/i.test(input2) ? Number.parseInt(input2, 16) & 31 : undefined;
   const control = actual ? frame?.cycle_events.control_hazard : undefined;
   const nextPc = dp?.next_pc ?? (actual ? frame?.global_result.current_pc : undefined);
-  const immediate = dp?.immediate?.dec ?? dp?.immediate?.decimal ?? item?.instruction_format?.immediate;
+  const immediate = dp?.immediate?.dec ?? dp?.immediate?.decimal;
   const steps: FlowStep[] = [
     {id: 'decode', title: '명령어 해석', units: ['cu', 'memory'], routes: ['fetch'],
-      description: `PC ${item?.pc ?? '미확인'}의 ${op || '선택한 명령어'}를 해석합니다. ${item?.instruction_format ? `${item.instruction_format.name}형의 필드가 입력·목적지·즉치값을 구분합니다.` : '명령어의 입력·목적지와 필요한 동작을 구분합니다.'}`},
+      description: `PC ${item?.pc ?? '미확인'}의 ${op || '선택한 명령어'}를 해석합니다. 명령어의 입력·목적지와 필요한 동작을 구분합니다.`},
     {id: 'read', title: system ? '실행 환경 요청' : '입력 준비', units: ['cu', ...(reads.length ? ['registers' as const] : [])], routes: reads.length ? ['control'] : [],
       description: system ? 'ECALL은 실행 환경에 서비스를 요청합니다. 일반 ALU 결과를 레지스터에 쓰는 명령어로 설명하지 않습니다.'
         : `${item?.explanation.reads == null ? '레지스터 입력 정보가 제공되지 않았습니다.' : reads.length ? `${reads.join(', ')}의 값을 읽습니다.` : '일반 입력 레지스터를 읽지 않습니다.'} ${item?.explanation.operands ?? ''}`},

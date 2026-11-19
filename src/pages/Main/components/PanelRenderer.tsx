@@ -181,7 +181,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "tutor":
       return (
         <TutorArea
-          onSelectAsm={(line, index) => onSelectTranslationLine(line, index, false)}
           simulationData={simulationData}
           currentCycleData={currentData}
           loadingMessage={loadingMessage}

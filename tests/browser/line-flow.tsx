@@ -1,7 +1,6 @@
 import {StrictMode, useState, useCallback} from 'react';
 import {createRoot} from 'react-dom/client';
 import {SingleCycleDatapath} from '../../src/pages/Main/components/SingleCycleDatapath';
-import TutorArea from '../../src/pages/Main/components/TutorArea';
 import {useSimulationPlayback} from '../../src/pages/Main/hooks/useSimulationPlayback';
 import {singleFlowDuration} from '../../src/pages/Main/utils/instructionFlow';
 import type {SimulationResult} from '../../src/type/simulation';
@@ -24,7 +23,6 @@ if (geometry && cases[geometry]) {
   const variant=cases[geometry];
   item.text=variant.text;
   item.explanation={...item.explanation,opcode:geometry,reads:variant.reads,writes:variant.writes};
-  delete item.instruction_format;
   dp.alu.input_1='0x80000000';dp.alu.input_2='0x7FFFFFFF';dp.alu.result='0xFFFFFFFF';
   if(dp.registers.rs1) dp.registers.rs1.value='0x80000000';
   if(dp.registers.rs2) dp.registers.rs2.value='0x7FFFFFFF';
@@ -42,7 +40,6 @@ const rows = run.tutor!.asm_instructions!.map(item => ({pc: item.pc!, text: item
 export function LineFlowHarness() {
   const [position, setPosition] = useState(2);
   const [selected, setSelected] = useState<number | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const [paused, setPaused] = useState(false);
   const frame = run.history[position];
   const props = {currentData: frame, prevData: position > 0 ? run.history[position - 1] : null, simulationData: run,
@@ -53,13 +50,10 @@ export function LineFlowHarness() {
     <div style={{display: 'flex', gap: 16, padding: 8}}>
       <button onClick={() => {setPosition(Math.max(0, position - 1)); setSelected(null);}}>previous clock</button>
       <button onClick={() => {setPosition(Math.min(run.history.length - 1, position + 1)); setSelected(null);}}>next clock</button>
-      <button onClick={() => setExpanded(value => !value)}>show tutor</button>
       <button onClick={() => document.documentElement.classList.toggle('dark')}>theme</button>
       <output>{paused ? 'playback paused' : 'playback running'}</output>
     </div>
-    {expanded ? <TutorArea simulationData={run} currentCycleData={frame} mappedRows={rows} translationSource={props.context.source}
-      selectedTranslationLine={5} selectedAsmIndex={selected ?? position} isUserSelected onSelectAsm={props.context.onSelectAsm}/>
-      : <SingleCycleDatapath {...props} lessonContext={props.context}/>}
+    <SingleCycleDatapath {...props} lessonContext={props.context}/>
   </main>;
 }
 function PlaybackTimingHarness() {
