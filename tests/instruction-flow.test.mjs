@@ -6,7 +6,7 @@ import ts from 'typescript';
 const source = readFileSync(new URL('../src/pages/Main/utils/instructionFlow.ts', import.meta.url), 'utf8');
 const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
-const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline} = exports;
+const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline,instructionFlowDuration} = exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
   global_result: {registers: {x10: '0x0000000C'}, metrics: {accumulated_instructions: 1}},
@@ -125,7 +125,8 @@ test('store, ECALL, jump and shift transfers keep their distinct meanings',()=>{
   assert.ok(system.some(value=>value.id==='environment'));
   assert.ok(system.every(value=>value.id!=='memory-address'&&value.id!=='calculate'));
   const jump=instructionTransfers(buildInstructionFlow(item('jal',[],['x1']),current,null,simulation(current)));
-  assert.equal(jump.find(value=>value.id==='writeback').source,'pc');
+  assert.equal(jump.find(value=>value.id==='result-to-mux').source,'pc');
+  assert.equal(jump.find(value=>value.id==='writeback').source,'mux');
   const store=instructionTransfers(buildInstructionFlow(item('sw',['x11','x12'],[]),current,null,simulation(current)));
   assert.ok(store.some(value=>value.id==='store-data'&&value.source==='registers'&&value.target==='memory'));
   assert.ok(store.every(value=>value.id!=='writeback'));
@@ -141,21 +142,32 @@ test('packet geometry advances along the same orthogonal wire and clamps endpoin
 });
 
 
-test('every flow step receives the same reading time, independent of path length and viewport',()=>{
+test('long returns cannot travel faster than the reference register input and memory steps retain reading time',()=>{
   const current=frame();
   for(const op of ['add','lw','sw','bne','ecall']) {
     const flow=buildInstructionFlow(item(op,['x11','x12'],['x10']),current,null,simulation(current));
     const transfers=instructionTransfers(flow);
-    for(const scale of [1,2.7]) {
-      const timeline=transferTimeline(transfers,instructionPaths(flow,scale),9000);
-      for(const entry of timeline) assert.equal(entry.duration,1600);
-      assert.equal(timeline.at(-1).start+timeline.at(-1).duration,transfers.length*1600);
-      for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') {
-        assert.equal(timeline[index].motion.route,undefined);
-        assert.equal(timeline[index].travel,0);
-      }
+    const timeline=transferTimeline(transfers,instructionPaths(flow),9000);
+    for(const entry of timeline) {
+      assert.ok(entry.duration>=1600-1e-9);
+      if(entry.motion.route) assert.ok(entry.motion.distance/entry.travel <= 195/1400+1e-9);
     }
+    assert.ok(Math.abs(instructionFlowDuration(flow,9000)-timeline.at(-1).start-timeline.at(-1).duration)<1e-9);
+    const input=timeline[transfers.findIndex(transfer=>transfer.id==='input-a')];
+    if(input&&!flow.pcRelative) assert.equal(input.duration,1600);
+    for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') assert.equal(timeline[index].travel,0);
   }
+});
+
+test('a load reaches the MUX before the register write is shown',()=>{
+  const current=frame('lw');
+  const flow=buildInstructionFlow(item('lw',['x11'],['x10']),current,null,simulation(current));
+  const transfers=instructionTransfers(flow);
+  const memory=transfers.findIndex(value=>value.id==='load-data');
+  assert.equal(transfers[memory].target,'mux');
+  assert.equal(transfers[memory+1].id,'writeback');
+  assert.equal(transfers[memory+1].source,'mux');
+  assert.equal(transfers[memory+1].value,transfers[memory].value);
 });
 
 test('immediate formats receive instruction bits before their immediate reaches the ALU',()=>{

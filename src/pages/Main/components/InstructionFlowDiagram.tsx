@@ -20,6 +20,7 @@ const NODES = {
   memory: "#009dd8",
   cu: "#a45de4",
   immediate: "#009dd8",
+  mux: "#9860dc",
 };
 const short = (value?: string | null) => displayValue(value).split(" · ")[0];
 
@@ -31,7 +32,6 @@ export default function InstructionFlowDiagram({
   count,
   arrived,
   onUnit,
-  onScale,
 }: {
   flow: Flow;
   transfer: InstructionTransfer;
@@ -40,7 +40,6 @@ export default function InstructionFlowDiagram({
   count: number;
   arrived: string[];
   onUnit: (unit: TransferUnit) => void;
-  onScale: (scale: number) => void;
 }) {
   const id = useId().replace(/:/g, "");
   const area = useRef<HTMLDivElement>(null);
@@ -59,7 +58,6 @@ export default function InstructionFlowDiagram({
     return () => observer.disconnect();
   }, []);
   const scale = viewWidth / 780;
-  useEffect(() => onScale(scale), [onScale, scale]);
   const sx = (value: number) => value * scale;
   const scalePath = (value: string) =>
     value.replace(
@@ -215,6 +213,8 @@ export default function InstructionFlowDiagram({
             onUnit(instructionMemory ? "cu" : unit);
           }
         }}
+        data-flow-active={active}
+        opacity={active ? 1 : 0.42}
         className="cursor-pointer outline-none focus-visible:drop-shadow-md"
       >
         {unit === "registers" && (
@@ -258,7 +258,11 @@ export default function InstructionFlowDiagram({
         {shape ? (
           <path
             d={shape}
-            fill={active ? "var(--ar-header-bg)" : "var(--ar-panel-bg)"}
+            fill={
+              active
+                ? `color-mix(in srgb, ${color} 9%, var(--ar-panel-bg))`
+                : "var(--ar-panel-bg)"
+            }
             stroke={stroke}
             strokeWidth={active ? 3 : 1.8}
           />
@@ -271,7 +275,11 @@ export default function InstructionFlowDiagram({
             rx={
               unit === "registers" || unit === "memory" || unit === "cu" ? 2 : 8
             }
-            fill={active ? "var(--ar-header-bg)" : "var(--ar-panel-bg)"}
+            fill={
+              active
+                ? `color-mix(in srgb, ${color} 9%, var(--ar-panel-bg))`
+                : "var(--ar-panel-bg)"
+            }
             stroke={stroke}
             strokeWidth={active ? 3 : 1.8}
           />
@@ -315,16 +323,17 @@ export default function InstructionFlowDiagram({
           y={box.y + (shape ? 42 : 25)}
           textAnchor="middle"
           fontSize="19"
-          fontWeight="650"
+          fontWeight="750"
+          className="font-mono"
           fill="var(--ar-text-primary)"
         >
           {title}
         </text>
         {status && (
           <text
-            x={box.x + box.w - (shape ? 24 : 12)}
-            y={box.y + (shape ? 34 : 24)}
-            textAnchor="end"
+            x={shape ? box.x + 45 : box.x + box.w - 12}
+            y={box.y + (shape ? 29 : 24)}
+            textAnchor={shape ? "start" : "end"}
             fontSize="11"
             fontWeight="600"
             fill={color}
@@ -338,19 +347,35 @@ export default function InstructionFlowDiagram({
             transfer.value != null &&
             (line.endsWith(`: ${short(transfer.value)}`) ||
               line.endsWith(`← ${short(transfer.value)}`));
+          const baseline = box.y + (shape ? 62 : 49) + i * (shape ? 18 : 22);
+          const inset = shape ? Math.max(48, (box.w - 180) / 2) : 12;
           return (
-            <text
-              key={i}
-              x={box.x + box.w / 2}
-              y={box.y + (shape ? 62 : 49) + i * (shape ? 18 : 22)}
-              textAnchor="middle"
-              fontSize={unit === "cu" || unit === "immediate" ? 14 : 15}
-              fontWeight={selected ? 700 : 400}
-              fill={selected ? color : "var(--ar-text-primary)"}
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {line}
-            </text>
+            <g key={i}>
+              {unit !== "registers" && (
+                <rect
+                  x={box.x + inset}
+                  y={baseline - 14}
+                  width={box.w - inset * 2}
+                  height="17"
+                  rx="3"
+                  fill={active ? "var(--ar-panel-bg)" : "var(--ar-header-bg)"}
+                  stroke={selected ? color : "var(--ar-border)"}
+                  strokeWidth=".6"
+                />
+              )}
+              <text
+                x={box.x + box.w / 2}
+                y={baseline}
+                textAnchor="middle"
+                fontSize={unit === "cu" || unit === "immediate" ? 15 : 16}
+                fontWeight={selected ? 750 : 550}
+                className="font-mono"
+                fill={selected ? color : "var(--ar-text-primary)"}
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {line}
+              </text>
+            </g>
           );
         })}
       </g>
@@ -378,6 +403,8 @@ export default function InstructionFlowDiagram({
   if (flow.load && flow.writes.length && !flow.error)
     wires.push({ key: "load-data", system: true });
   if (!flow.load && !flow.store && flow.writes.length)
+    wires.push({ key: "result-to-mux" });
+  if (!flow.store && flow.writes.length && !flow.error)
     wires.push({ key: "writeback" });
   const regLines = flow.registerInputs.map(
     (value) => `${registerLabel(value.name)}: ${short(value.value)}`,
@@ -385,7 +412,7 @@ export default function InstructionFlowDiagram({
   if (!regLines.length) regLines.push("입력 읽기 없음");
   if (flow.writes.length)
     regLines.push(
-      reached("writeback") || reached("load-data")
+      reached("writeback")
         ? `${flow.writes[0]} ← ${short(flow.writeValue)}`
         : "결과 기록 대기",
     );
@@ -447,6 +474,7 @@ export default function InstructionFlowDiagram({
           <g
             key={wire.key}
             data-circuit-wire={wire.key}
+            opacity={wire.key === transfer.id ? 1 : 0.28}
             data-memory-connection={wire.system || undefined}
           >
             {wire.system && wire.kind !== "control" && (
@@ -479,16 +507,14 @@ export default function InstructionFlowDiagram({
               d={path}
               fill="none"
               stroke="var(--ar-panel-bg)"
-              strokeWidth="10"
+              strokeWidth="14"
               strokeLinejoin="round"
             />
             <path
               d={path}
               fill="none"
               stroke={color}
-              strokeWidth={
-                transfer.kind === "control" ? 2.5 : transfer.systemBus ? 6 : 3
-              }
+              strokeWidth={transfer.kind === "control" ? 4 : 6}
               strokeDasharray={transfer.kind === "control" ? "6 4" : undefined}
               strokeLinejoin="round"
               markerEnd={`url(#${id}-${transfer.kind})`}
@@ -529,7 +555,10 @@ export default function InstructionFlowDiagram({
             ? `기록: ${flow.controlSignals.reg_write ? "켜짐" : "꺼짐"}`
             : "신호 미제공",
         ])}
-        <g aria-label="ALU 입력 선택">
+        <g
+          aria-label="ALU 입력 선택"
+          opacity={transfer.id === "input-b" ? 1 : 0.42}
+        >
           <path
             d={scalePath("M410 520H470L458 552H422Z")}
             fill="var(--ar-panel-bg)"
@@ -548,7 +577,15 @@ export default function InstructionFlowDiagram({
         </g>
         {node("alu", boxes.alu, "ALU", aluLines)}
         {node("memory", boxes.memory, "Data Memory", memoryLines)}
-        <g aria-label="기록값 선택">
+        <g
+          aria-label="기록값 선택"
+          data-flow-active={
+            transfer.source === "mux" || transfer.target === "mux"
+          }
+          opacity={
+            transfer.source === "mux" || transfer.target === "mux" ? 1 : 0.42
+          }
+        >
           <title>
             연산 결과·메모리 값·복귀 주소 중 명령어에 맞는 값을 선택합니다.
           </title>
@@ -556,7 +593,7 @@ export default function InstructionFlowDiagram({
             d={scalePath("M290 860H450L422 908H318Z")}
             fill="var(--ar-panel-bg)"
             stroke={
-              transfer.id === "writeback" || transfer.id === "load-data"
+              transfer.source === "mux" || transfer.target === "mux"
                 ? color
                 : "#9860dc"
             }
@@ -564,13 +601,27 @@ export default function InstructionFlowDiagram({
           />
           <text
             x={sx(370)}
-            y="885"
+            y="879"
             textAnchor="middle"
-            fontSize="14"
-            fontWeight="600"
+            fontSize="16"
+            fontWeight="700"
+            className="font-mono"
             fill="var(--ar-text-primary)"
           >
             기록값 MUX
+          </text>
+          <text
+            x={sx(370)}
+            y="900"
+            textAnchor="middle"
+            fontSize="13"
+            fontWeight="650"
+            className="font-mono"
+            fill={color}
+          >
+            {reached("load-data") || reached("result-to-mux")
+              ? short(flow.writeValue)
+              : "\uC804\uB2EC \uB300\uAE30"}
           </text>
         </g>
         <g data-text-layer="true">
@@ -589,15 +640,17 @@ export default function InstructionFlowDiagram({
             {(["address", "data", "control"] as const).map((kind, i) => (
               <g key={kind} data-system-bus-label={kind}>
                 <path
-                  d={`M${sx(220 + i * 150)} 937H${sx(244 + i * 150)}`}
+                  d={`M${sx(55)} ${257 + i * 30}H${sx(78)}`}
                   stroke={COLORS[kind]}
                   strokeWidth={kind === "control" ? 2 : 5}
                   strokeDasharray={kind === "control" ? "5 3" : undefined}
                 />
                 <text
-                  x={sx(252 + i * 150)}
-                  y="941"
-                  fontSize="13"
+                  x={sx(87)}
+                  y={262 + i * 30}
+                  fontSize="14"
+                  fontWeight="600"
+                  className="font-mono"
                   fill={COLORS[kind]}
                 >
                   {kind === "address"
@@ -613,6 +666,31 @@ export default function InstructionFlowDiagram({
             메모리 연결의 버스 역할을 설명한 개념도입니다.
           </text>
         </g>
+        {transfer.id === "read-control" && (
+          <g data-control-selection="true" aria-label="Read select">
+            <rect
+              x={sx(60)}
+              y="338"
+              width={sx(230)}
+              height="30"
+              rx="6"
+              fill="var(--ar-panel-bg)"
+              stroke={COLORS.control}
+              strokeWidth="1.5"
+            />
+            <text
+              x={sx(72)}
+              y="358"
+              fontSize="15"
+              className="font-mono"
+              fontWeight="650"
+              fill={COLORS.control}
+            >
+              Read select:{" "}
+              {flow.registerInputs.map((value) => value.name).join(", ")}
+            </text>
+          </g>
+        )}
         <g aria-label="현재 이동 데이터" data-transfer={transfer.id}>
           <rect
             x={sx(16)}

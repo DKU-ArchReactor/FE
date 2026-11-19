@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
-import {buildInstructionFlow, instructionPc, instructionTransfers, singleTransferDuration, singleFlowDuration} from '../utils/instructionFlow';
+import {buildInstructionFlow, instructionPc, instructionFlowDuration, singleFlowDuration} from '../utils/instructionFlow';
 
 import {instructionAt} from '../utils/tutorAnalysis';
 
@@ -36,6 +36,7 @@ export function useSimulationPlayback({
   } | null>(null);
 
   const timerRef = useRef<number | null>(null);
+  const singleClock = useRef<{frame: CycleHistoryItem | null; duration: number; remaining: number; started: number | null} | null>(null);
 
   const triggerPlaybackFeedback = (type: "play" | "pause" | "reset" | "trash" | "check") => {
     setPlaybackFeedback({ type, id: Date.now() });
@@ -239,37 +240,47 @@ export function useSimulationPlayback({
     if (!isSingleEngine || !currentCycle) return singleFlowDuration(playSpeed);
     const item = instructionAt(simulationData?.tutor, instructionPc(currentData) ?? undefined);
     const flow = buildInstructionFlow(item, currentData, prevData, simulationData);
-    return instructionTransfers(flow).length * singleTransferDuration(singleFlowDuration(playSpeed));
+    return instructionFlowDuration(flow, singleFlowDuration(playSpeed));
   }, [isSingleEngine, currentCycle, currentData, prevData, simulationData, playSpeed]);
   const singlePlaybackFrame = isSingleEngine ? currentCycle : 0;
 
-  // 자동 재생 타이머
+  const singleFrame = isSingleEngine ? currentData : null;
+  // Resume the remaining part of this instruction; restarting a full interval here
+  // left a completed diagram apparently frozen after Pause -> Play.
   useEffect(() => {
-    if (isPlaying) {
+    const advance = () => setCurrentCycle(previous => {
+      if (previous >= totalCycles) {setIsPlaying(false);return previous;}
+      return previous + 1;
+    });
+    if (isSingleEngine) {
+      if (!singleClock.current || singleClock.current.frame !== singleFrame || singleClock.current.duration !== singlePlaybackDelay)
+        singleClock.current = {frame: singleFrame, duration: singlePlaybackDelay, remaining: singlePlaybackDelay, started: null};
+      const clock = singleClock.current;
+      if (!isPlaying) return;
       onClearSelection();
-
-      timerRef.current = window.setInterval(() => {
-        setCurrentCycle((prev) => {
-          const maxLimit = totalCycles;
-          if (prev >= maxLimit) {
-            setIsPlaying(false);
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, isSingleEngine ? singlePlaybackDelay : playSpeed);
-    } else {
-      if (timerRef.current !== null) {
-        clearInterval(timerRef.current);
-      }
+      clock.started = performance.now();
+      timerRef.current = window.setTimeout(() => {clock.remaining = 0;clock.started = null;advance();}, clock.remaining);
+      return () => {
+        if (timerRef.current !== null) clearTimeout(timerRef.current);
+        if (clock.started !== null) {
+          clock.remaining = Math.max(0, clock.remaining - (performance.now() - clock.started));
+          clock.started = null;
+        }
+      };
     }
+    singleClock.current = null;
+    if (!isPlaying) return;
+    onClearSelection();
+    timerRef.current = window.setInterval(advance, playSpeed);
+    return () => {if (timerRef.current !== null) clearInterval(timerRef.current);};
+  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection, singlePlaybackDelay, singlePlaybackFrame, singleFrame]);
 
-    return () => {
-      if (timerRef.current !== null) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection, singlePlaybackDelay, singlePlaybackFrame]);
+  const pauseForFlow = () => {
+    // Manual flow controls detach from CPU playback. The next global Play starts
+    // this instruction afresh, while the diagram's own Pause/Resume keeps its cursor.
+    singleClock.current = null;
+    setIsPlaying(false);
+  };
 
   const handleStepBack = () => {
     setIsPlaying((prev) => {
@@ -352,6 +363,7 @@ export function useSimulationPlayback({
     activeCycleIndex,
     currentData,
     singlePlaybackDelay,
+    pauseForFlow,
     prevData,
     currentActiveRow,
     activeExecutionCLine,

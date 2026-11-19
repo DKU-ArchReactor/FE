@@ -107,7 +107,7 @@ test('global Play/Pause controls the same animation clock and preserves pipeline
   const before=await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed');
   await page.clock.runFor(2000);
   expect(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed')).toBe(before);
-  await page.getByRole('button',{name:'play',exact:true}).click();await page.clock.runFor(Number(await page.getByTestId('timing-delay').textContent())-1);
+  await page.getByRole('button',{name:'play',exact:true}).click();await page.clock.runFor(Number(await page.getByTestId('timing-delay').textContent())-351);
   await expect(page.getByTestId('timing-clock')).toHaveText('1');
   await page.clock.runFor(1);await expect(page.getByTestId('timing-clock')).toHaveText('2');
   await page.getByRole('button',{name:'흐름 다시 보기',exact:true}).click();
@@ -208,7 +208,52 @@ test('Imm Gen receives instruction bits before exposing the decoded immediate',a
   await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
   await page.clock.runFor(1100);
   await expect(page.locator('[data-transfer="decode-immediate"]')).toBeVisible();
-  await page.clock.runFor(600);
+  await page.clock.runFor(1000);
   await expect(page.locator('[data-transfer="input-a"]')).toBeVisible();
   await expect(immediate).toContainText('-4');
+});
+
+
+test('cycle three resumes locally after pausing global playback and can replay while global Play is active',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?timing=1');
+  for(let i=0;i<3;i++) await page.getByRole('button',{name:'step',exact:true}).click();
+  await expect(page.getByTestId('timing-clock')).toHaveText('3');
+  await page.getByRole('button',{name:'play',exact:true}).click();await page.clock.runFor(300);
+  await page.getByRole('button',{name:'\uD750\uB984 \uB2E4\uC2DC \uBCF4\uAE30',exact:true}).click();
+  await expect(page.getByTestId('global-playing')).toHaveText('false');
+  await expect(page.locator('[data-flow-playing]')).toHaveAttribute('data-flow-playing','true');
+  await page.clock.runFor(300);
+  expect(Number(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed'))).toBeGreaterThan(150);
+  for(let i=0;i<2;i++) {
+    await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+    const elapsed=await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed');
+    await page.clock.runFor(300);
+    expect(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed')).toBe(elapsed);
+    await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();await page.clock.runFor(300);
+    expect(Number(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed'))).toBeGreaterThan(Number(elapsed));
+  }
+});
+
+
+test('focus follows memory -> MUX -> registers, and control selection names the register ports',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');
+  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  const next=page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true});
+  for(let i=0;i<2;i++) await next.click();
+  await expect(page.locator('[data-control-selection]')).toContainText('Read select: x8');
+  const legendAboveRegisters=await page.locator('svg[data-layout]').evaluate(svg=>{
+    const register=svg.querySelector('[data-flow-node="registers"]') as SVGGraphicsElement;
+    return [...svg.querySelectorAll<SVGGraphicsElement>('[data-system-bus-label]')].every(label=>label.getBBox().y+label.getBBox().height<register.getBBox().y);
+  });
+  expect(legendAboveRegisters).toBe(true);
+  while(await page.getByLabel('\uD604\uC7AC \uC774\uB3D9 \uB370\uC774\uD130').getAttribute('data-transfer')!=='load-data') await next.click();
+  const registers=page.locator('[data-flow-node="registers"]');
+  await expect(registers).toContainText('\uACB0\uACFC \uAE30\uB85D \uB300\uAE30');
+  await expect(registers).toHaveAttribute('data-flow-active','false');
+  await expect(page.getByLabel('\uAE30\uB85D\uAC12 \uC120\uD0DD')).toHaveAttribute('data-flow-active','true');
+  await expect(page.locator('[data-flow-node="memory"]')).toHaveAttribute('data-flow-active','true');
+  await next.click();
+  await expect(page.locator('[data-transfer="writeback"]')).toBeVisible();
+  await expect(registers).toHaveAttribute('data-flow-active','true');
+  await expect(page.locator('[data-flow-node="memory"]')).toHaveAttribute('data-flow-active','false');
 });

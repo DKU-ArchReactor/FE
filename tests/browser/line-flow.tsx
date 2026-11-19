@@ -64,7 +64,7 @@ function PlaybackTimingHarness() {
   return <main style={{height:'96vh',display:'flex',flexDirection:'column'}}>
     <div><button onClick={playback.handleTogglePlay}>play</button><button onClick={() => playback.setPlaySpeed(500)}>2x</button><button onClick={playback.handleReset}>reset</button><button onClick={playback.handleStepForward}>step</button><output data-testid="timing-delay">{playback.singlePlaybackDelay}</output><output data-testid="timing-clock">{playback.currentCycle}</output><output data-testid="global-playing">{String(playback.isPlaying)}</output></div>
     {single&&<SingleCycleDatapath currentData={playback.currentData} prevData={playback.prevData} simulationData={run}
-      lessonContext={{rows,isPlaying:playback.isPlaying,flowDurationMs:singleFlowDuration(playback.playSpeed),onPausePlayback:()=>playback.setIsPlaying(false)}}/>}
+      lessonContext={{rows,isPlaying:playback.isPlaying,flowDurationMs:singleFlowDuration(playback.playSpeed),onPausePlayback:playback.pauseForFlow}}/>}
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<StrictMode>{new URLSearchParams(location.search).has('timing') ? <PlaybackTimingHarness/> : <LineFlowHarness/>}</StrictMode>);

@@ -96,7 +96,7 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
     taken: control?.taken, error: error?.has_error ? error : undefined, steps};
 }
 
-export type TransferUnit = FlowUnit | 'immediate';
+export type TransferUnit = FlowUnit | 'immediate' | 'mux';
 export interface InstructionTransfer {
   id: string; source: TransferUnit; target: TransferUnit; title: string;
   kind: 'address' | 'data' | 'control'; systemBus?: boolean; value?: string | null; detail: string;
@@ -135,8 +135,9 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
     'memory-address':'M360 680V730',
     'memory-control':'M760 420H770V775H500',
     'store-data':'M140 490V775H220',
-    'load-data':'M360 820V908H24V435H55',
-    writeback:flow.jump?'M460 167H748V838H420V882H370V908H24V435H55':'M300 680V700H190V838H330V882H370V908H24V435H55',
+    'load-data':'M360 820V838H370V860',
+    'result-to-mux':flow.jump?'M460 167H748V838H420V860':'M300 680V700H190V838H330V860',
+    writeback:'M370 908H24V435H55',
     'next-pc':'M700 365V167H460',
   };
   return Object.fromEntries(Object.entries(paths).map(([key,path])=>[key,path.replace(/([MHV])([^MHV]+)/g,(_,command:string,coordinates:string)=>{
@@ -154,14 +155,25 @@ export function transferMotion(transfer:InstructionTransfer,path?:string) {
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
   return {value,width,route,startPadding,endPadding,distance};
 }
-// Each visual step has the same reading time, including short wires and controls.
-// The playback hook uses this same step duration to wait for the complete instruction.
+// Use register -> ALU as the reference motion. Short connections retain reading time;
+// long return paths get more travel time instead of crossing the diagram in one flash.
+// Canonical geometry keeps timing identical between the playback hook and every viewport.
 export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,pace:number) {
-  const duration=singleTransferDuration(pace);
-  return transfers.map((transfer,index)=>{
+  const base=singleTransferDuration(pace);
+  let start=0;
+  return transfers.map(transfer=>{
     const motion=transferMotion(transfer,paths[transfer.id]);
-    return {start:index*duration,duration,lead:motion.route?duration*.05:0,travel:motion.route?duration*.875:0,motion};
+    const minimum=base*(transfer.id==='decode-immediate'||transfer.id==='memory-address'||transfer.id==='load-data'?1.2:1);
+    const lead=motion.route?minimum*.05:0;
+    const travel=motion.route?Math.max(minimum*.875,base*.875*motion.distance/195):0;
+    const duration=motion.route?lead+travel+minimum*.075:minimum;
+    const entry={start,duration,lead,travel,motion};
+    start+=duration;
+    return entry;
   });
+}
+export function instructionFlowDuration(flow:ReturnType<typeof buildInstructionFlow>,pace:number) {
+  return transferTimeline(instructionTransfers(flow),instructionPaths(flow),pace).reduce((sum,entry)=>sum+entry.duration,0);
 }
 export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlow>): InstructionTransfer[] {
   const result: InstructionTransfer[] = [
@@ -170,7 +182,7 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
   ];
   if (flow.system) result.push({id:'environment',source:'cu',target:'cu',title:'CU · 실행 환경 요청',kind:'control',value:'ECALL',detail:'일반 메모리 전송이 아닌 실행 환경 서비스 요청'});
   else {
-    if(flow.registerInputs.length) result.push({id:'read-control',source:'cu',target:'registers',title:'CU → 레지스터',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'입력으로 읽을 레지스터를 선택'});
+    if(flow.registerInputs.length) result.push({id:'read-control',source:'cu',target:'registers',title:'CU → 레지스터 · 읽기 선택',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'읽을 레지스터 번호를 지정하는 제어 신호 · 연산 데이터가 아닙니다'});
     if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'memory',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:flow.raw,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
     if(flow.pcRelative || flow.registerInputs.length) result.push({id:'input-a',source:flow.pcRelative?'pc':'registers',target:'alu',title:`${flow.pcRelative?'PC':'레지스터'} → ALU`,kind:'data',value:flow.input1,detail:'ALU 입력 A'});
     if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'alu',title:`${flow.usesImmediate?'즉치값 생성기':'레지스터'} → ALU`,kind:'data',value:flow.amount!=null?String(flow.amount):flow.input2,detail:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
@@ -181,11 +193,12 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
       result.push({id:'memory-control',source:'cu',target:'memory',title:'CU → 메모리',kind:'control',systemBus:true,value:signal==null?undefined:`${flow.load?'읽기':'쓰기'} 요청 = ${Number(signal)}`,detail:`${flow.width/8}바이트 ${flow.load?'읽기':'쓰기'} 제어`});
       if(!flow.error) {
         if(flow.store) result.push({id:'store-data',source:'registers',target:'memory',title:'레지스터 → 메모리',kind:'data',systemBus:true,value:flow.memoryValue,detail:`실제로 저장할 하위 ${flow.width}비트`});
-        else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'load-data',source:'memory',target:'registers',title:`메모리 → ${flow.writes.map(registerLabel).join(', ')}`,kind:'data',systemBus:true,value:flow.writeValue,detail:'읽기 결과를 목적지 레지스터에 기록'});
+        else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'load-data',source:'memory',target:'mux',title:'\uBA54\uBAA8\uB9AC \u2192 \uAE30\uB85D\uAC12 MUX',kind:'data',systemBus:true,value:flow.writeValue,detail:'\uC77D\uC740 \uAC12\uC744 \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC'});
         else result.push({id:'discard-load',source:'memory',target:'memory',title:'메모리 읽기 결과 확인',kind:'data',value:flow.memoryValue,detail:flow.writes.length?'완료가 확인되지 않아 레지스터 기록을 표시하지 않습니다':'x0 기록은 버리지만 메모리 읽기는 수행합니다'});
       }
-    } else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'writeback',source:flow.jump?'pc':'alu',target:'registers',title:`${flow.jump?'복귀 주소':'ALU 결과'} → ${flow.writes.map(registerLabel).join(', ')}`,kind:'data',value:flow.writeValue,detail:flow.jump?'PC + 4를 링크 레지스터에 기록':'목적지 레지스터에 결과 기록'});
+    } else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'result-to-mux',source:flow.jump?'pc':'alu',target:'mux',title:`${flow.jump?'\uBCF5\uADC0 \uC8FC\uC18C':'ALU \uACB0\uACFC'} \u2192 \uAE30\uB85D\uAC12 MUX`,kind:'data',value:flow.writeValue,detail:flow.jump?'PC + 4\uB97C \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC':'\uC5F0\uC0B0 \uACB0\uACFC\uB97C \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC'});
   }
+  if(!flow.store && flow.writes.length && !flow.error && (!flow.actual||flow.completed)) result.push({id:'writeback',source:'mux',target:'registers',title:`MUX \u2192 ${flow.writes.map(registerLabel).join(', ')}`,kind:'data',value:flow.writeValue,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 \uBAA9\uC801\uC9C0 \uB808\uC9C0\uC2A4\uD130\uC5D0 \uAE30\uB85D'});
   if(!flow.actual||flow.completed) result.push({id:'next-pc',source:'cu',target:'pc',title:'PC 주소 갱신',kind:'address',value:flow.nextPc,detail:'다음에 실행할 명령어의 주소'});
   return result;
 }

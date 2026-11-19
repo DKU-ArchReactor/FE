@@ -22,25 +22,29 @@ export default function SingleInstructionFlow({
   isPlaying?: boolean;
 }) {
   const transfers = useMemo(() => instructionTransfers(flow), [flow]);
-  const [scale, setScale] = useState(1);
-  const paths = useMemo(() => instructionPaths(flow, scale), [flow, scale]);
+  const paths = useMemo(() => instructionPaths(flow), [flow]);
   const timeline = useMemo(
     () => transferTimeline(transfers, paths, duration),
     [transfers, paths, duration],
   );
-  const totalDuration = timeline.length * timeline[0].duration;
+  const totalDuration = timeline.reduce(
+    (sum, entry) => sum + entry.duration,
+    0,
+  );
   const [clock, setClock] = useState({
     elapsed: 0,
     running: flow.actual && (isPlaying ?? true),
     globalPlaying: isPlaying,
+    local: isPlaying == null,
   });
   // Global Pause also applies to a new frame mounted at the same playback boundary.
   if (isPlaying != null && clock.globalPlaying !== isPlaying)
     setClock({
       ...clock,
       globalPlaying: isPlaying,
-      running: isPlaying === true,
-      elapsed: isPlaying && clock.elapsed >= totalDuration ? 0 : clock.elapsed,
+      running: isPlaying === true || (clock.local && clock.running),
+      local: isPlaying ? false : clock.local,
+      elapsed: isPlaying && (clock.local || clock.elapsed >= totalDuration) ? 0 : clock.elapsed,
     });
   useEffect(() => {
     if (!clock.running) return;
@@ -82,10 +86,11 @@ export default function SingleInstructionFlow({
         elapsed:
           timeline[Math.max(0, Math.min(transfers.length - 1, target))].start,
         running: false,
-        globalPlaying: false,
+        globalPlaying: isPlaying,
+        local: true,
       });
     },
-    [onPause, timeline, transfers.length],
+    [onPause, timeline, transfers.length, isPlaying],
   );
   const chooseUnit = useCallback(
     (unit: TransferUnit) => {
@@ -104,14 +109,20 @@ export default function SingleInstructionFlow({
     onPause?.();
     setClock((value) => ({
       ...value,
-      globalPlaying: false,
+      globalPlaying: isPlaying,
+      local: true,
       running: !value.running,
       elapsed: value.elapsed >= totalDuration ? 0 : value.elapsed,
     }));
   };
   const replay = () => {
     onPause?.();
-    setClock({ elapsed: 0, running: true, globalPlaying: false });
+    setClock({
+      elapsed: 0,
+      running: true,
+      globalPlaying: isPlaying,
+      local: true,
+    });
   };
   const button =
     "rounded-md border border-[var(--ar-border)] px-2.5 py-1.5 text-xs disabled:opacity-35 hover:bg-[var(--ar-header-bg)]";
@@ -181,7 +192,6 @@ export default function SingleInstructionFlow({
           index={index}
           count={transfers.length}
           arrived={arrived}
-          onScale={setScale}
           onUnit={chooseUnit}
         />
       </div>
