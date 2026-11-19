@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
-import {singleFlowDuration} from '../utils/instructionFlow';
+import {buildInstructionFlow, instructionPc, instructionTransfers, singleTransferDuration, singleFlowDuration} from '../utils/instructionFlow';
+
+import {instructionAt} from '../utils/tutorAnalysis';
 
 interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;
@@ -233,6 +235,14 @@ export function useSimulationPlayback({
     setPlaySpeed(1000);
   };
 
+  const singlePlaybackDelay = useMemo(() => {
+    if (!isSingleEngine || !currentCycle) return singleFlowDuration(playSpeed);
+    const item = instructionAt(simulationData?.tutor, instructionPc(currentData) ?? undefined);
+    const flow = buildInstructionFlow(item, currentData, prevData, simulationData);
+    return instructionTransfers(flow).length * singleTransferDuration(singleFlowDuration(playSpeed));
+  }, [isSingleEngine, currentCycle, currentData, prevData, simulationData, playSpeed]);
+  const singlePlaybackFrame = isSingleEngine ? currentCycle : 0;
+
   // 자동 재생 타이머
   useEffect(() => {
     if (isPlaying) {
@@ -247,7 +257,7 @@ export function useSimulationPlayback({
           }
           return prev + 1;
         });
-      }, isSingleEngine ? singleFlowDuration(playSpeed) : playSpeed);
+      }, isSingleEngine ? singlePlaybackDelay : playSpeed);
     } else {
       if (timerRef.current !== null) {
         clearInterval(timerRef.current);
@@ -259,7 +269,7 @@ export function useSimulationPlayback({
         clearInterval(timerRef.current);
       }
     };
-  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection]);
+  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection, singlePlaybackDelay, singlePlaybackFrame]);
 
   const handleStepBack = () => {
     setIsPlaying((prev) => {
@@ -341,6 +351,7 @@ export function useSimulationPlayback({
     playbackFeedback,
     activeCycleIndex,
     currentData,
+    singlePlaybackDelay,
     prevData,
     currentActiveRow,
     activeExecutionCLine,

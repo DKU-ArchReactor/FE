@@ -116,11 +116,17 @@ export default function InstructionFlowDiagram({
   const payload =
     transfer.value == null
       ? "미제공"
-      : transfer.kind === "address" || transfer.id === "fetch-instruction"
+      : transfer.kind === "address" ||
+          transfer.id === "fetch-instruction" ||
+          transfer.id === "decode-immediate"
         ? transfer.value
         : displayValue(transfer.value);
   const tag = (unit: TransferUnit, instructionMemory = false) => {
-    if (unit === "memory" && instructionMemory !== isFetch) return "";
+    if (
+      unit === "memory" &&
+      instructionMemory !== (isFetch || transfer.id === "decode-immediate")
+    )
+      return "";
     return transfer.source === unit && transfer.target === unit
       ? "처리 중"
       : transfer.source === unit
@@ -354,6 +360,7 @@ export default function InstructionFlowDiagram({
     [
       { key: "fetch-address", system: true, kind: "address" },
       { key: "fetch-instruction", system: true, kind: "data" },
+      { key: "decode-immediate", kind: "data" },
       { key: "next-pc", kind: "control" },
     ];
   if (flow.registerInputs.length)
@@ -494,22 +501,9 @@ export default function InstructionFlowDiagram({
             d={trail}
             fill="none"
             stroke={color}
-            strokeWidth="9"
+            strokeWidth="7"
             strokeLinecap="round"
-            opacity=".24"
-          />
-        )}
-        {point && progress > 0 && progress < 1 && (
-          <circle
-            className="flow-packet"
-            data-packet-x={point.x}
-            data-packet-y={point.y}
-            cx={point.x}
-            cy={point.y}
-            r="4"
-            fill={color}
-            stroke="var(--ar-panel-bg)"
-            strokeWidth="2"
+            opacity=".18"
           />
         )}
         {node("pc", boxes.pc, "PC", [flow.pc ?? "미제공"])}
@@ -523,7 +517,9 @@ export default function InstructionFlowDiagram({
         {node("registers", boxes.registers, "레지스터", regLines)}
         {node("immediate", boxes.immediate, "Imm Gen", [
           flow.usesImmediate || flow.branch
-            ? String(flow.amount ?? flow.immediate ?? "미제공")
+            ? reached("decode-immediate")
+              ? String(flow.amount ?? flow.immediate ?? "미제공")
+              : "명령어 해석 대기"
             : "사용 안 함",
           "즉치값 생성",
         ])}
@@ -652,7 +648,7 @@ export default function InstructionFlowDiagram({
           progress < 1 &&
           packetVisible && (
             <g
-              className="flow-data-word"
+              className="flow-data-word flow-packet"
               data-moving-value={packetValue}
               data-packet-x={point.x}
               data-packet-y={point.y}
@@ -663,27 +659,20 @@ export default function InstructionFlowDiagram({
                 y={packetBox.y}
                 width={packetBox.w}
                 height={packetBox.h}
-                rx="10"
-                fill="var(--ar-panel-bg)"
-                stroke={color}
-                strokeWidth="1.5"
+                rx="6"
+                fill={color}
+                stroke="var(--ar-panel-bg)"
+                strokeWidth="1"
                 style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
               />
-              <rect
-                x={packetBox.x + 5}
-                y={packetBox.y + 7}
-                width="3"
-                height="14"
-                rx="1.5"
-                fill={color}
-              />
               <text
-                x={packetBox.x + packetBox.w / 2 + 4}
+                x={packetBox.x + packetBox.w / 2}
                 y={packetBox.y + 20}
                 textAnchor="middle"
-                fontSize="18"
-                fontWeight="700"
-                fill={color}
+                fontSize="17"
+                fontWeight="600"
+                className="font-mono"
+                fill="#fff"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
                 {packetValue}

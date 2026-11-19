@@ -141,20 +141,31 @@ test('packet geometry advances along the same orthogonal wire and clamps endpoin
 });
 
 
-test('travel time is proportional to visible wire distance, with stationary controls and a preserved clock budget',()=>{
+test('every flow step receives the same reading time, independent of path length and viewport',()=>{
   const current=frame();
-  const flow=buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current));
-  const transfers=instructionTransfers(flow);
-  for(const scale of [1,2.7]) {
-    const timeline=transferTimeline(transfers,instructionPaths(flow,scale),9000);
-    const moving=timeline.filter(entry=>entry.motion.distance>0);
-    const speed=moving[0].motion.distance/moving[0].travel;
-    for(const entry of moving) assert.ok(Math.abs(entry.motion.distance/entry.travel-speed)<1e-9);
-    for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') {
-      assert.equal(timeline[index].motion.route,undefined);
-      assert.equal(timeline[index].travel,0);
-      assert.equal(timeline[index].duration,600);
+  for(const op of ['add','lw','sw','bne','ecall']) {
+    const flow=buildInstructionFlow(item(op,['x11','x12'],['x10']),current,null,simulation(current));
+    const transfers=instructionTransfers(flow);
+    for(const scale of [1,2.7]) {
+      const timeline=transferTimeline(transfers,instructionPaths(flow,scale),9000);
+      for(const entry of timeline) assert.equal(entry.duration,1600);
+      assert.equal(timeline.at(-1).start+timeline.at(-1).duration,transfers.length*1600);
+      for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') {
+        assert.equal(timeline[index].motion.route,undefined);
+        assert.equal(timeline[index].travel,0);
+      }
     }
-    assert.ok(Math.abs(timeline.at(-1).start+timeline.at(-1).duration-9000)<1e-9);
   }
+});
+
+test('immediate formats receive instruction bits before their immediate reaches the ALU',()=>{
+  const current=frame('lw');
+  const transfers=instructionTransfers(buildInstructionFlow(item('lw',['x11'],['x10']),current,null,simulation(current)));
+  const decode=transfers.findIndex(value=>value.id==='decode-immediate');
+  assert.ok(decode>0);
+  assert.ok(decode<transfers.findIndex(value=>value.id==='input-b'));
+  assert.equal(transfers[decode].target,'immediate');
+  assert.equal(transfers[decode].source,'memory');
+  const normal=instructionTransfers(buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current)));
+  assert.ok(!normal.some(value=>value.id==='decode-immediate'));
 });

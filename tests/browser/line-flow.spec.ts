@@ -107,7 +107,7 @@ test('global Play/Pause controls the same animation clock and preserves pipeline
   const before=await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed');
   await page.clock.runFor(2000);
   expect(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed')).toBe(before);
-  await page.getByRole('button',{name:'play',exact:true}).click();await page.clock.runFor(8999);
+  await page.getByRole('button',{name:'play',exact:true}).click();await page.clock.runFor(Number(await page.getByTestId('timing-delay').textContent())-1);
   await expect(page.getByTestId('timing-clock')).toHaveText('1');
   await page.clock.runFor(1);await expect(page.getByTestId('timing-clock')).toHaveText('2');
   await page.getByRole('button',{name:'흐름 다시 보기',exact:true}).click();
@@ -207,9 +207,26 @@ test('register selection asserts control without a travelling data packet',async
   for(let i=0;i<2;i++)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
   await expect(page.locator('[data-transfer="read-control"]')).toBeVisible();
   await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
-  await page.clock.runFor(300);
+  await page.clock.runFor(900);
   await page.setViewportSize({width:760,height:1000});await page.clock.runFor(32);
   await expect(page.locator('[data-transfer="read-control"]')).toBeVisible();
   await expect(page.locator('.flow-packet,.flow-data-word,.flow-data-trail')).toHaveCount(0);
   await expect(page.locator('[data-flow-node="registers"]')).toContainText('\uB3C4\uCC29');
+});
+
+
+test('Imm Gen receives instruction bits before exposing the decoded immediate',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');
+  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  const immediate=page.locator('[data-flow-node="immediate"]');
+  await expect(page.locator('[data-circuit-wire="decode-immediate"]')).toBeVisible();
+  await expect(immediate).toContainText('\uBA85\uB839\uC5B4 \uD574\uC11D \uB300\uAE30');
+  for(let i=0;i<3;i++) await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
+  await expect(page.locator('[data-transfer="decode-immediate"]')).toBeVisible();
+  await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
+  await page.clock.runFor(1100);
+  await expect(page.locator('[data-transfer="decode-immediate"]')).toBeVisible();
+  await page.clock.runFor(600);
+  await expect(page.locator('[data-transfer="input-a"]')).toBeVisible();
+  await expect(immediate).toContainText('-4');
 });

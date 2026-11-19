@@ -28,6 +28,7 @@ export default function SingleInstructionFlow({
     () => transferTimeline(transfers, paths, duration),
     [transfers, paths, duration],
   );
+  const totalDuration = timeline.length * timeline[0].duration;
   const [clock, setClock] = useState({
     elapsed: 0,
     running: flow.actual && (isPlaying ?? true),
@@ -39,7 +40,7 @@ export default function SingleInstructionFlow({
       ...clock,
       globalPlaying: isPlaying,
       running: isPlaying === true,
-      elapsed: isPlaying && clock.elapsed >= duration ? 0 : clock.elapsed,
+      elapsed: isPlaying && clock.elapsed >= totalDuration ? 0 : clock.elapsed,
     });
   useEffect(() => {
     if (!clock.running) return;
@@ -51,14 +52,14 @@ export default function SingleInstructionFlow({
       previous = now;
       setClock((value) => {
         if (!value.running) return value;
-        const elapsed = Math.min(duration, value.elapsed + delta);
-        return { ...value, elapsed, running: elapsed < duration };
+        const elapsed = Math.min(totalDuration, value.elapsed + delta);
+        return { ...value, elapsed, running: elapsed < totalDuration };
       });
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [clock.running, duration]);
+  }, [clock.running, totalDuration]);
   const activeIndex = timeline.findIndex(
     (entry) => clock.elapsed < entry.start + entry.duration,
   );
@@ -99,39 +100,13 @@ export default function SingleInstructionFlow({
     },
     [flow.load, flow.store, seek, transfers],
   );
-  const resize = useCallback(
-    (nextScale: number) => {
-      if (nextScale === scale) return;
-      const next = transferTimeline(
-        transfers,
-        instructionPaths(flow, nextScale),
-        duration,
-      );
-      setClock((value) => {
-        const found = timeline.findIndex(
-          (entry) => value.elapsed < entry.start + entry.duration,
-        );
-        const index = found < 0 ? timeline.length - 1 : found;
-        const fraction = Math.min(
-          1,
-          (value.elapsed - timeline[index].start) / timeline[index].duration,
-        );
-        return {
-          ...value,
-          elapsed: next[index].start + fraction * next[index].duration,
-        };
-      });
-      setScale(nextScale);
-    },
-    [duration, flow, scale, timeline, transfers],
-  );
   const toggle = () => {
     onPause?.();
     setClock((value) => ({
       ...value,
       globalPlaying: false,
       running: !value.running,
-      elapsed: value.elapsed >= duration ? 0 : value.elapsed,
+      elapsed: value.elapsed >= totalDuration ? 0 : value.elapsed,
     }));
   };
   const replay = () => {
@@ -149,7 +124,7 @@ export default function SingleInstructionFlow({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2">
         <span className="text-[11px] text-[var(--ar-text-muted)]">
           {clock.running ? "흐름 재생 중" : "흐름 일시정지"} · 전체{" "}
-          {Number((duration / 1000).toFixed(1))}초
+          {Number((totalDuration / 1000).toFixed(1))}초
         </span>
         <div
           className="flex items-center gap-1.5"
@@ -206,7 +181,7 @@ export default function SingleInstructionFlow({
           index={index}
           count={transfers.length}
           arrived={arrived}
-          onScale={resize}
+          onScale={setScale}
           onUnit={chooseUnit}
         />
       </div>

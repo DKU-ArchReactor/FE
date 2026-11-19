@@ -2,8 +2,9 @@ import type {CycleHistoryItem, SimulationResult, StageBuffer} from '@/type/simul
 import type {TutorInstruction} from './tutorAnalysis';
 
 export type FlowUnit = 'cu' | 'registers' | 'alu' | 'memory' | 'pc';
-// Presentation time only: one observed CPU clock must outlast its complete flow animation.
+// Presentation pace; total single-clock display time is step count times singleTransferDuration.
 export const singleFlowDuration = (playSpeed: number) => Math.max(4500, playSpeed * 9);
+export const singleTransferDuration = (pace: number) => pace * 1600 / 9000;
 export interface FlowStep {id: string; title: string; description: string; units: FlowUnit[]; routes: string[]}
 const ABI_NAMES = ['zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2', 's0', 's1', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 't3', 't4', 't5', 't6'];
 export function registerLabel(name: string) {
@@ -127,6 +128,7 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
   const paths:Record<string,string>={
     'fetch-address':'M360 202V245',
     'fetch-instruction':'M515 273H670V365',
+    'decode-immediate':'M515 290H550V335H440V380',
     'read-control':'M580 420H550V345H225V380',
     'input-a':flow.pcRelative?'M260 167H38V550H290V570':'M145 490V540H290V570',
     'input-b':flow.usesImmediate?'M440 470V570':'M240 490V510H440V570',
@@ -143,7 +145,7 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
   })]));
 }
 export function transferMotion(transfer:InstructionTransfer,path?:string) {
-  const value=transfer.kind==='address'||transfer.id==='fetch-instruction'?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
+  const value=transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
   const width=Math.max(56,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?18:11),28));
   const commands=path?.match(/[MHV]/g)??[];
   const route=path&&transfer.kind!=='control'?compileTransferRoute(path):undefined;
@@ -152,20 +154,13 @@ export function transferMotion(transfer:InstructionTransfer,path?:string) {
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
   return {value,width,route,startPadding,endPadding,distance};
 }
-// Keep the CPU clock duration unchanged; divide its visual travel budget by wire length.
-// Controls are asserted states, not travelling data. Processing steps get a readable hold.
-export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,duration:number) {
-  const motions=transfers.map(transfer=>transferMotion(transfer,paths[transfer.id]));
-  const pace=duration/9000;
-  const holds=motions.map(motion=>(motion.route?200:600)*pace);
-  const distance=motions.reduce((sum,motion)=>sum+motion.distance,0);
-  const budget=Math.max(0,duration-holds.reduce((sum,hold)=>sum+hold,0));
-  let start=0;
-  return motions.map((motion,index)=>{
-    const travel=distance?budget*motion.distance/distance:0;
-    const entry={start,duration:holds[index]+travel,lead:motion.route?80*pace:0,travel,motion};
-    start+=entry.duration;
-    return entry;
+// Each visual step has the same reading time, including short wires and controls.
+// The playback hook uses this same step duration to wait for the complete instruction.
+export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,pace:number) {
+  const duration=singleTransferDuration(pace);
+  return transfers.map((transfer,index)=>{
+    const motion=transferMotion(transfer,paths[transfer.id]);
+    return {start:index*duration,duration,lead:motion.route?duration*.05:0,travel:motion.route?duration*.875:0,motion};
   });
 }
 export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlow>): InstructionTransfer[] {
@@ -176,6 +171,7 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
   if (flow.system) result.push({id:'environment',source:'cu',target:'cu',title:'CU · 실행 환경 요청',kind:'control',value:'ECALL',detail:'일반 메모리 전송이 아닌 실행 환경 서비스 요청'});
   else {
     if(flow.registerInputs.length) result.push({id:'read-control',source:'cu',target:'registers',title:'CU → 레지스터',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'입력으로 읽을 레지스터를 선택'});
+    if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'memory',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:flow.raw,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
     if(flow.pcRelative || flow.registerInputs.length) result.push({id:'input-a',source:flow.pcRelative?'pc':'registers',target:'alu',title:`${flow.pcRelative?'PC':'레지스터'} → ALU`,kind:'data',value:flow.input1,detail:'ALU 입력 A'});
     if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'alu',title:`${flow.usesImmediate?'즉치값 생성기':'레지스터'} → ALU`,kind:'data',value:flow.amount!=null?String(flow.amount):flow.input2,detail:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
     result.push({id:'calculate',source:'alu',target:'alu',title:flow.load||flow.store?'ALU · 메모리 주소 계산':flow.branch?'ALU · 분기 조건 비교':flow.jump?'이동할 주소 선택':`ALU · ${flow.op.toUpperCase()} 연산`,kind:'data',value:flow.branch?(flow.taken==null?undefined:flow.taken?'조건 성립':'조건 불성립'):flow.jump?flow.nextPc:flow.result,detail:flow.load||flow.store?'기준 주소 + 바이트 오프셋':flow.branch?'부호 해석과 분기 조건은 명령어에 따라 다릅니다':'관찰된 연산 결과'});
