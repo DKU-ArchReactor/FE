@@ -19,14 +19,11 @@ import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
 import { getLearningExample } from "@/data/learningExamples";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
-  "# RISC-V 32IM 어셈블리 직접 작성",
-  ".globl main",
-  "main:",
-  "    addi x1, x0, 5",
-  "    addi x2, x0, 10",
-  "    add  x3, x1, x2",
-  "    slli x4, x3, 2",
-  "    ret",
+  "addi t0, zero, 5",
+  "addi t1, zero, 10",
+  "add  t2, t0, t1",
+  "slli a0, t2, 2",
+  "ret",
   "",
 ].join("\n");
 
@@ -79,9 +76,15 @@ const MainPage: React.FC = () => {
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
   const auth = useAuthSession();
-  const workspaceKey = JSON.stringify([fileMgr.translationSource, customAssembly, editorTarget, auth.epoch]);
+  const cWorkspaceKey = JSON.stringify([fileMgr.translationSource, auth.epoch]);
+  const asmWorkspaceKey = JSON.stringify([customAssembly, auth.epoch]);
+  const workspaceKey = editorTarget === "c" ? cWorkspaceKey : asmWorkspaceKey;
+
   const simSession = useSimulationSession({
     workspaceKey,
+    editorTarget,
+    cWorkspaceKey,
+    asmWorkspaceKey,
     savedFileId: auth.authenticated ? fileMgr.savedTranslationFileId : null,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
@@ -350,9 +353,6 @@ const handleMobileViewportSelect = (index: number) => {
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
               setAssistantHint(null);
-              if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
-                playback.triggerPlaybackFeedback("reset");
-              }
               setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {

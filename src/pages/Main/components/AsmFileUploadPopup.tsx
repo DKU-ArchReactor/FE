@@ -6,44 +6,36 @@ const ASM_TEMPLATES = [
   {
     title: "기본 산술 연산 (Basic ALU)",
     desc: "addi, add, sub 명령어를 사용한 기초 레지스터 연산",
-    code: `# RISC-V 32IM 기본 산술 연산 예제
-.globl main
-main:
-    addi x1, x0, 10      # x1 = 10
-    addi x2, x0, 20      # x2 = 20
-    add  x3, x1, x2      # x3 = x1 + x2 (30)
-    sub  x4, x3, x1      # x4 = x3 - x1 (20)
-    ret
+    code: `addi t0, zero, 10
+addi t1, zero, 20
+add  t2, t0, t1
+sub  a0, t2, t0
+ret
 `,
   },
   {
     title: "반복문 카운터 (Loop Counter)",
     desc: "조건 분기(bne)를 이용한 1부터 5까지의 합 계산 루프",
-    code: `# RISC-V 32IM 루프 카운터 예제
-.globl main
-main:
-    addi x1, x0, 0       # x1 (sum) = 0
-    addi x2, x0, 1       # x2 (i) = 1
-    addi x3, x0, 6       # x3 (limit) = 6
+    code: `addi t0, zero, 0
+addi t1, zero, 1
+addi t2, zero, 6
 loop:
-    add  x1, x1, x2      # sum += i
-    addi x2, x2, 1       # i++
-    bne  x2, x3, loop    # if i != 6 goto loop
-    ret
+add  t0, t0, t1
+addi t1, t1, 1
+bne  t1, t2, loop
+addi a0, t0, 0
+ret
 `,
   },
   {
     title: "메모리 로드 및 스토어 (Load & Store)",
     desc: "스택 포인터(sp)를 활용한 lw, sw 메모리 데이터 전송",
-    code: `# RISC-V 32IM 메모리 접근 예제
-.globl main
-main:
-    addi sp, sp, -16     # 스택 프레임 16바이트 할당
-    addi x5, x0, 42      # x5 = 42
-    sw   x5, 8(sp)       # sp + 8 주소에 x5 저장
-    lw   x6, 8(sp)       # sp + 8 주소에서 x6로 로드
-    addi sp, sp, 16      # 스택 복원
-    ret
+    code: `addi sp, sp, -16
+addi t0, zero, 42
+sw   t0, 8(sp)
+lw   a0, 8(sp)
+addi sp, sp, 16
+ret
 `,
   },
 ];
