@@ -167,7 +167,7 @@ const MainPage: React.FC = () => {
     }
     setTranslationSelectedLine(line);
     setTranslationSelectedAsmIndex(asmIndex);
-    if ((line !== null || asmIndex !== null) && openTutorModal) {
+    if ((line !== null || asmIndex !== null) && openTutorModal && simSession.simulationData) {
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setIsMobileTutorModalOpen(true);
       }
@@ -892,7 +892,7 @@ className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font
       </div>
 
       {/* 4. 모바일 전용 튜터 해설 모달 (코드 클릭 시 노출) */}
-      {isMobileTutorModalOpen && (
+      {isMobileTutorModalOpen && simSession.simulationData && (
         <div
           className="fixed inset-0 z-50 md:hidden bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-3 animate-in fade-in duration-150"
           onClick={() => setIsMobileTutorModalOpen(false)}

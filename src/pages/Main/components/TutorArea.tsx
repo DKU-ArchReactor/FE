@@ -56,17 +56,20 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   activeTarget = "c",
   onClose,
 }) => {
+  const isCompiled = Boolean(simulationData);
+
   // 1. C 소스 코드 라인별 배열
   const cLines = useMemo(() => {
     return (translationSource || "").split(/\r?\n/);
   }, [translationSource]);
 
-  // 2. 어셈블리 파싱 및 C 라인 매핑 결과 (시뮬레이션에서 주입된 mappedRows 우선 사용)
+  // 2. 어셈블리 파싱 및 C 라인 매핑 결과 (컴파일/어셈블 완료 시에만 활성화)
   const effectiveRows: MappedAssemblyRow[] = useMemo(() => {
+    if (!isCompiled) return [];
     if (propMappedRows && propMappedRows.length > 0) return propMappedRows;
     if (!translationAssembly) return [];
     return mapAssembly(translationAssembly, cLines.length);
-  }, [propMappedRows, translationAssembly, cLines.length]);
+  }, [isCompiled, propMappedRows, translationAssembly, cLines.length]);
 
   const historyPositions = useMemo(() => {
     const positions = new Map<CycleHistoryItem, number>();
@@ -129,14 +132,14 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
   ]), [effectiveRows]);
   const cExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() =>
-    selectedCLineText !== null && selectedTranslationLine
+    isCompiled && selectedCLineText !== null && selectedTranslationLine
       ? [{kind: 'c', text: selectedCLineText, line: selectedTranslationLine}] : [],
-  [selectedCLineText, selectedTranslationLine]);
+  [isCompiled, selectedCLineText, selectedTranslationLine]);
   const asmExplanationError = useTutorExplanations(asmExplanationItems, retryVersion);
   const cExplanationError = useTutorExplanations(cExplanationItems, retryVersion);
   const explanationError = asmExplanationError || cExplanationError;
 
-  const cLineAnalysis = selectedTranslationLine && selectedCLineText !== null
+  const cLineAnalysis = isCompiled && selectedTranslationLine && selectedCLineText !== null
     ? analyzeCLine(selectedCLineText, selectedTranslationLine) : null;
   const lineExplanation = simulationData?.tutor?.line_explanations?.find(
     item => item.source_line === selectedTranslationLine,
@@ -210,7 +213,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         {/* ========================================================= */}
         {/* 모드 0: CRT (C Runtime 부트스트랩) 코드가 선택되었을 때 */}
         {/* ========================================================= */}
-        {activeTarget !== "asm" && isCrtSelected && selectedRow ? (
+        {isCompiled && activeTarget !== "asm" && isCrtSelected && selectedRow ? (
           <div className="flex flex-col gap-3">
             <div className="rounded-xl border border-slate-300 dark:border-[#3E3E42] bg-slate-50/70 dark:bg-[#252526]/60 p-3.5 flex flex-col gap-3 shadow-2xs">
               {/* 상단 뱃지 및 제목 */}
@@ -276,7 +279,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
               })()}
             </div>
           </div>
-        ) : (activeTarget === "asm" && (selectedRow || (selectedTranslationLine && selectedAsmLineText !== null))) || (activeTarget !== "asm" && selectedTranslationLine && cLineAnalysis) ? (
+        ) : isCompiled && ((activeTarget === "asm" && (selectedRow || (selectedTranslationLine && selectedAsmLineText !== null))) || (activeTarget !== "asm" && selectedTranslationLine && cLineAnalysis)) ? (
           <div className="flex flex-col gap-3">
             {/* 1-A. ASM 직접 작성 모드에서 비명령어 줄(라벨/지시어/주석/빈 줄)을 선택했을 때의 상단 카드 */}
             {activeTarget === "asm" && !selectedRow && selectedTranslationLine && selectedAsmLineText !== null && (() => {
