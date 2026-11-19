@@ -100,14 +100,16 @@ export interface InstructionTransfer {
   id: string; source: TransferUnit; target: TransferUnit; title: string;
   kind: 'address' | 'data' | 'control'; systemBus?: boolean; value?: string | null; detail: string;
 }
-export function transferPoint(path:string, progress:number) {
+export function transferPoint(path:string, progress:number, startPadding=0, endPadding=0) {
   const points:{x:number;y:number}[]=[];
   for(const match of path.matchAll(/([MHV])([^MHV]+)/g)) {
     const numbers=match[2].trim().split(/[ ,]+/).map(Number),previous=points.at(-1)??{x:0,y:0};
     points.push(match[1]==='M'?{x:numbers[0],y:numbers[1]}:match[1]==='H'?{x:numbers[0],y:previous.y}:{x:previous.x,y:numbers[0]});
   }
   const lengths=points.slice(1).map((point,index)=>Math.abs(point.x-points[index].x)+Math.abs(point.y-points[index].y));
-  let remaining=lengths.reduce((sum,length)=>sum+length,0)*Math.max(0,Math.min(1,progress));
+  const total=lengths.reduce((sum,length)=>sum+length,0);
+  const start=Math.min(startPadding,total/2),end=Math.min(endPadding,total/2);
+  let remaining=start+Math.max(0,total-start-end)*Math.max(0,Math.min(1,progress));
   for(let i=0;i<lengths.length;i++) {
     if(remaining<=lengths[i]) {const part=lengths[i]?remaining/lengths[i]:0;return{x:points[i].x+(points[i+1].x-points[i].x)*part,y:points[i].y+(points[i+1].y-points[i].y)*part};}
     remaining-=lengths[i];

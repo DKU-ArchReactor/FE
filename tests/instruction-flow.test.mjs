@@ -136,4 +136,6 @@ test('packet geometry advances along the same orthogonal wire and clamps endpoin
   assert.deepEqual(point(-1),{x:10,y:20});
   assert.deepEqual(point(.5),{x:30,y:30});
   assert.deepEqual(point(2),{x:30,y:60});
+  assert.deepEqual(JSON.parse(JSON.stringify(transferPoint('M0 0H100',0,20,20))),{x:20,y:0});
+  assert.deepEqual(JSON.parse(JSON.stringify(transferPoint('M0 0H100',1,20,20))),{x:80,y:0});
 });

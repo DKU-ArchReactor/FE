@@ -22,10 +22,50 @@ test('the vertical circuit and memory-bus role labels fit without scrolling at d
     await expect(svg.getByRole('button',{name:'Data Memory 흐름 선택'})).toBeVisible();
     await expect(svg.getByLabel('ALU 입력 선택')).toBeVisible();
     await expect(svg.getByLabel('기록값 선택')).toBeVisible();
+    const spacing=await svg.evaluate(element=>{
+      const root=element as unknown as SVGSVGElement,view=root.viewBox.baseVal,rect=root.getBoundingClientRect();
+      const boxes=Array.from(root.querySelectorAll<SVGGraphicsElement>('[data-flow-node],[data-circuit-wire]')).map(node=>node.getBBox());
+      const left=Math.min(...boxes.map(box=>box.x)),right=Math.max(...boxes.map(box=>box.x+box.width));
+      return (right-left)*Math.min(rect.width/view.width,rect.height/view.height)/rect.width;
+    });
+    expect(spacing).toBeGreaterThan(.9);
+    await expect(svg.locator('[data-flow-node="registers"]')).toHaveAttribute('data-hardware-shape','register-file');
+    await expect(svg.locator('[data-flow-node="memory"]')).toHaveAttribute('data-hardware-shape','chip');
     await expect(svg.locator('[data-system-bus-label="address"]')).toContainText('주소');
     await expect(svg.locator('[data-system-bus-label="data"]')).toContainText('데이터');
     await expect(svg.locator('[data-system-bus-label="control"]')).toContainText('제어');
   }
+});
+
+test('the moving data word carries the real operand and freezes intact when paused',async ({page})=>{
+  await frozenTime(page);await page.setViewportSize({width:1400,height:900});
+  await page.goto('/tests/browser/line-flow.html');await page.clock.runFor(32);
+  await page.getByRole('button',{name:'흐름 일시정지',exact:true}).click();
+  for(let i=0;i<3;i++)await page.getByRole('button',{name:'다음 흐름',exact:true}).click();
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(150);
+  const word=page.locator('[data-moving-value="11"]');
+  await expect(word).toBeVisible();await expect(word).toContainText('11');
+  const before=await word.getAttribute('data-packet-x');
+  await page.clock.runFor(150);expect(await word.getAttribute('data-packet-x')).not.toBe(before);
+  await page.getByRole('button',{name:'흐름 일시정지',exact:true}).click();
+  const frozen=await word.getAttribute('data-packet-x');await page.clock.runFor(1000);
+  expect(await word.getAttribute('data-packet-x')).toBe(frozen);
+  const issues=await word.evaluate(element=>{
+    const capsule=(element as SVGGraphicsElement).getBBox();
+    const text=element.querySelector('text')!.getBBox();
+    return text.x<capsule.x||text.x+text.width>capsule.x+capsule.width;
+  });
+  expect(issues).toBe(false);
+  await page.goto('/tests/browser/line-flow.html?geometry=add');await page.clock.runFor(32);
+  await page.getByRole('button',{name:'흐름 일시정지',exact:true}).click();
+  for(let i=0;i<3;i++)await page.getByRole('button',{name:'다음 흐름',exact:true}).click();
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(150);
+  const large=page.locator('[data-moving-value="-2147483648"]');
+  await expect(large).toBeVisible();
+  expect(await large.evaluate(element=>{
+    const box=element.querySelector('rect')!.getBBox(),text=element.querySelector('text')!.getBBox();
+    return text.x>=box.x+10&&text.x+text.width<=box.x+box.width-5&&text.y>=box.y&&text.y+text.height<=box.y+box.height;
+  })).toBe(true);
 });
 
 test('the prominent payload identifies each operand and result without moving or covered text',async ({page})=>{
