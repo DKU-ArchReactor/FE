@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
 import type { CycleHistoryItem, SimulationResult, SingleCycleRegisterSignal } from "@/type/simulation";
+import InstructionLesson, {type InstructionLessonContext} from './InstructionLesson';
 
 interface SingleCycleDatapathProps {
+  lessonContext?: InstructionLessonContext;
   currentData: CycleHistoryItem | null;
   prevData?: CycleHistoryItem | null;
   simulationData?: SimulationResult | null;
@@ -470,7 +472,7 @@ const SvgPortCard: React.FC<SvgPortCardProps> = ({
   );
 };
 
-export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
+const SingleCycleOverview: React.FC<SingleCycleDatapathProps> = ({
   currentData,
   prevData,
   simulationData,
@@ -1094,5 +1096,21 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
     </div>
   );
 };
+
+export function SingleCycleDatapath(props: SingleCycleDatapathProps) {
+  const [view, setView] = useState<'instruction' | 'overview'>('instruction');
+  return <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] text-[var(--ar-text-primary)]" aria-label="싱글 사이클 데이터패스">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-2">
+      <h2 className="text-xs font-semibold">싱글 사이클 · 데이터 흐름</h2>
+      <div className="flex gap-1" role="group" aria-label="데이터패스 보기 선택">
+        <button type="button" aria-pressed={view === 'instruction'} onClick={() => setView('instruction')} className={`rounded px-3 py-1.5 text-xs ${view === 'instruction' ? 'bg-[var(--ar-accent)] text-white' : 'text-[var(--ar-text-muted)]'}`}>명령어 흐름</button>
+        <button type="button" aria-pressed={view === 'overview'} onClick={() => setView('overview')} className={`rounded px-3 py-1.5 text-xs ${view === 'overview' ? 'bg-[var(--ar-accent)] text-white' : 'text-[var(--ar-text-muted)]'}`}>전체 상태</button>
+      </div>
+    </header>
+    {props.loadingMessage ? <p className="p-6 text-sm">{props.loadingMessage}</p> : view === 'instruction'
+      ? <InstructionLesson {...props} context={props.lessonContext}/>
+      : <SingleCycleOverview {...props}/>}
+  </section>;
+}
 
 export default SingleCycleDatapath;

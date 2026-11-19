@@ -8,6 +8,11 @@ export interface RuleExplanation {
   supported?: boolean; evidence_level?: 'syntax' | 'observed' | 'unknown';
 }
 export interface TutorInstruction {
+  instruction_format?: {
+    name: 'R' | 'I' | 'S' | 'B' | 'U' | 'J'; word: string; width_bits: number;
+    description: string; immediate: number | null; basis: string; note: string;
+    fields: {name: string; high: number; low: number; width: number; value: number; binary: string; role: string}[];
+  } | null;
   text: string; explanation: RuleExplanation; runtime_explanation?: RuleExplanation | null;
   pc?: string; source_line?: number | null; source_file?: string | null;
   raw_instruction?: string | null;

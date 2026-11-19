@@ -176,6 +176,13 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "tutor":
       return (
         <TutorArea
+          onSelectAsm={(line, index) => onSelectTranslationLine(line, index, false)}
+          onJumpToCycle={cycle => {
+            onJumpToCycle(cycle);
+            if (translationSelectedAsmIndex != null) {
+              onSelectTranslationLine(translationSelectedLine, translationSelectedAsmIndex, Boolean(onCloseTutor));
+            }
+          }}
           simulationData={simulationData}
           currentCycleData={currentData}
           loadingMessage={loadingMessage}
@@ -200,6 +207,10 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "pipeline":
       return (
         <PipelineVisualizer
+          lessonContext={{source: editorTarget === 'c' ? translationSource : undefined,
+            rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
+            selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
+            onSelectAsm: (line, index) => onSelectTranslationLine(line, index, false), onJumpToCycle}}
           currentData={currentData}
           prevData={prevData}
           simulationData={simulationData}

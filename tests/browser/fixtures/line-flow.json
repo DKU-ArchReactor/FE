@@ -1,0 +1,2815 @@
+{
+  "schema_version": "1.0",
+  "simulator": {
+    "mode": "single",
+    "max_cycles": 2000,
+    "pipeline_model": "single-cycle"
+  },
+  "program": {
+    "fingerprint": "39f6f426262424391fd499ce9339b5c0a6a709c91b118c2d4475a721f2e7e343",
+    "instructions": [
+      {
+        "pc": "0x00010000",
+        "raw_instruction": "0x00000097",
+        "assembly": "auipc ra, 0"
+      },
+      {
+        "pc": "0x00010004",
+        "raw_instruction": "0x014080E7",
+        "assembly": "jalr ra, ra, 20"
+      },
+      {
+        "pc": "0x00010008",
+        "raw_instruction": "0x00A00893",
+        "assembly": "addi a7, zero, 10"
+      },
+      {
+        "pc": "0x0001000C",
+        "raw_instruction": "0x00000073",
+        "assembly": "ecall"
+      },
+      {
+        "pc": "0x00010010",
+        "raw_instruction": "0x0000006F",
+        "assembly": "jal zero, 0"
+      },
+      {
+        "pc": "0x00010014",
+        "raw_instruction": "0xFE010113",
+        "assembly": "addi sp, sp, -32"
+      },
+      {
+        "pc": "0x00010018",
+        "raw_instruction": "0x00112E23",
+        "assembly": "sw ra, 28(sp)"
+      },
+      {
+        "pc": "0x0001001C",
+        "raw_instruction": "0x00812C23",
+        "assembly": "sw s0, 24(sp)"
+      },
+      {
+        "pc": "0x00010020",
+        "raw_instruction": "0x02010413",
+        "assembly": "addi s0, sp, 32"
+      },
+      {
+        "pc": "0x00010024",
+        "raw_instruction": "0x00B00793",
+        "assembly": "addi a5, zero, 11"
+      },
+      {
+        "pc": "0x00010028",
+        "raw_instruction": "0xFEF42623",
+        "assembly": "sw a5, -20(s0)"
+      },
+      {
+        "pc": "0x0001002C",
+        "raw_instruction": "0x00700793",
+        "assembly": "addi a5, zero, 7"
+      },
+      {
+        "pc": "0x00010030",
+        "raw_instruction": "0xFEF42423",
+        "assembly": "sw a5, -24(s0)"
+      },
+      {
+        "pc": "0x00010034",
+        "raw_instruction": "0xFEC42703",
+        "assembly": "lw a4, -20(s0)"
+      },
+      {
+        "pc": "0x00010038",
+        "raw_instruction": "0xFE842783",
+        "assembly": "lw a5, -24(s0)"
+      },
+      {
+        "pc": "0x0001003C",
+        "raw_instruction": "0x00F707B3",
+        "assembly": "add a5, a4, a5"
+      },
+      {
+        "pc": "0x00010040",
+        "raw_instruction": "0xFEF42223",
+        "assembly": "sw a5, -28(s0)"
+      },
+      {
+        "pc": "0x00010044",
+        "raw_instruction": "0xFE442783",
+        "assembly": "lw a5, -28(s0)"
+      },
+      {
+        "pc": "0x00010048",
+        "raw_instruction": "0x00078513",
+        "assembly": "addi a0, a5, 0"
+      },
+      {
+        "pc": "0x0001004C",
+        "raw_instruction": "0x01C12083",
+        "assembly": "lw ra, 28(sp)"
+      },
+      {
+        "pc": "0x00010050",
+        "raw_instruction": "0x01812403",
+        "assembly": "lw s0, 24(sp)"
+      },
+      {
+        "pc": "0x00010054",
+        "raw_instruction": "0x02010113",
+        "assembly": "addi sp, sp, 32"
+      },
+      {
+        "pc": "0x00010058",
+        "raw_instruction": "0x00008067",
+        "assembly": "jalr zero, ra, 0"
+      }
+    ],
+    "code_mapping": {
+      "0x00010034": {
+        "assembly": "lw a4, -20(s0)",
+        "raw_instruction": "0xFEC42703",
+        "source_line": 5,
+        "source_file": "source.c"
+      },
+      "0x00010038": {
+        "assembly": "lw a5, -24(s0)",
+        "raw_instruction": "0xFE842783",
+        "source_line": 5,
+        "source_file": "source.c"
+      },
+      "0x0001003C": {
+        "assembly": "add a5, a4, a5",
+        "raw_instruction": "0x00F707B3",
+        "source_line": 5,
+        "source_file": "source.c"
+      },
+      "0x00010040": {
+        "assembly": "sw a5, -28(s0)",
+        "raw_instruction": "0xFEF42223",
+        "source_line": 5,
+        "source_file": "source.c"
+      }
+    },
+    "memory_regions": [
+      {
+        "name": ".text",
+        "start": "0x00010000",
+        "end_exclusive": "0x0001005C",
+        "kind": "code"
+      }
+    ],
+    "initial_stack_pointer": "0x7FFFEFFC",
+    "memory_layout": {
+      "stack": {
+        "name": "Stack",
+        "base": "0x7FFFEFFC",
+        "limit": "0x10008000",
+        "growth": "down"
+      },
+      "heap": {
+        "name": "Heap",
+        "base": "0x10004000",
+        "limit": "0x10008000",
+        "growth": "up"
+      },
+      "bss": {
+        "name": "BSS",
+        "start": "0x10000000",
+        "end_exclusive": "0x10000000",
+        "size_bytes": 0
+      },
+      "data": {
+        "name": "Data",
+        "start": "0x10000000",
+        "end_exclusive": "0x10000000",
+        "size_bytes": 0
+      },
+      "code": {
+        "name": "Code",
+        "start": "0x00010000",
+        "end_exclusive": "0x0001005C",
+        "size_bytes": 92,
+        "runtime_startup": {
+          "name": "System Runtime Startup (_start)",
+          "start": "0x00010000",
+          "end": "0x00010010",
+          "end_exclusive": "0x00010014",
+          "instruction_count": 5
+        },
+        "user_program": {
+          "name": "User Program (main)",
+          "start": "0x00010014",
+          "end": "0x00010058",
+          "end_exclusive": "0x0001005C",
+          "instruction_count": 18,
+          "entry_point": "0x00010014"
+        }
+      },
+      "reserved": {
+        "name": "NULL",
+        "start": "0x00000000",
+        "end_exclusive": "0x00010000",
+        "size_bytes": 65536,
+        "desc": "NULL Pointer Guard (접근 금지 보호 구역)"
+      },
+      "boundary_dividers": [
+        "0x10008000",
+        "0x10004000",
+        "0x10000000",
+        "0x10000000",
+        "0x00010000",
+        "0x00000000"
+      ]
+    },
+    "entry_point": "0x00010000",
+    "instruction_words": 23,
+    "data_words": 0
+  },
+  "status": "halted",
+  "initial_state": {
+    "current_pc": "0x00010034",
+    "registers": {
+      "x0": "0x00000000",
+      "x1": "0x00010008",
+      "x2": "0x7FFFEFDC",
+      "x3": "0x00000000",
+      "x4": "0x00000000",
+      "x5": "0x00000000",
+      "x6": "0x00000000",
+      "x7": "0x00000000",
+      "x8": "0x7FFFEFFC",
+      "x9": "0x00000000",
+      "x10": "0x00000000",
+      "x11": "0x00000000",
+      "x12": "0x00000000",
+      "x13": "0x00000000",
+      "x14": "0x00000000",
+      "x15": "0x00000007",
+      "x16": "0x00000000",
+      "x17": "0x00000000",
+      "x18": "0x00000000",
+      "x19": "0x00000000",
+      "x20": "0x00000000",
+      "x21": "0x00000000",
+      "x22": "0x00000000",
+      "x23": "0x00000000",
+      "x24": "0x00000000",
+      "x25": "0x00000000",
+      "x26": "0x00000000",
+      "x27": "0x00000000",
+      "x28": "0x00000000",
+      "x29": "0x00000000",
+      "x30": "0x00000000",
+      "x31": "0x00000000"
+    },
+    "memory_snapshot": {
+      "0x7FFFEFF8": "0x00010008",
+      "0x7FFFEFF4": "0x00000000",
+      "0x7FFFEFE8": "0x0000000B",
+      "0x7FFFEFE4": "0x00000007"
+    },
+    "active_stack_pointer": "0x7FFFEFDC",
+    "console_output": "",
+    "metrics": {
+      "accumulated_instructions": 10,
+      "accumulated_stalls": 0,
+      "accumulated_forwards": 0
+    }
+  },
+  "summary": {
+    "total_cycles": 22,
+    "instructions_executed": 22,
+    "data_hazards": 0,
+    "control_hazards": 0,
+    "stalls": 0,
+    "forwards": 0,
+    "executed_cycles": 22
+  },
+  "history": [
+    {
+      "clock": 10,
+      "buffers": {
+        "IF": null,
+        "ID": null,
+        "EX": null,
+        "MEM": null,
+        "WB": null
+      },
+      "stage_activity": {
+        "IF": {
+          "pc": "0x00010034",
+          "raw_instruction": "0xFEC42703",
+          "assembly": "lw a4, -20(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "ID": {
+          "assembly": "lw a4, -20(s0)",
+          "status": "normal",
+          "decoded_fields": {
+            "op": "lw",
+            "rd": "x14",
+            "rs1": {
+              "name": "s0",
+              "num": 8,
+              "current_value": "0x7FFFEFFC"
+            },
+            "rs2": {
+              "name": "zero",
+              "num": 0,
+              "current_value": "0x00000000"
+            },
+            "imm": -20
+          },
+          "hazard_detect": {
+            "has_stall": false,
+            "stall_reason": null
+          },
+          "pc": "0x00010034",
+          "raw_instruction": "0xFEC42703",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "EX": {
+          "assembly": "lw a4, -20(s0)",
+          "status": "normal",
+          "alu_operation": "lw",
+          "operand_1": "0x7FFFEFFC",
+          "operand_2": "0xFFFFFFEC",
+          "alu_result": "0x7FFFEFE8",
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "pc": "0x00010034",
+          "raw_instruction": "0xFEC42703",
+          "source_line": 5
+        },
+        "MEM": {
+          "assembly": "lw a4, -20(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "memory_operation": "load",
+          "target_address": "0x7FFFEFE8",
+          "read_data": "0x0000000B",
+          "write_data": null,
+          "pc": "0x00010034",
+          "raw_instruction": "0xFEC42703",
+          "source_line": 5
+        },
+        "WB": {
+          "assembly": "lw a4, -20(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "will_write_reg": true,
+          "destination_register": "a4",
+          "final_write_data": "0x0000000B",
+          "pc": "0x00010034",
+          "raw_instruction": "0xFEC42703",
+          "source_line": 5
+        }
+      },
+      "cycle_events": {
+        "stall": {
+          "has_stall": false,
+          "stage": null,
+          "assembly": null,
+          "stall_reason": null,
+          "stall_desc": null
+        },
+        "forwarding": {
+          "has_forwarded": false,
+          "stage": null,
+          "assembly": null,
+          "forwarded_operand_count": 0,
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "forwarding_desc": null
+        },
+        "control_hazard": {
+          "has_control_instruction": false,
+          "has_flush": false,
+          "stage": null,
+          "assembly": null,
+          "taken": null,
+          "target_pc": null,
+          "fallthrough_pc": null,
+          "flushed_stages": [],
+          "flush_reason": null,
+          "redirect_pc": null
+        },
+        "runtime_error": {
+          "has_error": false,
+          "code": null,
+          "stage": null,
+          "assembly": null,
+          "message": null,
+          "reason": null
+        }
+      },
+      "global_result": {
+        "current_pc": "0x00010038",
+        "registers": {
+          "x0": "0x00000000",
+          "x1": "0x00010008",
+          "x2": "0x7FFFEFDC",
+          "x3": "0x00000000",
+          "x4": "0x00000000",
+          "x5": "0x00000000",
+          "x6": "0x00000000",
+          "x7": "0x00000000",
+          "x8": "0x7FFFEFFC",
+          "x9": "0x00000000",
+          "x10": "0x00000000",
+          "x11": "0x00000000",
+          "x12": "0x00000000",
+          "x13": "0x00000000",
+          "x14": "0x0000000B",
+          "x15": "0x00000007",
+          "x16": "0x00000000",
+          "x17": "0x00000000",
+          "x18": "0x00000000",
+          "x19": "0x00000000",
+          "x20": "0x00000000",
+          "x21": "0x00000000",
+          "x22": "0x00000000",
+          "x23": "0x00000000",
+          "x24": "0x00000000",
+          "x25": "0x00000000",
+          "x26": "0x00000000",
+          "x27": "0x00000000",
+          "x28": "0x00000000",
+          "x29": "0x00000000",
+          "x30": "0x00000000",
+          "x31": "0x00000000"
+        },
+        "memory_snapshot": {
+          "0x7FFFEFF8": "0x00010008",
+          "0x7FFFEFF4": "0x00000000",
+          "0x7FFFEFE8": "0x0000000B",
+          "0x7FFFEFE4": "0x00000007"
+        },
+        "active_stack_pointer": "0x7FFFEFDC",
+        "console_output": "",
+        "metrics": {
+          "accumulated_instructions": 11,
+          "accumulated_stalls": 0,
+          "accumulated_forwards": 0
+        }
+      },
+      "datapath": {
+        "pc": "0x00010034",
+        "next_pc": "0x00010038",
+        "pc_plus_4": "0x00010038",
+        "instruction": {
+          "raw": "0xFEC42703",
+          "assembly": "lw a4, -20(s0)",
+          "op": "lw"
+        },
+        "control_signals": {
+          "reg_write": true,
+          "alu_src": "imm",
+          "alu_op": "lw",
+          "mem_read": true,
+          "mem_write": false,
+          "mem_to_reg": true,
+          "branch": false,
+          "jump": false,
+          "pc_src": "pc+4"
+        },
+        "registers": {
+          "rs1": {
+            "name": "s0",
+            "num": 8,
+            "value": "0x7FFFEFFC",
+            "dec": 2147479548
+          },
+          "rs2": {
+            "name": "zero",
+            "num": 0,
+            "value": "0x00000000",
+            "dec": 0
+          },
+          "rd": {
+            "name": "a4",
+            "num": 14,
+            "write_enabled": true,
+            "write_data": "0x0000000B"
+          }
+        },
+        "immediate": {
+          "value": "0xFFFFFFEC",
+          "dec": -20
+        },
+        "alu": {
+          "op": "lw",
+          "input_1": "0x7FFFEFFC",
+          "input_2": "0xFFFFFFEC",
+          "result": "0x7FFFEFE8",
+          "result_dec": 2147479528,
+          "zero": false
+        },
+        "data_memory": {
+          "enabled": true,
+          "operation": "load",
+          "address": "0x7FFFEFE8",
+          "read_data": "0x0000000B",
+          "write_data": null
+        }
+      },
+      "if_stage": {
+        "pc": "0x00010034",
+        "raw_instruction": "0xFEC42703",
+        "assembly": "lw a4, -20(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "id_stage": {
+        "assembly": "lw a4, -20(s0)",
+        "status": "normal",
+        "decoded_fields": {
+          "op": "lw",
+          "rd": "x14",
+          "rs1": {
+            "name": "s0",
+            "num": 8,
+            "current_value": "0x7FFFEFFC"
+          },
+          "rs2": {
+            "name": "zero",
+            "num": 0,
+            "current_value": "0x00000000"
+          },
+          "imm": -20
+        },
+        "hazard_detect": {
+          "has_stall": false,
+          "stall_reason": null
+        },
+        "pc": "0x00010034",
+        "raw_instruction": "0xFEC42703",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "ex_stage": {
+        "assembly": "lw a4, -20(s0)",
+        "status": "normal",
+        "alu_operation": "lw",
+        "operand_1": "0x7FFFEFFC",
+        "operand_2": "0xFFFFFFEC",
+        "alu_result": "0x7FFFEFE8",
+        "forwarding_info": {
+          "has_forwarded": false,
+          "forwarded_from": [],
+          "forwarded_to": [],
+          "target_register": [],
+          "forwarded_value": []
+        },
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "pc": "0x00010034",
+        "raw_instruction": "0xFEC42703",
+        "source_line": 5
+      },
+      "mem_stage": {
+        "assembly": "lw a4, -20(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "memory_operation": "load",
+        "target_address": "0x7FFFEFE8",
+        "read_data": "0x0000000B",
+        "write_data": null,
+        "pc": "0x00010034",
+        "raw_instruction": "0xFEC42703",
+        "source_line": 5
+      },
+      "wb_stage": {
+        "assembly": "lw a4, -20(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "will_write_reg": true,
+        "destination_register": "a4",
+        "final_write_data": "0x0000000B",
+        "pc": "0x00010034",
+        "raw_instruction": "0xFEC42703",
+        "source_line": 5
+      }
+    },
+    {
+      "clock": 11,
+      "buffers": {
+        "IF": null,
+        "ID": null,
+        "EX": null,
+        "MEM": null,
+        "WB": null
+      },
+      "stage_activity": {
+        "IF": {
+          "pc": "0x00010038",
+          "raw_instruction": "0xFE842783",
+          "assembly": "lw a5, -24(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "ID": {
+          "assembly": "lw a5, -24(s0)",
+          "status": "normal",
+          "decoded_fields": {
+            "op": "lw",
+            "rd": "x15",
+            "rs1": {
+              "name": "s0",
+              "num": 8,
+              "current_value": "0x7FFFEFFC"
+            },
+            "rs2": {
+              "name": "zero",
+              "num": 0,
+              "current_value": "0x00000000"
+            },
+            "imm": -24
+          },
+          "hazard_detect": {
+            "has_stall": false,
+            "stall_reason": null
+          },
+          "pc": "0x00010038",
+          "raw_instruction": "0xFE842783",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "EX": {
+          "assembly": "lw a5, -24(s0)",
+          "status": "normal",
+          "alu_operation": "lw",
+          "operand_1": "0x7FFFEFFC",
+          "operand_2": "0xFFFFFFE8",
+          "alu_result": "0x7FFFEFE4",
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "pc": "0x00010038",
+          "raw_instruction": "0xFE842783",
+          "source_line": 5
+        },
+        "MEM": {
+          "assembly": "lw a5, -24(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "memory_operation": "load",
+          "target_address": "0x7FFFEFE4",
+          "read_data": "0x00000007",
+          "write_data": null,
+          "pc": "0x00010038",
+          "raw_instruction": "0xFE842783",
+          "source_line": 5
+        },
+        "WB": {
+          "assembly": "lw a5, -24(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "will_write_reg": true,
+          "destination_register": "a5",
+          "final_write_data": "0x00000007",
+          "pc": "0x00010038",
+          "raw_instruction": "0xFE842783",
+          "source_line": 5
+        }
+      },
+      "cycle_events": {
+        "stall": {
+          "has_stall": false,
+          "stage": null,
+          "assembly": null,
+          "stall_reason": null,
+          "stall_desc": null
+        },
+        "forwarding": {
+          "has_forwarded": false,
+          "stage": null,
+          "assembly": null,
+          "forwarded_operand_count": 0,
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "forwarding_desc": null
+        },
+        "control_hazard": {
+          "has_control_instruction": false,
+          "has_flush": false,
+          "stage": null,
+          "assembly": null,
+          "taken": null,
+          "target_pc": null,
+          "fallthrough_pc": null,
+          "flushed_stages": [],
+          "flush_reason": null,
+          "redirect_pc": null
+        },
+        "runtime_error": {
+          "has_error": false,
+          "code": null,
+          "stage": null,
+          "assembly": null,
+          "message": null,
+          "reason": null
+        }
+      },
+      "global_result": {
+        "current_pc": "0x0001003C",
+        "registers": {
+          "x0": "0x00000000",
+          "x1": "0x00010008",
+          "x2": "0x7FFFEFDC",
+          "x3": "0x00000000",
+          "x4": "0x00000000",
+          "x5": "0x00000000",
+          "x6": "0x00000000",
+          "x7": "0x00000000",
+          "x8": "0x7FFFEFFC",
+          "x9": "0x00000000",
+          "x10": "0x00000000",
+          "x11": "0x00000000",
+          "x12": "0x00000000",
+          "x13": "0x00000000",
+          "x14": "0x0000000B",
+          "x15": "0x00000007",
+          "x16": "0x00000000",
+          "x17": "0x00000000",
+          "x18": "0x00000000",
+          "x19": "0x00000000",
+          "x20": "0x00000000",
+          "x21": "0x00000000",
+          "x22": "0x00000000",
+          "x23": "0x00000000",
+          "x24": "0x00000000",
+          "x25": "0x00000000",
+          "x26": "0x00000000",
+          "x27": "0x00000000",
+          "x28": "0x00000000",
+          "x29": "0x00000000",
+          "x30": "0x00000000",
+          "x31": "0x00000000"
+        },
+        "memory_snapshot": {
+          "0x7FFFEFF8": "0x00010008",
+          "0x7FFFEFF4": "0x00000000",
+          "0x7FFFEFE8": "0x0000000B",
+          "0x7FFFEFE4": "0x00000007"
+        },
+        "active_stack_pointer": "0x7FFFEFDC",
+        "console_output": "",
+        "metrics": {
+          "accumulated_instructions": 12,
+          "accumulated_stalls": 0,
+          "accumulated_forwards": 0
+        }
+      },
+      "datapath": {
+        "pc": "0x00010038",
+        "next_pc": "0x0001003C",
+        "pc_plus_4": "0x0001003C",
+        "instruction": {
+          "raw": "0xFE842783",
+          "assembly": "lw a5, -24(s0)",
+          "op": "lw"
+        },
+        "control_signals": {
+          "reg_write": true,
+          "alu_src": "imm",
+          "alu_op": "lw",
+          "mem_read": true,
+          "mem_write": false,
+          "mem_to_reg": true,
+          "branch": false,
+          "jump": false,
+          "pc_src": "pc+4"
+        },
+        "registers": {
+          "rs1": {
+            "name": "s0",
+            "num": 8,
+            "value": "0x7FFFEFFC",
+            "dec": 2147479548
+          },
+          "rs2": {
+            "name": "zero",
+            "num": 0,
+            "value": "0x00000000",
+            "dec": 0
+          },
+          "rd": {
+            "name": "a5",
+            "num": 15,
+            "write_enabled": true,
+            "write_data": "0x00000007"
+          }
+        },
+        "immediate": {
+          "value": "0xFFFFFFE8",
+          "dec": -24
+        },
+        "alu": {
+          "op": "lw",
+          "input_1": "0x7FFFEFFC",
+          "input_2": "0xFFFFFFE8",
+          "result": "0x7FFFEFE4",
+          "result_dec": 2147479524,
+          "zero": false
+        },
+        "data_memory": {
+          "enabled": true,
+          "operation": "load",
+          "address": "0x7FFFEFE4",
+          "read_data": "0x00000007",
+          "write_data": null
+        }
+      },
+      "if_stage": {
+        "pc": "0x00010038",
+        "raw_instruction": "0xFE842783",
+        "assembly": "lw a5, -24(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "id_stage": {
+        "assembly": "lw a5, -24(s0)",
+        "status": "normal",
+        "decoded_fields": {
+          "op": "lw",
+          "rd": "x15",
+          "rs1": {
+            "name": "s0",
+            "num": 8,
+            "current_value": "0x7FFFEFFC"
+          },
+          "rs2": {
+            "name": "zero",
+            "num": 0,
+            "current_value": "0x00000000"
+          },
+          "imm": -24
+        },
+        "hazard_detect": {
+          "has_stall": false,
+          "stall_reason": null
+        },
+        "pc": "0x00010038",
+        "raw_instruction": "0xFE842783",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "ex_stage": {
+        "assembly": "lw a5, -24(s0)",
+        "status": "normal",
+        "alu_operation": "lw",
+        "operand_1": "0x7FFFEFFC",
+        "operand_2": "0xFFFFFFE8",
+        "alu_result": "0x7FFFEFE4",
+        "forwarding_info": {
+          "has_forwarded": false,
+          "forwarded_from": [],
+          "forwarded_to": [],
+          "target_register": [],
+          "forwarded_value": []
+        },
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "pc": "0x00010038",
+        "raw_instruction": "0xFE842783",
+        "source_line": 5
+      },
+      "mem_stage": {
+        "assembly": "lw a5, -24(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "memory_operation": "load",
+        "target_address": "0x7FFFEFE4",
+        "read_data": "0x00000007",
+        "write_data": null,
+        "pc": "0x00010038",
+        "raw_instruction": "0xFE842783",
+        "source_line": 5
+      },
+      "wb_stage": {
+        "assembly": "lw a5, -24(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "will_write_reg": true,
+        "destination_register": "a5",
+        "final_write_data": "0x00000007",
+        "pc": "0x00010038",
+        "raw_instruction": "0xFE842783",
+        "source_line": 5
+      }
+    },
+    {
+      "clock": 12,
+      "buffers": {
+        "IF": null,
+        "ID": null,
+        "EX": null,
+        "MEM": null,
+        "WB": null
+      },
+      "stage_activity": {
+        "IF": {
+          "pc": "0x0001003C",
+          "raw_instruction": "0x00F707B3",
+          "assembly": "add a5, a4, a5",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "ID": {
+          "assembly": "add a5, a4, a5",
+          "status": "normal",
+          "decoded_fields": {
+            "op": "add",
+            "rd": "x15",
+            "rs1": {
+              "name": "a4",
+              "num": 14,
+              "current_value": "0x0000000B"
+            },
+            "rs2": {
+              "name": "a5",
+              "num": 15,
+              "current_value": "0x00000007"
+            },
+            "imm": 0
+          },
+          "hazard_detect": {
+            "has_stall": false,
+            "stall_reason": null
+          },
+          "pc": "0x0001003C",
+          "raw_instruction": "0x00F707B3",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "EX": {
+          "assembly": "add a5, a4, a5",
+          "status": "normal",
+          "alu_operation": "add",
+          "operand_1": "0x0000000B",
+          "operand_2": "0x00000007",
+          "alu_result": "0x00000012",
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "pc": "0x0001003C",
+          "raw_instruction": "0x00F707B3",
+          "source_line": 5
+        },
+        "MEM": {
+          "assembly": "add a5, a4, a5",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "memory_operation": "none",
+          "target_address": null,
+          "read_data": null,
+          "write_data": null,
+          "pc": "0x0001003C",
+          "raw_instruction": "0x00F707B3",
+          "source_line": 5
+        },
+        "WB": {
+          "assembly": "add a5, a4, a5",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "will_write_reg": true,
+          "destination_register": "a5",
+          "final_write_data": "0x00000012",
+          "pc": "0x0001003C",
+          "raw_instruction": "0x00F707B3",
+          "source_line": 5
+        }
+      },
+      "cycle_events": {
+        "stall": {
+          "has_stall": false,
+          "stage": null,
+          "assembly": null,
+          "stall_reason": null,
+          "stall_desc": null
+        },
+        "forwarding": {
+          "has_forwarded": false,
+          "stage": null,
+          "assembly": null,
+          "forwarded_operand_count": 0,
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "forwarding_desc": null
+        },
+        "control_hazard": {
+          "has_control_instruction": false,
+          "has_flush": false,
+          "stage": null,
+          "assembly": null,
+          "taken": null,
+          "target_pc": null,
+          "fallthrough_pc": null,
+          "flushed_stages": [],
+          "flush_reason": null,
+          "redirect_pc": null
+        },
+        "runtime_error": {
+          "has_error": false,
+          "code": null,
+          "stage": null,
+          "assembly": null,
+          "message": null,
+          "reason": null
+        }
+      },
+      "global_result": {
+        "current_pc": "0x00010040",
+        "registers": {
+          "x0": "0x00000000",
+          "x1": "0x00010008",
+          "x2": "0x7FFFEFDC",
+          "x3": "0x00000000",
+          "x4": "0x00000000",
+          "x5": "0x00000000",
+          "x6": "0x00000000",
+          "x7": "0x00000000",
+          "x8": "0x7FFFEFFC",
+          "x9": "0x00000000",
+          "x10": "0x00000000",
+          "x11": "0x00000000",
+          "x12": "0x00000000",
+          "x13": "0x00000000",
+          "x14": "0x0000000B",
+          "x15": "0x00000012",
+          "x16": "0x00000000",
+          "x17": "0x00000000",
+          "x18": "0x00000000",
+          "x19": "0x00000000",
+          "x20": "0x00000000",
+          "x21": "0x00000000",
+          "x22": "0x00000000",
+          "x23": "0x00000000",
+          "x24": "0x00000000",
+          "x25": "0x00000000",
+          "x26": "0x00000000",
+          "x27": "0x00000000",
+          "x28": "0x00000000",
+          "x29": "0x00000000",
+          "x30": "0x00000000",
+          "x31": "0x00000000"
+        },
+        "memory_snapshot": {
+          "0x7FFFEFF8": "0x00010008",
+          "0x7FFFEFF4": "0x00000000",
+          "0x7FFFEFE8": "0x0000000B",
+          "0x7FFFEFE4": "0x00000007"
+        },
+        "active_stack_pointer": "0x7FFFEFDC",
+        "console_output": "",
+        "metrics": {
+          "accumulated_instructions": 13,
+          "accumulated_stalls": 0,
+          "accumulated_forwards": 0
+        }
+      },
+      "datapath": {
+        "pc": "0x0001003C",
+        "next_pc": "0x00010040",
+        "pc_plus_4": "0x00010040",
+        "instruction": {
+          "raw": "0x00F707B3",
+          "assembly": "add a5, a4, a5",
+          "op": "add"
+        },
+        "control_signals": {
+          "reg_write": true,
+          "alu_src": "reg",
+          "alu_op": "add",
+          "mem_read": false,
+          "mem_write": false,
+          "mem_to_reg": false,
+          "branch": false,
+          "jump": false,
+          "pc_src": "pc+4"
+        },
+        "registers": {
+          "rs1": {
+            "name": "a4",
+            "num": 14,
+            "value": "0x0000000B",
+            "dec": 11
+          },
+          "rs2": {
+            "name": "a5",
+            "num": 15,
+            "value": "0x00000007",
+            "dec": 7
+          },
+          "rd": {
+            "name": "a5",
+            "num": 15,
+            "write_enabled": true,
+            "write_data": "0x00000012"
+          }
+        },
+        "immediate": {
+          "value": "0x00000000",
+          "dec": 0
+        },
+        "alu": {
+          "op": "add",
+          "input_1": "0x0000000B",
+          "input_2": "0x00000007",
+          "result": "0x00000012",
+          "result_dec": 18,
+          "zero": false
+        },
+        "data_memory": {
+          "enabled": false,
+          "operation": "none",
+          "address": null,
+          "read_data": null,
+          "write_data": null
+        }
+      },
+      "if_stage": {
+        "pc": "0x0001003C",
+        "raw_instruction": "0x00F707B3",
+        "assembly": "add a5, a4, a5",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "id_stage": {
+        "assembly": "add a5, a4, a5",
+        "status": "normal",
+        "decoded_fields": {
+          "op": "add",
+          "rd": "x15",
+          "rs1": {
+            "name": "a4",
+            "num": 14,
+            "current_value": "0x0000000B"
+          },
+          "rs2": {
+            "name": "a5",
+            "num": 15,
+            "current_value": "0x00000007"
+          },
+          "imm": 0
+        },
+        "hazard_detect": {
+          "has_stall": false,
+          "stall_reason": null
+        },
+        "pc": "0x0001003C",
+        "raw_instruction": "0x00F707B3",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "ex_stage": {
+        "assembly": "add a5, a4, a5",
+        "status": "normal",
+        "alu_operation": "add",
+        "operand_1": "0x0000000B",
+        "operand_2": "0x00000007",
+        "alu_result": "0x00000012",
+        "forwarding_info": {
+          "has_forwarded": false,
+          "forwarded_from": [],
+          "forwarded_to": [],
+          "target_register": [],
+          "forwarded_value": []
+        },
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "pc": "0x0001003C",
+        "raw_instruction": "0x00F707B3",
+        "source_line": 5
+      },
+      "mem_stage": {
+        "assembly": "add a5, a4, a5",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "memory_operation": "none",
+        "target_address": null,
+        "read_data": null,
+        "write_data": null,
+        "pc": "0x0001003C",
+        "raw_instruction": "0x00F707B3",
+        "source_line": 5
+      },
+      "wb_stage": {
+        "assembly": "add a5, a4, a5",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "will_write_reg": true,
+        "destination_register": "a5",
+        "final_write_data": "0x00000012",
+        "pc": "0x0001003C",
+        "raw_instruction": "0x00F707B3",
+        "source_line": 5
+      }
+    },
+    {
+      "clock": 13,
+      "buffers": {
+        "IF": null,
+        "ID": null,
+        "EX": null,
+        "MEM": null,
+        "WB": null
+      },
+      "stage_activity": {
+        "IF": {
+          "pc": "0x00010040",
+          "raw_instruction": "0xFEF42223",
+          "assembly": "sw a5, -28(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "ID": {
+          "assembly": "sw a5, -28(s0)",
+          "status": "normal",
+          "decoded_fields": {
+            "op": "sw",
+            "rd": "x4",
+            "rs1": {
+              "name": "s0",
+              "num": 8,
+              "current_value": "0x7FFFEFFC"
+            },
+            "rs2": {
+              "name": "a5",
+              "num": 15,
+              "current_value": "0x00000012"
+            },
+            "imm": -28
+          },
+          "hazard_detect": {
+            "has_stall": false,
+            "stall_reason": null
+          },
+          "pc": "0x00010040",
+          "raw_instruction": "0xFEF42223",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "source_line": 5
+        },
+        "EX": {
+          "assembly": "sw a5, -28(s0)",
+          "status": "normal",
+          "alu_operation": "sw",
+          "operand_1": "0x7FFFEFFC",
+          "operand_2": "0xFFFFFFE4",
+          "alu_result": "0x7FFFEFE0",
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "pc": "0x00010040",
+          "raw_instruction": "0xFEF42223",
+          "source_line": 5
+        },
+        "MEM": {
+          "assembly": "sw a5, -28(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "memory_operation": "store",
+          "target_address": "0x7FFFEFE0",
+          "read_data": null,
+          "write_data": "0x00000012",
+          "pc": "0x00010040",
+          "raw_instruction": "0xFEF42223",
+          "source_line": 5
+        },
+        "WB": {
+          "assembly": "sw a5, -28(s0)",
+          "status": "normal",
+          "flush_info": {
+            "is_flushed": false,
+            "reason": null
+          },
+          "will_write_reg": false,
+          "destination_register": "tp",
+          "final_write_data": null,
+          "pc": "0x00010040",
+          "raw_instruction": "0xFEF42223",
+          "source_line": 5
+        }
+      },
+      "cycle_events": {
+        "stall": {
+          "has_stall": false,
+          "stage": null,
+          "assembly": null,
+          "stall_reason": null,
+          "stall_desc": null
+        },
+        "forwarding": {
+          "has_forwarded": false,
+          "stage": null,
+          "assembly": null,
+          "forwarded_operand_count": 0,
+          "forwarding_info": {
+            "has_forwarded": false,
+            "forwarded_from": [],
+            "forwarded_to": [],
+            "target_register": [],
+            "forwarded_value": []
+          },
+          "forwarding_desc": null
+        },
+        "control_hazard": {
+          "has_control_instruction": false,
+          "has_flush": false,
+          "stage": null,
+          "assembly": null,
+          "taken": null,
+          "target_pc": null,
+          "fallthrough_pc": null,
+          "flushed_stages": [],
+          "flush_reason": null,
+          "redirect_pc": null
+        },
+        "runtime_error": {
+          "has_error": false,
+          "code": null,
+          "stage": null,
+          "assembly": null,
+          "message": null,
+          "reason": null
+        }
+      },
+      "global_result": {
+        "current_pc": "0x00010044",
+        "registers": {
+          "x0": "0x00000000",
+          "x1": "0x00010008",
+          "x2": "0x7FFFEFDC",
+          "x3": "0x00000000",
+          "x4": "0x00000000",
+          "x5": "0x00000000",
+          "x6": "0x00000000",
+          "x7": "0x00000000",
+          "x8": "0x7FFFEFFC",
+          "x9": "0x00000000",
+          "x10": "0x00000000",
+          "x11": "0x00000000",
+          "x12": "0x00000000",
+          "x13": "0x00000000",
+          "x14": "0x0000000B",
+          "x15": "0x00000012",
+          "x16": "0x00000000",
+          "x17": "0x00000000",
+          "x18": "0x00000000",
+          "x19": "0x00000000",
+          "x20": "0x00000000",
+          "x21": "0x00000000",
+          "x22": "0x00000000",
+          "x23": "0x00000000",
+          "x24": "0x00000000",
+          "x25": "0x00000000",
+          "x26": "0x00000000",
+          "x27": "0x00000000",
+          "x28": "0x00000000",
+          "x29": "0x00000000",
+          "x30": "0x00000000",
+          "x31": "0x00000000"
+        },
+        "memory_snapshot": {
+          "0x7FFFEFF8": "0x00010008",
+          "0x7FFFEFF4": "0x00000000",
+          "0x7FFFEFE8": "0x0000000B",
+          "0x7FFFEFE4": "0x00000007",
+          "0x7FFFEFE0": "0x00000012"
+        },
+        "active_stack_pointer": "0x7FFFEFDC",
+        "console_output": "",
+        "metrics": {
+          "accumulated_instructions": 14,
+          "accumulated_stalls": 0,
+          "accumulated_forwards": 0
+        }
+      },
+      "datapath": {
+        "pc": "0x00010040",
+        "next_pc": "0x00010044",
+        "pc_plus_4": "0x00010044",
+        "instruction": {
+          "raw": "0xFEF42223",
+          "assembly": "sw a5, -28(s0)",
+          "op": "sw"
+        },
+        "control_signals": {
+          "reg_write": false,
+          "alu_src": "imm",
+          "alu_op": "sw",
+          "mem_read": false,
+          "mem_write": true,
+          "mem_to_reg": false,
+          "branch": false,
+          "jump": false,
+          "pc_src": "pc+4"
+        },
+        "registers": {
+          "rs1": {
+            "name": "s0",
+            "num": 8,
+            "value": "0x7FFFEFFC",
+            "dec": 2147479548
+          },
+          "rs2": {
+            "name": "a5",
+            "num": 15,
+            "value": "0x00000012",
+            "dec": 18
+          },
+          "rd": {
+            "name": "tp",
+            "num": 4,
+            "write_enabled": false,
+            "write_data": null
+          }
+        },
+        "immediate": {
+          "value": "0xFFFFFFE4",
+          "dec": -28
+        },
+        "alu": {
+          "op": "sw",
+          "input_1": "0x7FFFEFFC",
+          "input_2": "0xFFFFFFE4",
+          "result": "0x7FFFEFE0",
+          "result_dec": 2147479520,
+          "zero": false
+        },
+        "data_memory": {
+          "enabled": true,
+          "operation": "store",
+          "address": "0x7FFFEFE0",
+          "read_data": null,
+          "write_data": "0x00000012"
+        }
+      },
+      "if_stage": {
+        "pc": "0x00010040",
+        "raw_instruction": "0xFEF42223",
+        "assembly": "sw a5, -28(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "id_stage": {
+        "assembly": "sw a5, -28(s0)",
+        "status": "normal",
+        "decoded_fields": {
+          "op": "sw",
+          "rd": "x4",
+          "rs1": {
+            "name": "s0",
+            "num": 8,
+            "current_value": "0x7FFFEFFC"
+          },
+          "rs2": {
+            "name": "a5",
+            "num": 15,
+            "current_value": "0x00000012"
+          },
+          "imm": -28
+        },
+        "hazard_detect": {
+          "has_stall": false,
+          "stall_reason": null
+        },
+        "pc": "0x00010040",
+        "raw_instruction": "0xFEF42223",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "source_line": 5
+      },
+      "ex_stage": {
+        "assembly": "sw a5, -28(s0)",
+        "status": "normal",
+        "alu_operation": "sw",
+        "operand_1": "0x7FFFEFFC",
+        "operand_2": "0xFFFFFFE4",
+        "alu_result": "0x7FFFEFE0",
+        "forwarding_info": {
+          "has_forwarded": false,
+          "forwarded_from": [],
+          "forwarded_to": [],
+          "target_register": [],
+          "forwarded_value": []
+        },
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "pc": "0x00010040",
+        "raw_instruction": "0xFEF42223",
+        "source_line": 5
+      },
+      "mem_stage": {
+        "assembly": "sw a5, -28(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "memory_operation": "store",
+        "target_address": "0x7FFFEFE0",
+        "read_data": null,
+        "write_data": "0x00000012",
+        "pc": "0x00010040",
+        "raw_instruction": "0xFEF42223",
+        "source_line": 5
+      },
+      "wb_stage": {
+        "assembly": "sw a5, -28(s0)",
+        "status": "normal",
+        "flush_info": {
+          "is_flushed": false,
+          "reason": null
+        },
+        "will_write_reg": false,
+        "destination_register": "tp",
+        "final_write_data": null,
+        "pc": "0x00010040",
+        "raw_instruction": "0xFEF42223",
+        "source_line": 5
+      }
+    }
+  ],
+  "console_output": "",
+  "tutor": {
+    "schema_version": "1.0",
+    "asm_instructions": [
+      {
+        "instruction_format": {
+          "name": "I",
+          "word": "0xFEC42703",
+          "width_bits": 32,
+          "description": "12비트 즉치 필드와 기준 레지스터를 사용합니다. 산술·로드·간접 점프·SYSTEM은 같은 비트 배치를 서로 다르게 해석합니다.",
+          "fields": [
+            {
+              "name": "imm[11:0]",
+              "high": 31,
+              "low": 20,
+              "width": 12,
+              "value": 4076,
+              "binary": "111111101100",
+              "role": "즉치값을 구성하는 비트 조각"
+            },
+            {
+              "name": "rs1",
+              "high": 19,
+              "low": 15,
+              "width": 5,
+              "value": 8,
+              "binary": "01000",
+              "role": "첫 번째 입력 레지스터 번호"
+            },
+            {
+              "name": "funct3",
+              "high": 14,
+              "low": 12,
+              "width": 3,
+              "value": 2,
+              "binary": "010",
+              "role": "같은 종류 안에서 연산을 구분"
+            },
+            {
+              "name": "rd",
+              "high": 11,
+              "low": 7,
+              "width": 5,
+              "value": 14,
+              "binary": "01110",
+              "role": "결과를 받을 레지스터 번호"
+            },
+            {
+              "name": "opcode",
+              "high": 6,
+              "low": 0,
+              "width": 7,
+              "value": 3,
+              "binary": "0000011",
+              "role": "명령어 종류를 고르는 기본 코드"
+            }
+          ],
+          "immediate": -20,
+          "basis": "machine_code",
+          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
+        },
+        "pc": "0x00010034",
+        "raw_instruction": "0xFEC42703",
+        "text": "lw a4, -20(s0)",
+        "source_line": 5,
+        "reported_source_line": 5,
+        "source_file": "source.c",
+        "source_column": null,
+        "function": null,
+        "mapping_status": "mapped",
+        "unmapped_reason": null,
+        "mapping_basis": "provided_code_mapping",
+        "retire_count": 1,
+        "observed_in_history": true,
+        "explanation": {
+          "kind": "asm",
+          "category": "load",
+          "title": "메모리 읽기",
+          "summary": "s0 기준 -20바이트 주소에서 4바이트를 읽어 a4에 담습니다.",
+          "detail": "유효 주소는 u32(s0 + -20)입니다. 주소를 추정해 스택·전역 변수로 단정하지 않습니다. 4바이트를 접근하며 ArchReactor는 little-endian으로 바이트를 배치합니다. 32비트 워드를 그대로 읽습니다. 실제 접근 주소·값·정렬 오류는 MEM 단계와 runtime_error 이벤트에서 확인합니다.",
+          "opcode": "lw",
+          "operands": "a4, -20(s0)",
+          "operation": "a4 ← MEM32[u32(s0 + -20)]",
+          "reads": [
+            "x8"
+          ],
+          "writes": [
+            "x14"
+          ],
+          "notes": [
+            "유효 주소는 u32(s0 + -20)입니다. 주소를 추정해 스택·전역 변수로 단정하지 않습니다.",
+            "4바이트를 접근하며 ArchReactor는 little-endian으로 바이트를 배치합니다.",
+            "32비트 워드를 그대로 읽습니다.",
+            "실제 접근 주소·값·정렬 오류는 MEM 단계와 runtime_error 이벤트에서 확인합니다."
+          ],
+          "evidence_level": "syntax",
+          "supported": true,
+          "memory": {
+            "access": "load",
+            "width_bits": 32,
+            "extension": "none",
+            "address_expression": "u32(s0 + -20)"
+          },
+          "control_flow": null
+        },
+        "runtime_explanation": null,
+        "teaching": {
+          "operand_roles": [
+            {
+              "operand": "a4",
+              "role": "읽은 값을 받는 레지스터"
+            },
+            {
+              "operand": "-20(s0)",
+              "role": "기준 레지스터에 바이트 오프셋을 더한 메모리 주소"
+            }
+          ],
+          "principle": "메모리의 값을 산술 연산에 사용하려면 먼저 레지스터로 읽습니다. 이번 명령어의 메모리 접근 크기는 4바이트입니다.",
+          "register_connections": [],
+          "walkthrough": [
+            {
+              "title": "위치 찾기",
+              "text": "-20(s0)로 메모리 주소를 계산합니다. 괄호 밖 숫자는 바이트 단위의 거리입니다."
+            },
+            {
+              "title": "읽기",
+              "text": "그 주소에서 4바이트를 읽습니다."
+            },
+            {
+              "title": "결과",
+              "text": "읽은 값을 a4에 담습니다."
+            }
+          ],
+          "concepts": [
+            {
+              "id": "load-store",
+              "title": "주소와 값은 다릅니다",
+              "explanation": "RISC-V는 메모리에서 읽기·쓰기와 레지스터 연산을 나눕니다. 주소의 오프셋 단위는 바이트이며, C 배열의 원소 번호와 다릅니다.",
+              "example": "lw a0, 4(sp): sp가 0x2000이면 접근 주소는 0x2004입니다. 읽은 값이 4라는 뜻은 아닙니다.",
+              "plain": "주소는 메모리에서 찾을 위치이고, 값은 그 위치에 들어 있는 내용입니다.",
+              "question": "int가 4바이트인 배열에서 다음 원소로 이동하려면 주소를 얼마나 바꿀까요?",
+              "answer": "4바이트입니다. 배열 인덱스에 원소 크기를 곱해 바이트 오프셋을 만듭니다.",
+              "sources": [
+                {
+                  "title": "RISC-V 공식 RV32I 명세",
+                  "url": "https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html"
+                }
+              ]
+            },
+            {
+              "id": "stack-abi",
+              "title": "sp·s0의 역할은 호출 규약",
+              "explanation": "표준 ABI에서 sp(x2)는 스택 포인터이고 s0(x8)는 보존 레지스터입니다. 프레임 포인터를 사용하면 s0가 그 역할을 맡습니다. s0가 언제나 프레임 포인터인 것은 아닙니다.",
+              "example": "addi sp, sp, -16은 스택을 낮은 주소로 16바이트 확장하는 전형적인 패턴입니다. 복귀 전 sp를 복원합니다.",
+              "plain": "스택은 함수가 필요한 값을 잠시 보관하는 메모리 공간입니다. sp는 스택의 현재 경계를 가리킵니다.",
+              "question": "-20(s0)만 보고 특정 C 변수의 저장 위치라고 확정할 수 있을까요?",
+              "answer": "확정할 수 없습니다. 함수 문맥과 디버그 정보가 필요합니다. 표준 RV32I ABI의 스택 정렬은 16바이트입니다.",
+              "sources": [
+                {
+                  "title": "RISC-V 공식 호출 규약",
+                  "url": "https://docs.riscv.org/reference/abi/v1.0/riscv-cc-procedure-calling-convention.html"
+                },
+                {
+                  "title": "Cornell CS 3410 · 함수 호출",
+                  "url": "https://www.cs.cornell.edu/courses/cs3410/2026sp/notes/asm-call.html"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "instruction_format": {
+          "name": "I",
+          "word": "0xFE842783",
+          "width_bits": 32,
+          "description": "12비트 즉치 필드와 기준 레지스터를 사용합니다. 산술·로드·간접 점프·SYSTEM은 같은 비트 배치를 서로 다르게 해석합니다.",
+          "fields": [
+            {
+              "name": "imm[11:0]",
+              "high": 31,
+              "low": 20,
+              "width": 12,
+              "value": 4072,
+              "binary": "111111101000",
+              "role": "즉치값을 구성하는 비트 조각"
+            },
+            {
+              "name": "rs1",
+              "high": 19,
+              "low": 15,
+              "width": 5,
+              "value": 8,
+              "binary": "01000",
+              "role": "첫 번째 입력 레지스터 번호"
+            },
+            {
+              "name": "funct3",
+              "high": 14,
+              "low": 12,
+              "width": 3,
+              "value": 2,
+              "binary": "010",
+              "role": "같은 종류 안에서 연산을 구분"
+            },
+            {
+              "name": "rd",
+              "high": 11,
+              "low": 7,
+              "width": 5,
+              "value": 15,
+              "binary": "01111",
+              "role": "결과를 받을 레지스터 번호"
+            },
+            {
+              "name": "opcode",
+              "high": 6,
+              "low": 0,
+              "width": 7,
+              "value": 3,
+              "binary": "0000011",
+              "role": "명령어 종류를 고르는 기본 코드"
+            }
+          ],
+          "immediate": -24,
+          "basis": "machine_code",
+          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
+        },
+        "pc": "0x00010038",
+        "raw_instruction": "0xFE842783",
+        "text": "lw a5, -24(s0)",
+        "source_line": 5,
+        "reported_source_line": 5,
+        "source_file": "source.c",
+        "source_column": null,
+        "function": null,
+        "mapping_status": "mapped",
+        "unmapped_reason": null,
+        "mapping_basis": "provided_code_mapping",
+        "retire_count": 1,
+        "observed_in_history": true,
+        "explanation": {
+          "kind": "asm",
+          "category": "load",
+          "title": "메모리 읽기",
+          "summary": "s0 기준 -24바이트 주소에서 4바이트를 읽어 a5에 담습니다.",
+          "detail": "유효 주소는 u32(s0 + -24)입니다. 주소를 추정해 스택·전역 변수로 단정하지 않습니다. 4바이트를 접근하며 ArchReactor는 little-endian으로 바이트를 배치합니다. 32비트 워드를 그대로 읽습니다. 실제 접근 주소·값·정렬 오류는 MEM 단계와 runtime_error 이벤트에서 확인합니다.",
+          "opcode": "lw",
+          "operands": "a5, -24(s0)",
+          "operation": "a5 ← MEM32[u32(s0 + -24)]",
+          "reads": [
+            "x8"
+          ],
+          "writes": [
+            "x15"
+          ],
+          "notes": [
+            "유효 주소는 u32(s0 + -24)입니다. 주소를 추정해 스택·전역 변수로 단정하지 않습니다.",
+            "4바이트를 접근하며 ArchReactor는 little-endian으로 바이트를 배치합니다.",
+            "32비트 워드를 그대로 읽습니다.",
+            "실제 접근 주소·값·정렬 오류는 MEM 단계와 runtime_error 이벤트에서 확인합니다."
+          ],
+          "evidence_level": "syntax",
+          "supported": true,
+          "memory": {
+            "access": "load",
+            "width_bits": 32,
+            "extension": "none",
+            "address_expression": "u32(s0 + -24)"
+          },
+          "control_flow": null
+        },
+        "runtime_explanation": null,
+        "teaching": {
+          "operand_roles": [
+            {
+              "operand": "a5",
+              "role": "읽은 값을 받는 레지스터"
+            },
+            {
+              "operand": "-24(s0)",
+              "role": "기준 레지스터에 바이트 오프셋을 더한 메모리 주소"
+            }
+          ],
+          "principle": "메모리의 값을 산술 연산에 사용하려면 먼저 레지스터로 읽습니다. 이번 명령어의 메모리 접근 크기는 4바이트입니다.",
+          "register_connections": [],
+          "walkthrough": [
+            {
+              "title": "위치 찾기",
+              "text": "-24(s0)로 메모리 주소를 계산합니다. 괄호 밖 숫자는 바이트 단위의 거리입니다."
+            },
+            {
+              "title": "읽기",
+              "text": "그 주소에서 4바이트를 읽습니다."
+            },
+            {
+              "title": "결과",
+              "text": "읽은 값을 a5에 담습니다."
+            }
+          ],
+          "concepts": [
+            {
+              "id": "load-store",
+              "title": "주소와 값은 다릅니다",
+              "explanation": "RISC-V는 메모리에서 읽기·쓰기와 레지스터 연산을 나눕니다. 주소의 오프셋 단위는 바이트이며, C 배열의 원소 번호와 다릅니다.",
+              "example": "lw a0, 4(sp): sp가 0x2000이면 접근 주소는 0x2004입니다. 읽은 값이 4라는 뜻은 아닙니다.",
+              "plain": "주소는 메모리에서 찾을 위치이고, 값은 그 위치에 들어 있는 내용입니다.",
+              "question": "int가 4바이트인 배열에서 다음 원소로 이동하려면 주소를 얼마나 바꿀까요?",
+              "answer": "4바이트입니다. 배열 인덱스에 원소 크기를 곱해 바이트 오프셋을 만듭니다.",
+              "sources": [
+                {
+                  "title": "RISC-V 공식 RV32I 명세",
+                  "url": "https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html"
+                }
+              ]
+            },
+            {
+              "id": "stack-abi",
+              "title": "sp·s0의 역할은 호출 규약",
+              "explanation": "표준 ABI에서 sp(x2)는 스택 포인터이고 s0(x8)는 보존 레지스터입니다. 프레임 포인터를 사용하면 s0가 그 역할을 맡습니다. s0가 언제나 프레임 포인터인 것은 아닙니다.",
+              "example": "addi sp, sp, -16은 스택을 낮은 주소로 16바이트 확장하는 전형적인 패턴입니다. 복귀 전 sp를 복원합니다.",
+              "plain": "스택은 함수가 필요한 값을 잠시 보관하는 메모리 공간입니다. sp는 스택의 현재 경계를 가리킵니다.",
+              "question": "-20(s0)만 보고 특정 C 변수의 저장 위치라고 확정할 수 있을까요?",
+              "answer": "확정할 수 없습니다. 함수 문맥과 디버그 정보가 필요합니다. 표준 RV32I ABI의 스택 정렬은 16바이트입니다.",
+              "sources": [
+                {
+                  "title": "RISC-V 공식 호출 규약",
+                  "url": "https://docs.riscv.org/reference/abi/v1.0/riscv-cc-procedure-calling-convention.html"
+                },
+                {
+                  "title": "Cornell CS 3410 · 함수 호출",
+                  "url": "https://www.cs.cornell.edu/courses/cs3410/2026sp/notes/asm-call.html"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "instruction_format": {
+          "name": "R",
+          "word": "0x00F707B3",
+          "width_bits": 32,
+          "description": "레지스터 두 개를 입력으로 사용하고 결과를 목적지 레지스터에 기록합니다. M 확장도 같은 R형 배치를 사용합니다.",
+          "fields": [
+            {
+              "name": "funct7",
+              "high": 31,
+              "low": 25,
+              "width": 7,
+              "value": 0,
+              "binary": "0000000",
+              "role": "연산을 더 구체적으로 구분"
+            },
+            {
+              "name": "rs2",
+              "high": 24,
+              "low": 20,
+              "width": 5,
+              "value": 15,
+              "binary": "01111",
+              "role": "두 번째 입력 레지스터 번호"
+            },
+            {
+              "name": "rs1",
+              "high": 19,
+              "low": 15,
+              "width": 5,
+              "value": 14,
+              "binary": "01110",
+              "role": "첫 번째 입력 레지스터 번호"
+            },
+            {
+              "name": "funct3",
+              "high": 14,
+              "low": 12,
+              "width": 3,
+              "value": 0,
+              "binary": "000",
+              "role": "같은 종류 안에서 연산을 구분"
+            },
+            {
+              "name": "rd",
+              "high": 11,
+              "low": 7,
+              "width": 5,
+              "value": 15,
+              "binary": "01111",
+              "role": "결과를 받을 레지스터 번호"
+            },
+            {
+              "name": "opcode",
+              "high": 6,
+              "low": 0,
+              "width": 7,
+              "value": 51,
+              "binary": "0110011",
+              "role": "명령어 종류를 고르는 기본 코드"
+            }
+          ],
+          "immediate": null,
+          "basis": "machine_code",
+          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
+        },
+        "pc": "0x0001003C",
+        "raw_instruction": "0x00F707B3",
+        "text": "add a5, a4, a5",
+        "source_line": 5,
+        "reported_source_line": 5,
+        "source_file": "source.c",
+        "source_column": null,
+        "function": null,
+        "mapping_status": "mapped",
+        "unmapped_reason": null,
+        "mapping_basis": "provided_code_mapping",
+        "retire_count": 1,
+        "observed_in_history": true,
+        "explanation": {
+          "kind": "asm",
+          "category": "arithmetic",
+          "title": "덧셈",
+          "summary": "a4와 a5의 덧셈 결과를 a5에 기록합니다.",
+          "detail": "결과는 32비트로 기록합니다. 실제 기록 값과 시점은 CORE 실행 이력을 근거로 확인합니다.",
+          "opcode": "add",
+          "operands": "a5, a4, a5",
+          "operation": "a5 = a4 + a5",
+          "reads": [
+            "x14",
+            "x15"
+          ],
+          "writes": [
+            "x15"
+          ],
+          "notes": [
+            "결과는 32비트로 기록합니다. 실제 기록 값과 시점은 CORE 실행 이력을 근거로 확인합니다."
+          ],
+          "evidence_level": "syntax",
+          "supported": true,
+          "memory": null,
+          "control_flow": null
+        },
+        "runtime_explanation": null,
+        "teaching": {
+          "operand_roles": [
+            {
+              "operand": "a5",
+              "role": "계산 결과를 받는 레지스터"
+            },
+            {
+              "operand": "a4",
+              "role": "첫 번째 입력값을 가진 레지스터"
+            },
+            {
+              "operand": "a5",
+              "role": "두 번째 입력값을 가진 레지스터"
+            }
+          ],
+          "principle": "a5의 기존 값을 입력으로 읽은 뒤, 계산 결과로 같은 레지스터를 갱신합니다.",
+          "register_connections": [
+            {
+              "register": "x14",
+              "pc": "0x00010034",
+              "text": "lw a4, -20(s0)"
+            },
+            {
+              "register": "x15",
+              "pc": "0x00010038",
+              "text": "lw a5, -24(s0)"
+            }
+          ],
+          "walkthrough": [
+            {
+              "title": "입력 읽기",
+              "text": "a4에 든 값과 a5에 든 값을 사용합니다."
+            },
+            {
+              "title": "연산",
+              "text": "덧셈 연산을 수행합니다."
+            },
+            {
+              "title": "결과 담기",
+              "text": "결과를 a5에 담습니다. 기존에 담겨 있던 값은 새 결과로 바뀝니다."
+            }
+          ],
+          "concepts": [
+            {
+              "id": "word-result",
+              "title": "32비트 결과와 C의 정수 규칙",
+              "explanation": "RV32 덧셈·뺄셈은 결과의 하위 32비트를 기록하며 정수 오버플로 자체로 예외를 내지 않습니다. 이것이 C signed 오버플로를 허용한다는 뜻은 아닙니다.",
+              "example": "0xFFFFFFFF + 1의 RV32 결과는 0x00000000입니다. C unsigned 32비트 연산도 이 범위에서 순환합니다.",
+              "plain": "레지스터는 CPU 안에서 값을 담는 작은 저장 공간입니다. RV32 레지스터 하나에는 32개의 비트가 들어갑니다.",
+              "question": "C의 int 최댓값에 1을 더하는 동작도 항상 순환한다고 가정할 수 있을까요?",
+              "answer": "아닙니다. C signed 오버플로는 정의되지 않은 동작이므로 ISA의 비트 계산과 구분해야 합니다.",
+              "sources": [
+                {
+                  "title": "RISC-V 공식 RV32I 명세",
+                  "url": "https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html"
+                },
+                {
+                  "title": "C11 공개 초안 · 정수 연산 (§6.5, §6.5.5)",
+                  "url": "https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "instruction_format": {
+          "name": "S",
+          "word": "0xFEF42223",
+          "width_bits": 32,
+          "description": "rs2의 데이터를 rs1 + 부호 확장 오프셋 주소에 저장합니다. rd 필드는 없고 즉치값이 두 구간으로 나뉩니다.",
+          "fields": [
+            {
+              "name": "imm[11:5]",
+              "high": 31,
+              "low": 25,
+              "width": 7,
+              "value": 127,
+              "binary": "1111111",
+              "role": "즉치값을 구성하는 비트 조각"
+            },
+            {
+              "name": "rs2",
+              "high": 24,
+              "low": 20,
+              "width": 5,
+              "value": 15,
+              "binary": "01111",
+              "role": "두 번째 입력 레지스터 번호"
+            },
+            {
+              "name": "rs1",
+              "high": 19,
+              "low": 15,
+              "width": 5,
+              "value": 8,
+              "binary": "01000",
+              "role": "첫 번째 입력 레지스터 번호"
+            },
+            {
+              "name": "funct3",
+              "high": 14,
+              "low": 12,
+              "width": 3,
+              "value": 2,
+              "binary": "010",
+              "role": "같은 종류 안에서 연산을 구분"
+            },
+            {
+              "name": "imm[4:0]",
+              "high": 11,
+              "low": 7,
+              "width": 5,
+              "value": 4,
+              "binary": "00100",
+              "role": "즉치값을 구성하는 비트 조각"
+            },
+            {
+              "name": "opcode",
+              "high": 6,
+              "low": 0,
+              "width": 7,
+              "value": 35,
+              "binary": "0100011",
+              "role": "명령어 종류를 고르는 기본 코드"
+            }
+          ],
+          "immediate": -28,
+          "basis": "machine_code",
+          "note": "형식의 필드 배치와 실제 사용 여부는 다릅니다. x0 쓰기는 버리고, 제어 신호와 실행값은 선택한 클록에서 확인합니다."
+        },
+        "pc": "0x00010040",
+        "raw_instruction": "0xFEF42223",
+        "text": "sw a5, -28(s0)",
+        "source_line": 5,
+        "reported_source_line": 5,
+        "source_file": "source.c",
+        "source_column": null,
+        "function": null,
+        "mapping_status": "mapped",
+        "unmapped_reason": null,
+        "mapping_basis": "provided_code_mapping",
+        "retire_count": 1,
+        "observed_in_history": true,
+        "explanation": {
+          "kind": "asm",
+          "category": "store",
+          "title": "메모리 쓰기",
+          "summary": "a5의 하위 32비트를 s0 기준 -28바이트 주소에 저장합니다.",
+          "detail": "유효 주소는 u32(s0 + -28)입니다. 주소를 추정해 스택·전역 변수로 단정하지 않습니다. 4바이트를 접근하며 ArchReactor는 little-endian으로 바이트를 배치합니다. 원본 레지스터의 하위 32비트만 저장합니다. Store는 레지스터에 결과를 쓰지 않습니다. 실제 접근 주소·값·정렬 오류는 MEM 단계와 runtime_error 이벤트에서 확인합니다.",
+          "opcode": "sw",
+          "operands": "a5, -28(s0)",
+          "operation": "MEM32[u32(s0 + -28)] ← a5",
+          "reads": [
+            "x15",
+            "x8"
+          ],
+          "writes": [],
+          "notes": [
+            "유효 주소는 u32(s0 + -28)입니다. 주소를 추정해 스택·전역 변수로 단정하지 않습니다.",
+            "4바이트를 접근하며 ArchReactor는 little-endian으로 바이트를 배치합니다.",
+            "원본 레지스터의 하위 32비트만 저장합니다. Store는 레지스터에 결과를 쓰지 않습니다.",
+            "실제 접근 주소·값·정렬 오류는 MEM 단계와 runtime_error 이벤트에서 확인합니다."
+          ],
+          "evidence_level": "syntax",
+          "supported": true,
+          "memory": {
+            "access": "store",
+            "width_bits": 32,
+            "extension": "low_bits",
+            "address_expression": "u32(s0 + -28)"
+          },
+          "control_flow": null
+        },
+        "runtime_explanation": null,
+        "teaching": {
+          "operand_roles": [
+            {
+              "operand": "a5",
+              "role": "저장할 데이터를 가진 레지스터"
+            },
+            {
+              "operand": "-28(s0)",
+              "role": "기준 레지스터에 바이트 오프셋을 더한 메모리 주소"
+            }
+          ],
+          "principle": "레지스터에 계산해 둔 값을 메모리에 반영합니다. 이번 명령어의 메모리 접근 크기는 4바이트입니다.",
+          "register_connections": [
+            {
+              "register": "x15",
+              "pc": "0x0001003C",
+              "text": "add a5, a4, a5"
+            }
+          ],
+          "walkthrough": [
+            {
+              "title": "위치 찾기",
+              "text": "-28(s0)로 메모리 주소를 계산합니다. 괄호 밖 숫자는 바이트 단위의 거리입니다."
+            },
+            {
+              "title": "쓰기",
+              "text": "a5의 하위 32비트를 그 주소에 저장합니다."
+            },
+            {
+              "title": "결과",
+              "text": "메모리가 바뀝니다. 데이터를 준 레지스터 값은 이 명령어로 바뀌지 않습니다."
+            }
+          ],
+          "concepts": [
+            {
+              "id": "load-store",
+              "title": "주소와 값은 다릅니다",
+              "explanation": "RISC-V는 메모리에서 읽기·쓰기와 레지스터 연산을 나눕니다. 주소의 오프셋 단위는 바이트이며, C 배열의 원소 번호와 다릅니다.",
+              "example": "lw a0, 4(sp): sp가 0x2000이면 접근 주소는 0x2004입니다. 읽은 값이 4라는 뜻은 아닙니다.",
+              "plain": "주소는 메모리에서 찾을 위치이고, 값은 그 위치에 들어 있는 내용입니다.",
+              "question": "int가 4바이트인 배열에서 다음 원소로 이동하려면 주소를 얼마나 바꿀까요?",
+              "answer": "4바이트입니다. 배열 인덱스에 원소 크기를 곱해 바이트 오프셋을 만듭니다.",
+              "sources": [
+                {
+                  "title": "RISC-V 공식 RV32I 명세",
+                  "url": "https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html"
+                }
+              ]
+            },
+            {
+              "id": "stack-abi",
+              "title": "sp·s0의 역할은 호출 규약",
+              "explanation": "표준 ABI에서 sp(x2)는 스택 포인터이고 s0(x8)는 보존 레지스터입니다. 프레임 포인터를 사용하면 s0가 그 역할을 맡습니다. s0가 언제나 프레임 포인터인 것은 아닙니다.",
+              "example": "addi sp, sp, -16은 스택을 낮은 주소로 16바이트 확장하는 전형적인 패턴입니다. 복귀 전 sp를 복원합니다.",
+              "plain": "스택은 함수가 필요한 값을 잠시 보관하는 메모리 공간입니다. sp는 스택의 현재 경계를 가리킵니다.",
+              "question": "-20(s0)만 보고 특정 C 변수의 저장 위치라고 확정할 수 있을까요?",
+              "answer": "확정할 수 없습니다. 함수 문맥과 디버그 정보가 필요합니다. 표준 RV32I ABI의 스택 정렬은 16바이트입니다.",
+              "sources": [
+                {
+                  "title": "RISC-V 공식 호출 규약",
+                  "url": "https://docs.riscv.org/reference/abi/v1.0/riscv-cc-procedure-calling-convention.html"
+                },
+                {
+                  "title": "Cornell CS 3410 · 함수 호출",
+                  "url": "https://www.cs.cornell.edu/courses/cs3410/2026sp/notes/asm-call.html"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "performance_analysis": {
+      "schema_version": "1.0",
+      "snapshots": [
+        {
+          "history_index": 0,
+          "cycles": 1,
+          "completed": 11,
+          "cpi": 0.09090909090909091,
+          "stall_cycles": 0,
+          "flush_cycles": 0,
+          "forwarding_cycles": 0,
+          "overlap_cycles": 0,
+          "hazard_cycles": 0,
+          "idle_cycles": 0,
+          "hazard_idle_cycles": 0,
+          "other_idle_cycles": 0,
+          "unknown_completion_cycles": 0,
+          "extra_cycles": null
+        },
+        {
+          "history_index": 1,
+          "cycles": 2,
+          "completed": 12,
+          "cpi": 0.16666666666666666,
+          "stall_cycles": 0,
+          "flush_cycles": 0,
+          "forwarding_cycles": 0,
+          "overlap_cycles": 0,
+          "hazard_cycles": 0,
+          "idle_cycles": 0,
+          "hazard_idle_cycles": 0,
+          "other_idle_cycles": 0,
+          "unknown_completion_cycles": 0,
+          "extra_cycles": null
+        },
+        {
+          "history_index": 2,
+          "cycles": 3,
+          "completed": 13,
+          "cpi": 0.23076923076923078,
+          "stall_cycles": 0,
+          "flush_cycles": 0,
+          "forwarding_cycles": 0,
+          "overlap_cycles": 0,
+          "hazard_cycles": 0,
+          "idle_cycles": 0,
+          "hazard_idle_cycles": 0,
+          "other_idle_cycles": 0,
+          "unknown_completion_cycles": 0,
+          "extra_cycles": null
+        },
+        {
+          "history_index": 3,
+          "cycles": 4,
+          "completed": 14,
+          "cpi": 0.2857142857142857,
+          "stall_cycles": 0,
+          "flush_cycles": 0,
+          "forwarding_cycles": 0,
+          "overlap_cycles": 0,
+          "hazard_cycles": 0,
+          "idle_cycles": 0,
+          "hazard_idle_cycles": 0,
+          "other_idle_cycles": 0,
+          "unknown_completion_cycles": 0,
+          "extra_cycles": null
+        }
+      ],
+      "records": [],
+      "notes": [
+        "스톨·플러시는 이벤트가 관찰된 클록 수입니다. 같은 클록의 중복은 별도로 표시합니다.",
+        "포워딩 관찰 클록과 전달된 피연산자 횟수는 다를 수 있습니다. 한 클록에서 여러 입력을 전달할 수 있습니다.",
+        "완료가 없는 클록에는 초기 채우기·종료 비우기·해저드 등의 영향이 함께 나타날 수 있습니다.",
+        "포워딩이 절약한 클록 수와 개별 플러시의 순수 손실은 비교 실행 없이 확정하지 않습니다."
+      ]
+    },
+    "cycle_explanations": [],
+    "execution_steps": [
+      {
+        "history_index": 0,
+        "cycle": 10,
+        "display_clock": 1,
+        "events": [],
+        "retired_pc": "0x00010034",
+        "retired_delta": 1,
+        "stages": [
+          {
+            "stage": "IF",
+            "pc": "0x00010034",
+            "assembly": "lw a4, -20(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "ID",
+            "pc": "0x00010034",
+            "assembly": "lw a4, -20(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "EX",
+            "pc": "0x00010034",
+            "assembly": "lw a4, -20(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "MEM",
+            "pc": "0x00010034",
+            "assembly": "lw a4, -20(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "WB",
+            "pc": "0x00010034",
+            "assembly": "lw a4, -20(s0)",
+            "status": "normal",
+            "source_line": 5
+          }
+        ],
+        "register_changes": [
+          {
+            "key": "x14",
+            "before": "0x00000000",
+            "after": "0x0000000B"
+          }
+        ],
+        "memory_changes": [],
+        "memory_transfer": {
+          "memory_operation": "load",
+          "target_address": "0x7FFFEFE8",
+          "read_data": "0x0000000B",
+          "write_data": null,
+          "pc": "0x00010034",
+          "assembly": "lw a4, -20(s0)"
+        },
+        "register_write": {
+          "register": "a4",
+          "value": "0x0000000B"
+        },
+        "current_pc": "0x00010038",
+        "instruction_observations": [
+          {
+            "pc": "0x00010034",
+            "stage": "EX",
+            "summary": "기준 주소 0x7FFFEFFC에 오프셋 0xFFFFFFEC을 더해 접근 주소 0x7FFFEFE8을 계산했습니다.",
+            "kind": "address"
+          },
+          {
+            "pc": "0x00010034",
+            "stage": "MEM",
+            "summary": "주소 0x7FFFEFE8의 읽기 결과는 11 (0x0000000B)입니다.",
+            "kind": "value"
+          },
+          {
+            "pc": "0x00010034",
+            "stage": "WB",
+            "summary": "a4에 11 (0x0000000B)을 기록했습니다.",
+            "kind": "value"
+          }
+        ]
+      },
+      {
+        "history_index": 1,
+        "cycle": 11,
+        "display_clock": 2,
+        "events": [],
+        "retired_pc": "0x00010038",
+        "retired_delta": 1,
+        "stages": [
+          {
+            "stage": "IF",
+            "pc": "0x00010038",
+            "assembly": "lw a5, -24(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "ID",
+            "pc": "0x00010038",
+            "assembly": "lw a5, -24(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "EX",
+            "pc": "0x00010038",
+            "assembly": "lw a5, -24(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "MEM",
+            "pc": "0x00010038",
+            "assembly": "lw a5, -24(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "WB",
+            "pc": "0x00010038",
+            "assembly": "lw a5, -24(s0)",
+            "status": "normal",
+            "source_line": 5
+          }
+        ],
+        "register_changes": [],
+        "memory_changes": [],
+        "memory_transfer": {
+          "memory_operation": "load",
+          "target_address": "0x7FFFEFE4",
+          "read_data": "0x00000007",
+          "write_data": null,
+          "pc": "0x00010038",
+          "assembly": "lw a5, -24(s0)"
+        },
+        "register_write": {
+          "register": "a5",
+          "value": "0x00000007"
+        },
+        "current_pc": "0x0001003C",
+        "instruction_observations": [
+          {
+            "pc": "0x00010038",
+            "stage": "EX",
+            "summary": "기준 주소 0x7FFFEFFC에 오프셋 0xFFFFFFE8을 더해 접근 주소 0x7FFFEFE4을 계산했습니다.",
+            "kind": "address"
+          },
+          {
+            "pc": "0x00010038",
+            "stage": "MEM",
+            "summary": "주소 0x7FFFEFE4의 읽기 결과는 7 (0x00000007)입니다.",
+            "kind": "value"
+          },
+          {
+            "pc": "0x00010038",
+            "stage": "WB",
+            "summary": "a5에 7 (0x00000007)을 기록했습니다.",
+            "kind": "value"
+          }
+        ]
+      },
+      {
+        "history_index": 2,
+        "cycle": 12,
+        "display_clock": 3,
+        "events": [],
+        "retired_pc": "0x0001003C",
+        "retired_delta": 1,
+        "stages": [
+          {
+            "stage": "IF",
+            "pc": "0x0001003C",
+            "assembly": "add a5, a4, a5",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "ID",
+            "pc": "0x0001003C",
+            "assembly": "add a5, a4, a5",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "EX",
+            "pc": "0x0001003C",
+            "assembly": "add a5, a4, a5",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "MEM",
+            "pc": "0x0001003C",
+            "assembly": "add a5, a4, a5",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "WB",
+            "pc": "0x0001003C",
+            "assembly": "add a5, a4, a5",
+            "status": "normal",
+            "source_line": 5
+          }
+        ],
+        "register_changes": [
+          {
+            "key": "x15",
+            "before": "0x00000007",
+            "after": "0x00000012"
+          }
+        ],
+        "memory_changes": [],
+        "memory_transfer": null,
+        "register_write": {
+          "register": "a5",
+          "value": "0x00000012"
+        },
+        "current_pc": "0x00010040",
+        "instruction_observations": [
+          {
+            "pc": "0x0001003C",
+            "stage": "EX",
+            "summary": "실제 계산은 11 (0x0000000B) + 7 (0x00000007) = 18 (0x00000012)입니다.",
+            "kind": "value"
+          },
+          {
+            "pc": "0x0001003C",
+            "stage": "WB",
+            "summary": "a5에 18 (0x00000012)을 기록했습니다.",
+            "kind": "value"
+          }
+        ]
+      },
+      {
+        "history_index": 3,
+        "cycle": 13,
+        "display_clock": 4,
+        "events": [],
+        "retired_pc": "0x00010040",
+        "retired_delta": 1,
+        "stages": [
+          {
+            "stage": "IF",
+            "pc": "0x00010040",
+            "assembly": "sw a5, -28(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "ID",
+            "pc": "0x00010040",
+            "assembly": "sw a5, -28(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "EX",
+            "pc": "0x00010040",
+            "assembly": "sw a5, -28(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "MEM",
+            "pc": "0x00010040",
+            "assembly": "sw a5, -28(s0)",
+            "status": "normal",
+            "source_line": 5
+          },
+          {
+            "stage": "WB",
+            "pc": "0x00010040",
+            "assembly": "sw a5, -28(s0)",
+            "status": "normal",
+            "source_line": 5
+          }
+        ],
+        "register_changes": [],
+        "memory_changes": [
+          {
+            "key": "0x7FFFEFE0",
+            "before": null,
+            "after": "0x00000012"
+          }
+        ],
+        "memory_transfer": {
+          "memory_operation": "store",
+          "target_address": "0x7FFFEFE0",
+          "read_data": null,
+          "write_data": "0x00000012",
+          "pc": "0x00010040",
+          "assembly": "sw a5, -28(s0)"
+        },
+        "register_write": null,
+        "current_pc": "0x00010044",
+        "instruction_observations": [
+          {
+            "pc": "0x00010040",
+            "stage": "EX",
+            "summary": "기준 주소 0x7FFFEFFC에 오프셋 0xFFFFFFE4을 더해 접근 주소 0x7FFFEFE0을 계산했습니다.",
+            "kind": "address"
+          },
+          {
+            "pc": "0x00010040",
+            "stage": "MEM",
+            "summary": "주소 0x7FFFEFE0에 18 (0x00000012)을 저장했습니다.",
+            "kind": "value"
+          }
+        ]
+      }
+    ],
+    "source_mapping": {
+      "basis": "provided_code_mapping",
+      "warnings": [],
+      "notes": [
+        "컴파일러 줄 정보는 소스와 명령어의 대응 근거이며, C 표현식 전체의 의미나 변수의 정확한 저장 위치를 보증하지 않습니다.",
+        "retire_count가 0인 명령어도 정적 테이블에 유지합니다. 인출된 적이 있어도 플러시됐다면 완료된 명령어로 세지 않습니다.",
+        "source_file이 제공되지 않으면 파일 간 동일 줄 번호를 완전히 구분할 수 없습니다."
+      ]
+    },
+    "line_explanations": [
+      {
+        "source_line": 5,
+        "summary": "메모리 읽기 → 덧셈 → 메모리 쓰기",
+        "detail": "컴파일러가 이 C 줄에 연결한 명령어를 주소 순서로 보여줍니다. 실제 실행 경로와 반복 횟수는 선택한 클록의 이력에서 확인할 수 있습니다.",
+        "steps": [
+          {
+            "pc": "0x00010034",
+            "text": "lw a4, -20(s0)",
+            "summary": "s0 기준 -20바이트 주소에서 4바이트를 읽어 a4에 담습니다."
+          },
+          {
+            "pc": "0x00010038",
+            "text": "lw a5, -24(s0)",
+            "summary": "s0 기준 -24바이트 주소에서 4바이트를 읽어 a5에 담습니다."
+          },
+          {
+            "pc": "0x0001003C",
+            "text": "add a5, a4, a5",
+            "summary": "a4와 a5의 덧셈 결과를 a5에 기록합니다."
+          },
+          {
+            "pc": "0x00010040",
+            "text": "sw a5, -28(s0)",
+            "summary": "a5의 하위 32비트를 s0 기준 -28바이트 주소에 저장합니다."
+          }
+        ]
+      }
+    ],
+    "source_sha256": "0d907582ff26a497b6fcf94eac11da5dc80be080c9651ebf3a47ceb20d75f8ae",
+    "limitations": [
+      "읽기 전용 해설이며 제출한 C/ASM을 실행하거나 CORE 상태를 변경하지 않습니다.",
+      "문법 규칙은 컴파일러·완전한 C 파서를 대신하지 않습니다. 관찰 값과 정적 의미를 구분합니다."
+    ]
+  }
+}

@@ -397,6 +397,7 @@ test("full workspace connects captured run to the actual assistant popup", async
     .click();
   await page
     .getByTitle("C 코드 컴파일 및 어셈블리 변환", { exact: true })
+    .filter({visible: true})
     .click();
   // Desktop and mobile controls coexist; exercise the visible control.
   const stepForward = page.getByTitle("한 단계 실행 (Step Over / Forward)", { exact: true }).filter({visible: true});

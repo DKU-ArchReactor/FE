@@ -6,8 +6,12 @@ import { TutorCycleEvidence, TutorInstructionEvidence, TutorText } from './Tutor
 import './TutorTypography.css';
 import { tutorExecutionFocus } from '../utils/tutorFocus';
 import TutorPerformanceSummary from './TutorPerformanceSummary';
+import InstructionLessonDialog from './InstructionLessonDialog';
+import type {InstructionLessonContext} from './InstructionLesson';
 
 export interface TutorAreaProps {
+  onSelectAsm?: InstructionLessonContext['onSelectAsm'];
+  onJumpToCycle?: InstructionLessonContext['onJumpToCycle'];
   simulationData: SimulationResult | null;
   currentCycleData: CycleHistoryItem | null;
   loadingMessage?: string | null;
@@ -43,6 +47,8 @@ function useTutorExplanations(items: Parameters<typeof fetchTutor>[0], retryVers
 }
 
 const TutorArea: React.FC<TutorAreaProps> = ({
+  onSelectAsm,
+  onJumpToCycle,
   simulationData,
   currentCycleData,
   loadingMessage,
@@ -56,6 +62,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   activeTarget = "c",
   onClose,
 }) => {
+  const [lessonOpen, setLessonOpen] = useState(false);
   const isCompiled = Boolean(simulationData);
 
   // 1. C 소스 코드 라인별 배열
@@ -189,6 +196,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
             {followsExecution && executionFocus ? `${executionFocus.stage} · 실행 따라가기` : activeTarget === "asm" ? "ASM INSTRUCTION" : "INSTRUCTION"}
           </span>
+          {simulationData?.tutor && <button type="button" onClick={() => setLessonOpen(true)} className="rounded border border-[var(--ar-border)] px-2 py-1 text-[11px] text-[var(--ar-text-primary)] hover:bg-[var(--ar-panel-bg)]">C·ASM 통합 보기</button>}
           {onClose && (
             <button
               type="button"
@@ -201,6 +209,11 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           )}
         </div>
       </header>
+      {lessonOpen && <InstructionLessonDialog currentData={currentCycleData}
+        prevData={historyIndex != null && historyIndex > 0 ? simulationData?.history[historyIndex - 1] : undefined}
+        simulationData={simulationData} onClose={() => setLessonOpen(false)}
+        context={{source: activeTarget === 'c' ? translationSource : undefined, rows: effectiveRows, selectedAsmIndex,
+          selectedCLine: activeTarget === 'c' ? selectedTranslationLine : undefined, onSelectAsm, onJumpToCycle}}/>}
       {/* 튜터 메인 본문 영역 */}
       <div ref={tutorBodyRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4 select-text [scrollbar-gutter:stable]">
         {explanationError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)]">
