@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useId, useMemo, useRef, useState } from "react";
 import {
   displayValue,
   registerLabel,
@@ -45,17 +45,20 @@ export default function InstructionFlowDiagram({
   const id = useId().replace(/:/g, "");
   const area = useRef<HTMLDivElement>(null);
   const [viewWidth, setViewWidth] = useState(780);
-  useEffect(() => {
-    const observer = new ResizeObserver(([entry]) => {
-      setViewWidth(
-        Math.max(
-          780,
-          (970 * entry.contentRect.width) /
-            Math.max(1, entry.contentRect.height),
-        ),
-      );
-    });
-    if (area.current) observer.observe(area.current);
+  useLayoutEffect(() => {
+    const measure = (width: number, height: number) => {
+      if (width > 0 && height > 0)
+        setViewWidth(Math.max(780, (1080 * width) / height));
+    };
+    const element = area.current;
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      measure(rect.width, rect.height);
+    }
+    const observer = new ResizeObserver(([entry]) =>
+      measure(entry.contentRect.width, entry.contentRect.height),
+    );
+    if (element) observer.observe(element);
     return () => observer.disconnect();
   }, []);
   const scale = viewWidth / 780;
@@ -140,8 +143,10 @@ export default function InstructionFlowDiagram({
     registers: { x: 180, y: 400, w: 210, h: 110 },
     immediate: { x: 425, y: 400, w: 160, h: 70 },
     cu: { x: 625, y: 395, w: 145, h: 108 },
-    alu: { x: 220, y: 594, w: 280, h: 110 },
-    memory: { x: 220, y: 754, w: 280, h: 90 },
+    alu: { x: 220, y: 690, w: 280, h: 110 },
+    memory: { x: 220, y: 850, w: 280, h: 86 },
+    "operand-mux": { x: 330, y: 550, w: 220, h: 80 },
+    mux: { x: 255, y: 966, w: 230, h: 76 },
   } satisfies Record<string, Box>;
   const boxes = Object.fromEntries(
     Object.entries(baseBoxes).map(([key, box]) => [
@@ -158,14 +163,21 @@ export default function InstructionFlowDiagram({
     title: string,
     lines: string[],
     instructionMemory = false,
+    accessibleLabel?: string,
   ) => {
+    const isMux = unit === "mux" || unit === "operand-mux";
+    const isAlu = unit === "alu";
     const status = tag(unit, instructionMemory),
       active = Boolean(status);
     const stroke = active ? color : NODES[unit];
     const shape =
       unit === "alu"
-        ? scalePath("M220 594H337L360 614L383 594H500L456 704H264Z")
-        : undefined;
+        ? scalePath("M220 690H337L360 710L383 690H500L456 800H264Z")
+        : unit === "operand-mux"
+          ? scalePath("M330 550H550L520 630H360Z")
+          : unit === "mux"
+            ? scalePath("M255 966H485L450 1042H290Z")
+            : undefined;
     return (
       <g
         role="button"
@@ -182,9 +194,11 @@ export default function InstructionFlowDiagram({
               ? "chip"
               : unit === "alu"
                 ? "alu"
-                : "register"
+                : isMux
+                  ? "mux"
+                  : "register"
         }
-        aria-label={`${title} 흐름 선택`}
+        aria-label={accessibleLabel ?? `${title} 흐름 선택`}
         onClick={() => onUnit(instructionMemory ? "cu" : unit)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -300,9 +314,10 @@ export default function InstructionFlowDiagram({
         )}
         <text
           x={box.x + box.w / 2}
-          y={box.y + (shape ? 42 : 25)}
+          y={box.y + (isAlu ? 42 : 25)}
           textAnchor="middle"
-          fontSize="22"
+          fontSize={isMux ? 20 : 22}
+          data-mux-title={unit === "mux" ? "true" : undefined}
           fontWeight="800"
           fill="var(--ar-text-primary)"
         >
@@ -310,9 +325,9 @@ export default function InstructionFlowDiagram({
         </text>
         {status && (
           <text
-            x={shape ? box.x + 45 : box.x + box.w - 12}
-            y={box.y + (shape ? 29 : 24)}
-            textAnchor={shape ? "start" : "end"}
+            x={isAlu ? box.x + 45 : box.x + box.w - (isMux ? 28 : 12)}
+            y={box.y + (isAlu ? 29 : 24)}
+            textAnchor={isAlu ? "start" : "end"}
             fontSize="16"
             fontWeight="750"
             fill={color}
@@ -326,8 +341,22 @@ export default function InstructionFlowDiagram({
             transfer.value != null &&
             (line.endsWith(`: ${short(transfer.value)}`) ||
               line.endsWith(`← ${short(transfer.value)}`));
-          const baseline = box.y + (shape ? 62 : 49) + i * (shape ? 18 : 22);
-          const inset = shape ? Math.max(48, (box.w - 180) / 2) : 12;
+          const baseline = isMux
+            ? box.y + (unit === "operand-mux" ? 65 : 55)
+            : box.y + (isAlu ? 62 : 49) + i * (isAlu ? 18 : 22);
+          const inset = isMux
+            ? (box.w - 158) / 2
+            : isAlu
+              ? Math.max(48, (box.w - 180) / 2)
+              : 12;
+          const coveredByTransfer =
+            isMux &&
+            active &&
+            packetBox &&
+            packetBox.x < box.x + box.w - inset &&
+            packetBox.x + packetBox.w > box.x + inset &&
+            packetBox.y < baseline + 5 &&
+            packetBox.y + packetBox.h > baseline - 19;
           return (
             <g key={i}>
               {unit !== "registers" && (
@@ -343,6 +372,8 @@ export default function InstructionFlowDiagram({
                 />
               )}
               <text
+                opacity={coveredByTransfer ? 0 : 1}
+                data-mux-status={unit === "mux" ? "true" : undefined}
                 data-control-selection={
                   unit === "cu" && line.startsWith("Read:") ? "true" : undefined
                 }
@@ -427,7 +458,7 @@ export default function InstructionFlowDiagram({
   return (
     <div ref={area} className="h-full min-h-0 w-full min-w-0 overflow-hidden">
       <svg
-        viewBox={`0 0 ${viewWidth} 970`}
+        viewBox={`0 0 ${viewWidth} 1080`}
         preserveAspectRatio="xMidYMin meet"
         className="ar-single-flow-diagram block h-full min-h-0 w-full font-sans"
         role="group"
@@ -544,86 +575,38 @@ export default function InstructionFlowDiagram({
             ? `기록: ${flow.controlSignals.reg_write ? "켜짐" : "꺼짐"}`
             : "신호 미제공",
         ])}
-        <g
-          aria-label="ALU 입력 선택"
-          data-flow-active={
-            transfer.source === "operand-mux" ||
-            transfer.target === "operand-mux"
-          }
-          opacity={
-            transfer.source === "operand-mux" ||
-            transfer.target === "operand-mux"
-              ? 1
-              : 0.62
-          }
-        >
-          <path
-            d={scalePath("M410 522H470L458 554H422Z")}
-            fill="var(--ar-panel-bg)"
-            stroke="#009dd8"
-            strokeWidth="1.6"
-          />
-          <text
-            x={sx(530)}
-            y="543"
-            textAnchor="start"
-            fontSize="17"
-            fontWeight="750"
-            fill="var(--ar-text-primary)"
-          >
-            MUX
-          </text>
-        </g>
+        {node(
+          "operand-mux",
+          boxes["operand-mux"],
+          "\uC785\uB825 MUX",
+          [
+            flow.usesImmediate || flow.registerInputs.length > 1
+              ? reached("input-b")
+                ? flow.amount != null
+                  ? String(flow.amount)
+                  : short(flow.input2)
+                : "\uC804\uB2EC \uB300\uAE30"
+              : "\uC0AC\uC6A9 \uC548 \uD568",
+          ],
+          false,
+          "ALU \uC785\uB825 \uC120\uD0DD",
+        )}
         {node("alu", boxes.alu, "ALU", aluLines)}
         {node("memory", boxes.memory, "Data Memory", memoryLines)}
-        <g
-          aria-label="기록값 선택"
-          data-flow-active={
-            transfer.source === "mux" || transfer.target === "mux"
-          }
-          opacity={
-            transfer.source === "mux" || transfer.target === "mux" ? 1 : 0.62
-          }
-        >
-          <title>
-            연산 결과·메모리 값·복귀 주소 중 명령어에 맞는 값을 선택합니다.
-          </title>
-          <path
-            d={scalePath("M270 884H470L432 932H308Z")}
-            fill="var(--ar-panel-bg)"
-            stroke={
-              transfer.source === "mux" || transfer.target === "mux"
-                ? color
-                : "#9860dc"
-            }
-            strokeWidth="2"
-          />
-          <text
-            x={sx(480)}
-            y="903"
-            textAnchor="start"
-            data-mux-title="true"
-            fontSize="20"
-            fontWeight="800"
-            fill="var(--ar-text-primary)"
-          >
-            기록값 MUX
-          </text>
-          <text
-            x={sx(480)}
-            y="928"
-            textAnchor="start"
-            data-mux-status="true"
-            fontSize="18"
-            fontWeight="700"
-            className="font-mono"
-            fill={color}
-          >
-            {reached("load-data") || reached("result-to-mux")
-              ? short(flow.writeValue)
-              : "\uC804\uB2EC \uB300\uAE30"}
-          </text>
-        </g>
+        {node(
+          "mux",
+          boxes.mux,
+          "\uAE30\uB85D\uAC12 MUX",
+          [
+            flow.writes.length && !flow.store
+              ? reached("load-data") || reached("result-to-mux")
+                ? short(flow.writeValue)
+                : "\uC804\uB2EC \uB300\uAE30"
+              : "\uC0AC\uC6A9 \uC548 \uD568",
+          ],
+          false,
+          "\uAE30\uB85D\uAC12 \uC120\uD0DD",
+        )}
         <g data-text-layer="true">
           <g data-instruction-address-label="true">
             <title>
@@ -661,7 +644,7 @@ export default function InstructionFlowDiagram({
               데이터 주소
             </text>
           )}
-          <text x={sx(32)} y="963" fontSize="11" fill="var(--ar-text-muted)">
+          <text x={sx(32)} y="1073" fontSize="11" fill="var(--ar-text-muted)">
             메모리 연결의 버스 역할을 설명한 개념도입니다.
           </text>
         </g>

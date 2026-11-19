@@ -136,7 +136,7 @@ export default function SingleInstructionFlow({
       data-flow-elapsed={clock.elapsed}
       data-flow-step-duration={entry.duration}
     >
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2">
+      <div className="grid h-[68px] shrink-0 grid-cols-1 content-center gap-1 px-3 py-1 sm:h-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <span className="text-[11px] text-[var(--ar-text-muted)]">
           {clock.running ? "흐름 재생 중" : "흐름 일시정지"} · 전체{" "}
           {Number((totalDuration / 1000).toFixed(1))}초

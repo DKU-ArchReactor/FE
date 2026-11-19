@@ -42,9 +42,9 @@ export default function InstructionLesson({currentData, prevData, simulationData
   if (!simulationData) return <div className="p-6 text-sm leading-7 text-[var(--ar-text-muted)]">코드를 컴파일하고 실행하면 C·ASM 줄별 데이터 흐름을 확인할 수 있습니다.</div>;
   if (!row || !item) return <div className="p-6 text-sm leading-7 text-[var(--ar-text-muted)]">{line != null && !row ? '선택한 C 줄에 연결된 실행 명령어가 없습니다. 선언·주석·최적화 또는 매핑 정보 누락으로 명령어가 없을 수 있습니다.' : 'C 줄이나 ASM 명령어를 선택하거나 한 클록 진행하세요. 선택한 줄의 해설이 제공되지 않으면 실행 경로를 추정하지 않습니다.'}</div>;
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-[var(--ar-text-primary)]">
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-[var(--ar-border)] px-3 py-2">
-      <h3 className="break-all font-mono text-xs font-semibold">{row.text} <span className="ml-2 font-normal text-[var(--ar-text-muted)]">{row.pc}</span></h3>
-      <span className="text-[10px] text-[var(--ar-text-muted)]">{flow.actual ? `CORE clock ${currentData?.clock}` : '선택 명령어 · 실행값 미표시'}</span>
+    <div className="flex h-11 min-h-11 shrink-0 items-center justify-between gap-x-3 border-b border-[var(--ar-border)] px-3 py-2">
+      <h3 title={`${row.text} · ${row.pc}`} className="min-w-0 flex-1 truncate font-mono text-xs font-semibold">{row.text} <span className="ml-2 font-normal text-[var(--ar-text-muted)]">{row.pc}</span></h3>
+      <span className="shrink-0 whitespace-nowrap text-[10px] text-[var(--ar-text-muted)]">{flow.actual ? `CORE clock ${currentData?.clock}` : '선택 명령어 · 실행값 미표시'}</span>
       {!flow.actual && target != null && context?.onJumpToCycle && <button type="button" className="rounded bg-[var(--ar-accent)] px-2 py-1 text-[11px] text-white" onClick={() => context.onJumpToCycle?.(target + 1)}>이 명령어의 실행 시점으로 이동</button>}
     </div>
     <SingleInstructionFlow key={`${row.pc}-${flow.historyIndex}-${context?.flowDurationMs}`} flow={flow} duration={context?.flowDurationMs} onPause={context?.onPausePlayback} isPlaying={context?.isPlaying}/>

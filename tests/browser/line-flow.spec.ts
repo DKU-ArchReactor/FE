@@ -285,10 +285,11 @@ test('data labels stay visible on both sides of MUXes and beside memory througho
           await expect(page.locator('.flow-data-word')).toBeVisible();
           expect(await page.locator('svg[data-layout]').evaluate(svg=>{
             const label=svg.querySelector<SVGGraphicsElement>('.flow-data-word')!.getBBox();
-            const obstacles=[...svg.querySelectorAll<SVGGraphicsElement>('[data-flow-node]')].map(node=>({x:Number(node.dataset.x),y:Number(node.dataset.y),width:Number(node.dataset.width),height:Number(node.dataset.height)}));
+            const obstacles=[...svg.querySelectorAll<SVGGraphicsElement>('[data-flow-node]')].filter(node=>!(node.dataset.hardwareShape==='mux'&&node.dataset.flowActive==='true')).map(node=>({x:Number(node.dataset.x),y:Number(node.dataset.y),width:Number(node.dataset.width),height:Number(node.dataset.height)}));
             for(const selector of ['[aria-label="\uAE30\uB85D\uAC12 \uC120\uD0DD"]','[aria-label="ALU \uC785\uB825 \uC120\uD0DD"]','[data-control-selection]']) {
               const node=svg.querySelector<SVGGraphicsElement>(selector);if(node&&node.getAttribute('data-flow-active')!=='true')obstacles.push(node.getBBox());
             }
+            for(const text of svg.querySelectorAll<SVGGraphicsElement>('[data-hardware-shape="mux"] text')) if(getComputedStyle(text).opacity!=='0')obstacles.push(text.getBBox());
             return obstacles.filter(box=>!(label.x+label.width<=box.x||label.x>=box.x+box.width||label.y+label.height<=box.y||label.y>=box.y+box.height)).map(box=>({label:{x:label.x,y:label.y,w:label.width,h:label.height},box:{x:box.x,y:box.y,w:box.width,h:box.height}}));
           }),`${op} ${id}: label covers device`).toEqual([]);
         }
@@ -375,7 +376,7 @@ test('writeback MUX captions stay in one place and remain clear of the moving va
     expect(await captions()).toEqual(before);
     expect(await page.locator('svg[data-layout]').evaluate(svg=>{
       const value=svg.querySelector<SVGGraphicsElement>('.flow-data-word')!.getBBox();
-      return [...svg.querySelectorAll<SVGGraphicsElement>('[data-mux-title],[data-mux-status]')].every(text=>{
+      return [...svg.querySelectorAll<SVGGraphicsElement>('[data-mux-title],[data-mux-status]')].filter(text=>getComputedStyle(text).opacity!=='0').every(text=>{
         const box=text.getBBox();return value.x+value.width<=box.x||value.x>=box.x+box.width||value.y+value.height<=box.y||value.y>=box.y+box.height;
       });
     })).toBe(true);
@@ -401,4 +402,35 @@ test('bus legend uses the upper-left free space and address captions sit close a
   expect(layout.legendRight).toBeLessThan(layout.memoryLeft);
   expect(layout.legendY).toBeGreaterThan(120);expect(layout.legendY).toBeLessThan(200);
   for(const caption of layout.captions) {expect(caption.size).toBeGreaterThanOrEqual(18);expect(caption.gap).toBeGreaterThanOrEqual(0);expect(caption.gap).toBeLessThanOrEqual(10);}
+});
+
+
+test('device geometry stays fixed from the first render when advancing instructions',async ({page})=>{
+  await frozenTime(page);await page.setViewportSize({width:1400,height:900});await page.goto('/tests/browser/line-flow.html');await page.clock.runFor(32);
+  const expected=await page.locator('svg[data-layout]').evaluate(svg=>[svg.getAttribute('viewBox'),...Array.from(svg.querySelectorAll<SVGGElement>('[data-flow-node]')).map(node=>[node.dataset.flowNode,node.dataset.x,node.dataset.y,node.dataset.width,node.dataset.height].join(':'))]);
+  await page.evaluate(()=>{
+    const snapshots:string[][]=[];Object.assign(window,{layoutSnapshots:snapshots});
+    new MutationObserver(()=>{
+      const svg=document.querySelector('svg[data-layout]');if(svg)snapshots.push([svg.getAttribute('viewBox')??'',...Array.from(svg.querySelectorAll<SVGGElement>('[data-flow-node]')).map(node=>[node.dataset.flowNode,node.dataset.x,node.dataset.y,node.dataset.width,node.dataset.height].join(':'))]);
+    }).observe(document.querySelector('main')!,{childList:true,subtree:true});
+  });
+  for(let i=0;i<3;i++){await page.getByRole('button',{name:'next clock',exact:true}).click();await page.clock.runFor(32);}
+  const snapshots=await page.evaluate(()=>(window as unknown as {layoutSnapshots:string[][]}).layoutSnapshots);
+  expect(snapshots.length).toBeGreaterThan(0);
+  for(const snapshot of snapshots)expect(snapshot).toEqual(expected);
+});
+
+
+test('both MUXes show centered names, values and arrival/departure states like other devices',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');
+  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  for(const [id,unit,status] of [['input-b','operand-mux','\uB3C4\uCC29'],['mux-to-alu','operand-mux','\uCD9C\uBC1C'],['load-data','mux','\uB3C4\uCC29'],['writeback','mux','\uCD9C\uBC1C']]) {
+    while(await page.locator('[data-transfer]').getAttribute('data-transfer')!==id)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
+    const node=page.locator(`[data-flow-node="${unit}"]`);await expect(node).toContainText(status);
+    expect(await node.evaluate(node=>{
+      const title=node.querySelector('text')!,value=node.querySelector('g text')!;
+      const center=Number((node as SVGElement).dataset.x)+Number((node as SVGElement).dataset.width)/2;
+      return Math.abs(Number(title.getAttribute('x'))-center)<.01&&Math.abs(Number(value.getAttribute('x'))-center)<.01;
+    })).toBe(true);
+  }
 });
