@@ -18,7 +18,7 @@ test('the vertical circuit and memory-bus role labels fit without scrolling at d
     });
     expect(bounds).toEqual([]);
     await expect(svg).toHaveAttribute('data-layout','vertical-datapath');
-    await expect(svg.locator('[data-instruction-address-label]')).toContainText('\uBA85\uB839\uC5B4 \uC8FC\uC18C (PC)');
+    await expect(svg.locator('[data-instruction-address-label]')).toContainText('\uBA85\uB839\uC5B4 \uC8FC\uC18C');
     await expect(svg.getByRole('button',{name:'Instruction Memory 흐름 선택'})).toBeVisible();
     await expect(svg.getByRole('button',{name:'Data Memory 흐름 선택'})).toBeVisible();
     await expect(svg.getByLabel('ALU 입력 선택')).toBeVisible();
@@ -209,10 +209,11 @@ test('Imm Gen receives instruction bits before exposing the decoded immediate',a
   await expect(immediate).toContainText('\uBA85\uB839\uC5B4 \uD574\uC11D \uB300\uAE30');
   for(let i=0;i<2;i++) await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
   await expect(page.locator('[data-transfer="decode-immediate"]')).toBeVisible();
+  const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
   await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();
-  await page.clock.runFor(700);
+  await page.clock.runFor(duration*.5);
   await expect(page.locator('[data-transfer="decode-immediate"]')).toBeVisible();
-  await page.clock.runFor(900);
+  await page.clock.runFor(duration*.6);
   await expect(page.locator('[data-transfer="read-control"]')).toBeVisible();
   await expect(immediate).toContainText('-4');
 });
@@ -322,10 +323,14 @@ test('the value stays centered on its moving wire position without jumps or clip
           const x=Number(word.dataset.packetX),y=Number(word.dataset.packetY);
           const path=svg.querySelector<SVGPathElement>('[data-flow-route] path')!;
           const view=(svg as SVGSVGElement).viewBox.baseVal;
-          return {x,y,error:Math.hypot(box.x+box.width/2-x,box.y+box.height/2-y),length:path.getTotalLength(),inside:box.x>=0&&box.x+box.width<=view.width&&box.y>=0&&box.y+box.height<=view.height};
+          const clearLabels=[...svg.querySelectorAll<SVGGraphicsElement>('[data-bus-legend],[data-instruction-address-label],[data-instruction-word-label],[data-memory-address-label]')].every(label=>{
+            const other=label.getBBox();return box.x+box.width<=other.x||box.x>=other.x+other.width||box.y+box.height<=other.y||box.y>=other.y+other.height;
+          });
+          return {x,y,error:Math.hypot(box.x+box.width/2-x,box.y+box.height/2-y),length:path.getTotalLength(),inside:box.x>=0&&box.x+box.width<=view.width&&box.y>=0&&box.y+box.height<=view.height,clearLabels};
         });
         expect(geometry.error,`${size.width} ${id}: value detached from its wire`).toBeLessThan(.01);
         expect(geometry.inside,`${id}: packet clipped`).toBe(true);
+        expect(geometry.clearLabels,`${id}: packet covers caption or bus legend`).toBe(true);
         if(previous)expect(Math.hypot(geometry.x-previous.x,geometry.y-previous.y),`${id}: teleport between samples`).toBeLessThanOrEqual(geometry.length/12+2);
         previous=geometry;
       }
@@ -352,4 +357,48 @@ test('consecutive MUX transfers carry the same value across the stage boundary w
       await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
     }
   }
+});
+
+
+test('writeback MUX captions stay in one place and remain clear of the moving value',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html');
+  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  await page.evaluate(()=>document.fonts.ready);
+  const captions=()=>page.locator('[data-mux-title],[data-mux-status]').evaluateAll(nodes=>nodes.map(node=>({x:node.getAttribute('x'),y:node.getAttribute('y'),size:Number(node.getAttribute('font-size'))})));
+  const before=await captions();
+  expect(before[0].size).toBeGreaterThanOrEqual(20);expect(before[1].size).toBeGreaterThanOrEqual(18);
+  for(const id of ['result-to-mux','writeback']) {
+    while(await page.locator('[data-transfer]').getAttribute('data-transfer')!==id)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
+    expect(await captions()).toEqual(before);
+    const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+    await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();await page.clock.runFor(duration*.5);
+    expect(await captions()).toEqual(before);
+    expect(await page.locator('svg[data-layout]').evaluate(svg=>{
+      const value=svg.querySelector<SVGGraphicsElement>('.flow-data-word')!.getBBox();
+      return [...svg.querySelectorAll<SVGGraphicsElement>('[data-mux-title],[data-mux-status]')].every(text=>{
+        const box=text.getBBox();return value.x+value.width<=box.x||value.x>=box.x+box.width||value.y+value.height<=box.y||value.y>=box.y+box.height;
+      });
+    })).toBe(true);
+    await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  }
+});
+
+
+test('bus legend uses the upper-left free space and address captions sit close above their memories',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');
+  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  await page.evaluate(()=>document.fonts.ready);
+  const layout=await page.locator('svg[data-layout]').evaluate(svg=>{
+    const legend=svg.querySelector<SVGGraphicsElement>('[data-bus-legend]')!.getBBox();
+    const instruction=svg.querySelector<SVGGraphicsElement>('[data-flow-node="instruction-memory"]')!;
+    const captions=[['[data-instruction-address-label] text','instruction-memory'],['[data-memory-address-label]','memory']].map(([selector,node])=>{
+      const label=svg.querySelector<SVGGraphicsElement>(selector)!,box=label.getBBox();
+      const memory=svg.querySelector<SVGGraphicsElement>(`[data-flow-node="${node}"]`)!;
+      return {gap:Number(memory.dataset.y)-box.y-box.height,size:Number(label.getAttribute('font-size'))};
+    });
+    return {legendRight:legend.x+legend.width,memoryLeft:Number(instruction.dataset.x),legendY:legend.y,captions};
+  });
+  expect(layout.legendRight).toBeLessThan(layout.memoryLeft);
+  expect(layout.legendY).toBeGreaterThan(120);expect(layout.legendY).toBeLessThan(200);
+  for(const caption of layout.captions) {expect(caption.size).toBeGreaterThanOrEqual(18);expect(caption.gap).toBeGreaterThanOrEqual(0);expect(caption.gap).toBeLessThanOrEqual(10);}
 });

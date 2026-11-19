@@ -127,19 +127,19 @@ export function transferPoint(path:string, progress:number, startPadding=0, endP
 export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1):Record<string,string> {
   const paths:Record<string,string>={
     'fetch-address':'M360 192V245',
-    'fetch-instruction':'M515 273H670V365',
-    'decode-immediate':'M515 290H610V340H480V380',
-    'read-control':'M670 365V350H280V380',
-    'input-a':flow.pcRelative?'M260 167H90V550H290V594':'M230 490V550H290V594',
-    'input-b':flow.usesImmediate?'M440 450V518':'M330 490V518H440',
-    'mux-to-alu':'M440 518V594',
+    'fetch-instruction':'M515 273H670V395',
+    'decode-immediate':'M515 290H610V340H480V400',
+    'read-control':'M650 395V365H280V400',
+    'input-a':flow.pcRelative?'M460 167H700V375H90V550H290V594':'M230 510V550H290V594',
+    'input-b':flow.usesImmediate?'M440 470V538':'M330 510V538H440',
+    'mux-to-alu':'M440 538V594',
     'memory-address':'M360 704V754',
-    'memory-control':'M670 473V740H660V799H500',
-    'store-data':'M225 490V550H130V799H220',
+    'memory-control':'M670 503V740H660V799H500',
+    'store-data':'M225 510V550H130V799H220',
     'load-data':'M360 844V862H370V908',
-    'result-to-mux':flow.jump?'M260 167H90V724H130V862H370V908':'M300 704V724H130V862H370V908',
-    writeback:'M370 908V932H90V435H180',
-    'next-pc':'M700 365V167H460',
+    'result-to-mux':flow.jump?'M460 167H700V375H90V724H130V862H370V908':'M300 704V724H130V862H370V908',
+    writeback:'M370 908V932H90V455H180',
+    'next-pc':'M700 395V167H460',
   };
   return Object.fromEntries(Object.entries(paths).map(([key,path])=>[key,path.replace(/([MHV])([^MHV]+)/g,(_,command:string,coordinates:string)=>{
     const values=coordinates.trim().split(/[ ,]+/).map(Number);

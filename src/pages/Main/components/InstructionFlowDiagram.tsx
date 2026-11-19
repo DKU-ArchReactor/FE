@@ -137,9 +137,9 @@ export default function InstructionFlowDiagram({
   const baseBoxes = {
     pc: { x: 260, y: 132, w: 200, h: 60 },
     instruction: { x: 205, y: 245, w: 310, h: 76 },
-    registers: { x: 180, y: 380, w: 210, h: 110 },
-    immediate: { x: 425, y: 380, w: 160, h: 70 },
-    cu: { x: 625, y: 365, w: 145, h: 108 },
+    registers: { x: 180, y: 400, w: 210, h: 110 },
+    immediate: { x: 425, y: 400, w: 160, h: 70 },
+    cu: { x: 625, y: 395, w: 145, h: 108 },
     alu: { x: 220, y: 594, w: 280, h: 110 },
     memory: { x: 220, y: 754, w: 280, h: 90 },
   } satisfies Record<string, Box>;
@@ -558,25 +558,15 @@ export default function InstructionFlowDiagram({
           }
         >
           <path
-            d={scalePath("M410 502H470L458 534H422Z")}
+            d={scalePath("M410 522H470L458 554H422Z")}
             fill="var(--ar-panel-bg)"
             stroke="#009dd8"
             strokeWidth="1.6"
           />
           <text
-            x={
-              transfer.source === "operand-mux" ||
-              transfer.target === "operand-mux"
-                ? sx(480)
-                : sx(440)
-            }
-            y="523"
-            textAnchor={
-              transfer.source === "operand-mux" ||
-              transfer.target === "operand-mux"
-                ? "start"
-                : "middle"
-            }
+            x={sx(530)}
+            y="543"
+            textAnchor="start"
             fontSize="17"
             fontWeight="750"
             fill="var(--ar-text-primary)"
@@ -592,14 +582,14 @@ export default function InstructionFlowDiagram({
             transfer.source === "mux" || transfer.target === "mux"
           }
           opacity={
-            transfer.source === "mux" || transfer.target === "mux" ? 1 : 0.42
+            transfer.source === "mux" || transfer.target === "mux" ? 1 : 0.62
           }
         >
           <title>
             연산 결과·메모리 값·복귀 주소 중 명령어에 맞는 값을 선택합니다.
           </title>
           <path
-            d={scalePath("M290 884H450L422 932H318Z")}
+            d={scalePath("M270 884H470L432 932H308Z")}
             fill="var(--ar-panel-bg)"
             stroke={
               transfer.source === "mux" || transfer.target === "mux"
@@ -609,38 +599,23 @@ export default function InstructionFlowDiagram({
             strokeWidth="2"
           />
           <text
-            x={
-              transfer.source === "mux" || transfer.target === "mux"
-                ? sx(470)
-                : sx(370)
-            }
+            x={sx(480)}
             y="903"
-            textAnchor={
-              transfer.source === "mux" || transfer.target === "mux"
-                ? "start"
-                : "middle"
-            }
-            fontSize="16"
-            fontWeight="700"
-            className="font-mono"
+            textAnchor="start"
+            data-mux-title="true"
+            fontSize="20"
+            fontWeight="800"
             fill="var(--ar-text-primary)"
           >
             기록값 MUX
           </text>
           <text
-            x={
-              transfer.source === "mux" || transfer.target === "mux"
-                ? sx(470)
-                : sx(370)
-            }
-            y="924"
-            textAnchor={
-              transfer.source === "mux" || transfer.target === "mux"
-                ? "start"
-                : "middle"
-            }
-            fontSize="13"
-            fontWeight="650"
+            x={sx(480)}
+            y="928"
+            textAnchor="start"
+            data-mux-status="true"
+            fontSize="18"
+            fontWeight="700"
             className="font-mono"
             fill={color}
           >
@@ -654,29 +629,35 @@ export default function InstructionFlowDiagram({
             <title>
               PC가 명령어 메모리에 전달하는, 읽을 명령어의 주소입니다.
             </title>
-            <rect
-              x={sx(360) + 96}
-              y="208"
-              width={160}
-              height="28"
-              rx="5"
-              fill="var(--ar-panel-bg)"
-            />
             <text
-              x={sx(360) + 108}
-              y="227"
-              fontSize="16"
-              fontWeight="650"
+              x={boxes.instruction.x - 18}
+              y={boxes.instruction.y - 8}
+              fontSize="18"
+              fontWeight="750"
               fill={COLORS.address}
             >
-              명령어 주소 (PC)
+              명령어 주소
             </text>
           </g>
-          <text x={sx(560)} y="322" fontSize="13" fill={COLORS.data}>
+          <text
+            x={sx(540)}
+            y="250"
+            fontSize="18"
+            fontWeight="700"
+            data-instruction-word-label="true"
+            fill={COLORS.data}
+          >
             명령어
           </text>
           {(flow.load || flow.store) && (
-            <text x={sx(460)} y="731" fontSize="14" fill={COLORS.address}>
+            <text
+              data-memory-address-label="true"
+              x={boxes.memory.x + boxes.memory.w - 40}
+              y={boxes.memory.y - 8}
+              fontSize="18"
+              fontWeight="750"
+              fill={COLORS.address}
+            >
               데이터 주소
             </text>
           )}
@@ -713,20 +694,23 @@ export default function InstructionFlowDiagram({
             {transfer.detail}
           </text>
         </g>
-        <g aria-label="메모리 연결: 시스템 버스의 주소·데이터·제어 역할">
+        <g
+          data-bus-legend="true"
+          aria-label="메모리 연결: 시스템 버스의 주소·데이터·제어 역할"
+        >
           {(["address", "data", "control"] as const).map((kind, i) => (
             <g key={kind} data-system-bus-label={kind}>
               <path
-                d={`M${viewWidth - 154} ${28 + i * 24}H${viewWidth - 132}`}
+                d={`M${sx(35)} ${172 + i * 32}H${sx(59)}`}
                 stroke={COLORS[kind]}
                 strokeWidth={kind === "control" ? 2 : 5}
                 strokeDasharray={kind === "control" ? "5 3" : undefined}
               />
               <text
-                x={viewWidth - 122}
-                y={33 + i * 24}
-                fontSize="14"
-                fontWeight="600"
+                x={sx(70)}
+                y={177 + i * 32}
+                fontSize="16"
+                fontWeight="650"
                 className="font-mono"
                 fill={COLORS[kind]}
               >
