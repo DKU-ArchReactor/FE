@@ -50,8 +50,8 @@ export function useSimulationSession({
   }>({ single: null, pipeline: null });
 
   const [simulationEngineMode, setSimulationEngineMode] = useState<"single" | "pipeline">("single");
-  const simulationData = resultWorkspace === workspaceKey ? simulationCache[simulationEngineMode] : null;
-  const loadingMessage = null;
+  const simulationData = !translationBusy && resultWorkspace === workspaceKey ? simulationCache[simulationEngineMode] : null;
+  const loadingMessage = translationBusy ? "컴파일 및 시뮬레이션 데이터를 불러오는 중입니다..." : null;
   const [activeBuildId, setActiveBuildId] = useState<string | null>(null);
   const [activeSimulationToken, setActiveSimulationToken] = useState<string | null>(null);
 
@@ -65,6 +65,7 @@ export function useSimulationSession({
 
   // 어셈블리 행 파싱: 백엔드가 시뮬레이션 로그에 직접 주입한 source_line 매핑을 단일 진실 원천으로 사용
   const mappedAssemblyRows = useMemo(() => {
+    if (translationBusy) return [];
     const fromSim = extractAssemblyFromSimulation(simulationData);
     if (fromSim.length > 0) return fromSim;
     if (resultWorkspace === workspaceKey && buildResult?.analysis?.instructions.length) {
@@ -72,7 +73,7 @@ export function useSimulationSession({
     }
     if (!translationAssembly) return [];
     return mapAssembly(translationAssembly, 1000);
-  }, [simulationData, translationAssembly, buildResult, resultWorkspace, workspaceKey]);
+  }, [translationBusy, simulationData, translationAssembly, buildResult, resultWorkspace, workspaceKey]);
 
   const clearSimulationCache = () => {
     requests.current.invalidate();
@@ -91,13 +92,6 @@ export function useSimulationSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceKey]);
 
-  const onCompiled = (request: { isCurrent: () => boolean }, result: BuildCompileResponse) => {
-    if (!request.isCurrent()) return;
-    setResultWorkspace(workspaceKey);
-    setBuildResult(result);
-    setTranslationAssembly(result.analysis?.instructions.map(item => item.assembly).join("\n") ?? "");
-  };
-
   const beginRequest = () => {
     const request = requests.current.begin();
     const auth = getAuthSession();
@@ -108,8 +102,10 @@ export function useSimulationSession({
   const handleTranslationCompile = async (callbacks: Pick<SimulationCallbacks, "onSimulationComplete" | "triggerPlaybackFeedback" | "onCompilationComplete">) => {
     if (!translationSource.trim() || translationBusy) return;
     const request = beginRequest();
+    let compiledResult: BuildCompileResponse | null = null;
     setSimulationCache({ single: null, pipeline: null });
     setBuildResult(null);
+    setTranslationAssembly("");
     setActiveBuildId(null);
     setActiveSimulationToken(null);
     setTranslationBusy(true);
@@ -122,9 +118,16 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-      } = await compileTranslation(translationSource, simulationEngineMode, { ...request, fileId: request.capture ? savedFileId : null, onCompiled: result => onCompiled(request, result) });
+      } = await compileTranslation(translationSource, simulationEngineMode, {
+        ...request,
+        fileId: request.capture ? savedFileId : null,
+        onCompiled: result => {
+          if (request.isCurrent()) compiledResult = result;
+        },
+      });
       if (!request.isCurrent()) return;
       setResultWorkspace(workspaceKey);
+      if (compiledResult) setBuildResult(compiledResult);
 
       setTranslationAssembly(assembly);
       callbacks.onCompilationComplete?.();
@@ -143,6 +146,10 @@ export function useSimulationSession({
       }
     } catch (error) {
       if (!request.isCurrent()) return;
+      if (compiledResult) {
+        setResultWorkspace(workspaceKey);
+        setBuildResult(compiledResult);
+      }
       setTranslationError(error instanceof Error ? error.message : "컴파일에 실패했습니다.");
     } finally {
       if (request.isCurrent()) setTranslationBusy(false);
@@ -157,13 +164,14 @@ export function useSimulationSession({
     if (!codeToSimulate.trim() || translationBusy) return;
 
     const request = beginRequest();
+    let compiledResult: BuildCompileResponse | null = null;
     setSimulationCache({ single: null, pipeline: null });
     setBuildResult(null);
+    setTranslationAssembly("");
     setActiveBuildId(null);
     setActiveSimulationToken(null);
     setTranslationBusy(true);
     setTranslationError("");
-    setTranslationAssembly(codeToSimulate);
 
     try {
       const {
@@ -173,9 +181,15 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-      } = await compileAssemblyDirectly(codeToSimulate, simulationEngineMode, { ...request, onCompiled: result => onCompiled(request, result) });
+      } = await compileAssemblyDirectly(codeToSimulate, simulationEngineMode, {
+        ...request,
+        onCompiled: result => {
+          if (request.isCurrent()) compiledResult = result;
+        },
+      });
       if (!request.isCurrent()) return;
       setResultWorkspace(workspaceKey);
+      if (compiledResult) setBuildResult(compiledResult);
 
       setTranslationAssembly(assembly);
       callbacks.onCompilationComplete?.();
@@ -194,6 +208,10 @@ export function useSimulationSession({
       }
     } catch (err) {
       if (!request.isCurrent()) return;
+      if (compiledResult) {
+        setResultWorkspace(workspaceKey);
+        setBuildResult(compiledResult);
+      }
       setTranslationError(err instanceof Error ? err.message : "어셈블리 시뮬레이션 요청에 실패했습니다.");
     } finally {
       if (request.isCurrent()) setTranslationBusy(false);
@@ -218,6 +236,7 @@ export function useSimulationSession({
 
     // 캐시가 아직 비어있을 때만 네트워크 호출
     if (activeBuildId || activeSimulationToken) {
+      setTranslationBusy(true);
       try {
         const targetToken = activeBuildId
           ? { build_id: activeBuildId }
@@ -236,6 +255,8 @@ export function useSimulationSession({
         }
       } catch {
         if (request.isCurrent()) setTranslationError("시뮬레이션 모드 전환에 실패했습니다. 다시 실행해 주세요.");
+      } finally {
+        if (request.isCurrent()) setTranslationBusy(false);
       }
     }
   };
