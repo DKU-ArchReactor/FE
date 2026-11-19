@@ -7,7 +7,36 @@ import type {SimulationResult} from '../../src/type/simulation';
 import fixture from './fixtures/line-flow.json';
 import '../../src/index.css';
 
-const run = fixture as unknown as SimulationResult;
+const run = structuredClone(fixture) as unknown as SimulationResult;
+// Synthetic display stress cases, separate from the recorded execution regression.
+const geometry = new URLSearchParams(location.search).get('geometry');
+const cases: Record<string, {text: string; reads: string[]; writes: string[]}> = {
+  add: {text:'add a5,a4,a5',reads:['x14','x15'],writes:['x15']},
+  lw: {text:'lw a5,-4(s0)',reads:['x8'],writes:['x15']},
+  sw: {text:'sw a5,-4(s0)',reads:['x15','x8'],writes:[]},
+  bne: {text:'bne a4,a5,8',reads:['x14','x15'],writes:[]},
+  jal: {text:'jal ra,8',reads:[],writes:['x1']},
+  ecall: {text:'ecall',reads:[],writes:[]},
+};
+if (geometry && cases[geometry]) {
+  const item=run.tutor!.asm_instructions![2], frame=run.history[2], dp=frame.datapath!;
+  const variant=cases[geometry];
+  item.text=variant.text;
+  item.explanation={...item.explanation,opcode:geometry,reads:variant.reads,writes:variant.writes};
+  delete item.instruction_format;
+  dp.alu.input_1='0x80000000';dp.alu.input_2='0x7FFFFFFF';dp.alu.result='0xFFFFFFFF';
+  if(dp.registers.rs1) dp.registers.rs1.value='0x80000000';
+  if(dp.registers.rs2) dp.registers.rs2.value='0x7FFFFFFF';
+  if(dp.registers.rd) dp.registers.rd.write_data=geometry==='jal'?'0x00010040':'0xFFFFFFFF';
+  dp.data_memory={address:'0x7FFFFFFC',read_data:'0xFFFFFFFF',write_data:'0xFFFFFFFF'};
+  dp.immediate={dec:geometry==='bne'||geometry==='jal'?8:-4};
+  dp.next_pc=geometry==='bne'||geometry==='jal'?'0x00010044':'0x00010040';
+  if(geometry==='lw'||geometry==='sw') {
+    dp.alu.input_2='0xFFFFFFFC';dp.alu.result='0x7FFFFFFC';
+    dp.registers.rs1={name:'s0',num:8,value:'0x80000000'};
+    dp.registers.rs2=geometry==='sw'?{name:'a5',num:15,value:'0xFFFFFFFF'}:null;
+  }
+}
 const rows = run.tutor!.asm_instructions!.map(item => ({pc: item.pc!, text: item.text, sourceLine: item.source_line ?? null}));
 export function LineFlowHarness() {
   const [position, setPosition] = useState(2);

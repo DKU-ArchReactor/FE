@@ -87,3 +87,42 @@ test('single playback waits for the complete slow flow; pipeline timing stays un
   await page.clock.runFor(1);
   await expect(page.getByTestId('timing-clock')).toHaveText('1');
 });
+
+test('bus widths, labels and extreme values stay inside their shapes in all instruction layouts',async ({page})=>{
+  for(const op of ['add','lw','sw','bne','jal','ecall']) {
+    await page.goto(`/tests/browser/line-flow.html?geometry=${op}`);
+    await page.getByRole('combobox',{name:'그림 크기'}).selectOption('all');
+    if(op==='sw') await page.evaluate(()=>document.documentElement.classList.add('dark'));
+    const svg=page.getByRole('group',{name:'데이터가 이동하는 싱글 사이클 경로'});
+    const issues=await svg.evaluate(element=>{
+      const root=element as unknown as SVGSVGElement;
+      const issues:string[]=[];
+      const nodes=Array.from(root.querySelectorAll<SVGGElement>('[data-flow-node]'));
+      for(const node of nodes) {
+        const x=Number(node.dataset.x),y=Number(node.dataset.y),w=Number(node.dataset.width),h=Number(node.dataset.height);
+        for(const text of node.querySelectorAll<SVGTextElement>(':scope > text')) {
+          const box=text.getBBox();
+          if(box.x<x+2||box.y<y+1||box.x+box.width>x+w-2||box.y+box.height>y+h-1) issues.push(`node: ${text.textContent}`);
+          const shape=node.querySelector<SVGPathElement>(':scope > path');
+          if(shape) for(const [px,py] of [[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]]) {
+            if(!shape.isPointInFill(new DOMPoint(px,py))) issues.push(`polygon: ${text.textContent}`);
+          }
+          if(text.textContent?.includes('…')) issues.push('truncated value');
+        }
+      }
+      const view=root.viewBox.baseVal;
+      for(const text of root.querySelectorAll<SVGTextElement>('.bus-label text,.bus-width text')) {
+        const box=text.getBBox();
+        if(box.x<view.x||box.y<view.y||box.x+box.width>view.x+view.width||box.y+box.height>view.y+view.height) issues.push(`viewBox: ${text.textContent}`);
+        for(const node of nodes) {
+          const x=Number(node.dataset.x),y=Number(node.dataset.y),w=Number(node.dataset.width),h=Number(node.dataset.height);
+          if(box.x<x+w&&box.x+box.width>x&&box.y<y+h&&box.y+box.height>y) issues.push(`overlap: ${text.textContent}`);
+        }
+      }
+      return issues;
+    });
+    expect(issues,op).toEqual([]);
+    await expect(svg.locator('[data-connection="bus"] > path').first()).toHaveAttribute('stroke-width','12');
+    await expect(svg.getByLabel('범례: 굵은 묶음선은 논리 버스, 보라 점선은 제어 신호. 실제 공유 단일 버스 회로를 뜻하지 않습니다.')).toHaveCount(1);
+  }
+});
