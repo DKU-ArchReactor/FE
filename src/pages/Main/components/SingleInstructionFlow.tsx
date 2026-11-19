@@ -8,6 +8,7 @@ import {
   type buildInstructionFlow,
 } from "../utils/instructionFlow";
 import InstructionFlowDiagram from "./InstructionFlowDiagram";
+import InstructionHardwareDetail from "./InstructionHardwareDetail";
 import "./SingleInstructionFlow.css";
 
 export default function SingleInstructionFlow({
@@ -37,6 +38,19 @@ export default function SingleInstructionFlow({
     globalPlaying: isPlaying,
     local: isPlaying == null,
   });
+  const [detail, setDetail] = useState<"alu" | "pc-select" | "decoder" | null>(
+    null,
+  );
+  const inspect = (unit: "alu" | "pc-select" | "decoder") => {
+    onPause?.();
+    setClock((value) => ({
+      ...value,
+      running: false,
+      local: true,
+      globalPlaying: isPlaying,
+    }));
+    setDetail(unit);
+  };
   // Global Pause also applies to a new frame mounted at the same playback boundary.
   if (isPlaying != null && clock.globalPlaying !== isPlaying)
     setClock({
@@ -137,10 +151,33 @@ export default function SingleInstructionFlow({
       data-flow-step-duration={entry.duration}
     >
       <div className="grid h-[68px] shrink-0 grid-cols-1 content-center gap-1 px-3 py-1 sm:h-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-        <span className="text-[11px] text-[var(--ar-text-muted)]">
-          {clock.running ? "흐름 재생 중" : "흐름 일시정지"} · 전체{" "}
-          {Number((totalDuration / 1000).toFixed(1))}초
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="whitespace-nowrap text-[11px] text-[var(--ar-text-muted)]">
+            {clock.running ? "흐름 재생 중" : "흐름 일시정지"} · 전체{" "}
+            {Number((totalDuration / 1000).toFixed(1))}초
+          </span>
+          <button
+            type="button"
+            className={button}
+            onClick={() => inspect("alu")}
+          >
+            ALU 내부
+          </button>
+          <button
+            type="button"
+            className={button}
+            onClick={() => inspect("pc-select")}
+          >
+            PC 회로
+          </button>
+          <button
+            type="button"
+            className={button}
+            onClick={() => inspect("decoder")}
+          >
+            해독
+          </button>
+        </div>
         <div
           className="flex items-center gap-1.5"
           role="group"
@@ -197,8 +234,16 @@ export default function SingleInstructionFlow({
           count={transfers.length}
           arrived={arrived}
           onUnit={chooseUnit}
+          onInspect={inspect}
         />
       </div>
+      {detail && (
+        <InstructionHardwareDetail
+          flow={flow}
+          unit={detail}
+          onClose={() => setDetail(null)}
+        />
+      )}
       <p className="sr-only">
         시스템 버스는 CPU와 메모리 사이의 주소·데이터·제어 역할을 설명한
         개념도입니다. 실제 공유 버스 회로나 하드웨어 지연을 재현한 것은

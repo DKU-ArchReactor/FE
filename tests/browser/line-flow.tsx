@@ -19,13 +19,14 @@ const cases: Record<string, {text: string; reads: string[]; writes: string[]}> =
   ecall: {text:'ecall',reads:[],writes:[]},
   sra: {text:'sra a5,a4,a5',reads:['x14','x15'],writes:['x15']},
   srai: {text:'srai a5,a4,2',reads:['x14'],writes:['x15']},
+  jalr: {text:'jalr ra,8(a5)',reads:['x15'],writes:['x1']},
 };
 if (geometry && cases[geometry]) {
   const item=run.tutor!.asm_instructions![2], frame=run.history[2], dp=frame.datapath!;
   const variant=cases[geometry];
   item.text=variant.text;
   item.explanation={...item.explanation,opcode:geometry,reads:variant.reads,writes:variant.writes};
-  const encodings: Record<string,string> = {add:'0x00F707B3',lw:'0xFFC42783',sw:'0xFEF42E23',bne:'0x00F71463',jal:'0x008000EF',ecall:'0x00000073',sra:'0x40F757B3',srai:'0x40275793'};
+  const encodings: Record<string,string> = {add:'0x00F707B3',lw:'0xFFC42783',sw:'0xFEF42E23',bne:'0x00F71463',jal:'0x008000EF',ecall:'0x00000073',sra:'0x40F757B3',srai:'0x40275793',jalr:'0x008780E7'};
   dp.instruction.raw=encodings[geometry];
   dp.control_signals={...dp.control_signals,reg_write:variant.writes.length>0,mem_read:geometry==='lw',mem_write:geometry==='sw'};
   dp.alu.input_1='0x80000000';dp.alu.input_2='0x7FFFFFFF';dp.alu.result='0xFFFFFFFF';
@@ -45,6 +46,11 @@ if (geometry && cases[geometry]) {
     if(dp.registers.rs2)dp.registers.rs2.value='0x00000402';
     if(dp.registers.rd)dp.registers.rd.write_data='0xE0000000';
     dp.immediate={dec:2};
+  }
+  if(geometry==='jalr') {
+    dp.alu={...dp.alu,input_1:'0x00000000',input_2:'0x00000000',result:'0x00000000'};
+    dp.registers.rs1={num:15,value:'0x0001003C'};dp.immediate={dec:8};dp.next_pc='0x00010044';
+    if(dp.registers.rd)dp.registers.rd.write_data='0x00010040';
   }
 }
 const rows = run.tutor!.asm_instructions!.map(item => ({pc: item.pc!, text: item.text, sourceLine: item.source_line ?? null}));

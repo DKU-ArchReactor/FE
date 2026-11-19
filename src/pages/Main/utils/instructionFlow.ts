@@ -151,25 +151,25 @@ export function transferPoint(path:string, progress:number, startPadding=0, endP
 export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1,compact=false,verticalScale=1):Record<string,string> {
   const paths:Record<string,string>={
     'fetch-address':'M245 220H285V150H1150V250H1200',
-    'fetch-instruction':'M1200 330H860V265H825',
-    'decode-control':'M780 320V355H825V390',
-    'decode-immediate':'M540 320V365H510V390',
-    'read-control':'M380 320V350H195V390',
+    'fetch-instruction':'M1200 330H1030V282H825',
+    'decode-control':'M780 355V375H825V390',
+    'decode-immediate':'M540 355V375H510V390',
+    'read-control':'M380 355V370H195V390',
     'input-a-register':'M335 480H375V590H770V625',
     'input-a-pc':'M150 265V340H1030V585H770V625',
     'input-b-register':'M335 520H390V700H525',
     'input-b-immediate':'M510 505V575H525V700',
     'mux-to-alu':'M525 700H650V735H710',
-    'memory-address':'M960 680H1135V745H1200',
+    'memory-address':'M1010 680H1135V745H1200',
     'memory-control':'M960 450H1165V805H1200',
     'store-data':'M195 560V800H335V1030H1100V865H1200',
     'load-data':'M1200 885H1135V1015H675V940H525',
-    'result-alu':'M835 790V990H675V940H525',
+    'result-alu':'M860 830V990H675V940H525',
     'result-link':'M295 925H345V1040H675V940H525',
     'writeback':'M525 940H355V540H335',
     'pc-input':'M150 265V340H-40V925H55',
     'pc-immediate':'M415 445H365V815H320V895H295',
-    'pc-alu':'M835 790V1000H320V925H295',
+    'pc-base':'M195 600V800H320V925H295',
     'pc-control':'M690 480H655V815H175V865',
     'branch-decision':'M835 625V575H900V540',
     'alu-select-control':'M825 540V590H835V625',
@@ -183,8 +183,8 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
   paths['result-to-mux']=paths[flow.jump?'result-link':'result-alu'];
   if(compact) Object.assign(paths, {
     'fetch-address':'M55 220H-40V1210H55',
-    'fetch-instruction':'M55 1295H-75V370H860V265H825',
-    'memory-address':'M960 680H1090V1210H1005',
+    'fetch-instruction':'M55 1295H-75V370H1030V282H825',
+    'memory-address':'M1010 680H1090V1210H1005',
     'memory-control':'M960 450H1100V1270H1005',
     'store-data':'M195 560V800H335V1040H1130V1330H1005',
     'load-data':'M1005 1350H1055V1015H675V940H525',
@@ -196,12 +196,12 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
 }
 export function transferMotion(transfer:InstructionTransfer,path?:string) {
   const value=transfer.kind==='control'?(transfer.id==='read-control'?`Read ${[...(transfer.value??'').matchAll(/\bx\d+\b/g)].map(match=>match[0]).join(', ')||transfer.value||'\uC81C\uC5B4'}`:transfer.value??'\uC81C\uC5B4 \uC2E0\uD638'):transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
-  const width=Math.max(56,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?18:11),28));
+  const width=Math.max(80,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?32:19.5),36));
   const route=path?compileTransferRoute(path):undefined;
   // The packet stays centered on the actual wire. Reserve its footprint at ports,
   // but join consecutive MUX transfers at the device center without a position jump.
   const commands=path?.match(/[MHV]/g)??[];
-  const portPadding=(horizontal:boolean)=>horizontal?width/2+6:18;
+  const portPadding=(horizontal:boolean)=>horizontal?width/2+6:26;
   const startPadding=route?(transfer.source==='mux'||transfer.source==='operand-mux'?0:portPadding(commands[1]==='H')):0;
   const endPadding=route?(transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
@@ -236,11 +236,13 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
   if (flow.system) result.push({id:'environment',source:'cu',target:'cu',title:'CU · 실행 환경 요청',kind:'control',value:'ECALL',detail:'일반 메모리 전송이 아닌 실행 환경 서비스 요청'});
   else {
     if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'decoder',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:flow.raw,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
+    if(flow.jump) result.push({id:'pc-immediate',source:'immediate',target:'pc-select',title:'즉치값 → 분기·점프 주소 계산',kind:'data',value:flow.immediate == null ? undefined : String(flow.immediate),detail:'분기와 JAL의 목적지는 현재 PC + 즉치값입니다.'});
     if(flow.registerInputs.length) result.push({id:'read-control',source:'decoder',target:'registers',title:'명령어 필드 → 레지스터 읽기 주소',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'rs1·rs2 필드가 읽을 레지스터 번호를 지정합니다. 레지스터의 값과 구분하세요.'});
-    if(flow.pcRelative || flow.registerInputs.length) result.push({id:'input-a',source:flow.pcRelative?'pc':'registers',target:'alu',title:`${flow.pcRelative?'PC':'레지스터'} → ALU`,kind:'data',value:flow.input1,detail:'ALU 입력 A'});
-    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'operand-mux',title:`${flow.usesImmediate?'\uC989\uCE58\uAC12 \uC0DD\uC131\uAE30':'\uB808\uC9C0\uC2A4\uD130'} \u2192 \uC785\uB825 MUX`,kind:'data',value:flow.amount!=null&&flow.usesImmediate?String(flow.amount):flow.input2,detail:flow.amount!=null&&!flow.usesImmediate?`rs2 \uC804\uCCB4 \uAC12 \uC804\uB2EC \u00b7 ALU\uB294 \uD558\uC704 5\uBE44\uD2B8\uB85C ${flow.amount}\uBE44\uD2B8 \uC774\uB3D9`:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
-    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'mux-to-alu',source:'operand-mux',target:'alu',title:'\uC785\uB825 MUX \u2192 ALU',kind:'data',value:flow.amount!=null&&flow.usesImmediate?String(flow.amount):flow.input2,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 ALU \uC785\uB825 B\uB85C \uC804\uB2EC'});
-    result.push({id:'calculate',source:'alu',target:'alu',title:flow.load||flow.store?'ALU · 메모리 주소 계산':flow.branch?'ALU · 분기 조건 비교':flow.jump?'이동할 주소 선택':`ALU · ${flow.op.toUpperCase()} 연산`,kind:'data',value:flow.branch?(flow.taken==null?undefined:flow.taken?'조건 성립':'조건 불성립'):flow.jump?flow.nextPc:flow.result,detail:flow.load||flow.store?'기준 주소 + 바이트 오프셋':flow.branch?'부호 해석과 분기 조건은 명령어에 따라 다릅니다':'관찰된 연산 결과'});
+    if(flow.op==='jalr') result.push({id:'pc-base',source:'registers',target:'pc-select',title:'레지스터 → JALR 기준 주소',kind:'data',value:flow.registerInputs[0]?.value,detail:'rs1의 값을 목적지 주소 가산기에 제공합니다. 일반 ALU 결과 필드와 구분합니다.'});
+    if(!flow.jump && (flow.pcRelative || flow.registerInputs.length)) result.push({id:'input-a',source:flow.pcRelative?'pc':'registers',target:'alu',title:`${flow.pcRelative?'PC':'레지스터'} → ALU`,kind:'data',value:flow.input1,detail:'ALU 입력 A'});
+    if(!flow.jump && (flow.usesImmediate || flow.registerInputs.length>1)) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'operand-mux',title:`${flow.usesImmediate?'\uC989\uCE58\uAC12 \uC0DD\uC131\uAE30':'\uB808\uC9C0\uC2A4\uD130'} \u2192 \uC785\uB825 MUX`,kind:'data',value:flow.amount!=null&&flow.usesImmediate?String(flow.amount):flow.input2,detail:flow.amount!=null&&!flow.usesImmediate?`rs2 \uC804\uCCB4 \uAC12 \uC804\uB2EC \u00b7 ALU\uB294 \uD558\uC704 5\uBE44\uD2B8\uB85C ${flow.amount}\uBE44\uD2B8 \uC774\uB3D9`:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
+    if(!flow.jump && (flow.usesImmediate || flow.registerInputs.length>1)) result.push({id:'mux-to-alu',source:'operand-mux',target:'alu',title:'\uC785\uB825 MUX \u2192 ALU',kind:'data',value:flow.amount!=null&&flow.usesImmediate?String(flow.amount):flow.input2,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 ALU \uC785\uB825 B\uB85C \uC804\uB2EC'});
+    result.push({id:'calculate',source:flow.jump?'pc-select':'alu',target:flow.jump?'pc-select':'alu',title:flow.load||flow.store?'ALU · 메모리 주소 계산':flow.branch?'ALU · 분기 조건 비교':flow.jump?'이동할 주소 선택':`ALU · ${flow.op.toUpperCase()} 연산`,kind:'data',value:flow.branch?(flow.taken==null?undefined:flow.taken?'조건 성립':'조건 불성립'):flow.jump?flow.nextPc:flow.result,detail:flow.load||flow.store?'기준 주소 + 바이트 오프셋':flow.branch?'부호 해석과 분기 조건은 명령어에 따라 다릅니다':'관찰된 연산 결과'});
     if(flow.load||flow.store) {
       result.push({id:'memory-address',source:'alu',target:'memory',title:'ALU → 메모리',kind:'address',systemBus:true,value:flow.address,detail:'데이터를 읽거나 쓸 주소'});
       const signal=flow.load?flow.controlSignals?.mem_read:flow.controlSignals?.mem_write;
@@ -255,8 +257,9 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
   if(!flow.store && flow.writes.length && !flow.error && (!flow.actual||flow.completed)) result.push({id:'writeback',source:'mux',target:'registers',title:`MUX \u2192 ${flow.writes.map(registerLabel).join(', ')}`,kind:'data',value:flow.writeValue,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 \uBAA9\uC801\uC9C0 \uB808\uC9C0\uC2A4\uD130\uC5D0 \uAE30\uB85D'});
   if(!flow.actual||flow.completed) {
 
-    if(flow.branch || flow.op === 'jal') result.push({id:'pc-immediate',source:'immediate',target:'pc-select',title:'즉치값 → 분기·점프 주소 계산',kind:'data',value:flow.immediate == null ? undefined : String(flow.immediate),detail:'분기와 JAL의 목적지는 현재 PC + 즉치값입니다.'});
-    if(flow.op === 'jalr') result.push({id:'pc-alu',source:'alu',target:'pc-select',title:'ALU → JALR 목적지',kind:'address',value:flow.result,detail:'rs1 + 즉치값의 최하위 비트를 0으로 만든 주소를 선택합니다.'});
+
+    if(flow.branch) result.push({id:'pc-immediate',source:'immediate',target:'pc-select',title:'즉치값 → 분기·점프 주소 계산',kind:'data',value:flow.immediate == null ? undefined : String(flow.immediate),detail:'분기와 JAL의 목적지는 현재 PC + 즉치값입니다.'});
+
     if(flow.branch) result.push({id:'branch-decision',source:'alu',target:'cu',title:'비교 회로 → 분기 제어',kind:'control',value:flow.taken == null ? undefined : flow.taken ? '분기 성립' : '분기 불성립',detail:'레지스터 비교 결과를 바탕으로 CU가 다음 PC 선택을 제어합니다.'});
     result.push({id:'pc-control',source:'cu',target:'pc-select',title:'CU → 다음 주소 선택',kind:'control',value:flow.branch ? (flow.taken == null ? undefined : flow.taken ? '분기 성립' : '분기 불성립') : flow.jump ? '점프' : 'PC + 4',detail:'명령어 종류와 분기 판정에 따라 순차 주소 또는 목적지를 선택합니다.'});
     result.push({id:'next-pc',source:'pc-select',target:'pc',title:'다음 주소 회로 → PC',kind:'address',value:flow.nextPc,detail:'선택된 다음 명령어 주소를 PC에 기록합니다.'});

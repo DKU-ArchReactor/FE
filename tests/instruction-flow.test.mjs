@@ -41,6 +41,17 @@ test('decode and next-PC routes have real functional owners instead of treating 
   assert.ok(transfers.findIndex(t=>t.id==='calculate')<transfers.findIndex(t=>t.id==='branch-decision'));
 });
 
+test('JALR uses the register base and immediate before PC calculation without presenting an ALU placeholder as its target',()=>{
+  const current=frame('jalr');current.datapath.alu.result='0x00000000';current.datapath.immediate={dec:8};
+  const transfers=instructionTransfers(buildInstructionFlow(item('jalr',['x11'],['x1']),current,null,simulation(current)));
+  const calc=transfers.findIndex(t=>t.id==='calculate');
+  assert.equal(transfers[calc].source,'pc-select');
+  assert.ok(transfers.findIndex(t=>t.id==='pc-base')<calc);
+  assert.ok(transfers.findIndex(t=>t.id==='pc-immediate')<calc);
+  assert.ok(!transfers.some(t=>t.id==='pc-alu'||t.id==='mux-to-alu'));
+  assert.equal(transfers.find(t=>t.id==='pc-base').value,'0x00000005');
+});
+
 test('all alternative physical connections remain fixed across instruction classes',()=>{
   const current=frame();let expected;
   for(const op of ['add','lw','sw','jal','auipc','bne']) {

@@ -2,7 +2,6 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   displayValue,
   numericPc,
-  registerLabel,
   instructionFields,
   instructionPaths,
   pointOnTransfer,
@@ -12,20 +11,21 @@ import {
   type InstructionTransfer,
   type buildInstructionFlow,
 } from "../utils/instructionFlow";
+import { aluLesson } from "../utils/hardwareLesson";
 
 type Flow = ReturnType<typeof buildInstructionFlow>;
 type Box = { x: number; y: number; w: number; h: number };
 const COLORS = { address: "#bc700a", data: "#087fce", control: "#8951ce" };
 const BOXES: Record<TransferUnit, Box> = {
-  pc: { x: 55, y: 175, w: 190, h: 105 },
-  decoder: { x: 335, y: 175, w: 490, h: 145 },
-  registers: { x: 55, y: 390, w: 280, h: 190 },
-  immediate: { x: 415, y: 390, w: 190, h: 115 },
-  cu: { x: 690, y: 390, w: 270, h: 160 },
+  pc: { x: 55, y: 175, w: 190, h: 120 },
+  decoder: { x: 335, y: 175, w: 490, h: 180 },
+  registers: { x: 55, y: 390, w: 280, h: 210 },
+  immediate: { x: 415, y: 390, w: 190, h: 125 },
+  cu: { x: 690, y: 390, w: 270, h: 180 },
   "operand-mux": { x: 420, y: 625, w: 210, h: 100 },
-  alu: { x: 710, y: 625, w: 250, h: 175 },
+  alu: { x: 710, y: 625, w: 300, h: 205 },
   mux: { x: 420, y: 865, w: 210, h: 100 },
-  "pc-select": { x: 55, y: 865, w: 240, h: 160 },
+  "pc-select": { x: 55, y: 865, w: 240, h: 180 },
   "instruction-memory": { x: 1200, y: 230, w: 320, h: 210 },
   memory: { x: 1200, y: 705, w: 320, h: 210 },
 };
@@ -38,22 +38,22 @@ const TITLES: Record<TransferUnit, string> = {
   "operand-mux": "입력 MUX",
   alu: "ALU · 연산 장치",
   mux: "기록값 MUX",
-  "pc-select": "다음 주소 회로",
+  "pc-select": "PC 가산·선택",
   "instruction-memory": "명령어 메모리",
   memory: "데이터 메모리",
 };
 const ROLES: Record<TransferUnit, string> = {
-  pc: "읽을 명령어 주소 보관",
+  pc: "명령어 주소",
   decoder: "opcode 연산 · rd 기록 · rs1/rs2 읽기",
   cu: "계산·읽기·쓰기를 제어",
-  registers: "계산에 쓸 값을 가까이 보관",
-  immediate: "명령어 속 상수를 구성",
+  registers: "입력·계산 결과 보관",
+  immediate: "상수 생성",
   "operand-mux": "ALU의 두 번째 입력 선택",
-  alu: "입력 선택 · 계산 · 조건 비교",
+  alu: "연산 회로 선택",
   mux: "레지스터에 쓸 결과 선택",
-  "pc-select": "주소 계산 + PC 선택 MUX",
-  "instruction-memory": "주소에 해당하는 명령어 반환",
-  memory: "주소를 받아 데이터를 읽거나 저장",
+  "pc-select": "가산기 + PC MUX",
+  "instruction-memory": "주소 → 명령어 읽기",
+  memory: "주소 → 읽기·쓰기",
 };
 const short = (value?: string | null) => displayValue(value).split(" · ")[0];
 const AUXILIARY_CONNECTIONS = new Set([
@@ -62,7 +62,7 @@ const AUXILIARY_CONNECTIONS = new Set([
   "next-pc",
   "result-link",
   "pc-immediate",
-  "pc-alu",
+  "pc-base",
   "branch-decision",
 ]);
 // Fixed physical-model connections: instructions select paths, never change the topology.
@@ -86,7 +86,7 @@ const WIRES: { key: string; kind: keyof typeof COLORS; system?: boolean }[] = [
   { key: "writeback", kind: "data" },
   { key: "pc-input", kind: "address" },
   { key: "pc-immediate", kind: "data" },
-  { key: "pc-alu", kind: "address" },
+  { key: "pc-base", kind: "address" },
   { key: "pc-control", kind: "control" },
   { key: "next-pc", kind: "address" },
   { key: "branch-decision", kind: "control" },
@@ -104,6 +104,7 @@ export default function InstructionFlowDiagram({
   count,
   arrived,
   onUnit,
+  onInspect,
 }: {
   flow: Flow;
   transfer: InstructionTransfer;
@@ -112,9 +113,16 @@ export default function InstructionFlowDiagram({
   count: number;
   arrived: string[];
   onUnit: (unit: TransferUnit) => void;
+  onInspect: (unit: "alu" | "pc-select" | "decoder") => void;
 }) {
   const id = useId().replace(/:/g, "");
   const area = useRef<HTMLDivElement>(null);
+  const lesson = aluLesson(flow);
+  const selectUnit = (unit: TransferUnit) => {
+    onUnit(unit);
+    if (unit === "alu" || unit === "pc-select" || unit === "decoder")
+      onInspect(unit);
+  };
   const [{ compact, verticalScale }, setCanvas] = useState({
     compact: false,
     verticalScale: 1,
@@ -157,7 +165,7 @@ export default function InstructionFlowDiagram({
         1.35,
         Math.max(
           1,
-          (height * (compact ? 1380 : 1740)) /
+          (height * (compact ? 1470 : 1830)) /
             (width * (compact ? 1460 : 1120)),
         ),
       );
@@ -212,12 +220,14 @@ export default function InstructionFlowDiagram({
       )
     : undefined;
   const packet = point
-    ? { x: point.x - motion.width / 2, y: point.y - 14, w: motion.width, h: 28 }
+    ? { x: point.x - motion.width / 2, y: point.y - 23, w: motion.width, h: 46 }
     : undefined;
   const color = COLORS[transfer.kind];
   const reached = (key: string) =>
     arrived.includes(key) || (transfer.id === key && progress >= 0.95);
   const decoded = instructionFields(flow.raw);
+  const specialEncoding =
+    decoded && ["1110011", "0001111"].includes(decoded.opcode);
   const signal = (value?: boolean) =>
     value == null ? "미제공" : value ? "1" : "0";
   const hasWrite = flow.writes.length > 0 && !flow.store;
@@ -237,16 +247,16 @@ export default function InstructionFlowDiagram({
               : "불성립: PC + 4"
           : "순차: PC + 4";
   const lines: Record<TransferUnit, string[]> = {
-    pc: [flow.pc ?? "미제공"],
+    pc: [flow.pc?.replace(/^0x0+(?=[\da-f])/i, "0x") ?? "미제공"],
     decoder: [flow.raw ?? "기계어 미제공"],
     cu: [
       `ALU: ${flow.system ? "사용 안 함" : flow.load || flow.store ? "ADD · 주소 계산" : flow.op.toUpperCase()}`,
-      `RegWrite ${signal(flow.controlSignals?.reg_write)}`,
-      `MemRead ${signal(flow.controlSignals?.mem_read)} · MemWrite ${signal(flow.controlSignals?.mem_write)}`,
+      `기록 ${signal(flow.controlSignals?.reg_write)}`,
+      `읽기 ${signal(flow.controlSignals?.mem_read)} · 쓰기 ${signal(flow.controlSignals?.mem_write)}`,
     ],
     registers: [
       ...flow.registerInputs.map(
-        (input) => `${registerLabel(input.name)}: ${short(input.value)}`,
+        (input) => `${input.name}: ${short(input.value)}`,
       ),
       hasWrite
         ? reached("writeback")
@@ -277,15 +287,17 @@ export default function InstructionFlowDiagram({
           )
         : "입력 대기",
     ],
-    alu: flow.system
-      ? ["실행 환경 서비스 요청", "일반 ALU 계산 없음"]
-      : [
-          `A ${!flow.pcRelative && !flow.registerInputs.length ? short(flow.input1) : reached("input-a") ? short(flow.input1) : "입력 대기"}`,
-          `B ${reached("mux-to-alu") ? (flow.amount == null ? short(flow.input2) : `${flow.amount}비트 이동`) : "입력 대기"}`,
-          flow.branch
-            ? `비교 ${reached("calculate") ? (flow.taken == null ? "미제공" : flow.taken ? "성립" : "불성립") : "대기"}`
-            : `결과 ${reached("calculate") ? short(flow.result) : "계산 대기"}`,
-        ],
+    alu: flow.jump
+      ? ["PC ????", "?? ?????"]
+      : flow.system
+        ? ["환경 요청", "ALU 사용 안 함"]
+        : [
+            `A ${!flow.pcRelative && !flow.registerInputs.length ? short(flow.input1) : reached("input-a") ? short(flow.input1) : "입력 대기"}`,
+            `B ${reached("mux-to-alu") ? (flow.amount == null ? short(flow.input2) : `${flow.amount}비트 이동`) : "입력 대기"}`,
+            flow.branch
+              ? `비교 ${reached("calculate") ? (flow.taken == null ? "미제공" : flow.taken ? "성립" : "불성립") : "대기"}`
+              : `→ ${reached("calculate") ? short(flow.result) : "계산 대기"}`,
+          ],
     mux: [
       hasWrite
         ? flow.load
@@ -300,8 +312,8 @@ export default function InstructionFlowDiagram({
     ],
     "pc-select": [
       nextRule,
-      `PC+4 ${pcPlusFour}`,
-      `다음 ${reached("next-pc") ? (flow.nextPc ?? "미제공") : "선택 대기"}`,
+      `+4 ${pcPlusFour.replace(/^0x0+(?=[\da-f])/i, "0x")}`,
+      `다음 ${reached("next-pc") ? (flow.nextPc?.replace(/^0x0+(?=[\da-f])/i, "0x") ?? "미제공") : "선택 대기"}`,
     ],
     "instruction-memory": [
       `주소 ${flow.pc ?? "미제공"}`,
@@ -319,14 +331,14 @@ export default function InstructionFlowDiagram({
               ? "접근 오류 · 성공값 미표시"
               : flow.load && flow.width < 32
                 ? /^(lb|lh)$/.test(flow.op)
-                  ? "부호 확장 후 32비트 기록"
-                  : "0 확장 후 32비트 기록"
+                  ? "부호 확장 → 32비트"
+                  : "0 확장 → 32비트"
                 : "32비트 데이터 경로",
           ]
         : [
             "이번 명령어는 접근 안 함",
             "메모리 읽기·쓰기 없음",
-            "계산 명령은 레지스터 사용",
+            "계산은 레지스터에서",
             "Load / Store에서 사용",
           ],
   };
@@ -352,7 +364,7 @@ export default function InstructionFlowDiagram({
     const shape = mux
       ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
       : unit === "alu"
-        ? `M${b.x} ${b.y}H${b.x + 95}L${b.x + 120} ${b.y + sy(15)}L${b.x + 145} ${b.y}H${b.x + b.w}L${b.x + b.w - 24} ${b.y + b.h}H${b.x + 24}Z`
+        ? `M${b.x} ${b.y}H${b.x + b.w / 2 - 25}L${b.x + b.w / 2} ${b.y + sy(15)}L${b.x + b.w / 2 + 25} ${b.y}H${b.x + b.w}L${b.x + b.w - 24} ${b.y + b.h}H${b.x + 24}Z`
         : undefined;
     const fill = active
       ? `color-mix(in srgb, ${color} 8%, var(--ar-panel-bg))`
@@ -378,11 +390,11 @@ export default function InstructionFlowDiagram({
                 ? "register-file"
                 : "chip"
         }
-        onClick={() => onUnit(unit)}
+        onClick={() => selectUnit(unit)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            onUnit(unit);
+            selectUnit(unit);
           }
         }}
         className="cursor-pointer outline-none focus-visible:drop-shadow-md"
@@ -422,9 +434,9 @@ export default function InstructionFlowDiagram({
         )}
         <text
           x={b.x + b.w / 2}
-          y={b.y + sy(unit === "alu" ? 47 : mux ? 27 : 32)}
+          y={b.y + sy(unit === "alu" ? 53 : mux ? 33 : 40)}
           textAnchor="middle"
-          fontSize={mux ? 22 : 25}
+          fontSize={mux ? 26 : 30}
           fontWeight="800"
           fill="var(--ar-text-primary)"
         >
@@ -455,19 +467,23 @@ export default function InstructionFlowDiagram({
         {!mux && (
           <text
             x={b.x + b.w / 2}
-            y={b.y + sy(unit === "alu" ? 73 : 60)}
+            y={b.y + sy(unit === "alu" ? 82 : 66)}
             textAnchor="middle"
-            fontSize={unit === "immediate" ? 15 : 17}
+            fontSize={22}
             fill="var(--ar-text-muted)"
           >
-            {ROLES[unit]}
+            {unit === "alu"
+              ? lesson.category === "adder"
+                ? `가산기 · A ${lesson.operator} B`
+                : lesson.unit
+              : ROLES[unit]}
           </text>
         )}
         {unit === "registers" && (
           <text
             x={b.x + 14}
-            y={b.y + sy(86)}
-            fontSize="13"
+            y={b.y + sy(91)}
+            fontSize="18"
             fontWeight="700"
             fill={stroke}
           >
@@ -479,13 +495,13 @@ export default function InstructionFlowDiagram({
             b.y +
             sy(
               (unit === "registers"
-                ? 114
+                ? 126
                 : unit === "alu"
-                  ? 104
+                  ? 127
                   : mux
-                    ? 56
-                    : 90) +
-                i * 26,
+                    ? 57
+                    : 107) +
+                i * 29,
             );
           const overlap =
             packet &&
@@ -500,7 +516,15 @@ export default function InstructionFlowDiagram({
               y={baseline}
               textAnchor="middle"
               fontSize={
-                unit === "cu" || unit === "pc-select" ? 20 : mux ? 18 : 23
+                unit === "cu" || unit === "pc-select"
+                  ? 24
+                  : mux
+                    ? i === 0
+                      ? 22
+                      : 28
+                    : unit === "registers"
+                      ? 28
+                      : 30
               }
               fontWeight="650"
               opacity={overlap ? 0 : 1}
@@ -515,38 +539,40 @@ export default function InstructionFlowDiagram({
           <g data-instruction-fields="true">
             <text
               x={b.x + b.w / 2}
-              y={b.y + sy(112)}
+              y={b.y + sy(140)}
               textAnchor="middle"
-              fontSize="15"
+              fontSize="24"
               fontWeight="700"
               fill="var(--ar-text-primary)"
             >
               {decoded
-                ? `${decoded.format}형 · opcode ${decoded.opcode}${decoded.funct3 == null ? "" : ` · funct3 ${decoded.funct3}`}${decoded.funct7 == null ? "" : ` · funct7 ${decoded.funct7}`}`
-                : "기계어가 있어야 비트 필드를 해독합니다"}
+                ? `${decoded.format}\uD615 \u00b7 opcode ${decoded.opcode}`
+                : "\uAE30\uACC4\uC5B4 \uBBF8\uC81C\uACF5"}
             </text>
             <text
               x={b.x + b.w / 2}
-              y={b.y + sy(137)}
+              y={b.y + sy(166)}
               textAnchor="middle"
-              fontSize="17"
+              fontSize="23"
               fontWeight="700"
               fill={COLORS.control}
             >
-              {decoded
-                ? [
-                    decoded.rd == null ? "" : `rd x${decoded.rd}`,
-                    decoded.rs1 == null ? "" : `rs1 x${decoded.rs1}`,
-                    decoded.rs2 == null ? "" : `rs2 x${decoded.rs2}`,
-                    decoded.shamt != null
-                      ? `shamt ${decoded.shamt}`
-                      : decoded.immediate == null
-                        ? ""
-                        : `imm ${decoded.immediate}`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                : "필드 정보 미제공"}
+              {specialEncoding
+                ? "SYSTEM / FENCE"
+                : decoded
+                  ? [
+                      decoded.rd == null ? "" : `rd x${decoded.rd}`,
+                      decoded.rs1 == null ? "" : `rs1 x${decoded.rs1}`,
+                      decoded.rs2 == null ? "" : `rs2 x${decoded.rs2}`,
+                      decoded.shamt != null
+                        ? `shamt ${decoded.shamt}`
+                        : decoded.immediate == null
+                          ? ""
+                          : `imm ${decoded.immediate}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "필드 정보 미제공"}
             </text>
           </g>
         )}
@@ -557,7 +583,7 @@ export default function InstructionFlowDiagram({
     <div ref={area} className="h-full min-h-0 w-full min-w-0 overflow-hidden">
       <svg
         viewBox={
-          compact ? `-160 0 1380 ${sy(1460)}` : `-160 0 1740 ${sy(1120)}`
+          compact ? `-210 0 1470 ${sy(1460)}` : `-210 0 1830 ${sy(1120)}`
         }
         preserveAspectRatio="xMidYMin meet"
         className="ar-single-flow-diagram block h-full w-full font-sans"
@@ -829,9 +855,9 @@ export default function InstructionFlowDiagram({
               />
               <text
                 x={point.x}
-                y={point.y + 6}
+                y={point.y + 10}
                 textAnchor="middle"
-                fontSize="18"
+                fontSize="32"
                 fontWeight="750"
                 className="font-mono"
                 fill={transfer.kind === "control" ? color : "#fff"}

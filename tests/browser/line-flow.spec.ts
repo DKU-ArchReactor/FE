@@ -68,7 +68,7 @@ test('a load decodes its actual encoded fields, selects registers by fields and 
   const fields=page.locator('[data-instruction-fields]');await expect(fields).toContainText('I형');await expect(fields).toContainText('opcode 0000011');
   await expect(fields).toContainText('rd x15');await expect(fields).toContainText('rs1 x8');await expect(fields).toContainText('imm -4');
   await seek(page,'decode-control');await expect(page.locator('[data-flow-node="cu"]')).toHaveAttribute('data-flow-active','true');
-  await expect(page.locator('[data-flow-node="cu"]')).toContainText('MemRead 1');
+  await expect(page.locator('[data-flow-node="cu"]')).toContainText('\uC77D\uAE30 1');
   await seek(page,'read-control');await expect(page.locator('[data-flow-node="decoder"]')).toHaveAttribute('data-flow-active','true');
   await expect(page.locator('[data-flow-node="registers"] [data-device-status]')).toHaveAttribute('data-device-status','도착');
   await expect(page.locator('[data-transfer]')).toContainText('rs1·rs2 필드');
@@ -82,7 +82,7 @@ test('actual operands and results remain visible as device inputs and outputs',a
   await page.clock.runFor(150);expect(await word.evaluate(p=>[p.getAttribute('data-packet-x'),p.getAttribute('data-packet-y')])).not.toEqual(before);await pause(page);
   await seek(page,'input-b');await expect(page.locator('[data-transfer-value]')).toHaveText('7 · 0x00000007');
   await seek(page,'calculate');await expect(page.locator('[data-transfer-value]')).toHaveText('18 · 0x00000012');
-  await expect(page.locator('[data-flow-node="alu"]')).toContainText('조건 비교');
+  await expect(page.locator('[data-flow-node="alu"]')).toContainText('\uAC00\uC0B0\uAE30');
 });
 
 test('register shifts transport the register word and immediate shifts transport shamt',async({page})=>{
@@ -93,6 +93,28 @@ test('register shifts transport the register word and immediate shifts transport
     await seek(page,'calculate');await expect(page.locator('[data-flow-node="alu"]')).toContainText('2비트 이동');
     if(op==='srai')await expect(page.locator('[data-instruction-fields]')).toContainText('shamt 2');
   }
+});
+
+test('large hardware details show real addition, selectable carry bits, PC components and instruction decoding',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
+  await page.getByRole('button',{name:'ALU 내부',exact:true}).click();
+  const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await expect(dialog.locator('[data-numeric-equation]')).toContainText('11 + 7 → 18');
+  await expect(dialog).toContainText('전가산기');await page.getByLabel('가산기 비트 구간').selectOption('1');await expect(dialog.getByRole('columnheader',{name:'15',exact:true})).toBeVisible();
+  expect(await dialog.locator('[data-alu-formula]').evaluate(n=>parseFloat(getComputedStyle(n).fontSize))).toBeGreaterThanOrEqual(24);
+  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+  await page.getByRole('button',{name:'PC 회로',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('PC 선택 MUX');await expect(page.getByRole('dialog')).toContainText('0x00010040');
+  await page.getByRole('button',{name:'닫기',exact:true}).click();
+  await page.getByRole('button',{name:'해독',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('funct7');await expect(page.getByRole('dialog')).toContainText('x14');
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('[data-flow-playing]')).toHaveAttribute('data-flow-playing','false');
+});
+
+test('jump address explanation keeps CORE ALU placeholders separate from real PC inputs',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=jalr');await pause(page);
+  await seek(page,'pc-base');await expect(page.locator('[data-transfer-value]')).toContainText('0x0001003C');
+  await seek(page,'calculate');await expect(page.locator('[data-flow-node="pc-select"]')).toHaveAttribute('data-flow-active','true');
+  await expect(page.locator('[data-flow-node="alu"]')).toHaveAttribute('data-flow-active','false');
+  await page.getByRole('button',{name:'ALU 내부',exact:true}).click();await expect(page.getByRole('dialog').locator('[data-numeric-equation]')).toHaveCount(0);await expect(page.getByRole('dialog')).toContainText('PC 주소 연산');
 });
 
 test('load and store use distinct bus directions; arithmetic does not access data memory',async({page})=>{
