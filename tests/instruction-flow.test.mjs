@@ -7,6 +7,7 @@ const source = readFileSync(new URL('../src/pages/Main/utils/instructionFlow.ts'
 const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
 const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline,instructionFlowDuration} = exports;
+const {instructionFields} = exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
   global_result: {registers: {x10: '0x0000000C'}, metrics: {accumulated_instructions: 1}},
@@ -14,6 +15,40 @@ const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_er
     registers: {rs1: {name: 'a1', num: 11, value: '0x00000005'}, rs2: {name: 'a2', num: 12, value: '0x00000007'}, rd: {num: 10, write_data: '0x0000000C'}},
     instruction: {op}, control_signals: {reg_write: true}, data_memory: {}}});
 const simulation = current => ({simulator: {mode: 'single'}, initial_state: {registers: {}, metrics: {accumulated_instructions: 0}}, history: [current]});
+
+test('real RV32 encodings decode R/I/S/B/U/J fields, negative offsets and shift funct bits', () => {
+  const cases = [
+    ['0x00F707B3', {format:'R',rd:15,rs1:14,rs2:15,funct7:'0000000'}],
+    ['0xFFC42783', {format:'I',rd:15,rs1:8,immediate:-4}],
+    ['0xFEF42E23', {format:'S',rs1:8,rs2:15,rd:undefined,immediate:-4}],
+    ['0x00F71463', {format:'B',rs1:14,rs2:15,rd:undefined,immediate:8}],
+    ['0x80000537', {format:'U',rd:10,rs1:undefined,immediate:-2147483648}],
+    ['0x008000EF', {format:'J',rd:1,rs1:undefined,immediate:8}],
+    ['0x4025D513', {format:'I',rd:10,rs1:11,shamt:2,funct7:'0100000'}],
+  ];
+  for(const [raw, expected] of cases)for(const [field,value] of Object.entries(expected))assert.equal(instructionFields(raw)[field],value,`${raw} ${field}`);
+  for(const invalid of [undefined,'not available','0x1','0xFFFFFFFF'])assert.equal(instructionFields(invalid),undefined);
+});
+
+test('decode and next-PC routes have real functional owners instead of treating CU as an address source', () => {
+  const current=frame(), flow=buildInstructionFlow(item('bne',['x11','x12'],[]),current,null,simulation(current));
+  const transfers=instructionTransfers(flow);
+  assert.equal(transfers.find(t=>t.id==='fetch-instruction').target,'decoder');
+  assert.equal(transfers.find(t=>t.id==='read-control').source,'decoder');
+  assert.equal(transfers.find(t=>t.id==='next-pc').source,'pc-select');
+  assert.equal(transfers.find(t=>t.id==='branch-decision').source,'alu');
+  assert.ok(transfers.findIndex(t=>t.id==='pc-input')<transfers.findIndex(t=>t.id==='calculate'));
+  assert.ok(transfers.findIndex(t=>t.id==='calculate')<transfers.findIndex(t=>t.id==='branch-decision'));
+});
+
+test('all alternative physical connections remain fixed across instruction classes',()=>{
+  const current=frame();let expected;
+  for(const op of ['add','lw','sw','jal','auipc','bne']) {
+    const paths=instructionPaths(buildInstructionFlow(item(op,[],[]),current,null,simulation(current)));
+    const fixed=Object.fromEntries(Object.entries(paths).filter(([key])=>!['input-a','input-b','result-to-mux'].includes(key)));
+    if(expected)assert.equal(JSON.stringify(fixed),JSON.stringify(expected));else expected=fixed;
+  }
+});
 
 test('CORE clock zero is a real observed frame and num/write_data fields are read', () => {
   const current = frame();
@@ -121,11 +156,14 @@ test('store, ECALL, jump and shift transfers keep their distinct meanings',()=>{
   const current=frame();current.datapath.alu.input_2='0x00000402';
   const shift=instructionTransfers(buildInstructionFlow(item('srai',['x11'],['x10']),current,null,simulation(current)));
   assert.equal(shift.find(value=>value.id==='input-b').value,'2');
+  const registerShift=instructionTransfers(buildInstructionFlow(item('sra',['x11','x12'],['x10']),current,null,simulation(current)));
+  assert.equal(registerShift.find(value=>value.id==='input-b').value,'0x00000402');
+  assert.equal(registerShift.find(value=>value.id==='mux-to-alu').value,'0x00000402');
   const system=instructionTransfers(buildInstructionFlow(item('ecall',[],[]),current,null,simulation(current)));
   assert.ok(system.some(value=>value.id==='environment'));
   assert.ok(system.every(value=>value.id!=='memory-address'&&value.id!=='calculate'));
   const jump=instructionTransfers(buildInstructionFlow(item('jal',[],['x1']),current,null,simulation(current)));
-  assert.equal(jump.find(value=>value.id==='result-to-mux').source,'pc');
+  assert.equal(jump.find(value=>value.id==='result-to-mux').source,'pc-select');
   assert.equal(jump.find(value=>value.id==='writeback').source,'mux');
   const store=instructionTransfers(buildInstructionFlow(item('sw',['x11','x12'],[]),current,null,simulation(current)));
   assert.ok(store.some(value=>value.id==='store-data'&&value.source==='registers'&&value.target==='memory'));
@@ -155,7 +193,7 @@ test('short connections stay readable and long returns use a bounded quicker sch
     }
     assert.ok(Math.abs(instructionFlowDuration(flow,9000)-timeline.at(-1).start-timeline.at(-1).duration)<1e-9);
     const input=timeline[transfers.findIndex(transfer=>transfer.id==='input-a')];
-    if(input&&!flow.pcRelative) assert.ok(input.duration>=1200&&input.duration<1700);
+    if(input&&!flow.pcRelative) assert.ok(input.duration>=1200&&input.duration<=2200);
     for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') assert.equal(timeline[index].travel>0,Boolean(instructionPaths(flow)[transfer.id]));
   }
 });
@@ -178,7 +216,7 @@ test('immediate formats receive instruction bits before their immediate reaches 
   assert.ok(decode>0);
   assert.ok(decode<transfers.findIndex(value=>value.id==='input-b'));
   assert.equal(transfers[decode].target,'immediate');
-  assert.equal(transfers[decode].source,'memory');
+  assert.equal(transfers[decode].source,'decoder');
   const normal=instructionTransfers(buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current)));
   assert.ok(!normal.some(value=>value.id==='decode-immediate'));
 });

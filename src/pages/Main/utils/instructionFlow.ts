@@ -2,7 +2,7 @@ import type {CycleHistoryItem, SimulationResult, StageBuffer} from '@/type/simul
 import type {TutorInstruction} from './tutorAnalysis';
 
 export type FlowUnit = 'cu' | 'registers' | 'alu' | 'memory' | 'pc';
-// Presentation pace; total single-clock display time is step count times singleTransferDuration.
+// Presentation pace; CPU playback and the diagram share the route schedule below.
 export const singleFlowDuration = (playSpeed: number) => Math.max(4500, playSpeed * 9);
 export const singleTransferDuration = (pace: number) => pace * 1600 / 9000;
 export interface FlowStep {id: string; title: string; description: string; units: FlowUnit[]; routes: string[]}
@@ -96,7 +96,31 @@ export function buildInstructionFlow(item: TutorInstruction | undefined, frame: 
     taken: control?.taken, error: error?.has_error ? error : undefined, steps};
 }
 
-export type TransferUnit = FlowUnit | 'immediate' | 'mux' | 'operand-mux';
+export type TransferUnit = FlowUnit | 'immediate' | 'mux' | 'operand-mux' | 'decoder' | 'instruction-memory' | 'pc-select';
+
+// Decode the encoded bits, not the human-readable assembly operands.
+export function instructionFields(raw?: string | null) {
+  if (!raw || !/^0x[\da-f]{8}$/i.test(raw)) return undefined;
+  const word = Number.parseInt(raw, 16) >>> 0;
+  const opcode = word & 127;
+  const format = opcode === 0x33 ? 'R' : opcode === 0x23 ? 'S' : opcode === 0x63 ? 'B'
+    : opcode === 0x37 || opcode === 0x17 ? 'U' : opcode === 0x6f ? 'J'
+    : [0x03, 0x13, 0x67, 0x73, 0x0f].includes(opcode) ? 'I' : undefined;
+  if (!format) return undefined;
+  const sign = (value: number, bits: number) => (value << (32 - bits)) >> (32 - bits);
+  const immediate = format === 'I' ? word >> 20 : format === 'S' ? sign(((word >>> 25) << 5) | ((word >>> 7) & 31), 12)
+    : format === 'B' ? sign(((word >>> 31) << 12) | (((word >>> 7) & 1) << 11) | (((word >>> 25) & 63) << 5) | (((word >>> 8) & 15) << 1), 13)
+    : format === 'U' ? word & 0xfffff000
+    : format === 'J' ? sign(((word >>> 31) << 20) | (((word >>> 12) & 255) << 12) | (((word >>> 20) & 1) << 11) | (((word >>> 21) & 1023) << 1), 21) : undefined;
+  return {format, opcode: opcode.toString(2).padStart(7, '0'),
+    rd: ['R', 'I', 'U', 'J'].includes(format) ? (word >>> 7) & 31 : undefined,
+    rs1: ['R', 'I', 'S', 'B'].includes(format) ? (word >>> 15) & 31 : undefined,
+    rs2: ['R', 'S', 'B'].includes(format) ? (word >>> 20) & 31 : undefined,
+    funct3: ['R', 'I', 'S', 'B'].includes(format) ? ((word >>> 12) & 7).toString(2).padStart(3, '0') : undefined,
+    funct7: format === 'R' || (opcode === 0x13 && [1, 5].includes((word >>> 12) & 7)) ? (word >>> 25).toString(2).padStart(7, '0') : undefined,
+    shamt: opcode === 0x13 && [1, 5].includes((word >>> 12) & 7) ? (word >>> 20) & 31 : undefined,
+    immediate};
+}
 export interface InstructionTransfer {
   id: string; source: TransferUnit; target: TransferUnit; title: string;
   kind: 'address' | 'data' | 'control'; systemBus?: boolean; value?: string | null; detail: string;
@@ -124,23 +148,47 @@ export function pointOnTransfer(route:TransferRoute, progress:number, startPaddi
 export function transferPoint(path:string, progress:number, startPadding=0, endPadding=0) {
   return pointOnTransfer(compileTransferRoute(path),progress,startPadding,endPadding);
 }
-export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1):Record<string,string> {
+export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,scale=1,compact=false):Record<string,string> {
   const paths:Record<string,string>={
-    'fetch-address':'M360 192V245',
-    'fetch-instruction':'M515 273H670V395',
-    'decode-immediate':'M515 290H610V340H480V400',
-    'read-control':'M650 395V365H280V400',
-    'input-a':flow.pcRelative?'M460 167H700V375H90V550H290V690':'M230 510V550H290V690',
-    'input-b':flow.usesImmediate?'M440 470V534H610V608H440':'M330 510V534H610V608H440',
-    'mux-to-alu':'M440 608V690',
-    'memory-address':'M360 800V850',
-    'memory-control':'M670 503V836H660V895H500',
-    'store-data':'M225 510V534H130V895H220',
-    'load-data':'M360 936V954H560V1014H370',
-    'result-to-mux':flow.jump?'M460 167H700V375H90V820H130V954H560V1014H370':'M300 800V820H130V954H560V1014H370',
-    writeback:'M370 1014H90V455H180',
-    'next-pc':'M700 395V167H460',
+    'fetch-address':'M215 205H255V156H1010V185H1050',
+    'fetch-instruction':'M1050 235H750V230',
+    'decode-control':'M705 295V340',
+    'decode-immediate':'M450 295V340',
+    'read-control':'M320 295V318H180V340',
+    'input-a-register':'M315 435H335V480H650V520',
+    'input-a-pc':'M135 245V305H850V500H650V520',
+    'input-b-register':'M315 465H335V555H440',
+    'input-b-immediate':'M450 440V490H440V555',
+    'mux-to-alu':'M440 555H560V610H585',
+    'memory-address':'M825 575H940V540H1050',
+    'memory-control':'M825 395H980V605H1050',
+    'store-data':'M180 495V615H285V790H1010V665H1050',
+    'load-data':'M1050 690H960V775H550V710H440',
+    'result-alu':'M705 660V760H550V710H440',
+    'result-link':'M260 690H290V805H550V710H440',
+    'writeback':'M440 710H325V485H315',
+    'pc-input':'M135 245V280H30V695H55',
+    'pc-immediate':'M360 405H340V600H275V675H260',
+    'pc-alu':'M705 660V755H275V695H260',
+    'pc-control':'M580 410H560V630H150V640',
+    'branch-decision':'M705 520V485H800V460',
+    'alu-select-control':'M705 460V520',
+    'operand-select-control':'M580 430H550V505H505V515',
+    'register-write-control':'M580 385H550V315H280V340',
+    'write-select-control':'M825 430H845V735H530',
+    'next-pc':'M55 715H20V205H55',
   };
+  paths['input-a']=paths[flow.pcRelative?'input-a-pc':'input-a-register'];
+  paths['input-b']=paths[flow.usesImmediate?'input-b-immediate':'input-b-register'];
+  paths['result-to-mux']=paths[flow.jump?'result-link':'result-alu'];
+  if(compact) Object.assign(paths, {
+    'fetch-address':'M55 205H-20V975H55',
+    'fetch-instruction':'M55 1030H-45V310H770V230H750',
+    'memory-address':'M825 575H890V975H850',
+    'memory-control':'M825 395H920V1025H850',
+    'store-data':'M180 495V615H285V805H950V1090H850',
+    'load-data':'M550 1070H455V828H550V710H440',
+  });
   return Object.fromEntries(Object.entries(paths).map(([key,path])=>[key,path.replace(/([MHV])([^MHV]+)/g,(_,command:string,coordinates:string)=>{
     const values=coordinates.trim().split(/[ ,]+/).map(Number);
     return command+(command==='V'?values[0]:command==='H'?values[0]*scale:`${values[0]*scale} ${values[1]}`);
@@ -180,16 +228,18 @@ export function instructionFlowDuration(flow:ReturnType<typeof buildInstructionF
 }
 export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlow>): InstructionTransfer[] {
   const result: InstructionTransfer[] = [
-    {id:'fetch-address',source:'pc',target:'memory',title:'PC → 메모리',kind:'address',systemBus:true,value:flow.pc,detail:'읽을 명령어의 주소'},
-    {id:'fetch-instruction',source:'memory',target:'cu',title:'메모리 → CU',kind:'data',systemBus:true,value:flow.raw,detail:`명령어 ${flow.op.toUpperCase()}`},
+    {id:'fetch-address',source:'pc',target:'instruction-memory',title:'PC → 명령어 메모리',kind:'address',systemBus:true,value:flow.pc,detail:'PC가 읽을 명령어의 주소를 제공합니다.'},
+    {id:'fetch-instruction',source:'instruction-memory',target:'decoder',title:'명령어 메모리 → 해독 회로',kind:'data',systemBus:true,value:flow.raw,detail:'32비트 명령어에서 연산 종류와 레지스터 번호, 즉치값 필드를 구분합니다.'},
+    {id:'decode-control',source:'decoder',target:'cu',title:'명령어 해독 → CU',kind:'control',value:flow.op.toUpperCase(),detail:'opcode와 funct 필드를 해석해 연산과 제어 신호를 결정합니다.'},
+    {id:'pc-input',source:'pc',target:'pc-select',title:'PC → 다음 주소 회로',kind:'address',value:flow.pc,detail:'현재 PC를 바탕으로 순차 실행 주소 PC + 4를 계산합니다.'},
   ];
   if (flow.system) result.push({id:'environment',source:'cu',target:'cu',title:'CU · 실행 환경 요청',kind:'control',value:'ECALL',detail:'일반 메모리 전송이 아닌 실행 환경 서비스 요청'});
   else {
-    if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'memory',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:flow.raw,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
-    if(flow.registerInputs.length) result.push({id:'read-control',source:'cu',target:'registers',title:'CU → 레지스터 · 읽기 선택',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'읽을 레지스터 번호를 지정하는 제어 신호 · 연산 데이터가 아닙니다'});
+    if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'decoder',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:flow.raw,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
+    if(flow.registerInputs.length) result.push({id:'read-control',source:'decoder',target:'registers',title:'명령어 필드 → 레지스터 읽기 주소',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'rs1·rs2 필드가 읽을 레지스터 번호를 지정합니다. 레지스터의 값과 구분하세요.'});
     if(flow.pcRelative || flow.registerInputs.length) result.push({id:'input-a',source:flow.pcRelative?'pc':'registers',target:'alu',title:`${flow.pcRelative?'PC':'레지스터'} → ALU`,kind:'data',value:flow.input1,detail:'ALU 입력 A'});
-    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'operand-mux',title:`${flow.usesImmediate?'\uC989\uCE58\uAC12 \uC0DD\uC131\uAE30':'\uB808\uC9C0\uC2A4\uD130'} \u2192 \uC785\uB825 MUX`,kind:'data',value:flow.amount!=null?String(flow.amount):flow.input2,detail:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
-    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'mux-to-alu',source:'operand-mux',target:'alu',title:'\uC785\uB825 MUX \u2192 ALU',kind:'data',value:flow.amount!=null?String(flow.amount):flow.input2,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 ALU \uC785\uB825 B\uB85C \uC804\uB2EC'});
+    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'input-b',source:flow.usesImmediate?'immediate':'registers',target:'operand-mux',title:`${flow.usesImmediate?'\uC989\uCE58\uAC12 \uC0DD\uC131\uAE30':'\uB808\uC9C0\uC2A4\uD130'} \u2192 \uC785\uB825 MUX`,kind:'data',value:flow.amount!=null&&flow.usesImmediate?String(flow.amount):flow.input2,detail:flow.amount!=null&&!flow.usesImmediate?`rs2 \uC804\uCCB4 \uAC12 \uC804\uB2EC \u00b7 ALU\uB294 \uD558\uC704 5\uBE44\uD2B8\uB85C ${flow.amount}\uBE44\uD2B8 \uC774\uB3D9`:flow.amount!=null?'실제 비트 이동 크기': 'ALU 입력 B'});
+    if(flow.usesImmediate || flow.registerInputs.length>1) result.push({id:'mux-to-alu',source:'operand-mux',target:'alu',title:'\uC785\uB825 MUX \u2192 ALU',kind:'data',value:flow.amount!=null&&flow.usesImmediate?String(flow.amount):flow.input2,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 ALU \uC785\uB825 B\uB85C \uC804\uB2EC'});
     result.push({id:'calculate',source:'alu',target:'alu',title:flow.load||flow.store?'ALU · 메모리 주소 계산':flow.branch?'ALU · 분기 조건 비교':flow.jump?'이동할 주소 선택':`ALU · ${flow.op.toUpperCase()} 연산`,kind:'data',value:flow.branch?(flow.taken==null?undefined:flow.taken?'조건 성립':'조건 불성립'):flow.jump?flow.nextPc:flow.result,detail:flow.load||flow.store?'기준 주소 + 바이트 오프셋':flow.branch?'부호 해석과 분기 조건은 명령어에 따라 다릅니다':'관찰된 연산 결과'});
     if(flow.load||flow.store) {
       result.push({id:'memory-address',source:'alu',target:'memory',title:'ALU → 메모리',kind:'address',systemBus:true,value:flow.address,detail:'데이터를 읽거나 쓸 주소'});
@@ -200,9 +250,16 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
         else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'load-data',source:'memory',target:'mux',title:'\uBA54\uBAA8\uB9AC \u2192 \uAE30\uB85D\uAC12 MUX',kind:'data',systemBus:true,value:flow.writeValue,detail:'\uC77D\uC740 \uAC12\uC744 \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC'});
         else result.push({id:'discard-load',source:'memory',target:'memory',title:'메모리 읽기 결과 확인',kind:'data',value:flow.memoryValue,detail:flow.writes.length?'완료가 확인되지 않아 레지스터 기록을 표시하지 않습니다':'x0 기록은 버리지만 메모리 읽기는 수행합니다'});
       }
-    } else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'result-to-mux',source:flow.jump?'pc':'alu',target:'mux',title:`${flow.jump?'\uBCF5\uADC0 \uC8FC\uC18C':'ALU \uACB0\uACFC'} \u2192 \uAE30\uB85D\uAC12 MUX`,kind:'data',value:flow.writeValue,detail:flow.jump?'PC + 4\uB97C \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC':'\uC5F0\uC0B0 \uACB0\uACFC\uB97C \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC'});
+    } else if(flow.writes.length && (!flow.actual||flow.completed)) result.push({id:'result-to-mux',source:flow.jump?'pc-select':'alu',target:'mux',title:`${flow.jump?'\uBCF5\uADC0 \uC8FC\uC18C':'ALU \uACB0\uACFC'} \u2192 \uAE30\uB85D\uAC12 MUX`,kind:'data',value:flow.writeValue,detail:flow.jump?'PC + 4\uB97C \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC':'\uC5F0\uC0B0 \uACB0\uACFC\uB97C \uAE30\uB85D\uAC12 \uC120\uD0DD\uAE30\uB85C \uC804\uB2EC'});
   }
   if(!flow.store && flow.writes.length && !flow.error && (!flow.actual||flow.completed)) result.push({id:'writeback',source:'mux',target:'registers',title:`MUX \u2192 ${flow.writes.map(registerLabel).join(', ')}`,kind:'data',value:flow.writeValue,detail:'\uC120\uD0DD\uB41C \uAC12\uC744 \uBAA9\uC801\uC9C0 \uB808\uC9C0\uC2A4\uD130\uC5D0 \uAE30\uB85D'});
-  if(!flow.actual||flow.completed) result.push({id:'next-pc',source:'cu',target:'pc',title:'PC 주소 갱신',kind:'address',value:flow.nextPc,detail:'다음에 실행할 명령어의 주소'});
+  if(!flow.actual||flow.completed) {
+
+    if(flow.branch || flow.op === 'jal') result.push({id:'pc-immediate',source:'immediate',target:'pc-select',title:'즉치값 → 분기·점프 주소 계산',kind:'data',value:flow.immediate == null ? undefined : String(flow.immediate),detail:'분기와 JAL의 목적지는 현재 PC + 즉치값입니다.'});
+    if(flow.op === 'jalr') result.push({id:'pc-alu',source:'alu',target:'pc-select',title:'ALU → JALR 목적지',kind:'address',value:flow.result,detail:'rs1 + 즉치값의 최하위 비트를 0으로 만든 주소를 선택합니다.'});
+    if(flow.branch) result.push({id:'branch-decision',source:'alu',target:'cu',title:'비교 회로 → 분기 제어',kind:'control',value:flow.taken == null ? undefined : flow.taken ? '분기 성립' : '분기 불성립',detail:'레지스터 비교 결과를 바탕으로 CU가 다음 PC 선택을 제어합니다.'});
+    result.push({id:'pc-control',source:'cu',target:'pc-select',title:'CU → 다음 주소 선택',kind:'control',value:flow.branch ? (flow.taken == null ? undefined : flow.taken ? '분기 성립' : '분기 불성립') : flow.jump ? '점프' : 'PC + 4',detail:'명령어 종류와 분기 판정에 따라 순차 주소 또는 목적지를 선택합니다.'});
+    result.push({id:'next-pc',source:'pc-select',target:'pc',title:'다음 주소 회로 → PC',kind:'address',value:flow.nextPc,detail:'선택된 다음 명령어 주소를 PC에 기록합니다.'});
+  }
   return result;
 }
