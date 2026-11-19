@@ -78,9 +78,15 @@ const MainPage: React.FC = () => {
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
   const auth = useAuthSession();
-  const workspaceKey = JSON.stringify([fileMgr.translationSource, customAssembly, editorTarget, auth.epoch]);
+  const cWorkspaceKey = JSON.stringify([fileMgr.translationSource, auth.epoch]);
+  const asmWorkspaceKey = JSON.stringify([customAssembly, auth.epoch]);
+  const workspaceKey = editorTarget === "c" ? cWorkspaceKey : asmWorkspaceKey;
+
   const simSession = useSimulationSession({
     workspaceKey,
+    editorTarget,
+    cWorkspaceKey,
+    asmWorkspaceKey,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
     translationBusy: fileMgr.translationBusy,
@@ -353,9 +359,6 @@ const MainPage: React.FC = () => {
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
               setAssistantHint(null);
-              if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
-                playback.triggerPlaybackFeedback("reset");
-              }
               setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {

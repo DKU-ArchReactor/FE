@@ -296,7 +296,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 {layer.key === "IF" ? (
                   <svg
                     viewBox="0 0 500 180"
-                    preserveAspectRatio="none"
+                    preserveAspectRatio="xMidYMid meet"
                     className="w-full h-full select-none block font-sans"
                   >
                     <defs>
@@ -413,7 +413,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   ══════════════════════════════════════════════════════════════ */
                   <svg
                     viewBox="0 0 500 180"
-                    preserveAspectRatio="none"
+                    preserveAspectRatio="xMidYMid meet"
                     className="w-full h-full select-none block font-sans"
                   >
                     {/* 상단 버퍼에서 들어오는 입력선 */}
@@ -515,7 +515,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   ══════════════════════════════════════════════════════════════ */
                   <svg
                     viewBox="0 0 500 180"
-                    preserveAspectRatio="none"
+                    preserveAspectRatio="xMidYMid meet"
                     className="w-full h-full select-none block font-sans"
                   >
                     {/* ID/EX 버퍼에서 내려오는 Operand A (rs1) 입력 */}
@@ -615,7 +615,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   ══════════════════════════════════════════════════════════════ */
                   <svg
                     viewBox="0 0 500 120"
-                    preserveAspectRatio="none"
+                    preserveAspectRatio="xMidYMid meet"
                     className="w-full h-full select-none block font-sans"
                   >
                     {/* EX/MEM 버퍼에서 내려오는 ALU Result 화살표 */}
@@ -671,7 +671,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   ══════════════════════════════════════════════════════════════ */
                   <svg
                     viewBox="0 0 500 120"
-                    preserveAspectRatio="none"
+                    preserveAspectRatio="xMidYMid meet"
                     className="w-full h-full select-none block font-sans"
                   >
                     {/* MEM/WB 버퍼에서 내려오는 두 입력선 (Bypass vs Read Data) */}
