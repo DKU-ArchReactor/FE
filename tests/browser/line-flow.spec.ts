@@ -45,22 +45,18 @@ test('all device boxes and all available wires stay identical across instruction
   }
 });
 
-test('memory panels match, available height is used, and extra wiring stays optional and persistent',async({page})=>{
+test('memory panels match and the diagram uses its height without removed controls or footnotes',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
   for(const size of [{width:1400,height:900},{width:760,height:1000}]) {
     await page.setViewportSize(size);await page.clock.runFor(32);
     const geometry=await page.locator('svg[data-layout]').evaluate(svg=>{
       const first=svg.querySelector<SVGGElement>('[data-flow-node="instruction-memory"]')!,second=svg.querySelector<SVGGElement>('[data-flow-node="memory"]')!;
-      return {equalSize:first.dataset.width===second.dataset.width&&first.dataset.height===second.dataset.height,
-        bottomGap:svg.getBoundingClientRect().bottom-svg.querySelector('[data-diagram-bottom]')!.getBoundingClientRect().bottom};
+      const bottom=Math.max(...Array.from(svg.querySelectorAll('[data-hardware-region]')).map(n=>n.getBoundingClientRect().bottom));
+      return {equalSize:first.dataset.width===second.dataset.width&&first.dataset.height===second.dataset.height,bottomGap:svg.getBoundingClientRect().bottom-bottom};
     });expect(geometry.equalSize).toBe(true);expect(geometry.bottomGap).toBeLessThan(24);
   }
-  const all=page.locator('[data-circuit-wire]'),visible=page.locator('[data-wire-visible="true"]');
-  expect(await visible.count()).toBeLessThan(await all.count());
-  const toggle=page.locator('[data-connection-toggle]');await toggle.focus();await toggle.press('Enter');
-  await expect(toggle).toHaveAttribute('aria-pressed','true');expect(await visible.count()).toBe(await all.count());
-  await page.getByRole('button',{name:'next clock',exact:true}).click();await expect(page.locator('[data-connection-toggle]')).toHaveAttribute('aria-pressed','true');
-  await page.locator('[data-connection-toggle]').click();expect(await visible.count()).toBeLessThan(await all.count());
+  await expect(page.locator('[data-connection-toggle]')).toHaveCount(0);
+  await expect(page.locator('[data-diagram-bottom]')).toHaveCount(0);
 });
 
 test('a load decodes its actual encoded fields, selects registers by fields and sends opcode to CU',async({page})=>{
@@ -72,6 +68,27 @@ test('a load decodes its actual encoded fields, selects registers by fields and 
   await seek(page,'read-control');await expect(page.locator('[data-flow-node="decoder"]')).toHaveAttribute('data-flow-active','true');
   await expect(page.locator('[data-flow-node="registers"] [data-device-status]')).toHaveAttribute('data-device-status','도착');
   await expect(page.locator('[data-transfer]')).toContainText('rs1·rs2 필드');
+});
+
+test('supplementary actions stay below the diagram and instructions, register alignment and operation labels are explicit',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
+  await expect(page.locator('[data-current-instruction]')).toContainText('lw a5,-4(s0)');
+  await expect(page.getByRole('button',{name:'전체 상태',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'전체 연결 표시 전환',exact:true})).toHaveCount(0);
+  const alignment=await page.locator('[data-register-width]').evaluate(text=>{
+    const node=text.closest<SVGGElement>('[data-flow-node]')!;
+    return text.getAttribute('text-anchor')==='middle'&&Number(text.getAttribute('x'))===Number(node.dataset.x)+Number(node.dataset.width)/2;
+  });expect(alignment).toBe(true);
+  const footer=page.locator('[data-supplementary-explanations]');await expect(footer).toContainText('보충 설명');
+  const diagram=await page.locator('svg[data-layout]').boundingBox(),supplement=await footer.boundingBox();expect(supplement!.y).toBeGreaterThanOrEqual(diagram!.y+diagram!.height-1);
+  await expect(page.locator('[data-flow-node="alu"] > text').first()).toHaveText('ALU');
+  await seek(page,'decode-immediate');await expect(page.locator('[data-transfer-value]')).toHaveText('0xFFC');
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(250);
+  const first=await page.locator('.flow-packet').getAttribute('data-packet-y');await page.clock.runFor(250);expect(await page.locator('.flow-packet').getAttribute('data-packet-y')).not.toBe(first);await pause(page);
+  await seek(page,'calculate');await expect(page.locator('[data-flow-node="alu"] [data-device-status]')).toHaveAttribute('data-device-status','주소 계산');
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(550);
+  await expect(page.locator('[data-transfer]')).toHaveAttribute('data-transfer','memory-address');await expect(page.locator('.flow-packet')).toBeVisible();
+  await expect(page.locator('[data-flow-node="alu"] [data-device-status]')).toHaveAttribute('data-device-status','주소 전달');
 });
 
 test('actual operands and results remain visible as device inputs and outputs',async({page})=>{
@@ -100,6 +117,8 @@ test('large hardware details show real addition, selectable carry bits, PC compo
   await page.getByRole('button',{name:'ALU 내부',exact:true}).click();
   const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await expect(dialog.locator('[data-numeric-equation]')).toContainText('11 + 7 → 18');
   await expect(dialog).toContainText('전가산기');await page.getByLabel('가산기 비트 구간').selectOption('1');await expect(dialog.getByRole('columnheader',{name:'15',exact:true})).toBeVisible();
+  await dialog.getByText('전가산기 한 개 자세히',{exact:true}).click();await page.getByLabel('전가산기 비트 선택').selectOption('1');
+  await expect(dialog.locator('[data-full-adder]')).toContainText('1 XOR 1 XOR 1 = 1');await expect(dialog.locator('[data-full-adder]')).toContainText('2번 자리로 전달');
   expect(await dialog.locator('[data-alu-formula]').evaluate(n=>parseFloat(getComputedStyle(n).fontSize))).toBeGreaterThanOrEqual(24);
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
   await page.getByRole('button',{name:'PC 회로',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('PC 선택 MUX');await expect(page.getByRole('dialog')).toContainText('0x00010040');

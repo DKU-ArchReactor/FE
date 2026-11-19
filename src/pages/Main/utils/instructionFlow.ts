@@ -121,6 +121,14 @@ export function instructionFields(raw?: string | null) {
     shamt: opcode === 0x13 && [1, 5].includes((word >>> 12) & 7) ? (word >>> 20) & 31 : undefined,
     immediate};
 }
+export function immediateField(raw?: string | null) {
+  const decoded=instructionFields(raw);
+  if(!decoded || decoded.format==='R')return undefined;
+  if(!raw)return undefined;
+  const word=Number.parseInt(raw.slice(2),16)>>>0;
+  const packed=decoded.format==='I'?word>>>20:decoded.format==='S'||decoded.format==='B'?((word>>>25)<<5)|((word>>>7)&31):word>>>12;
+  return {format:decoded.format,width:['I','S','B'].includes(decoded.format)?12:20,value:`0x${packed.toString(16).toUpperCase()}`};
+}
 export interface InstructionTransfer {
   id: string; source: TransferUnit; target: TransferUnit; title: string;
   kind: 'address' | 'data' | 'control'; systemBus?: boolean; value?: string | null; detail: string;
@@ -153,11 +161,11 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
     'fetch-address':'M245 220H285V150H1150V250H1200',
     'fetch-instruction':'M1200 330H1030V282H825',
     'decode-control':'M780 355V375H825V390',
-    'decode-immediate':'M540 355V375H510V390',
+    'decode-immediate':'M375 355V500H415',
     'read-control':'M380 355V370H195V390',
-    'input-a-register':'M335 480H375V590H770V625',
+    'input-a-register':'M315 480H375V590H770V625',
     'input-a-pc':'M150 265V340H1030V585H770V625',
-    'input-b-register':'M335 520H390V700H525',
+    'input-b-register':'M315 520H390V700H525',
     'input-b-immediate':'M510 505V575H525V700',
     'mux-to-alu':'M525 700H650V735H710',
     'memory-address':'M1010 680H1135V745H1200',
@@ -166,7 +174,7 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
     'load-data':'M1200 885H1135V1015H675V940H525',
     'result-alu':'M860 830V990H675V940H525',
     'result-link':'M295 925H345V1040H675V940H525',
-    'writeback':'M525 940H355V540H335',
+    'writeback':'M525 940H355V540H315',
     'pc-input':'M150 265V340H-40V925H55',
     'pc-immediate':'M415 445H365V815H320V895H295',
     'pc-base':'M195 600V800H320V925H295',
@@ -202,8 +210,8 @@ export function transferMotion(transfer:InstructionTransfer,path?:string) {
   // but join consecutive MUX transfers at the device center without a position jump.
   const commands=path?.match(/[MHV]/g)??[];
   const portPadding=(horizontal:boolean)=>horizontal?width/2+6:26;
-  const startPadding=route?(transfer.source==='mux'||transfer.source==='operand-mux'?0:portPadding(commands[1]==='H')):0;
-  const endPadding=route?(transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
+  const startPadding=route?(transfer.id==='decode-immediate'?26:transfer.source==='mux'||transfer.source==='operand-mux'?0:portPadding(commands[1]==='H')):0;
+  const endPadding=route?(transfer.id==='decode-immediate'?26:transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
   return {value,width,route,startPadding,endPadding,distance};
 }
@@ -217,7 +225,7 @@ export function transferTimeline(transfers:InstructionTransfer[],paths:Record<st
     const minimum=base*(transfer.id==='decode-immediate'?1.1:1);
     const lead=motion.route?minimum*.05:0;
     const travel=motion.route?Math.max(minimum*.875,Math.min(base*(transfer.kind==='control'?.95:1.5),base*.875*motion.distance/195)):0;
-    const duration=motion.route?lead+travel+minimum*.075:base*(transfer.kind==='control'?.9:.8);
+    const duration=motion.route?lead+travel+minimum*.075:base*(transfer.id==='calculate'?.35:transfer.kind==='control'?.9:.8);
     const entry={start,duration,lead,travel,motion};
     start+=duration;
     return entry;
@@ -235,7 +243,7 @@ export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlo
   ];
   if (flow.system) result.push({id:'environment',source:'cu',target:'cu',title:'CU · 실행 환경 요청',kind:'control',value:'ECALL',detail:'일반 메모리 전송이 아닌 실행 환경 서비스 요청'});
   else {
-    if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'decoder',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:flow.raw,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
+    if(flow.usesImmediate||flow.branch) result.push({id:'decode-immediate',source:'decoder',target:'immediate',title:'\uBA85\uB839\uC5B4 \u2192 Imm Gen',kind:'data',value:immediateField(flow.raw)?.value,detail:'\uBA85\uB839\uC5B4 \uBE44\uD2B8\uC5D0\uC11C \uC989\uCE58\uAC12\uC744 \uCD94\uCD9C\uD558\uACE0 32\uBE44\uD2B8\uB85C \uD655\uC7A5'});
     if(flow.jump) result.push({id:'pc-immediate',source:'immediate',target:'pc-select',title:'즉치값 → 분기·점프 주소 계산',kind:'data',value:flow.immediate == null ? undefined : String(flow.immediate),detail:'분기와 JAL의 목적지는 현재 PC + 즉치값입니다.'});
     if(flow.registerInputs.length) result.push({id:'read-control',source:'decoder',target:'registers',title:'명령어 필드 → 레지스터 읽기 주소',kind:'control',value:flow.registerInputs.map(value=>registerLabel(value.name)).join(', '),detail:'rs1·rs2 필드가 읽을 레지스터 번호를 지정합니다. 레지스터의 값과 구분하세요.'});
     if(flow.op==='jalr') result.push({id:'pc-base',source:'registers',target:'pc-select',title:'레지스터 → JALR 기준 주소',kind:'data',value:flow.registerInputs[0]?.value,detail:'rs1의 값을 목적지 주소 가산기에 제공합니다. 일반 ALU 결과 필드와 구분합니다.'});

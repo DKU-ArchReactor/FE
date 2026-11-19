@@ -8,6 +8,7 @@ const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
 const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline,instructionFlowDuration} = exports;
 const {instructionFields} = exports;
+const {immediateField}=exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
   global_result: {registers: {x10: '0x0000000C'}, metrics: {accumulated_instructions: 1}},
@@ -15,6 +16,18 @@ const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_er
     registers: {rs1: {name: 'a1', num: 11, value: '0x00000005'}, rs2: {name: 'a2', num: 12, value: '0x00000007'}, rd: {num: 10, write_data: '0x0000000C'}},
     instruction: {op}, control_signals: {reg_write: true}, data_memory: {}}});
 const simulation = current => ({simulator: {mode: 'single'}, initial_state: {registers: {}, metrics: {accumulated_instructions: 0}}, history: [current]});
+
+test('Imm Gen receives packed instruction fields with a visible route rather than a stationary full word',()=>{
+  for(const [raw,value,width] of [['0xFFC42783','0xFFC',12],['0x00642223','0x4',12],['0x80000537','0x80000',20],['0x008000EF','0x800',20]]) {
+    assert.equal(immediateField(raw).value,value);assert.equal(immediateField(raw).width,width);
+  }
+  assert.equal(immediateField('0x00F707B3'),undefined);assert.equal(immediateField(undefined),undefined);
+  const current=frame('lw');current.datapath.instruction.raw='0xFFC42783';
+  const flow=buildInstructionFlow(item('lw',['x8'],['x15']),current,null,simulation(current));
+  const transfers=instructionTransfers(flow),index=transfers.findIndex(t=>t.id==='decode-immediate');
+  const route=transferTimeline(transfers,instructionPaths(flow),9000)[index];
+  assert.equal(transfers[index].value,'0xFFC');assert.ok(route.motion.distance>100);
+});
 
 test('real RV32 encodings decode R/I/S/B/U/J fields, negative offsets and shift funct bits', () => {
   const cases = [
@@ -198,7 +211,7 @@ test('short connections stay readable and long returns use a bounded quicker sch
     const transfers=instructionTransfers(flow);
     const timeline=transferTimeline(transfers,instructionPaths(flow),9000);
     for(const entry of timeline) {
-      assert.ok(entry.duration>=840-1e-9);
+      if(transfers[timeline.indexOf(entry)].id==='calculate')assert.ok(entry.duration>=300&&entry.duration<=600);else assert.ok(entry.duration>=840-1e-9);
       assert.ok(entry.duration<=2200);
       if(entry.motion.route) assert.ok(entry.travel>=1050-1e-9);
     }

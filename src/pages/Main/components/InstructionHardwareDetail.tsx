@@ -20,12 +20,14 @@ export default function InstructionHardwareDetail({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [byte, setByte] = useState(0);
+  const [bitIndex, setBitIndex] = useState(0);
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
   const lesson = aluLesson(flow),
     bits = adderBits(flow.input1, flow.input2, flow.op === "sub");
   const decoded = instructionFields(flow.raw);
+  const selectedBit = bits?.[bitIndex];
   const specialEncoding =
     decoded && ["1110011", "0001111"].includes(decoded.opcode);
   const card =
@@ -250,6 +252,80 @@ export default function InstructionHardwareDetail({
                   <br />
                   올림 출력 = (A AND B) OR (올림 입력 AND (A XOR B))
                 </p>
+                {selectedBit && (
+                  <details className="group mt-4 rounded-xl border border-[var(--ar-border)] p-3 open:bg-[var(--ar-panel-bg)]">
+                    <summary className="cursor-pointer rounded-lg px-2 py-1 font-semibold group-open:text-[var(--ar-accent)]">
+                      전가산기 한 개 자세히
+                    </summary>
+                    <div className="space-y-3 pt-3" data-full-adder="true">
+                      <label className="text-sm">
+                        선택할 자리{" "}
+                        <select
+                          aria-label="전가산기 비트 선택"
+                          value={bitIndex}
+                          onChange={(event) =>
+                            setBitIndex(Number(event.target.value))
+                          }
+                          className="ml-2 rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] p-2"
+                        >
+                          {Array.from({ length: 32 }, (_, i) => (
+                            <option key={i} value={i}>
+                              {i}번 비트
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        {[
+                          ["A", selectedBit.a],
+                          [flow.op === "sub" ? "~B" : "B", selectedBit.b],
+                          ["올림 입력", selectedBit.carryIn],
+                        ].map(([label, value]) => (
+                          <div
+                            key={label}
+                            className="rounded-lg border border-[var(--ar-border)] p-2"
+                          >
+                            <p className="text-sm">{label}</p>
+                            <p className="font-mono text-xl font-bold">
+                              {value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="rounded-xl border-2 border-[var(--ar-accent)] p-4">
+                        <h4 className="text-center font-bold">
+                          {bitIndex}번 전가산기
+                        </h4>
+                        <p className="mt-2 break-words font-mono">
+                          {selectedBit.a} XOR {selectedBit.b} XOR{" "}
+                          {selectedBit.carryIn} = {selectedBit.sum}
+                        </p>
+                        <p className="mt-2 text-sm">
+                          세 입력 중 1의 개수가 홀수면 합 비트가 1입니다. 1이 두
+                          개 이상이면 올림 출력이 1입니다.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-center">
+                        <div className="rounded-lg bg-[var(--ar-header-bg)] p-3">
+                          <p>결과의 {bitIndex}번 비트</p>
+                          <p className="font-mono text-xl font-bold">
+                            {selectedBit.sum}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-[var(--ar-header-bg)] p-3">
+                          <p>
+                            {bitIndex === 31
+                              ? "32비트 밖의 올림"
+                              : `${bitIndex + 1}번 자리로 전달`}
+                          </p>
+                          <p className="font-mono text-xl font-bold">
+                            {selectedBit.carryOut}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+                )}
               </section>
             )}
             {lesson.category === "shift" && flow.amount != null && (

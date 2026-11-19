@@ -4,6 +4,7 @@ import {
   numericPc,
   registerLabel,
   instructionFields,
+  immediateField,
   instructionPaths,
   pointOnTransfer,
   transferMotion,
@@ -20,7 +21,7 @@ const COLORS = { address: "#bc700a", data: "#087fce", control: "#8951ce" };
 const BOXES: Record<TransferUnit, Box> = {
   pc: { x: 55, y: 175, w: 190, h: 120 },
   decoder: { x: 335, y: 175, w: 490, h: 180 },
-  registers: { x: 55, y: 390, w: 280, h: 210 },
+  registers: { x: 35, y: 390, w: 280, h: 210 },
   immediate: { x: 415, y: 390, w: 190, h: 125 },
   cu: { x: 690, y: 390, w: 270, h: 180 },
   "operand-mux": { x: 420, y: 625, w: 210, h: 100 },
@@ -33,11 +34,11 @@ const BOXES: Record<TransferUnit, Box> = {
 const TITLES: Record<TransferUnit, string> = {
   pc: "PC",
   decoder: "명령어 해독",
-  cu: "CU · 제어 장치",
+  cu: "CU",
   registers: "레지스터 파일",
   immediate: "Imm Gen",
   "operand-mux": "입력 MUX",
-  alu: "ALU · 연산 장치",
+  alu: "ALU",
   mux: "기록값 MUX",
   "pc-select": "PC 가산·선택",
   "instruction-memory": "명령어 메모리",
@@ -129,9 +130,6 @@ export default function InstructionFlowDiagram({
     verticalScale: 1,
   });
   const sy = (value: number) => value * verticalScale;
-  const [allConnections, setAllConnections] = useState(
-    () => sessionStorage.getItem("single-all-connections") === "true",
-  );
   const usedPaths = useMemo(
     () =>
       new Set(
@@ -149,13 +147,8 @@ export default function InstructionFlowDiagram({
       ),
     [flow],
   );
-  const toggleConnections = () =>
-    setAllConnections((previous) => {
-      sessionStorage.setItem("single-all-connections", String(!previous));
-      return !previous;
-    });
   const showWire = (key: string) =>
-    allConnections || (usedPaths.has(key) && !AUXILIARY_CONNECTIONS.has(key));
+    usedPaths.has(key) && !AUXILIARY_CONNECTIONS.has(key);
   useLayoutEffect(() => {
     const element = area.current;
     if (!element) return;
@@ -167,7 +160,7 @@ export default function InstructionFlowDiagram({
         Math.max(
           1,
           (height * (compact ? 1470 : 1830)) /
-            (width * (compact ? 1460 : 1120)),
+            (width * (compact ? 1408 : 1080)),
         ),
       );
       setCanvas((previous) =>
@@ -238,11 +231,13 @@ export default function InstructionFlowDiagram({
   const offset = flow.immediate ?? decoded?.immediate;
   const addressFormula = `${baseName ?? "rs1"} ${offset == null ? "+ imm" : offset < 0 ? `− ${Math.abs(offset)}` : `+ ${offset}`}`;
   const detailText =
-    (flow.load || flow.store) && transfer.id === "memory-address"
-      ? `ALU가 ${addressFormula}로 계산한 주소를 Address Bus로 보냅니다.`
-      : flow.store && transfer.id === "store-data"
-        ? `${storeName ?? "rs2"}의 하위 ${flow.width}비트를 Data Bus로 보냅니다. CU가 메모리 쓰기를 제어합니다.`
-        : transfer.detail;
+    transfer.id === "decode-immediate"
+      ? `${immediateField(flow.raw)?.format ?? ""}형 즉치 필드를 전달하고, Imm Gen에서 비트를 조합·확장합니다.`
+      : (flow.load || flow.store) && transfer.id === "memory-address"
+        ? `ALU가 ${addressFormula}로 계산한 주소를 Address Bus로 보냅니다.`
+        : flow.store && transfer.id === "store-data"
+          ? `${storeName ?? "rs2"}의 하위 ${flow.width}비트를 Data Bus로 보냅니다. CU가 메모리 쓰기를 제어합니다.`
+          : transfer.detail;
   const specialEncoding =
     decoded && ["1110011", "0001111"].includes(decoded.opcode);
   const signal = (value?: boolean) =>
@@ -365,13 +360,28 @@ export default function InstructionFlowDiagram({
       active = transfer.source === unit || transfer.target === unit;
     const status =
       transfer.source === unit && transfer.target === unit
-        ? "처리 중"
-        : transfer.source === unit
-          ? "출발"
-          : transfer.target === unit
-            ? "도착"
-            : "";
+        ? unit === "alu"
+          ? flow.load || flow.store
+            ? "주소 계산"
+            : flow.branch
+              ? "조건 비교"
+              : `${flow.op.toUpperCase()} 연산`
+          : unit === "pc-select"
+            ? "주소 선택"
+            : flow.system
+              ? "환경 요청"
+              : "읽기 확인"
+        : transfer.id === "memory-address" && unit === "alu"
+          ? "주소 전달"
+          : transfer.id === "memory-address" && unit === "memory"
+            ? "주소 수신"
+            : transfer.source === unit
+              ? "출발"
+              : transfer.target === unit
+                ? "도착"
+                : "";
     const mux = unit === "mux" || unit === "operand-mux";
+    const statusWidth = Math.max(58, [...status].length * 18 + 20);
     const stroke = active
       ? color
       : unit === "registers"
@@ -450,6 +460,28 @@ export default function InstructionFlowDiagram({
             strokeWidth={active ? 3 : 1.5}
           />
         )}
+        {[
+          "cu",
+          "decoder",
+          "memory",
+          "instruction-memory",
+          "immediate",
+        ].includes(unit) && (
+          <g
+            aria-hidden="true"
+            stroke={stroke}
+            strokeWidth="1.5"
+            opacity=".65"
+            data-hardware-pins="true"
+          >
+            {[0.32, 0.5, 0.68].map((position) => (
+              <path
+                key={position}
+                d={`M${b.x - 7} ${b.y + b.h * position}h7M${b.x + b.w} ${b.y + b.h * position}h7`}
+              />
+            ))}
+          </g>
+        )}
         <text
           x={b.x + b.w / 2}
           y={b.y + sy(unit === "alu" ? 53 : mux ? 33 : 40)}
@@ -463,18 +495,18 @@ export default function InstructionFlowDiagram({
         {status && (
           <g data-device-status={status}>
             <rect
-              x={b.x + b.w - 58}
-              y={b.y - sy(19)}
-              width="58"
-              height={sy(23)}
+              x={b.x + b.w - statusWidth}
+              y={b.y - sy(24)}
+              width={statusWidth}
+              height={sy(28)}
               rx="5"
               fill={color}
             />
             <text
-              x={b.x + b.w - 29}
-              y={b.y - sy(3)}
+              x={b.x + b.w - statusWidth / 2}
+              y={b.y - sy(4)}
               textAnchor="middle"
-              fontSize="14"
+              fontSize="18"
               fontWeight="750"
               fill="white"
             >
@@ -501,8 +533,10 @@ export default function InstructionFlowDiagram({
         )}
         {unit === "registers" && (
           <text
-            x={b.x + 14}
+            data-register-width="true"
+            x={b.x + b.w / 2}
             y={b.y + sy(91)}
+            textAnchor="middle"
             fontSize="18"
             fontWeight="700"
             fill={stroke}
@@ -603,7 +637,7 @@ export default function InstructionFlowDiagram({
     <div ref={area} className="h-full min-h-0 w-full min-w-0 overflow-hidden">
       <svg
         viewBox={
-          compact ? `-210 0 1470 ${sy(1460)}` : `-210 0 1830 ${sy(1120)}`
+          compact ? `-210 0 1470 ${sy(1408)}` : `-210 0 1830 ${sy(1080)}`
         }
         preserveAspectRatio="xMidYMin meet"
         className="ar-single-flow-diagram block h-full w-full font-sans"
@@ -682,7 +716,7 @@ export default function InstructionFlowDiagram({
               d={paths[wire.key]}
               fill="none"
               stroke={COLORS[wire.kind]}
-              strokeOpacity={allConnections ? 0.32 : 0.19}
+              strokeOpacity=".19"
               strokeWidth={wire.system ? 5 : 2.5}
               strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
               strokeLinejoin="round"
@@ -784,62 +818,8 @@ export default function InstructionFlowDiagram({
           <text x="36" y={sy(91)} fontSize="16" fill="var(--ar-text-muted)">
             {detailText}
           </text>
-          <g
-            role="button"
-            tabIndex={0}
-            aria-label="전체 연결 표시 전환"
-            aria-pressed={allConnections}
-            data-connection-toggle="true"
-            onClick={toggleConnections}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                toggleConnections();
-              }
-            }}
-            className="cursor-pointer outline-none focus-visible:drop-shadow-md"
-          >
-            <rect
-              x={compact ? 905 : 1300}
-              y={sy(47)}
-              width="220"
-              height={sy(34)}
-              rx="7"
-              fill="var(--ar-panel-bg)"
-              stroke="var(--ar-border)"
-            />
-            <text
-              x={compact ? 1015 : 1410}
-              y={sy(70)}
-              textAnchor="middle"
-              fontSize="18"
-              fontWeight="700"
-              fill="var(--ar-text-primary)"
-            >
-              {allConnections
-                ? "\uC8FC\uC694 \uC5F0\uACB0\uB9CC \uBCF4\uAE30"
-                : "\uC804\uCCB4 \uC5F0\uACB0 \uBCF4\uAE30"}
-            </text>
-          </g>
         </g>
-        <text
-          x="28"
-          y={sy(compact ? 1430 : 1085)}
-          fontSize="15"
-          fill="var(--ar-text-muted)"
-        >
-          하버드형 교육 모델 · 주요 연결 표시 · 전체 연결 보기로 보조 배선 확인
-        </text>
-        <text
-          x="28"
-          y={sy(compact ? 1455 : 1110)}
-          data-diagram-bottom="true"
-          fontSize="15"
-          fill="var(--ar-text-muted)"
-        >
-          한 클록 내부 동작을 느리게 재생합니다. 실제 칩 배치·버스 중재·전파
-          시간을 재현한 그림은 아닙니다.
-        </text>
+
         {point && packet && (
           <g className="flow-token">
             <g
