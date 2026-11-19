@@ -9,10 +9,10 @@ const ASM_TEMPLATES = [
     code: `# RISC-V 32IM 기본 산술 연산 예제
 .globl main
 main:
-    addi x1, x0, 10      # x1 = 10
-    addi x2, x0, 20      # x2 = 20
-    add  x3, x1, x2      # x3 = x1 + x2 (30)
-    sub  x4, x3, x1      # x4 = x3 - x1 (20)
+    addi t0, zero, 10    # t0 = 10
+    addi t1, zero, 20    # t1 = 20
+    add  t2, t0, t1      # t2 = t0 + t1 (30)
+    sub  a0, t2, t0      # a0 = t2 - t0 (반환값: 20)
     ret
 `,
   },
@@ -22,13 +22,14 @@ main:
     code: `# RISC-V 32IM 루프 카운터 예제
 .globl main
 main:
-    addi x1, x0, 0       # x1 (sum) = 0
-    addi x2, x0, 1       # x2 (i) = 1
-    addi x3, x0, 6       # x3 (limit) = 6
+    addi t0, zero, 0     # t0 (sum) = 0
+    addi t1, zero, 1     # t1 (i) = 1
+    addi t2, zero, 6     # t2 (limit) = 6
 loop:
-    add  x1, x1, x2      # sum += i
-    addi x2, x2, 1       # i++
-    bne  x2, x3, loop    # if i != 6 goto loop
+    add  t0, t0, t1      # sum += i
+    addi t1, t1, 1       # i++
+    bne  t1, t2, loop    # if i != 6 goto loop
+    addi a0, t0, 0       # a0 = sum (반환값: 15)
     ret
 `,
   },
@@ -39,9 +40,9 @@ loop:
 .globl main
 main:
     addi sp, sp, -16     # 스택 프레임 16바이트 할당
-    addi x5, x0, 42      # x5 = 42
-    sw   x5, 8(sp)       # sp + 8 주소에 x5 저장
-    lw   x6, 8(sp)       # sp + 8 주소에서 x6로 로드
+    addi t0, zero, 42    # t0 = 42
+    sw   t0, 8(sp)       # sp + 8 주소에 t0 저장
+    lw   a0, 8(sp)       # sp + 8 주소에서 a0로 로드 (반환값: 42)
     addi sp, sp, 16      # 스택 복원
     ret
 `,
