@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   displayValue,
   numericPc,
+  registerLabel,
   instructionFields,
   instructionPaths,
   pointOnTransfer,
@@ -226,6 +227,22 @@ export default function InstructionFlowDiagram({
   const reached = (key: string) =>
     arrived.includes(key) || (transfer.id === key && progress >= 0.95);
   const decoded = instructionFields(flow.raw);
+  const baseName =
+    decoded?.rs1 == null
+      ? undefined
+      : registerLabel(`x${decoded.rs1}`).split(" ")[0];
+  const storeName =
+    decoded?.rs2 == null
+      ? undefined
+      : registerLabel(`x${decoded.rs2}`).split(" ")[0];
+  const offset = flow.immediate ?? decoded?.immediate;
+  const addressFormula = `${baseName ?? "rs1"} ${offset == null ? "+ imm" : offset < 0 ? `− ${Math.abs(offset)}` : `+ ${offset}`}`;
+  const detailText =
+    (flow.load || flow.store) && transfer.id === "memory-address"
+      ? `ALU가 ${addressFormula}로 계산한 주소를 Address Bus로 보냅니다.`
+      : flow.store && transfer.id === "store-data"
+        ? `${storeName ?? "rs2"}의 하위 ${flow.width}비트를 Data Bus로 보냅니다. CU가 메모리 쓰기를 제어합니다.`
+        : transfer.detail;
   const specialEncoding =
     decoded && ["1110011", "0001111"].includes(decoded.opcode);
   const signal = (value?: boolean) =>
@@ -256,7 +273,8 @@ export default function InstructionFlowDiagram({
     ],
     registers: [
       ...flow.registerInputs.map(
-        (input) => `${input.name}: ${short(input.value)}`,
+        (input) =>
+          `${registerLabel(input.name).split(" ")[0]}: ${short(input.value)}`,
       ),
       hasWrite
         ? reached("writeback")
@@ -326,7 +344,7 @@ export default function InstructionFlowDiagram({
         ? [
             `주소 ${reached("memory-address") ? (flow.address ?? "미제공") : "전달 대기"}`,
             `${flow.width / 8}바이트 ${flow.load ? "읽기" : "쓰기"}`,
-            `값 ${reached("load-data") || reached("store-data") || reached("discard-load") ? short(flow.memoryValue) : "전달 대기"}`,
+            `${flow.store ? (storeName ?? "rs2") : "값"} ${reached("load-data") || reached("store-data") || reached("discard-load") ? `→ ${short(flow.memoryValue)}` : "전달 대기"}`,
             flow.error
               ? "접근 오류 · 성공값 미표시"
               : flow.load && flow.width < 32
@@ -473,9 +491,11 @@ export default function InstructionFlowDiagram({
             fill="var(--ar-text-muted)"
           >
             {unit === "alu"
-              ? lesson.category === "adder"
-                ? `가산기 · A ${lesson.operator} B`
-                : lesson.unit
+              ? flow.load || flow.store
+                ? `주소 = ${addressFormula}`
+                : lesson.category === "adder"
+                  ? `가산기 · A ${lesson.operator} B`
+                  : lesson.unit
               : ROLES[unit]}
           </text>
         )}
@@ -762,7 +782,7 @@ export default function InstructionFlowDiagram({
                 : displayValue(transfer.value)}
           </text>
           <text x="36" y={sy(91)} fontSize="16" fill="var(--ar-text-muted)">
-            {transfer.detail}
+            {detailText}
           </text>
           <g
             role="button"

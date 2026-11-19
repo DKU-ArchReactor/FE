@@ -13,7 +13,7 @@ const geometry = new URLSearchParams(location.search).get('geometry');
 const cases: Record<string, {text: string; reads: string[]; writes: string[]}> = {
   add: {text:'add a5,a4,a5',reads:['x14','x15'],writes:['x15']},
   lw: {text:'lw a5,-4(s0)',reads:['x8'],writes:['x15']},
-  sw: {text:'sw a5,-4(s0)',reads:['x15','x8'],writes:[]},
+  sw: {text:'sw t1,4(s0)',reads:['x6','x8'],writes:[]},
   bne: {text:'bne a4,a5,8',reads:['x14','x15'],writes:[]},
   jal: {text:'jal ra,8',reads:[],writes:['x1']},
   ecall: {text:'ecall',reads:[],writes:[]},
@@ -26,7 +26,7 @@ if (geometry && cases[geometry]) {
   const variant=cases[geometry];
   item.text=variant.text;
   item.explanation={...item.explanation,opcode:geometry,reads:variant.reads,writes:variant.writes};
-  const encodings: Record<string,string> = {add:'0x00F707B3',lw:'0xFFC42783',sw:'0xFEF42E23',bne:'0x00F71463',jal:'0x008000EF',ecall:'0x00000073',sra:'0x40F757B3',srai:'0x40275793',jalr:'0x008780E7'};
+  const encodings: Record<string,string> = {add:'0x00F707B3',lw:'0xFFC42783',sw:'0x00642223',bne:'0x00F71463',jal:'0x008000EF',ecall:'0x00000073',sra:'0x40F757B3',srai:'0x40275793',jalr:'0x008780E7'};
   dp.instruction.raw=encodings[geometry];
   dp.control_signals={...dp.control_signals,reg_write:variant.writes.length>0,mem_read:geometry==='lw',mem_write:geometry==='sw'};
   dp.alu.input_1='0x80000000';dp.alu.input_2='0x7FFFFFFF';dp.alu.result='0xFFFFFFFF';
@@ -40,6 +40,12 @@ if (geometry && cases[geometry]) {
     dp.alu.input_2='0xFFFFFFFC';dp.alu.result='0x7FFFFFFC';
     dp.registers.rs1={name:'s0',num:8,value:'0x80000000'};
     dp.registers.rs2=geometry==='sw'?{name:'a5',num:15,value:'0xFFFFFFFF'}:null;
+  }
+  if(geometry==='sw') {
+    dp.alu={...dp.alu,input_1:'0x00002000',input_2:'0x00000004',result:'0x00002004'};
+    dp.registers.rs1={name:'s0',num:8,value:'0x00002000'};
+    dp.registers.rs2={name:'t1',num:6,value:'0x12345678'};
+    dp.immediate={dec:4};dp.data_memory={address:'0x00002004',write_data:'0x12345678'};
   }
   if(geometry==='sra'||geometry==='srai') {
     dp.alu.input_2='0x00000402';dp.alu.result='0xE0000000';

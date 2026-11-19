@@ -117,6 +117,16 @@ test('jump address explanation keeps CORE ALU placeholders separate from real PC
   await page.getByRole('button',{name:'ALU 내부',exact:true}).click();await expect(page.getByRole('dialog').locator('[data-numeric-equation]')).toHaveCount(0);await expect(page.getByRole('dialog')).toContainText('PC 주소 연산');
 });
 
+test('reference store example distinguishes the ALU address from the register data on its buses',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=sw');await pause(page);
+  await expect(page.locator('[data-flow-node="registers"]')).toContainText('t1:');await expect(page.locator('[data-flow-node="registers"]')).toContainText('s0:');
+  await expect(page.locator('[data-flow-node="alu"]')).toContainText('s0 + 4');
+  await seek(page,'memory-address');await expect(page.locator('[data-transfer-value]')).toHaveText('0x00002004');await expect(page.locator('[data-transfer]')).toContainText('Address Bus');
+  await seek(page,'store-data');await expect(page.locator('[data-transfer-value]')).toHaveText('305419896 · 0x12345678');await expect(page.locator('[data-transfer]')).toContainText('t1');await expect(page.locator('[data-transfer]')).toContainText('Data Bus');
+  await page.getByRole('button',{name:'ALU 내부',exact:true}).click();const dialog=page.getByRole('dialog');
+  await expect(dialog.getByLabel('주소와 데이터의 구분')).toContainText('0x00002004');await expect(dialog.getByLabel('주소와 데이터의 구분')).toContainText('0x12345678');
+});
+
 test('load and store use distinct bus directions; arithmetic does not access data memory',async({page})=>{
   await frozenTime(page);
   for(const op of ['add','lw','sw','ecall']) {

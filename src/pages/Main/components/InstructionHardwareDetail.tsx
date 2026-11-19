@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   displayValue,
   instructionFields,
+  registerLabel,
   numericPc,
   type buildInstructionFlow,
 } from "../utils/instructionFlow";
@@ -84,6 +85,33 @@ export default function InstructionHardwareDetail({
                 </div>
               ))}
             </div>
+            {(flow.load || flow.store) && (
+              <div
+                className="grid gap-3 sm:grid-cols-2"
+                aria-label="주소와 데이터의 구분"
+              >
+                <div className={card}>
+                  <h3 className="font-bold">Address Bus · 접근할 위치</h3>
+                  <p className="mt-2 break-all font-mono text-xl font-bold">
+                    {flow.address ?? "미제공"}
+                  </p>
+                  <p>기준 레지스터 + 오프셋으로 계산한 주소입니다.</p>
+                </div>
+                <div className={card}>
+                  <h3 className="font-bold">
+                    Data Bus · {flow.store ? "저장할 값" : "읽은 값"}
+                  </h3>
+                  <p className="mt-2 break-words font-mono text-xl font-bold">
+                    {displayValue(flow.memoryValue)}
+                  </p>
+                  <p>
+                    {flow.store
+                      ? "주소 자체와 저장할 데이터는 서로 다릅니다. Store는 레지스터에 결과를 쓰지 않습니다."
+                      : "메모리에서 읽은 값이 레지스터 기록 경로로 돌아옵니다."}
+                  </p>
+                </div>
+              </div>
+            )}
             <div className={card}>
               <p className="font-bold text-[var(--ar-accent)]">
                 선택된 연산부 · {lesson.unit}
@@ -268,6 +296,11 @@ export default function InstructionHardwareDetail({
               <p className="text-sm font-semibold">
                 명령어 메모리에서 받은 32비트
               </p>
+              <p className="mt-2 text-base">
+                IR(명령어 레지스터)은 현재 명령어를 보관해 해독 회로에 제공하는
+                역할입니다. 이 화면은 CORE가 제공한 현재 명령어 비트를 표시하며,
+                별도의 IR 래치나 저장 시점까지 재현하지 않습니다.
+              </p>
               <p className="mt-2 font-mono text-2xl font-bold">
                 {flow.raw ?? "미제공"}
               </p>
@@ -292,21 +325,21 @@ export default function InstructionHardwareDetail({
                       "rd · 비트 11~7",
                       specialEncoding || decoded.rd == null
                         ? undefined
-                        : `x${decoded.rd}`,
+                        : registerLabel(`x${decoded.rd}`),
                       "결과를 기록할 레지스터 번호입니다.",
                     ],
                     [
                       "rs1 · 비트 19~15",
                       specialEncoding || decoded.rs1 == null
                         ? undefined
-                        : `x${decoded.rs1}`,
+                        : registerLabel(`x${decoded.rs1}`),
                       "첫 입력 레지스터 번호입니다. 그 레지스터에 저장된 값 자체와 구분하세요.",
                     ],
                     [
                       "rs2 · 비트 24~20",
                       specialEncoding || decoded.rs2 == null
                         ? undefined
-                        : `x${decoded.rs2}`,
+                        : registerLabel(`x${decoded.rs2}`),
                       "두 번째 입력 레지스터 번호입니다.",
                     ],
                     [
