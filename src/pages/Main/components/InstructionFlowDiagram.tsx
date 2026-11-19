@@ -138,8 +138,8 @@ export default function InstructionFlowDiagram({
     pc: { x: 260, y: 132, w: 200, h: 60 },
     instruction: { x: 205, y: 245, w: 310, h: 76 },
     registers: { x: 180, y: 380, w: 210, h: 110 },
-    immediate: { x: 400, y: 380, w: 160, h: 70 },
-    cu: { x: 580, y: 365, w: 180, h: 108 },
+    immediate: { x: 425, y: 380, w: 160, h: 70 },
+    cu: { x: 625, y: 365, w: 145, h: 108 },
     alu: { x: 220, y: 594, w: 280, h: 110 },
     memory: { x: 220, y: 754, w: 280, h: 90 },
   } satisfies Record<string, Box>;
