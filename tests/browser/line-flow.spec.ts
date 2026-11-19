@@ -18,6 +18,7 @@ test('the vertical circuit and memory-bus role labels fit without scrolling at d
     });
     expect(bounds).toEqual([]);
     await expect(svg).toHaveAttribute('data-layout','vertical-datapath');
+    await expect(svg.locator('[data-instruction-address-label]')).toContainText('\uBA85\uB839\uC5B4 \uC8FC\uC18C (PC)');
     await expect(svg.getByRole('button',{name:'Instruction Memory 흐름 선택'})).toBeVisible();
     await expect(svg.getByRole('button',{name:'Data Memory 흐름 선택'})).toBeVisible();
     await expect(svg.getByLabel('ALU 입력 선택')).toBeVisible();
@@ -184,7 +185,7 @@ test('node text, payloads and system-bus labels remain readable in every transfe
 });
 
 
-test('register selection asserts control without a travelling data packet',async ({page})=>{
+test('register selection sends a distinct moving control signal',async ({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html');
   await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
   for(let i=0;i<2;i++)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
@@ -193,7 +194,8 @@ test('register selection asserts control without a travelling data packet',async
   await page.clock.runFor(900);
   await page.setViewportSize({width:760,height:1000});await page.clock.runFor(32);
   await expect(page.locator('[data-transfer="read-control"]')).toBeVisible();
-  await expect(page.locator('.flow-packet,.flow-data-word,.flow-data-trail')).toHaveCount(0);
+  await expect(page.locator('.flow-data-word,.flow-data-trail')).toHaveCount(0);
+  await expect(page.locator('.flow-control-word')).toContainText('Read x14, x15');
   await expect(page.locator('[data-flow-node="registers"]')).toContainText('\uB3C4\uCC29');
 });
 
@@ -295,4 +297,23 @@ test('data labels stay visible on both sides of MUXes and beside memory througho
     }
   }
   expect([...observed].sort()).toEqual(['decode-immediate','input-b','load-data','mux-to-alu','result-to-mux','writeback'].sort());
+});
+
+
+test('short immediate and MUX links show their value on the first frame without relocating the text mid-transfer',async ({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');
+  await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  for(const id of ['decode-immediate','input-b','mux-to-alu']) {
+    while(await page.locator('[data-transfer]').getAttribute('data-transfer')!==id)await page.getByRole('button',{name:'\uB2E4\uC74C \uD750\uB984',exact:true}).click();
+    const word=page.locator('.flow-data-word');
+    await expect(word).toBeVisible();await expect(page.locator('[data-flow-marker]')).toBeVisible();
+    const box=await word.locator('rect').evaluate(rect=>({x:rect.getAttribute('x'),y:rect.getAttribute('y')}));
+    const startY=await word.getAttribute('data-packet-y');
+    const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+    await page.getByRole('button',{name:'\uD750\uB984 \uC7AC\uC0DD',exact:true}).click();await page.clock.runFor(duration*.5);
+    await expect(word).toBeVisible();await expect(page.locator('[data-flow-marker]')).toBeVisible();
+    expect(await word.locator('rect').evaluate(rect=>({x:rect.getAttribute('x'),y:rect.getAttribute('y')}))).toEqual(box);
+    expect(await word.getAttribute('data-packet-y')).not.toBe(startY);
+    await page.getByRole('button',{name:'\uD750\uB984 \uC77C\uC2DC\uC815\uC9C0',exact:true}).click();
+  }
 });

@@ -152,14 +152,22 @@ export default function InstructionFlowDiagram({
   ) as Record<keyof typeof baseBoxes, Box>;
   const obstacles = [
     ...Object.values(boxes),
+    { x: sx(388), y: 208, w: sx(150), h: 28 },
+    { x: sx(55), y: 198, w: sx(140), h: 90 },
     { x: sx(290), y: 860, w: sx(160), h: 48 },
     { x: sx(410), y: 502, w: sx(60), h: 32 },
     ...(flow.registerInputs.length
       ? [{ x: sx(60), y: 338, w: sx(230), h: 30 }]
       : []),
   ];
-  const packetBox = point
-    ? placeFlowLabel(point, packetWidth, obstacles, viewWidth)
+  // Short links use a stable callout so routing around a MUX cannot make text jump
+  // between opposite sides of the wire. The marker still follows the real path.
+  const labelAnchor =
+    route && ["decode-immediate", "input-b", "mux-to-alu"].includes(transfer.id)
+      ? pointOnTransfer(route, 0.5, startPadding, endPadding)
+      : point;
+  const packetBox = labelAnchor
+    ? placeFlowLabel(labelAnchor, packetWidth, obstacles, viewWidth)
     : undefined;
   const node = (
     unit: TransferUnit,
@@ -510,7 +518,11 @@ export default function InstructionFlowDiagram({
         )}
         {trail && (
           <path
-            className="flow-data-trail"
+            className={
+              transfer.kind === "control"
+                ? "flow-control-trail"
+                : "flow-data-trail"
+            }
             d={trail}
             fill="none"
             stroke={color}
@@ -527,7 +539,6 @@ export default function InstructionFlowDiagram({
               strokeWidth="1.6"
               fill="none"
             />
-            <circle cx={point.x} cy={point.y} r="4" fill={color} />
           </g>
         )}
         {node("pc", boxes.pc, "PC", [flow.pc ?? "미제공"])}
@@ -633,9 +644,26 @@ export default function InstructionFlowDiagram({
           </text>
         </g>
         <g data-text-layer="true">
-          <text x={sx(460)} y="223" fontSize="14" fill={COLORS.address}>
-            명령어 주소
-          </text>
+          <g data-instruction-address-label="true">
+            <title>PC가 명령어 메모리에 전달하는, 읽을 명령어의 주소입니다.</title>
+            <rect
+              x={sx(388)}
+              y="208"
+              width={sx(150)}
+              height="28"
+              rx="5"
+              fill="var(--ar-panel-bg)"
+            />
+            <text
+              x={sx(400)}
+              y="227"
+              fontSize="16"
+              fontWeight="650"
+              fill={COLORS.address}
+            >
+              명령어 주소 (PC)
+            </text>
+          </g>
           <text x={sx(560)} y="322" fontSize="13" fill={COLORS.data}>
             명령어
           </text>
@@ -648,14 +676,14 @@ export default function InstructionFlowDiagram({
             {(["address", "data", "control"] as const).map((kind, i) => (
               <g key={kind} data-system-bus-label={kind}>
                 <path
-                  d={`M${sx(55)} ${257 + i * 30}H${sx(78)}`}
+                  d={`M${sx(55)} ${212 + i * 30}H${sx(78)}`}
                   stroke={COLORS[kind]}
                   strokeWidth={kind === "control" ? 2 : 5}
                   strokeDasharray={kind === "control" ? "5 3" : undefined}
                 />
                 <text
                   x={sx(87)}
-                  y={262 + i * 30}
+                  y={217 + i * 30}
                   fontSize="14"
                   fontWeight="600"
                   className="font-mono"
@@ -732,36 +760,57 @@ export default function InstructionFlowDiagram({
           </text>
         </g>
         {point && packetBox && (
-          <g
-            className="flow-data-word flow-packet"
-            data-moving-value={packetValue}
-            data-packet-x={point.x}
-            data-packet-y={point.y}
-            aria-label={`이동 중인 값 ${packetValue}`}
-          >
-            <rect
-              x={packetBox.x}
-              y={packetBox.y}
-              width={packetBox.w}
-              height={packetBox.h}
-              rx="6"
+          <g className="flow-token">
+            <circle
+              data-flow-marker="true"
+              cx={point.x}
+              cy={point.y}
+              r="4"
               fill={color}
-              stroke="var(--ar-panel-bg)"
-              strokeWidth="1"
-              style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
             />
-            <text
-              x={packetBox.x + packetBox.w / 2}
-              y={packetBox.y + 23}
-              textAnchor="middle"
-              fontSize="19"
-              fontWeight="750"
-              className="font-mono"
-              fill="#fff"
-              style={{ fontVariantNumeric: "tabular-nums" }}
+            <g
+              className={
+                transfer.kind === "control"
+                  ? "flow-control-word flow-packet"
+                  : "flow-data-word flow-packet"
+              }
+              data-label-kind={transfer.kind}
+              data-moving-value={packetValue}
+              data-packet-x={point.x}
+              data-packet-y={point.y}
+              aria-label={`${transfer.kind === "control" ? "제어 신호" : "이동 중인 값"} ${packetValue}`}
             >
-              {packetValue}
-            </text>
+              <rect
+                x={packetBox.x}
+                y={packetBox.y}
+                width={packetBox.w}
+                height={packetBox.h}
+                rx="6"
+                fill={
+                  transfer.kind === "control" ? "var(--ar-panel-bg)" : color
+                }
+                stroke={
+                  transfer.kind === "control" ? color : "var(--ar-panel-bg)"
+                }
+                strokeWidth={transfer.kind === "control" ? 1.8 : 1}
+                strokeDasharray={
+                  transfer.kind === "control" ? "5 3" : undefined
+                }
+                style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
+              />
+              <text
+                x={packetBox.x + packetBox.w / 2}
+                y={packetBox.y + 23}
+                textAnchor="middle"
+                fontSize="19"
+                fontWeight="750"
+                className="font-mono"
+                fill={transfer.kind === "control" ? color : "#fff"}
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {packetValue}
+              </text>
+            </g>
           </g>
         )}
       </svg>

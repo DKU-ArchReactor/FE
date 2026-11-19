@@ -150,13 +150,13 @@ test('short connections stay readable and long returns use a bounded quicker sch
     const timeline=transferTimeline(transfers,instructionPaths(flow),9000);
     for(const entry of timeline) {
       assert.ok(entry.duration>=840-1e-9);
-      assert.ok(entry.duration<=2040);
+      assert.ok(entry.duration<=2200);
       if(entry.motion.route) assert.ok(entry.travel>=1050-1e-9);
     }
     assert.ok(Math.abs(instructionFlowDuration(flow,9000)-timeline.at(-1).start-timeline.at(-1).duration)<1e-9);
     const input=timeline[transfers.findIndex(transfer=>transfer.id==='input-a')];
-    if(input&&!flow.pcRelative) assert.ok(input.duration>=1200&&input.duration<1400);
-    for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') assert.equal(timeline[index].travel,0);
+    if(input&&!flow.pcRelative) assert.ok(input.duration>=1200&&input.duration<1500);
+    for(const [index,transfer] of transfers.entries()) if(transfer.kind==='control') assert.equal(timeline[index].travel>0,Boolean(instructionPaths(flow)[transfer.id]));
   }
 });
 

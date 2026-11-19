@@ -147,9 +147,9 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
   })]));
 }
 export function transferMotion(transfer:InstructionTransfer,path?:string) {
-  const value=transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
+  const value=transfer.kind==='control'?(transfer.id==='read-control'?`Read ${[...(transfer.value??'').matchAll(/\bx\d+\b/g)].map(match=>match[0]).join(', ')||transfer.value||'\uC81C\uC5B4'}`:transfer.value??'\uC81C\uC5B4 \uC2E0\uD638'):transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
   const width=Math.max(56,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?18:11),28));
-  const route=path&&transfer.kind!=='control'?compileTransferRoute(path):undefined;
+  const route=path?compileTransferRoute(path):undefined;
   // The value label can sit off the wire, so short MUX links need only a small port inset.
   const startPadding=route?Math.min(6,route.total*.1):0;
   const endPadding=startPadding;
@@ -159,13 +159,13 @@ export function transferMotion(transfer:InstructionTransfer,path?:string) {
 // Keep short connections readable, but cap long returns instead of making one
 // instruction take tens of seconds. The CPU playback uses this same schedule.
 export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,pace:number) {
-  const base=singleTransferDuration(pace)*.75;
+  const base=singleTransferDuration(pace)*.81;
   let start=0;
   return transfers.map(transfer=>{
     const motion=transferMotion(transfer,paths[transfer.id]);
     const minimum=base*(transfer.id==='decode-immediate'?1.1:1);
     const lead=motion.route?minimum*.05:0;
-    const travel=motion.route?Math.max(minimum*.875,Math.min(base*1.5,base*.875*motion.distance/195)):0;
+    const travel=motion.route?Math.max(minimum*.875,Math.min(base*(transfer.kind==='control'?.95:1.5),base*.875*motion.distance/195)):0;
     const duration=motion.route?lead+travel+minimum*.075:base*(transfer.kind==='control'?.9:.8);
     const entry={start,duration,lead,travel,motion};
     start+=duration;
@@ -176,6 +176,7 @@ export type FlowLabelBox={x:number;y:number;w:number;h:number};
 export function placeFlowLabel(point:{x:number;y:number},width:number,obstacles:FlowLabelBox[],viewWidth:number):FlowLabelBox {
   const offsets=[[0,0],[0,-42],[0,42],[-width/2-22,0],[width/2+22,0],[0,-76],[0,76],[-width/2-22,-42],[width/2+22,-42],[-width/2-22,42],[width/2+22,42],[0,-112],[0,112]];
   for(const obstacle of obstacles) {
+    for(const dy of [-12,12]) offsets.push([obstacle.x-width/2-point.x-10,dy],[obstacle.x+obstacle.w+width/2-point.x+10,dy]);
     offsets.push([obstacle.x-width/2-point.x-10,0],[obstacle.x+obstacle.w+width/2-point.x+10,0],[0,obstacle.y-point.y-26],[0,obstacle.y+obstacle.h-point.y+26]);
   }
   const boxes=offsets.map(([dx,dy])=>({x:Math.max(8,Math.min(viewWidth-width-8,point.x-width/2+dx)),y:Math.max(122,Math.min(910,point.y-16+dy)),w:width,h:32}));
