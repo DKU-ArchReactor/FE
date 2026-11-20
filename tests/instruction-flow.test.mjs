@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../src/pages/Main/utils/instructionFlow.ts'
 const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
 const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline,instructionFlowDuration} = exports;
-const {instructionFields} = exports;
+const {instructionFields,instructionCycleForPc} = exports;
 const {immediateField,transferMotion}=exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
@@ -309,4 +309,16 @@ test('input MUX output reaches the slanted ALU boundary and keeps space outside 
     assert.match(path,/H690/);
     assert.ok(transferMotion({...transfer,value:'0x80000000'},path).distance>200);
   }
+});
+
+
+test('ASM selection uses an execution occurrence, never the source row number',()=>{
+ const history=[{datapath:{pc:'0x1000'}},{datapath:{pc:'0x2000'}},{datapath:{pc:'0x2000'}},{datapath:{pc:'0x100C'}}];
+ assert.equal(instructionCycleForPc(history,'0x2000',1),2);
+ assert.equal(instructionCycleForPc(history,'0x2000',2),2);
+ assert.equal(instructionCycleForPc(history,'0x2000',3),3);
+ assert.equal(instructionCycleForPc(history,'0x2000',4),2);
+ assert.equal(instructionCycleForPc(history,'0x100C',1),4);
+ assert.equal(instructionCycleForPc(history,'0x3000',1),undefined);
+ assert.equal(instructionCycleForPc(history,'not-a-pc',1),undefined);
 });

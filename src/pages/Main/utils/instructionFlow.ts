@@ -15,6 +15,14 @@ export const numericPc = (value?: string | null) => value && /^0x[\da-f]+$/i.tes
 export function instructionPc(frame: CycleHistoryItem | null) {
   return frame?.datapath?.pc ?? frame?.stage_activity?.IF?.pc ?? frame?.buffers?.IF?.pc ?? frame?.if_stage?.pc;
 }
+export function instructionCycleForPc(history: CycleHistoryItem[], pc: string, currentCycle: number) {
+  const address = numericPc(pc);
+  if (!Number.isFinite(address)) return undefined;
+  const matches = (frame: CycleHistoryItem) => numericPc(instructionPc(frame)) === address;
+  let index = history.findIndex((frame, index) => index >= Math.max(0, currentCycle - 1) && matches(frame));
+  if (index < 0) index = history.findIndex(matches);
+  return index < 0 ? undefined : index + 1;
+}
 export function displayValue(value?: string | null): string {
   if (value == null) return '미제공';
   if (!/^0x[\da-f]{1,8}$/i.test(value)) return value;

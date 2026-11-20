@@ -17,6 +17,7 @@ import { useSimulationSession } from "./hooks/useSimulationSession";
 import { useFileManager } from "./hooks/useFileManager";
 import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
 import { getLearningExample } from "@/data/learningExamples";
+import { instructionCycleForPc } from "./utils/instructionFlow";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
   "# RISC-V 32IM 어셈블리 직접 작성",
@@ -159,11 +160,17 @@ const MainPage: React.FC = () => {
     asmIndex: number | null = null,
     openTutorModal: boolean = asmIndex !== null
   ) => {
-    if (line !== null) {
+    if (line !== null || (simSession.isSingleEngine && asmIndex !== null)) {
       playback.setIsPlaying((prev) => {
         if (prev) playback.triggerPlaybackFeedback("pause");
         return false;
       });
+    }
+    if (simSession.isSingleEngine && asmIndex !== null) {
+      const pc = simSession.mappedAssemblyRows[asmIndex]?.pc;
+      const history = simSession.simulationData?.history;
+      const cycle = pc && history ? instructionCycleForPc(history, pc, playback.currentCycle) : undefined;
+      if (cycle !== undefined) playback.handleJumpToCycle(cycle);
     }
     setTranslationSelectedLine(line);
     setTranslationSelectedAsmIndex(asmIndex);

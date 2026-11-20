@@ -889,7 +889,7 @@ export default function InstructionFlowDiagram({
             <text
               x={compact ? 35 : 1200}
               y={sy(compact ? 1080 : 515)}
-              fontSize="19"
+              fontSize="25"
               fontWeight="800"
               fill="var(--ar-text-primary)"
             >
@@ -901,24 +901,24 @@ export default function InstructionFlowDiagram({
                   d={
                     compact
                       ? `M${35 + i * 340} ${sy(1100)}h28`
-                      : `M1205 ${sy(550 + i * 36)}H1240`
+                      : `M1205 ${sy(550 + i * 46)}H1240`
                   }
                   stroke={COLORS[kind]}
-                  strokeWidth={kind === "control" ? 2.5 : 5}
+                  strokeWidth={kind === "control" ? 4 : 6}
                   strokeDasharray={kind === "control" ? "5 4" : undefined}
                 />
                 <text
                   x={compact ? 75 + i * 340 : 1255}
-                  y={sy(compact ? 1106 : 556 + i * 36)}
-                  fontSize={compact ? 15 : 17}
-                  fontWeight="700"
+                  y={sy(compact ? 1106 : 557 + i * 46)}
+                  fontSize="26"
+                  fontWeight="800"
                   fill={COLORS[kind]}
                 >
                   {kind === "address"
-                    ? "Address Bus · 주소"
+                    ? "Address Bus"
                     : kind === "data"
-                      ? "Data Bus · 값·명령어"
-                      : "Control Bus · 읽기·쓰기"}
+                      ? "Data Bus"
+                      : "Control Bus"}
                 </text>
               </g>
             ))}

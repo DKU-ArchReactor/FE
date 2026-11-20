@@ -13,6 +13,19 @@ async function seek(page: Page, id: string) {
   throw new Error(`Transfer not found: ${id}`);
 }
 
+test('bus legend uses readable English labels in wide and compact layouts',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
+  for(const size of [{width:1400,height:900},{width:760,height:1000}]) {
+    await page.setViewportSize(size);await page.clock.runFor(32);
+    for(const label of ['Address Bus','Data Bus','Control Bus']) {
+      const text=page.locator('[data-bus-legend] text').filter({hasText:new RegExp(`^${label}$`)});
+      await expect(text).toBeVisible();
+      const box=await text.boundingBox();expect(box!.height).toBeGreaterThan(11);
+      expect(await text.getAttribute('font-size')).toBe('26');
+    }
+  }
+});
+
 test('changing speed preserves the current transfer and its position while playing or paused',async({page})=>{
   await page.goto('/tests/browser/line-flow.html?timing=1');await page.waitForLoadState('networkidle');await frozenTime(page);
   for(const paused of [false,true]) {
