@@ -256,18 +256,69 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
           </p>
         </div>
       ) : !simulationData || traceRows.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-[#57606A] dark:text-[#858585] gap-1.5 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
-          <span className="text-xl">📊</span>
-          <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-            {isSingleMode
-              ? '시뮬레이션을 실행하면 싱글사이클 직렬 실행 타이밍 다이어그램이 생성됩니다'
-              : '시뮬레이션을 실행하면 계단식 파이프라인 타이밍 다이어그램이 생성됩니다'}
-          </span>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585]">
-            {isSingleMode
-              ? '스텝별 각 명령어의 직렬 완료 단계(DONE)를 한눈에 추적합니다.'
-              : '사이클별 각 명령어의 진행 단계(IF·ID·EX·MEM·WB)와 버블(BBL)/스톨(STL) 발생 위치를 한눈에 추적합니다.'}
-          </span>
+        <div className="flex-1 min-h-0 flex relative select-none bg-white dark:bg-[#1E1E1E]">
+          {/* 좌측 고정 명령어 열 (빈 개형: 5개 행에 '—' 대시) */}
+          <div
+            className="shrink-0 flex flex-col bg-white dark:bg-[#1E1E1E] overflow-hidden"
+            style={{ width: `${LEFT_COL_WIDTH}px` }}
+          >
+            <div className="h-7 shrink-0 px-2 flex items-center border-b border-[#E5E5E5] dark:border-[#333333] bg-[#F3F3F3] dark:bg-[#252526] text-[10px] font-bold text-[#57606A] dark:text-[#858585] border-l-3 border-l-transparent">
+              <span className="shrink-0 w-6 mr-4" />
+              <span>Instruction</span>
+            </div>
+            <div className="flex flex-col">
+              {[0, 1, 2, 3, 4].map((idx) => (
+                <div
+                  key={idx}
+                  className="h-7 shrink-0 px-2 flex items-center justify-between border-b border-[#F0F0F0] dark:border-[#2A2A2A] text-xs font-mono select-none"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[10px] text-[var(--ar-text-muted)] w-4 text-right">—</span>
+                    <span className="text-[11px] text-[var(--ar-text-muted)]">—</span>
+                  </div>
+                  <span className="text-[10px] text-[var(--ar-text-muted)]">—</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 세로 구분선 */}
+          <div className="w-[1px] shrink-0 bg-[#E5E5E5] dark:bg-[#333333] z-20" />
+
+          {/* 우측 빈 사이클 그리드 개형 */}
+          <div className="flex-1 min-w-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
+            <div className="flex flex-col">
+              {/* 상단 사이클 번호 헤더 행 (대시 '—' 8열) */}
+              <div className="h-7 shrink-0 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] bg-[#F3F3F3] dark:bg-[#252526]">
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((cIdx) => (
+                  <div
+                    key={cIdx}
+                    className="shrink-0 flex items-center justify-center font-mono text-[10px] font-semibold border-r border-[#E5E5E5] dark:border-[#333333] text-[var(--ar-text-muted)]"
+                    style={{ width: `${COL_WIDTH}px` }}
+                  >
+                    —
+                  </div>
+                ))}
+              </div>
+              {/* 본문 빈 격자 행 (5행 x 8열) */}
+              {[0, 1, 2, 3, 4].map((rIdx) => (
+                <div
+                  key={rIdx}
+                  className="h-7 shrink-0 flex items-stretch border-b border-[#F0F0F0] dark:border-[#2A2A2A]"
+                >
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((cIdx) => (
+                    <div
+                      key={cIdx}
+                      className="shrink-0 border-r border-[#F0F0F0] dark:border-[#2A2A2A] flex items-center justify-center text-[9px] text-[var(--ar-text-muted)]/40 font-mono"
+                      style={{ width: `${COL_WIDTH}px` }}
+                    >
+                      ·
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="flex-1 min-h-0 flex relative select-none bg-white dark:bg-[#1E1E1E]">

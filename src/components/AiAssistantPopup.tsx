@@ -47,22 +47,104 @@ const QUESTION_EXAMPLES = [
   { label: '🔍 코드·실행 비교', question: '작성 중인 코드와 첨부 실행이 같은 코드인지 확인 가능한지 먼저 말하고, 확인되는 범위에서 실행 상태를 설명해줘. 코드나 실행 정보가 부족하면 필요한 자료를 요청하고, 코드가 비슷하다는 이유만으로 같은 실행이라고 단정하지 마.' },
 ];
 
-const POPUP_WIDTH = 380;
-const POPUP_HEIGHT = 500;
+const DEFAULT_POPUP_WIDTH = 480;
+const DEFAULT_POPUP_HEIGHT = 570;
+const MIN_POPUP_WIDTH = 480;
+const MIN_POPUP_HEIGHT = 570;
+
+// 사이트 글로벌 헤더의 하단 경계(px) 계산
+export const getSiteHeaderBottom = () => {
+  if (typeof document === "undefined") return 48;
+  const siteHeader = document.querySelector("header.sticky") || document.querySelector("header");
+  if (siteHeader) {
+    const rect = siteHeader.getBoundingClientRect();
+    return Math.max(48, Math.round(rect.bottom));
+  }
+  return 48;
+};
+
+type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+const getResizeCursor = (dir: ResizeDirection): string => {
+  switch (dir) {
+    case 'n':
+    case 's':
+      return 'ns-resize';
+    case 'e':
+    case 'w':
+      return 'ew-resize';
+    case 'ne':
+    case 'sw':
+      return 'nesw-resize';
+    case 'nw':
+    case 'se':
+      return 'nwse-resize';
+  }
+};
 
 export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, inline = false, authenticated, simulation, currentData, mode, beforeExecution, editorLanguage = 'c', editorContent = '', sourceSelection }) => {
   const isSingle = mode === "single";
-  // 1. 위치 및 드래그 상태 관리
+  // 1. 위치, 크기 및 조작(이동/리사이즈/애니메이션) 상태 관리
+  const [size, setSize] = useState<{ width: number; height: number }>({
+    width: DEFAULT_POPUP_WIDTH,
+    height: DEFAULT_POPUP_HEIGHT,
+  });
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [resizingDirection, setResizingDirection] = useState<ResizeDirection | null>(null);
+  const [isSmoothTransition, setIsSmoothTransition] = useState(false);
   // 첫 오픈 시에만 드롭 애니메이션을 실행하고, 드래그&드롭 등 이후 조작 시에는 재실행 방지
   const [hasAnimated, setHasAnimated] = useState(false);
+
+  const transitionTimerRef = useRef<number | null>(null);
+
+  const triggerSmoothChange = (nextSize: { width: number; height: number }, nextPos: { x: number; y: number }) => {
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+    }
+    setIsSmoothTransition(true);
+    setSize(nextSize);
+    setPosition(nextPos);
+    transitionTimerRef.current = window.setTimeout(() => {
+      setIsSmoothTransition(false);
+      transitionTimerRef.current = null;
+    }, 320);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current !== null) {
+        window.clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, []);
+
+  const sizeRef = useRef(size);
+  useEffect(() => {
+    sizeRef.current = size;
+  }, [size]);
 
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; posX: number; posY: number }>({
     mouseX: 0,
     mouseY: 0,
     posX: 0,
     posY: 0,
+  });
+
+  const resizeStartRef = useRef<{
+    mouseX: number;
+    mouseY: number;
+    posX: number;
+    posY: number;
+    width: number;
+    height: number;
+  }>({
+    mouseX: 0,
+    mouseY: 0,
+    posX: 0,
+    posY: 0,
+    width: DEFAULT_POPUP_WIDTH,
+    height: DEFAULT_POPUP_HEIGHT,
   });
 
   // 2. 대화 메시지 상태
@@ -124,18 +206,19 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
   useEffect(() => () => requestRef.current?.abort(), []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 버튼 바로 아래 기본 위치 계산 (버튼 오른쪽 정렬 & 바로 아래 8px)
-  const getAnchorPosition = useCallback(() => {
+  // 버튼 바로 아래 기본 위치 계산 (사이트 헤더 제외, 버튼 오른쪽 정렬 & 바로 아래 8px)
+  const getAnchorPosition = useCallback((popupWidth = sizeRef.current.width, popupHeight = sizeRef.current.height) => {
     if (typeof window === "undefined") return { x: 100, y: 64 };
+    const minY = getSiteHeaderBottom() + 8;
     if (anchorRef?.current) {
       const rect = anchorRef.current.getBoundingClientRect();
-      const x = Math.max(12, Math.min(window.innerWidth - POPUP_WIDTH - 12, rect.right - POPUP_WIDTH));
-      const y = Math.max(12, Math.min(window.innerHeight - POPUP_HEIGHT - 12, rect.bottom + 8));
+      const x = Math.max(12, Math.min(window.innerWidth - popupWidth - 12, rect.right - popupWidth));
+      const y = Math.max(minY, Math.min(window.innerHeight - popupHeight - 12, rect.bottom + 8));
       return { x, y };
     }
     const margin = 16;
-    const x = Math.max(12, window.innerWidth - POPUP_WIDTH - margin);
-    const y = 64;
+    const x = Math.max(12, window.innerWidth - popupWidth - margin);
+    const y = Math.max(minY, 64);
     return { x, y };
   }, [anchorRef]);
 
@@ -158,16 +241,28 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     }
   }, [isOpen, hasAnimated]);
 
-  // 브라우저 리사이즈 시 화면 내 유지
+  // 브라우저 리사이즈 시 화면 내 유지 (사이트 헤더 제외 영역)
   useEffect(() => {
     const handleResize = () => {
+      const curW = sizeRef.current.width;
+      const curH = sizeRef.current.height;
+      const minY = getSiteHeaderBottom() + 8;
+      const maxAllowedW = Math.max(MIN_POPUP_WIDTH, window.innerWidth - 24);
+      const maxAllowedH = Math.max(MIN_POPUP_HEIGHT, window.innerHeight - minY - 12);
+      const clampedW = Math.min(curW, maxAllowedW);
+      const clampedH = Math.min(curH, maxAllowedH);
+
+      if (clampedW !== curW || clampedH !== curH) {
+        setSize({ width: clampedW, height: clampedH });
+      }
+
       setPosition((prev) => {
         if (!prev) return prev;
-        const maxX = Math.max(12, window.innerWidth - POPUP_WIDTH - 12);
-        const maxY = Math.max(12, window.innerHeight - POPUP_HEIGHT - 12);
+        const maxX = Math.max(12, window.innerWidth - clampedW - 12);
+        const maxY = Math.max(minY, window.innerHeight - clampedH - 12);
         return {
           x: Math.max(12, Math.min(maxX, prev.x)),
-          y: Math.max(12, Math.min(maxY, prev.y)),
+          y: Math.max(minY, Math.min(maxY, prev.y)),
         };
       });
     };
@@ -181,7 +276,11 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     e.preventDefault();
     e.stopPropagation();
 
-    // 드래그가 시작되면 즉시 애니메이션 완료 상태로 처리하여 마우스를 놓을 때 바운스 방지
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+    setIsSmoothTransition(false);
     setHasAnimated(true);
 
     const curPos = position || getAnchorPosition();
@@ -194,7 +293,31 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
     setIsDragging(true);
   };
 
-  // 전역 마우스 이동 & 마우스 업 이벤트 리스너
+  // 리사이즈 시작 핸들러
+  const startResize = (e: React.MouseEvent, dir: ResizeDirection) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+    setIsSmoothTransition(false);
+    setHasAnimated(true);
+
+    const curPos = position || getAnchorPosition();
+    resizeStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      posX: curPos.x,
+      posY: curPos.y,
+      width: sizeRef.current.width,
+      height: sizeRef.current.height,
+    };
+    setResizingDirection(dir);
+  };
+
+  // 전역 마우스 이동 & 마우스 업 이벤트 리스너 (위치 이동)
   useEffect(() => {
     if (!isDragging) return;
 
@@ -202,15 +325,18 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       const deltaX = e.clientX - dragStartRef.current.mouseX;
       const deltaY = e.clientY - dragStartRef.current.mouseY;
 
-      const maxX = Math.max(12, window.innerWidth - POPUP_WIDTH - 12);
-      const maxY = Math.max(12, window.innerHeight - POPUP_HEIGHT - 12);
+      const curW = sizeRef.current.width;
+      const curH = sizeRef.current.height;
+      const minY = getSiteHeaderBottom() + 8;
+      const maxX = Math.max(12, window.innerWidth - curW - 12);
+      const maxY = Math.max(minY, window.innerHeight - curH - 12);
 
       const rawX = dragStartRef.current.posX + deltaX;
       const rawY = dragStartRef.current.posY + deltaY;
 
       setPosition({
         x: Math.max(12, Math.min(maxX, rawX)),
-        y: Math.max(12, Math.min(maxY, rawY)),
+        y: Math.max(minY, Math.min(maxY, rawY)),
       });
     };
 
@@ -229,6 +355,106 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       document.body.style.userSelect = "";
     };
   }, [isDragging]);
+
+  // 전역 마우스 이동 & 마우스 업 이벤트 리스너 (테두리 리사이즈)
+  useEffect(() => {
+    if (!resizingDirection) return;
+
+    const dir = resizingDirection;
+    const handleMouseMove = (e: MouseEvent) => {
+      const { mouseX, mouseY, posX, posY, width, height } = resizeStartRef.current;
+      const deltaX = e.clientX - mouseX;
+      const deltaY = e.clientY - mouseY;
+
+      let newX = posX;
+      let newY = posY;
+      let newWidth = width;
+      let newHeight = height;
+
+      const minW = MIN_POPUP_WIDTH;
+      const minH = MIN_POPUP_HEIGHT;
+      const minY = getSiteHeaderBottom() + 8;
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+
+      // 가로 리사이즈
+      if (dir.includes('e')) {
+        const maxAllowedWidth = Math.max(minW, viewportW - posX - 12);
+        newWidth = Math.max(minW, Math.min(maxAllowedWidth, width + deltaX));
+      } else if (dir.includes('w')) {
+        const rightEdge = posX + width;
+        const rawX = posX + deltaX;
+        newX = Math.max(12, Math.min(rightEdge - minW, rawX));
+        newWidth = rightEdge - newX;
+      }
+
+      // 세로 리사이즈 (사이트 헤더 제외 minY)
+      if (dir.includes('s')) {
+        const maxAllowedHeight = Math.max(minH, viewportH - posY - 12);
+        newHeight = Math.max(minH, Math.min(maxAllowedHeight, height + deltaY));
+      } else if (dir.includes('n')) {
+        const bottomEdge = posY + height;
+        const rawY = posY + deltaY;
+        newY = Math.max(minY, Math.min(bottomEdge - minH, rawY));
+        newHeight = bottomEdge - newY;
+      }
+
+      setSize({ width: newWidth, height: newHeight });
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setResizingDirection(null);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = getResizeCursor(dir);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+  }, [resizingDirection]);
+
+  // 헤더 더블클릭 핸들러: 최대 크기 ↔ 최소 크기 스르륵 전환
+  const handleHeaderDoubleClick = (e: React.MouseEvent) => {
+    if (inline) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    setIsDragging(false);
+    document.body.style.userSelect = "";
+    setHasAnimated(true);
+
+    const siteHeaderBottom = getSiteHeaderBottom();
+    const topY = siteHeaderBottom + 8;
+    const maxW = Math.max(MIN_POPUP_WIDTH, window.innerWidth - 24);
+    const maxH = Math.max(MIN_POPUP_HEIGHT, window.innerHeight - topY - 12);
+
+    const isCurrentMax = (
+      sizeRef.current.width >= maxW - 20 &&
+      sizeRef.current.height >= maxH - 20
+    );
+
+    if (isCurrentMax) {
+      // 최대 크기일 때는 최소 크기(320x380)로 스르륵 전환
+      const nextSize = { width: MIN_POPUP_WIDTH, height: MIN_POPUP_HEIGHT };
+      const nextPos = getAnchorPosition(MIN_POPUP_WIDTH, MIN_POPUP_HEIGHT);
+      triggerSmoothChange(nextSize, nextPos);
+    } else {
+      // 그 외 상태일 때는 최대 크기로 스르륵 확장
+      const nextSize = { width: maxW, height: maxH };
+      const nextPos = { x: 12, y: topY };
+      triggerSmoothChange(nextSize, nextPos);
+    }
+  };
 
   // 대화 스크롤 하단 이동
   useEffect(() => {
@@ -319,8 +545,8 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           : {
               left: `${curPos.x}px`,
               top: `${curPos.y}px`,
-              width: `${POPUP_WIDTH}px`,
-              height: `${POPUP_HEIGHT}px`,
+              width: `${size.width}px`,
+              height: `${size.height}px`,
             }
       }
       onAnimationEnd={(e) => {
@@ -331,87 +557,189 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       className={
         inline
           ? "w-full h-full flex-1 min-h-0 flex flex-col rounded-lg overflow-hidden select-none border border-[var(--ar-border)] shadow-sm bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]"
-          : `hidden md:flex fixed z-50 flex-col rounded-xl overflow-hidden select-none border-2 ${
+          : `hidden md:flex fixed z-50 flex-col rounded-xl select-none border-2 ${
               isSingle
                 ? "border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
                 : "border-[#7C3AED]/40 dark:border-[#A855F7]/50 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(168,85,247,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
             } ${
-              isDragging
+              isDragging || resizingDirection
                 ? isSingle
                   ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
                   : "ring-2 ring-[#7C3AED] dark:ring-[#A855F7] shadow-[0_24px_56px_-4px_rgba(124,58,237,0.3)]"
                 : ""
             } ${
               !hasAnimated ? "ai-popup-drop-anim" : ""
+            } ${
+              isSmoothTransition ? "transition-all duration-300 ease-out" : ""
             } bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]`
       }
     >
-      {/* 팝업/패널 헤더 */}
-      <header
-        onMouseDown={inline ? undefined : startDrag}
-        className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b ${
-          isSingle
-            ? "border-[#005FB8]/15 dark:border-[#007ACC]/25"
-            : "border-[#7C3AED]/15 dark:border-[#A855F7]/25"
-        } ${inline ? "" : "cursor-grab active:cursor-grabbing"} transition-colors ${
-          !inline && isDragging ? "bg-[#EAEAEA] dark:bg-[#2D2D2D]" : ""
-        }`}
-        title={inline ? undefined : "드래그하여 원하는 위치로 이동할 수 있습니다."}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm shrink-0">✨</span>
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-xs font-bold text-[#1F2328] dark:text-[#CCCCCC] truncate">
-                ArchReactor AI 어시스턴트
-              </h3>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                isSingle ? "bg-[#005FB8] dark:bg-[#007ACC]" : "bg-[#7C3AED] dark:bg-[#A855F7]"
-              } animate-pulse`} />
-            </div>
-            {!inline && (
-              <span className="text-[10px] text-[#57606A] dark:text-[#858585] truncate font-mono">
-                헤더를 잡고 드래그하여 이동
+      {/* 테두리 리사이즈 핸들 (플로팅 모드 전용) */}
+      {!inline && (
+        <>
+          {/* 상하좌우 4개 엣지 핸들 */}
+          <div
+            onMouseDown={(e) => startResize(e, 'n')}
+            className="absolute -top-1 left-3 right-3 h-2.5 cursor-ns-resize z-30"
+            title="상단 크기 조절"
+          />
+          <div
+            onMouseDown={(e) => startResize(e, 's')}
+            className="absolute -bottom-1 left-3 right-3 h-2.5 cursor-ns-resize z-30"
+            title="하단 크기 조절"
+          />
+          <div
+            onMouseDown={(e) => startResize(e, 'w')}
+            className="absolute -left-1 top-3 bottom-3 w-2.5 cursor-ew-resize z-30"
+            title="좌측 크기 조절"
+          />
+          <div
+            onMouseDown={(e) => startResize(e, 'e')}
+            className="absolute -right-1 top-3 bottom-3 w-2.5 cursor-ew-resize z-30"
+            title="우측 크기 조절"
+          />
+
+          {/* 4개 코너 핸들 */}
+          <div
+            onMouseDown={(e) => startResize(e, 'nw')}
+            className="absolute -top-1 -left-1 w-3.5 h-3.5 cursor-nwse-resize z-40"
+            title="대각선 크기 조절"
+          />
+          <div
+            onMouseDown={(e) => startResize(e, 'ne')}
+            className="absolute -top-1 -right-1 w-3.5 h-3.5 cursor-nesw-resize z-40"
+            title="대각선 크기 조절"
+          />
+          <div
+            onMouseDown={(e) => startResize(e, 'sw')}
+            className="absolute -bottom-1 -left-1 w-3.5 h-3.5 cursor-nesw-resize z-40"
+            title="대각선 크기 조절"
+          />
+          <div
+            onMouseDown={(e) => startResize(e, 'se')}
+            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 cursor-nwse-resize z-40"
+            title="대각선 크기 조절"
+          />
+
+          {/* 우측 하단 리사이즈 시각적 그립 표시 */}
+          <div
+            className="absolute bottom-1 right-1 w-3 h-3 z-20 flex items-end justify-end pointer-events-none"
+            aria-hidden="true"
+          >
+            <svg className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500 opacity-60" viewBox="0 0 6 6" fill="currentColor">
+              <circle cx="5" cy="5" r="0.6" />
+              <circle cx="3" cy="5" r="0.6" />
+              <circle cx="5" cy="3" r="0.6" />
+              <circle cx="1" cy="5" r="0.6" />
+              <circle cx="3" cy="3" r="0.6" />
+              <circle cx="5" cy="1" r="0.6" />
+            </svg>
+          </div>
+        </>
+      )}
+
+      {/* 내부 콘텐츠 컨테이너 (모서리 곡률 유지) */}
+      <div className={inline ? "flex-1 flex flex-col min-h-0 overflow-hidden" : "flex-1 flex flex-col min-h-0 overflow-hidden rounded-[10px]"}>
+        {/* 팝업/패널 헤더 */}
+        <header
+          onMouseDown={inline ? undefined : startDrag}
+          onDoubleClick={handleHeaderDoubleClick}
+          className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b ${
+            isSingle
+              ? "border-[#005FB8]/15 dark:border-[#007ACC]/25"
+              : "border-[#7C3AED]/15 dark:border-[#A855F7]/25"
+          } ${inline ? "" : "cursor-grab active:cursor-grabbing"} transition-colors ${
+            !inline && isDragging ? "bg-[#EAEAEA] dark:bg-[#2D2D2D]" : ""
+          }`}
+          title={inline ? undefined : "드래그하여 이동 / 더블클릭하여 최대·최소 크기 전환"}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-base shrink-0">✨</span>
+            <div className="flex flex-col min-w-0 gap-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h3 className="text-xs font-bold text-[#1F2328] dark:text-[#CCCCCC] truncate">
+                  ArchReactor AI 어시스턴트
+                </h3>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  isSingle ? "bg-[#005FB8] dark:bg-[#007ACC]" : "bg-[#7C3AED] dark:bg-[#A855F7]"
+                } animate-pulse`} />
+              </div>
+              <span className="text-[10px] leading-normal text-[#8C959F] dark:text-[#858585] select-none font-sans tracking-tight">
+                Powered by <strong className="italic font-bold text-[#0969DA] dark:text-[#58A6FF]">DKU SOLID LLM</strong>
               </span>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* 우측 컨트롤 버튼 (플로팅 모드 전용: 버튼 아래 원위치 / 닫기) */}
-        {!inline && (
-          <div className="flex items-center gap-1 shrink-0">
-            {/* 버튼 바로 아래로 원위치 복귀 */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPosition(getAnchorPosition());
-              }}
-              title="버튼 바로 아래 기본 위치로 복귀"
-              className={`p-1 rounded text-[#57606A] dark:text-[#858585] ${
-                isSingle
-                  ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                  : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-              } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
-            >
-              ↺
-            </button>
+          {/* 우측 컨트롤 버튼 (플로팅 모드 전용: 확대 / 축소 / 닫기 순서) */}
+          {!inline && (
+            <div className="flex items-center gap-1 shrink-0">
+              {/* 1. 최대화 (확대) 버튼 */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const siteHeaderBottom = getSiteHeaderBottom();
+                  const topY = siteHeaderBottom + 8;
+                  const maxW = Math.max(MIN_POPUP_WIDTH, window.innerWidth - 24);
+                  const maxH = Math.max(MIN_POPUP_HEIGHT, window.innerHeight - topY - 12);
+                  triggerSmoothChange(
+                    { width: maxW, height: maxH },
+                    { x: 12, y: topY }
+                  );
+                }}
+                title="최대 크기로 확대"
+                className={`w-5 h-5 flex items-center justify-center rounded text-[#57606A] dark:text-[#858585] ${
+                  isSingle
+                    ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                    : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+                } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
+              >
+                <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                  {/* 4방향 바깥 확장 코너 프레임 */}
+                  <path d="M1.5 4.5V1.5H4.5M10.5 4.5V1.5H7.5M1.5 7.5v3H4.5M10.5 7.5v3H7.5" />
+                </svg>
+              </button>
 
-            {/* 닫기 버튼 */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              title="창 닫기"
-              className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-      </header>
+              {/* 2. 최소화 (축소) 버튼 */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerSmoothChange(
+                    { width: MIN_POPUP_WIDTH, height: MIN_POPUP_HEIGHT },
+                    getAnchorPosition(MIN_POPUP_WIDTH, MIN_POPUP_HEIGHT)
+                  );
+                }}
+                title="최소 크기로 축소"
+                className={`w-5 h-5 flex items-center justify-center rounded text-[#57606A] dark:text-[#858585] ${
+                  isSingle
+                    ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
+                    : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
+                } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
+              >
+                <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                  {/* 4방향 안쪽 축소 코너 프레임 */}
+                  <path d="M4.5 1.5V4.5H1.5M7.5 1.5V4.5h3M4.5 10.5V7.5H1.5M7.5 10.5V7.5h3" />
+                </svg>
+              </button>
+
+              {/* 3. 닫기 버튼 */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                title="창 닫기"
+                className="w-5 h-5 flex items-center justify-center rounded text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs select-none"
+              >
+                <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                  <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </header>
 
       {/* 대화 본문 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
@@ -564,6 +892,7 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           {localError && <p role="alert">{localError}</p>}
         </div>
         </footer>
+      </div>
       </div>
     </div>
   );

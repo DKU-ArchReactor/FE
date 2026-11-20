@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import type { SimulationResult } from "@/type/simulation";
 
 interface ControlPanelProps {
   currentCycle: number;
@@ -15,6 +16,7 @@ interface ControlPanelProps {
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
   isCompiling?: boolean; // 컴파일 진행 중 여부
   mode?: "single" | "pipeline"; // Single-Cycle(Serial) 또는 5-Stage Pipeline(Parallel) 모드
+  simulationData?: SimulationResult | null; // 전체 히스토리 및 이벤트 정보 (스톨/플러시 등)
   // C ↔ ASM 모드 제어
   editorTarget?: "c" | "asm";
   onChangeEditorTarget?: (target: "c" | "asm") => void;
@@ -37,6 +39,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isReady = true,
   isCompiling = false,
   mode = "pipeline",
+  simulationData = null,
   editorTarget = "c",
   onChangeEditorTarget,
   onChangeSimulationMode,
@@ -44,6 +47,61 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const isSingle = mode === "single";
   // Single 모드 및 Pipeline 모드 모두 Cycle 0(초기 Reset 대기) ~ Cycle totalCycles까지 0~totalCycles 이동
   const maxCycle = totalCycles;
+
+  // 전체 사이클(0 ~ maxCycle)의 모든 사이클 위치에 작은 회색 세로바 배치
+  const cycleTicks = useMemo(() => {
+    if (!isReady || maxCycle <= 0) return [];
+    const ticks: number[] = [];
+    for (let c = 0; c <= maxCycle; c++) {
+      ticks.push(c);
+    }
+    return ticks;
+  }, [isReady, maxCycle]);
+
+  // rAF를 이용한 부드러운 고정 속도 연속 슬라이딩 (DOM 직접 조작으로 React 리렌더링 병목 및 끊김 완전 제거)
+  const trackRef = useRef<HTMLDivElement>(null);
+  const fillBarRef = useRef<HTMLDivElement>(null);
+  const indicatorRef = useRef<HTMLDivElement>(null);
+
+  // currentCycle 또는 maxCycle 변경 시 즉시 위치 동기화 (수동 조작 / 일시정지)
+  useEffect(() => {
+    if (!isPlaying) {
+      const pct = maxCycle > 0 ? Math.min(100, Math.max(0, (currentCycle / maxCycle) * 100)) : 0;
+      if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
+      if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
+    }
+  }, [currentCycle, maxCycle, isPlaying]);
+
+  // 재생 중일 때 매 프레임(60fps/120fps) GPU 합성으로 부드럽게 연속 이동
+  useEffect(() => {
+    if (!isPlaying || maxCycle <= 0) return;
+
+    let animId: number;
+    let lastTime = performance.now();
+    let currentPos = currentCycle;
+
+    const tick = (now: number) => {
+      const delta = now - lastTime;
+      lastTime = now;
+
+      // playSpeed(ms) 동안 1사이클 전진
+      currentPos += delta / playSpeed;
+      if (currentPos > maxCycle) currentPos = maxCycle;
+
+      const pct = (currentPos / maxCycle) * 100;
+      if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
+      if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
+
+      if (currentPos < maxCycle) {
+        animId = requestAnimationFrame(tick);
+      }
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, playSpeed, maxCycle, currentCycle]);
+
+  const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (currentCycle / maxCycle) * 100)) : 0;
 
   return (
     <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3 md:px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
@@ -144,20 +202,70 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
         
-        <div className="hidden md:flex flex-1 min-w-0 items-center gap-2 relative">
-          <input
-            type="range"
-            min={0}
-            max={maxCycle}
-            disabled={!isReady || totalCycles <= 1}
-            value={currentCycle}
-            onChange={(e) => onJumpToCycle(Number(e.target.value))}
-            className={`w-full h-1 bg-[#E1E4E8] dark:bg-[#333333] rounded appearance-none cursor-pointer focus:outline-none transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
-              isSingle
-                ? "accent-[#005FB8] dark:accent-[#007ACC]"
-                : "accent-[#7C3AED] dark:accent-[#A855F7]"
-            }`}
-          />
+        <div className="hidden md:flex flex-1 min-w-0 items-center gap-2 relative h-full">
+          {/* 타임라인 트랙 컨테이너: 가로 바 자체가 세로 정중앙(items-center)에 위치 */}
+          <div className="relative w-full h-3 flex items-center">
+            {/* 상단 사이클 위치를 나타내는 작은 점들 (트랙 바 위쪽으로 absolute 띄움) */}
+            <div className="absolute -top-2 inset-x-0 h-1 pointer-events-none">
+              {isReady && maxCycle > 0 && cycleTicks.map((tick) => {
+                const tickPos = (tick / maxCycle) * 100;
+                return (
+                  <div
+                    key={`tick-${tick}`}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[2.5px] h-[2.5px] bg-[#94A3B8] dark:bg-[#64748B] rounded-full"
+                    style={{ left: `${tickPos}%` }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* 배경 트랙 */}
+            <div ref={trackRef} className="absolute inset-x-0 h-1.5 bg-[#E2E8F0] dark:bg-[#2D333B] rounded-full overflow-hidden">
+              {/* 채워진 진행 바 (DOM 직접 조작으로 리렌더링 없이 부드럽게 연속 슬라이딩) */}
+              <div
+                ref={fillBarRef}
+                className={`h-full rounded-full ${
+                  isSingle
+                    ? "bg-[#005FB8] dark:bg-[#007ACC]"
+                    : "bg-[#7C3AED] dark:bg-[#8B5CF6]"
+                }`}
+                style={{
+                  width: `${initialPct}%`,
+                }}
+              />
+            </div>
+
+            {/* 현재 재생 위치를 나타내는 슬라이딩 원 (Circle Indicator) */}
+            {isReady && totalCycles > 0 && (
+              <div
+                ref={indicatorRef}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 pointer-events-none flex items-center justify-center will-change-[left]"
+                style={{
+                  left: `${initialPct}%`,
+                }}
+              >
+                <div
+                  className={`w-3.5 h-3.5 rounded-full shadow-md border-2 border-white dark:border-[#1E1E1E] ${
+                    isSingle
+                      ? "bg-[#005FB8] dark:bg-[#388BFD]"
+                      : "bg-[#7C3AED] dark:bg-[#A855F7]"
+                  }`}
+                />
+              </div>
+            )}
+
+            {/* 투명 상호작용 Range Slider (마우스 클릭 & 드래그 탐색 지원) */}
+            <input
+              type="range"
+              min={0}
+              max={maxCycle}
+              disabled={!isReady || totalCycles <= 1}
+              value={currentCycle}
+              onChange={(e) => onJumpToCycle(Number(e.target.value))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed disabled:pointer-events-none z-30"
+              title={`현재 위치: ${currentCycle}/${maxCycle}`}
+            />
+          </div>
 
           {!isReady && (
             <div className="hidden sm:flex items-center gap-1 shrink-0 px-2 py-0.5 rounded bg-[#F6F8FA] dark:bg-[#1E1E1E] border border-[#D0D7DE] dark:border-[#3E3E42] text-[#57606A] dark:text-[#858585] text-[10px]">

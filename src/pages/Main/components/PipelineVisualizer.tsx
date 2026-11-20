@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import SingleCycleDatapath from './SingleCycleDatapath';
-import type {InstructionLessonContext} from './InstructionLesson';
+import type { InstructionLessonContext } from './InstructionLesson';
 
 interface PipelineVisualizerProps {
   lessonContext?: InstructionLessonContext;
@@ -49,38 +49,32 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     );
   }
 
-  if (!currentData) {
-    return (
-      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-6 flex items-center justify-center text-[var(--ar-text-muted)] text-sm transition-colors duration-150">
-        C 소스 코드를 작성하고 [⚡ 컴파일]을 누르면 파이프라인 데이터패스가 활성화됩니다.
-      </div>
-    );
-  }
-
-  const { buffers, cycle_events, clock } = currentData;
-  const isStall = !isSingle && cycle_events.stall?.has_stall;
-  const isForward = !isSingle && cycle_events.forwarding?.has_forwarded;
-  const isBranchFlush = !isSingle && cycle_events.control_hazard?.has_flush;
+  const buffers = currentData?.buffers;
+  const cycle_events = currentData?.cycle_events;
+  const clock = currentData?.clock;
+  const isStall = Boolean(!isSingle && cycle_events?.stall?.has_stall);
+  const isForward = Boolean(!isSingle && cycle_events?.forwarding?.has_forwarded);
+  const isBranchFlush = Boolean(!isSingle && cycle_events?.control_hazard?.has_flush);
 
   // Single-cycle 모드: 1클럭에 1개 명령어 전체가 IF~WB 전 단계를 한 번에 통과
   // Pipeline 모드: 각 스테이지 버퍼에 개별 명령어가 순차적으로 위치
   const singleCycleInst = isSingle
-    ? (buffers.IF?.assembly || currentData.stage_activity?.IF?.assembly || currentData.if_stage?.assembly || 'bubble')
+    ? (buffers?.IF?.assembly || currentData?.stage_activity?.IF?.assembly || currentData?.if_stage?.assembly || '—')
     : null;
 
   // 5단계별 명령어
-  const ifInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.IF?.assembly || 'bubble');
-  const idInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.ID?.assembly || 'bubble');
-  const exInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.EX?.assembly || 'bubble');
-  const memInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.MEM?.assembly || 'bubble');
-  const wbInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.WB?.assembly || 'bubble');
+  const ifInst = isSingle ? (singleCycleInst || '—') : (buffers?.IF?.assembly || '—');
+  const idInst = isSingle ? (singleCycleInst || '—') : (buffers?.ID?.assembly || '—');
+  const exInst = isSingle ? (singleCycleInst || '—') : (buffers?.EX?.assembly || '—');
+  const memInst = isSingle ? (singleCycleInst || '—') : (buffers?.MEM?.assembly || '—');
+  const wbInst = isSingle ? (singleCycleInst || '—') : (buffers?.WB?.assembly || '—');
 
   // 활성 여부
-  const isIfActive = ifInst !== 'bubble' && ifInst !== 'empty';
-  const isIdActive = idInst !== 'bubble' && idInst !== 'empty';
-  const isExActive = exInst !== 'bubble' && exInst !== 'empty';
-  const isMemActive = memInst !== 'bubble' && memInst !== 'empty';
-  const isWbActive = wbInst !== 'bubble' && wbInst !== 'empty';
+  const isIfActive = ifInst !== '—' && ifInst !== 'bubble' && ifInst !== 'empty';
+  const isIdActive = idInst !== '—' && idInst !== 'bubble' && idInst !== 'empty';
+  const isExActive = exInst !== '—' && exInst !== 'bubble' && exInst !== 'empty';
+  const isMemActive = memInst !== '—' && memInst !== 'bubble' && memInst !== 'empty';
+  const isWbActive = wbInst !== '—' && wbInst !== 'bubble' && wbInst !== 'empty';
 
   // 명령어 파싱 및 세부 동작 분류
   const parseOp = (assembly: string | null | undefined): string => {
@@ -126,11 +120,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const memOp = parseOp(memInst);
   const wbOp = parseOp(wbInst);
 
-  // [개발/작업용 디버그 플래그] true: 평소에 모든 선을 회색(#94A3B8)으로 표시, false: 평소에 모든 선을 투명하게 숨김
-  const DEBUG_SHOW_ALL_WIRES = true;
-
-  const inactiveStroke = DEBUG_SHOW_ALL_WIRES ? "#94A3B8" : "transparent";
-  const inactiveMarker = DEBUG_SHOW_ALL_WIRES ? "url(#m-arr-def)" : undefined;
+  // 컴파일 이전(currentData === null)에는 전체 도식 개형을 보여주기 위해 모든 선을 표시하고,
+  // 컴파일 이후(시뮬레이션 재생 중)에는 실제로 신호가 흐르는 활성 선만 보여주고 비활성 선은 투명화합니다.
+  const isInitialEmpty = !currentData;
+  const inactiveStroke = isInitialEmpty ? "#94A3B8" : "transparent";
+  const inactiveMarker = isInitialEmpty ? "url(#m-arr-def)" : undefined;
 
   // [IF 단계 와이어 활성 조건]
   const ifPcMuxToPcActive = isIfActive;
@@ -138,7 +132,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const ifPcToPlus4Active = isIfActive;
   const ifPcToIfIdActive = isIfActive && usesPc(ifOp);
   const ifPlus4LoopbackActive = isIfActive && !isBranchFlush;
-  const branchLoopbackActive = isBranchFlush || Boolean(cycle_events.control_hazard?.taken);
+  const branchLoopbackActive = isBranchFlush || Boolean(cycle_events?.control_hazard?.taken);
   const ifImemToIfIdActive = isIfActive;
 
   // [ID 단계 와이어 활성 조건]
@@ -177,13 +171,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const wbReverseFeedbackActive = isWbActive && writesReg(wbOp);
 
   const wireStyle = (active: boolean): React.CSSProperties => ({
-    opacity: (DEBUG_SHOW_ALL_WIRES || active) ? 1 : 0,
+    opacity: (isInitialEmpty || active) ? 1 : 0,
     transition: "opacity 0.25s ease-in-out",
-    pointerEvents: (DEBUG_SHOW_ALL_WIRES || active) ? "auto" : "none",
+    pointerEvents: (isInitialEmpty || active) ? "auto" : "none",
   });
 
-  // 순차 전파 애니메이션 헬퍼
-  const wireStepClass = (active: boolean, step: 0 | 1 | 2 | 3) => (active ? `wire-step-${step}` : undefined);
+  // 순차 전파 애니메이션 헬퍼 (실선: wire-solid-step, 점선: wire-dashed-step)
+  const wireStepClass = (active: boolean, step: 0 | 1 | 2 | 3, isDashed = false) => 
+    (active ? (isDashed ? `wire-dashed-step-${step}` : `wire-solid-step-${step}`) : undefined);
   const dotStepClass = (active: boolean, step: 0 | 1 | 2 | 3) => (active ? `dot-step-${step}` : undefined);
   const boxStepClass = (active: boolean, step: 0 | 1 | 2 | 3) => (active ? `box-step-${step}` : undefined);
 
@@ -196,49 +191,92 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
       {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일: 2.0초 주기로 Step 0 -> 1 -> 2 -> 3 순차 전파 */}
       <style>{`
-        @keyframes pulseStep0 {
-          0%       { stroke-dashoffset: 52; opacity: 0.35; stroke-width: 2.8; }
-          10%, 25% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
-          40%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          85%      { stroke-dashoffset: -52; opacity: 0.8; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -78; opacity: 0.35; stroke-width: 2.8; }
+        /* 1) 실선 펄스 애니메이션 (dash 없음, 굵기와 투명도만 펄스 전파) */
+        @keyframes solidPulseStep0 {
+          0%       { opacity: 0.35; stroke-width: 2.8; }
+          12%, 28% { opacity: 1.0;  stroke-width: 4.0; }
+          45%      { opacity: 0.85; stroke-width: 2.8; }
+          85%      { opacity: 0.8;  stroke-width: 2.8; }
+          100%     { opacity: 0.35; stroke-width: 2.8; }
         }
-        @keyframes pulseStep1 {
-          0%, 15%  { stroke-dashoffset: 52; opacity: 0.25; stroke-width: 2.8; }
-          25%, 45% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
-          60%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          85%      { stroke-dashoffset: -52; opacity: 0.8; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -78; opacity: 0.25; stroke-width: 2.8; }
+        @keyframes solidPulseStep1 {
+          0%, 18%  { opacity: 0.25; stroke-width: 2.8; }
+          30%, 48% { opacity: 1.0;  stroke-width: 4.0; }
+          65%      { opacity: 0.85; stroke-width: 2.8; }
+          85%      { opacity: 0.8;  stroke-width: 2.8; }
+          100%     { opacity: 0.25; stroke-width: 2.8; }
         }
-        @keyframes pulseStep2 {
-          0%, 38%  { stroke-dashoffset: 52; opacity: 0.25; stroke-width: 2.8; }
-          48%, 70% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
-          80%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          90%      { stroke-dashoffset: -39; opacity: 0.8; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -52; opacity: 0.25; stroke-width: 2.8; }
+        @keyframes solidPulseStep2 {
+          0%, 40%  { opacity: 0.25; stroke-width: 2.8; }
+          52%, 72% { opacity: 1.0;  stroke-width: 4.0; }
+          82%      { opacity: 0.85; stroke-width: 2.8; }
+          90%      { opacity: 0.8;  stroke-width: 2.8; }
+          100%     { opacity: 0.25; stroke-width: 2.8; }
         }
-        @keyframes pulseStep3 {
-          0%, 62%  { stroke-dashoffset: 52; opacity: 0.25; stroke-width: 2.8; }
-          72%, 92% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
-          98%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -26; opacity: 0.35; stroke-width: 2.8; }
+        @keyframes solidPulseStep3 {
+          0%, 65%  { opacity: 0.25; stroke-width: 2.8; }
+          75%, 94% { opacity: 1.0;  stroke-width: 4.0; }
+          98%      { opacity: 0.85; stroke-width: 2.8; }
+          100%     { opacity: 0.35; stroke-width: 2.8; }
         }
 
-        .wire-step-0 {
-          stroke-dasharray: 8 5;
-          animation: pulseStep0 2.0s linear infinite;
+        .wire-solid-step-0 {
+          animation: solidPulseStep0 2.0s linear infinite;
         }
-        .wire-step-1 {
-          stroke-dasharray: 8 5;
-          animation: pulseStep1 2.0s linear infinite;
+        .wire-solid-step-1 {
+          animation: solidPulseStep1 2.0s linear infinite;
         }
-        .wire-step-2 {
-          stroke-dasharray: 8 5;
-          animation: pulseStep2 2.0s linear infinite;
+        .wire-solid-step-2 {
+          animation: solidPulseStep2 2.0s linear infinite;
         }
-        .wire-step-3 {
-          stroke-dasharray: 8 5;
-          animation: pulseStep3 2.0s linear infinite;
+        .wire-solid-step-3 {
+          animation: solidPulseStep3 2.0s linear infinite;
+        }
+
+        /* 2) 점선 제어선 애니메이션 (strokeDasharray 6 3 유지, dashoffset 행진 및 펄스) */
+        @keyframes dashedPulseStep0 {
+          0%       { stroke-dashoffset: 36; opacity: 0.35; stroke-width: 2.8; }
+          12%, 28% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+          45%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          85%      { stroke-dashoffset: -36; opacity: 0.8; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -54; opacity: 0.35; stroke-width: 2.8; }
+        }
+        @keyframes dashedPulseStep1 {
+          0%, 18%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
+          30%, 48% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+          65%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          85%      { stroke-dashoffset: -36; opacity: 0.8; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -54; opacity: 0.25; stroke-width: 2.8; }
+        }
+        @keyframes dashedPulseStep2 {
+          0%, 40%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
+          52%, 72% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+          82%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          90%      { stroke-dashoffset: -27; opacity: 0.8; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -36; opacity: 0.25; stroke-width: 2.8; }
+        }
+        @keyframes dashedPulseStep3 {
+          0%, 65%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
+          75%, 94% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+          98%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -18; opacity: 0.35; stroke-width: 2.8; }
+        }
+
+        .wire-dashed-step-0 {
+          stroke-dasharray: 6 3;
+          animation: dashedPulseStep0 2.0s linear infinite;
+        }
+        .wire-dashed-step-1 {
+          stroke-dasharray: 6 3;
+          animation: dashedPulseStep1 2.0s linear infinite;
+        }
+        .wire-dashed-step-2 {
+          stroke-dasharray: 6 3;
+          animation: dashedPulseStep2 2.0s linear infinite;
+        }
+        .wire-dashed-step-3 {
+          stroke-dasharray: 6 3;
+          animation: dashedPulseStep3 2.0s linear infinite;
         }
 
         @keyframes dotPulse0 {
@@ -299,14 +337,16 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono w-16 shrink-0 tabular-nums">({isSingle ? `STEP:${clock ?? 0}` : `CYCLE:${clock ?? 0}`})</span>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono w-16 shrink-0 tabular-nums">
+            ({isSingle ? `STEP:${clock ?? "—"}` : `CYCLE:${clock ?? "—"}`})
+          </span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
         <div className="flex items-center gap-1.5">
           {/* CRT 런타임 진입/초기화 식별 뱃지 */}
           {((ifInst && (ifInst.startsWith("auipc") || ifInst.startsWith("jal") || ifInst.startsWith("li") || ifInst.startsWith("csrw"))) ||
-            (clock !== undefined && clock < 10 && !cycle_events.stall?.has_stall && !cycle_events.forwarding?.has_forwarded)) && (
+            (clock !== undefined && clock < 10 && !cycle_events?.stall?.has_stall && !cycle_events?.forwarding?.has_forwarded)) && (
             <span
               className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/30"
               title="C main() 진입 전 또는 종료 후 런타임 시스템 코드"
@@ -373,7 +413,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
         style={{ scrollbarGutter: "stable both-edges" }}
       >
         <div
-          className="m-auto shrink-0 transition-all duration-150 border-2 border-black dark:border-white"
+          className="m-auto shrink-0 transition-all duration-150"
           style={{
             height: `${zoomLevel * 100}%`,
             maxHeight: "100%",
@@ -384,7 +424,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           <svg
             viewBox="-75 -65 1220 1390"
             preserveAspectRatio="xMidYMid meet"
-            className="w-full h-full select-none block border-2 border-black dark:border-white"
+            className="w-full h-full select-none block"
           >
             <defs>
               {/* 정밀 화살표 마커 (끝점 refX=8.5로 선 끝이 박스 경계에 정확히 닿도록 설정) */}
@@ -427,8 +467,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
-                stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
-                strokeWidth="2.2"
+                stroke={isIfActive ? "#EF4444" : "#94A3B8"}
+                strokeWidth="2.8"
               />
               <path
                 d="M -40,107 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
@@ -451,7 +491,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="136"
                 x2="236"
                 y2="136"
-                stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
+                stroke={isIfActive ? "#EF4444" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
@@ -477,8 +517,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isIdActive ? "#FFF7ED" : "#F8FAFC"}
-                stroke={isIdActive ? "#EA580C" : "#CBD5E1"}
-                strokeWidth="2.2"
+                stroke={isIdActive ? "#EA580C" : "#94A3B8"}
+                strokeWidth="2.8"
               />
               <path
                 d="M -40,391 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
@@ -501,7 +541,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="420"
                 x2="236"
                 y2="420"
-                stroke={isIdActive ? "#EA580C" : "#CBD5E1"}
+                stroke={isIdActive ? "#EA580C" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
@@ -527,8 +567,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isExActive ? "#F0FDF4" : "#F8FAFC"}
-                stroke={isExActive ? "#16A34A" : "#CBD5E1"}
-                strokeWidth="2.2"
+                stroke={isExActive ? "#16A34A" : "#94A3B8"}
+                strokeWidth="2.8"
               />
               <path
                 d="M -40,703 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
@@ -551,7 +591,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="732"
                 x2="236"
                 y2="732"
-                stroke={isExActive ? "#16A34A" : "#CBD5E1"}
+                stroke={isExActive ? "#16A34A" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
@@ -577,8 +617,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isMemActive ? "#F0F9FF" : "#F8FAFC"}
-                stroke={isMemActive ? "#0284C7" : "#CBD5E1"}
-                strokeWidth="2.2"
+                stroke={isMemActive ? "#0284C7" : "#94A3B8"}
+                strokeWidth="2.8"
               />
               <path
                 d="M -40,1011 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
@@ -601,7 +641,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="1040"
                 x2="236"
                 y2="1040"
-                stroke={isMemActive ? "#0284C7" : "#CBD5E1"}
+                stroke={isMemActive ? "#0284C7" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
@@ -627,8 +667,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isWbActive ? "#F5F3FF" : "#F8FAFC"}
-                stroke={isWbActive ? "#8B5CF6" : "#CBD5E1"}
-                strokeWidth="2.2"
+                stroke={isWbActive ? "#8B5CF6" : "#94A3B8"}
+                strokeWidth="2.8"
               />
               <path
                 d="M -40,1232 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
@@ -651,7 +691,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="1261"
                 x2="236"
                 y2="1261"
-                stroke={isWbActive ? "#8B5CF6" : "#CBD5E1"}
+                stroke={isWbActive ? "#8B5CF6" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
@@ -684,8 +724,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               ry="19"
               className={boxStepClass(ifPcMuxToPcActive, 0)}
               fill={ifPcMuxToPcActive ? "#FEF2F2" : "#F8FAFC"}
-              stroke={ifPcMuxToPcActive ? "#EF4444" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={ifPcMuxToPcActive ? "#EF4444" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="380"
@@ -722,8 +762,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               rx="8"
               className={boxStepClass(isIfActive, 0)}
               fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
-              stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="380"
@@ -788,8 +828,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               points="756,88 846,88 826,128 776,128"
               className={boxStepClass(ifPlus4LoopbackActive, 1)}
               fill={ifPlus4LoopbackActive ? "#FEF2F2" : "#F8FAFC"}
-              stroke={ifPlus4LoopbackActive ? "#EF4444" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={ifPlus4LoopbackActive ? "#EF4444" : "#94A3B8"}
+              strokeWidth="2.8"
               strokeLinejoin="round"
             />
             <text
@@ -836,8 +876,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               rx="8"
               className={boxStepClass(isIfActive, 1)}
               fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
-              stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="380"
@@ -874,15 +914,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="614"
               height="26"
               rx="6"
-              fill={isIfActive ? "#FEF2F2" : "#F1F5F9"}
-              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
-              strokeWidth="1.6"
+              fill={isIfActive ? "#FEF9C3" : "#F1F5F9"}
+              stroke={isIfActive ? "#EAB308" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="383"
               y="298"
               dominantBaseline="central"
-              fill={isIfActive ? "#EF4444" : "#94A3B8"}
+              fill={isIfActive ? "#A16207" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
@@ -932,7 +972,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(idControlUnitActive, 1)}
+              className={wireStepClass(idControlUnitActive, 1, true)}
               markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idControlUnitActive)}
             />
@@ -946,8 +986,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               rx="8"
               className={boxStepClass(idToRegsActive, 1)}
               fill={idToRegsActive ? "#FFF7ED" : "#F8FAFC"}
-              stroke={idToRegsActive ? "#EA580C" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={idToRegsActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="280"
@@ -970,8 +1010,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               ry="58"
               className={boxStepClass(idToImmGenActive, 1)}
               fill={idToImmGenActive ? "#FFF7ED" : "#F8FAFC"}
-              stroke={idToImmGenActive ? "#EA580C" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={idToImmGenActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="578"
@@ -1006,8 +1046,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               ry="58"
               className={boxStepClass(idControlUnitActive, 1)}
               fill={idControlUnitActive ? "#FFF7ED" : "#F8FAFC"}
-              stroke={idControlUnitActive ? "#EA580C" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={idControlUnitActive ? "#EA580C" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="801"
@@ -1090,7 +1130,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(idControlUnitActive, 2)}
+              className={wireStepClass(idControlUnitActive, 2, true)}
               style={wireStyle(idControlUnitActive)}
             />
             {/* 분기 1: EX 셀 인입 (X = 755) */}
@@ -1102,7 +1142,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(idControlUnitActive, 2)}
+              className={wireStepClass(idControlUnitActive, 2, true)}
               markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idControlUnitActive)}
             />
@@ -1115,7 +1155,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(idControlUnitActive, 2)}
+              className={wireStepClass(idControlUnitActive, 2, true)}
               markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idControlUnitActive)}
             />
@@ -1128,7 +1168,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(idControlUnitActive, 2)}
+              className={wireStepClass(idControlUnitActive, 2, true)}
               markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idControlUnitActive)}
             />
@@ -1143,15 +1183,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="614"
               height="26"
               rx="6"
-              fill={isIdActive ? "#FFF7ED" : "#F1F5F9"}
-              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-              strokeWidth="1.6"
+              fill={isIdActive ? "#FEF9C3" : "#F1F5F9"}
+              stroke={isIdActive ? "#EAB308" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="382"
               y="553"
               dominantBaseline="central"
-              fill={isIdActive ? "#EA580C" : "#94A3B8"}
+              fill={isIdActive ? "#A16207" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
@@ -1170,10 +1210,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 rx="6"
                 fill="#F1F5F9"
                 stroke="#94A3B8"
-                strokeWidth="1.6"
+                strokeWidth="2.8"
               />
-              <line x1="778" y1="540" x2="778" y2="566" stroke="#CBD5E1" strokeWidth="1" />
-              <line x1="824" y1="540" x2="824" y2="566" stroke="#CBD5E1" strokeWidth="1" />
+              <line x1="778" y1="540" x2="778" y2="566" stroke="#94A3B8" strokeWidth="1" />
+              <line x1="824" y1="540" x2="824" y2="566" stroke="#94A3B8" strokeWidth="1" />
               
               {/* EX 셀 (X = 732 ~ 778) */}
               <rect
@@ -1249,7 +1289,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={exAluSrcToAluActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(exAluSrcToAluActive, 1)}
+              className={wireStepClass(exAluSrcToAluActive, 1, true)}
               markerEnd={exAluSrcToAluActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exAluSrcToAluActive)}
             />
@@ -1262,7 +1302,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={isExActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(isExActive, 1)}
+              className={wireStepClass(isExActive, 1, true)}
               markerEnd={isExActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(isExActive)}
             />
@@ -1275,7 +1315,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={isExActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(isExActive, 1)}
+              className={wireStepClass(isExActive, 1, true)}
               markerEnd={isExActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(isExActive)}
             />
@@ -1378,8 +1418,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               ry="19"
               className={boxStepClass(exAluSrcToAluActive, 1)}
               fill={exAluSrcToAluActive ? "#F0FDF4" : "#F8FAFC"}
-              stroke={exAluSrcToAluActive ? "#16A34A" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={exAluSrcToAluActive ? "#16A34A" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="380"
@@ -1421,8 +1461,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 "
                 className={boxStepClass(exAluToExMemActive || (isExActive && isBranch(exOp)), 2)}
                 fill={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#F0FDF4" : "#F8FAFC"}
-                stroke={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#16A34A" : "#CBD5E1"}
-                strokeWidth="2"
+                stroke={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#16A34A" : "#94A3B8"}
+                strokeWidth="2.8"
                 strokeLinejoin="round"
               />
               <text
@@ -1468,8 +1508,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               points="550,745 680,745 650,808 580,808"
               className={boxStepClass(exBranchAddActive, 2)}
               fill={exBranchAddActive ? "#F0FDF4" : "#F8FAFC"}
-              stroke={exBranchAddActive ? "#16A34A" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={exBranchAddActive ? "#16A34A" : "#94A3B8"}
+              strokeWidth="2.8"
               strokeLinejoin="round"
             />
             <text
@@ -1520,15 +1560,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="660"
               height="26"
               rx="6"
-              fill={isExActive ? "#F0FDF4" : "#F1F5F9"}
-              stroke={isExActive ? "#16A34A" : "#94A3B8"}
-              strokeWidth="1.6"
+              fill={isExActive ? "#FEF9C3" : "#F1F5F9"}
+              stroke={isExActive ? "#EAB308" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="440"
               y="923"
               dominantBaseline="central"
-              fill={isExActive ? "#16A34A" : "#94A3B8"}
+              fill={isExActive ? "#A16207" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
@@ -1547,9 +1587,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 rx="6"
                 fill="#F1F5F9"
                 stroke="#94A3B8"
-                strokeWidth="1.6"
+                strokeWidth="2.8"
               />
-              <line x1="824" y1="910" x2="824" y2="936" stroke="#CBD5E1" strokeWidth="1" />
+              <line x1="824" y1="910" x2="824" y2="936" stroke="#94A3B8" strokeWidth="1" />
 
               {/* M 셀 (X = 778 ~ 824) */}
               <rect
@@ -1603,7 +1643,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={memAluToDmemAddrActive ? "#0284C7" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(memAluToDmemAddrActive, 1)}
+              className={wireStepClass(memAluToDmemAddrActive, 1, true)}
               markerEnd={memAluToDmemAddrActive ? "url(#m-arr-blue)" : inactiveMarker}
               style={wireStyle(memAluToDmemAddrActive)}
             />
@@ -1616,7 +1656,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={isMemActive ? "#0284C7" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(isMemActive, 1)}
+              className={wireStepClass(isMemActive, 1, true)}
               markerEnd={isMemActive ? "url(#m-arr-blue)" : inactiveMarker}
               style={wireStyle(isMemActive)}
             />
@@ -1688,8 +1728,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               rx="8"
               className={boxStepClass(memAluToDmemAddrActive, 1)}
               fill={memAluToDmemAddrActive ? "#F0F9FF" : "#F8FAFC"}
-              stroke={memAluToDmemAddrActive ? "#0284C7" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={memAluToDmemAddrActive ? "#0284C7" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="410"
@@ -1727,15 +1767,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="706"
               height="26"
               rx="6"
-              fill={isMemActive ? "#F0F9FF" : "#F1F5F9"}
-              stroke={isMemActive ? "#0284C7" : "#94A3B8"}
-              strokeWidth="1.6"
+              fill={isMemActive ? "#FEF9C3" : "#F1F5F9"}
+              stroke={isMemActive ? "#EAB308" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="463"
               y="1169"
               dominantBaseline="central"
-              fill={isMemActive ? "#0284C7" : "#94A3B8"}
+              fill={isMemActive ? "#A16207" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
@@ -1754,7 +1794,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 rx="6"
                 fill={isWbActive ? "#F5F3FF" : "#F1F5F9"}
                 stroke={isWbActive ? "#8B5CF6" : "#94A3B8"}
-                strokeWidth="1.6"
+                strokeWidth="2.8"
               />
               <text
                 x="847"
@@ -1777,7 +1817,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               stroke={wbAluBypassActive || wbDmemReadDataActive ? "#8B5CF6" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              className={wireStepClass(wbAluBypassActive || wbDmemReadDataActive, 1)}
+              className={wireStepClass(wbAluBypassActive || wbDmemReadDataActive, 1, true)}
               markerEnd={wbAluBypassActive || wbDmemReadDataActive ? "url(#m-arr-purple)" : inactiveMarker}
               style={wireStyle(wbAluBypassActive || wbDmemReadDataActive)}
             />
@@ -1819,8 +1859,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               ry="19"
               className={boxStepClass(wbAluBypassActive || wbDmemReadDataActive, 1)}
               fill={wbAluBypassActive || wbDmemReadDataActive ? "#F5F3FF" : "#F8FAFC"}
-              stroke={wbAluBypassActive || wbDmemReadDataActive ? "#8B5CF6" : "#CBD5E1"}
-              strokeWidth="2"
+              stroke={wbAluBypassActive || wbDmemReadDataActive ? "#8B5CF6" : "#94A3B8"}
+              strokeWidth="2.8"
             />
             <text
               x="440"
