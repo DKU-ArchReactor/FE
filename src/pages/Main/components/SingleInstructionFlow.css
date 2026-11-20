@@ -17,10 +17,10 @@
   --ar-flow-region-bg: var(--ar-panel-bg);
 }
 .ar-single-flow-diagram {
-  font-family: "Inter", "Malgun Gothic", system-ui, sans-serif;
+  font-family: sans-serif;
 }
 .ar-single-flow-diagram .font-mono {
-  font-family: "Cascadia Code", Consolas, "Pretendard Tutor", monospace;
+  font-family: "D2Coding", Consolas, monospace;
 }
 .dark .ar-single-flow {
   --ar-flow-border: #4b5563;

@@ -39,16 +39,16 @@ const BOXES: Record<TransferUnit, Box> = {
 };
 const TITLES: Record<TransferUnit, string> = {
   pc: "PC",
-  decoder: "명령어 해독",
-  cu: "CU",
-  registers: "레지스터 파일",
+  decoder: "Instruction Decoder",
+  cu: "Control Unit",
+  registers: "Registers",
   immediate: "Imm Gen",
-  "operand-mux": "입력 MUX",
+  "operand-mux": "MUX",
   alu: "ALU",
-  mux: "기록값 MUX",
-  "pc-select": "PC 가산·선택",
-  "instruction-memory": "명령어 메모리",
-  memory: "데이터 메모리",
+  mux: "MUX",
+  "pc-select": "PC Select",
+  "instruction-memory": "Instruction Memory",
+  memory: "Data Memory",
 };
 const ROLES: Record<TransferUnit, string> = {
   pc: "명령어 주소",
@@ -901,7 +901,7 @@ export default function InstructionFlowDiagram({
           {(Object.keys(BOXES) as TransferUnit[]).map(node)}
           <g
             data-bus-legend="true"
-            aria-label="CPU와 메모리를 연결하는 주소·데이터·제어 경로"
+            aria-label="현재 전송의 주소·데이터·제어 종류"
           >
             <text
               x={compact ? 35 : 1220}
@@ -910,11 +910,11 @@ export default function InstructionFlowDiagram({
               fontWeight="800"
               fill="var(--ar-text-primary)"
             >
-              CPU ↔ 메모리 연결
+              전송 신호·버스 구분
             </text>
             {(["address", "data", "control"] as const).map((kind, i) => {
               const busActive = Boolean(
-                !finished && transfer.systemBus && transfer.kind === kind,
+                !finished && path && transfer.kind === kind,
               );
               return (
                 <g
