@@ -602,8 +602,8 @@ export const SingleCycleDatapath: React.FC<SingleCycleDatapathProps> = ({
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             SINGLE-CYCLE DATAPATH
           </h3>
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
-            (CLK:{state.clock})
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono w-16 shrink-0 tabular-nums">
+            (STEP:{state.clock})
           </span>
         </div>
 

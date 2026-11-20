@@ -414,6 +414,10 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background-color: transparent !important;
 }
 
+/* ======================================================== */
+/* 1. 기본 상태 (Default / Unfocused Line Numbers)          */
+/* 모든 일반 라인넘버는 모드 불문 중립 회색(#8C959F, #858585) & 두께 400 */
+/* ======================================================== */
 .asm-monaco-container .monaco-editor .line-numbers {
   left: 38px !important;
   width: 32px !important;
@@ -427,14 +431,9 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   text-align: right !important;
 }
 
-.asm-monaco-container .monaco-editor .line-numbers.active-line-number {
-  color: #8C959F !important;
-  font-weight: 400 !important;
-}
-
-html.dark .asm-monaco-container .monaco-editor .line-numbers,
-html.dark .asm-monaco-container .monaco-editor .line-numbers.active-line-number {
+html.dark .asm-monaco-container .monaco-editor .line-numbers {
   color: #858585 !important;
+  font-weight: 400 !important;
 }
 
 /* 2. 에디터 본문 텍스트 폰트 및 행간 정확한 매칭 */
@@ -446,104 +445,158 @@ html.dark .asm-monaco-container .monaco-editor .line-numbers.active-line-number 
   letter-spacing: normal !important;
 }
 
-.monaco-selected-asm-line {
-  background-color: #eff6ff !important; /* bg-blue-50 (싱글 사이클 기본) */
-}
-html.mode-pipeline .monaco-selected-asm-line {
-  background-color: #f5f3ff !important; /* bg-purple-50 (파이프라인) */
+/* ======================================================== */
+/* 2. 포커싱(커서 활성 / 선택) 라인 넘버                   */
+/* 1) 싱글 모드: 파란색 볼드체 (#005FB8 / 다크 #79C0FF, 700)   */
+/* 2) 파이프라인 모드: 보라색 볼드체 (#6D28D9 / 다크 #C4B5FD, 700) */
+/* ======================================================== */
+
+/* [싱글 모드 - 포커싱/선택 라인넘버] */
+.asm-monaco-container.is-single-mode .monaco-editor.focused .line-numbers.active-line-number,
+.asm-monaco-container .monaco-editor .line-numbers.monaco-selected-asm-linenumber-single,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-selected-asm-linenumber-single {
+  color: #005FB8 !important;
+  font-weight: 700 !important;
 }
 
-.monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
+html.dark .asm-monaco-container.is-single-mode .monaco-editor.focused .line-numbers.active-line-number,
+html.dark .asm-monaco-container .monaco-editor .line-numbers.monaco-selected-asm-linenumber-single,
+html.dark .asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-selected-asm-linenumber-single {
+  color: #79C0FF !important;
+  font-weight: 700 !important;
+}
+
+/* [파이프라인 모드 - 포커싱/선택 라인넘버] */
+.asm-monaco-container.is-pipeline-mode .monaco-editor.focused .line-numbers.active-line-number,
+.asm-monaco-container .monaco-editor .line-numbers.monaco-selected-asm-linenumber-pipeline,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-selected-asm-linenumber-pipeline {
+  color: #6D28D9 !important;
+  font-weight: 700 !important;
+}
+
+html.dark .asm-monaco-container.is-pipeline-mode .monaco-editor.focused .line-numbers.active-line-number,
+html.dark .asm-monaco-container .monaco-editor .line-numbers.monaco-selected-asm-linenumber-pipeline,
+html.dark .asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-selected-asm-linenumber-pipeline {
+  color: #C4B5FD !important;
+  font-weight: 700 !important;
+}
+
+/* ======================================================== */
+/* 3. 실행 중인 라인 넘버 (에메랄드 볼드체 #047857 / #7EE787) */
+/* ======================================================== */
+.asm-monaco-container .monaco-editor .line-numbers.monaco-executing-asm-linenumber,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-executing-asm-linenumber,
+.asm-monaco-container .monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-executing-selected-asm-linenumber {
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+html.dark .asm-monaco-container .monaco-editor .line-numbers.monaco-executing-asm-linenumber,
+html.dark .asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-executing-asm-linenumber,
+html.dark .asm-monaco-container .monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber,
+html.dark .asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-executing-selected-asm-linenumber {
+  color: #7EE787 !important;
+  font-weight: 700 !important;
+}
+
+/* ======================================================== */
+/* 4. 선택/실행 라인 배경 및 좌측 인디케이터 바              */
+/* ======================================================== */
+
+/* [싱글 모드 선택 라인] */
+.monaco-selected-asm-line-single {
   background-color: #eff6ff !important;
-  box-shadow: inset 4px 0 0 0 #2563eb !important; /* 맨 왼쪽 4px 파란 바 */
 }
-html.mode-pipeline .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
-  background-color: #f5f3ff !important;
-  box-shadow: inset 4px 0 0 0 #7c3aed !important; /* 맨 왼쪽 4px 보라색 바 */
-}
-
-.monaco-editor .line-numbers.monaco-selected-asm-linenumber {
-  color: #1d4ed8 !important; /* blue-700 진한 파란색 */
-  font-weight: 700 !important;
-}
-html.mode-pipeline .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
-  color: #6d28d9 !important; /* purple-700 진한 보라색 */
-  font-weight: 700 !important;
-}
-
-/* Dark mode Monaco Line Highlights (C 에디터와 1:1 일치) */
-html.dark .monaco-selected-asm-line {
+html.dark .monaco-selected-asm-line-single {
   background-color: #04395e !important;
 }
-html.dark.mode-pipeline .monaco-selected-asm-line {
-  background-color: #2e1065 !important; /* purple-950/80 */
+.monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber-single) {
+  background-color: #eff6ff !important;
+  box-shadow: inset 4px 0 0 0 #005fb8 !important;
 }
-
-html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber-single) {
   background-color: #04395e !important;
   box-shadow: inset 4px 0 0 0 #007acc !important;
 }
-html.dark.mode-pipeline .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber) {
+
+/* [파이프라인 모드 선택 라인] */
+.monaco-selected-asm-line-pipeline {
+  background-color: #f5f3ff !important;
+}
+html.dark .monaco-selected-asm-line-pipeline {
   background-color: #2e1065 !important;
-  box-shadow: inset 4px 0 0 0 #8b5cf6 !important; /* 보라색 액센트 바 */
+}
+.monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber-pipeline) {
+  background-color: #f5f3ff !important;
+  box-shadow: inset 4px 0 0 0 #7c3aed !important;
+}
+html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber-pipeline) {
+  background-color: #2e1065 !important;
+  box-shadow: inset 4px 0 0 0 #8b5cf6 !important;
 }
 
-html.dark .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
-  color: #9cdcfe !important;
-  font-weight: 700 !important;
-}
-html.dark.mode-pipeline .monaco-editor .line-numbers.monaco-selected-asm-linenumber {
-  color: #c4b5fd !important; /* purple-300 */
-  font-weight: 700 !important;
-}
-
-/* 실행 중인 어셈블리 라인 (에메랄드/그린 하드웨어 클록 통일) */
+/* [실행 라인] */
 .monaco-executing-asm-line {
   background-color: #ecfdf5 !important;
+}
+html.dark .monaco-executing-asm-line {
+  background-color: #133a27 !important;
 }
 .monaco-editor .margin-view-overlays > div:has(.monaco-executing-asm-linenumber) {
   background-color: #ecfdf5 !important;
   box-shadow: inset 4px 0 0 0 #059669 !important;
 }
-.monaco-editor .line-numbers.monaco-executing-asm-linenumber {
-  color: #047857 !important;
-  font-weight: 700 !important;
-}
-
-html.dark .monaco-executing-asm-line {
-  background-color: #133a27 !important;
-}
 html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-asm-linenumber) {
   background-color: #133a27 !important;
   box-shadow: inset 4px 0 0 0 #23d18b !important;
 }
-html.dark .monaco-editor .line-numbers.monaco-executing-asm-linenumber {
-  color: #7ee787 !important;
+
+/* [실행 중이면서 선택된 라인] */
+.monaco-executing-selected-asm-line-single {
+  background-color: #eff6ff !important;
+}
+html.dark .monaco-executing-selected-asm-line-single {
+  background-color: #04395e !important;
+}
+.monaco-executing-selected-asm-line-pipeline {
+  background-color: #f5f3ff !important;
+}
+html.dark .monaco-executing-selected-asm-line-pipeline {
+  background-color: #2e1065 !important;
+}
+
+/* ======================================================== */
+/* 5. Opcode 하이라이트                                     */
+/* ======================================================== */
+
+/* 싱글모드 선택된 라인 Opcode: 파란색 볼드 */
+.monaco-selected-asm-opcode-single {
+  color: #005FB8 !important;
+  font-weight: 700 !important;
+}
+html.dark .monaco-selected-asm-opcode-single {
+  color: #79C0FF !important;
   font-weight: 700 !important;
 }
 
-/* 실행 중이면서 선택된 어셈블리 라인 (C 에디터와 동일한 시안/하늘색 하이브리드) */
-.monaco-executing-selected-asm-line {
-  background-color: #ecfeff !important; /* cyan-50 */
+/* 파이프라인 모드 선택된 라인 Opcode: 보라색 볼드 */
+.monaco-selected-asm-opcode-pipeline {
+  color: #6D28D9 !important;
+  font-weight: 700 !important;
 }
-.monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-asm-linenumber) {
-  background-color: #ecfeff !important;
-  box-shadow: inset 4px 0 0 0 #0891b2 !important; /* cyan-600 */
-}
-.monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber {
-  color: #0e7490 !important; /* cyan-700 */
+html.dark .monaco-selected-asm-opcode-pipeline {
+  color: #E9D5FF !important;
   font-weight: 700 !important;
 }
 
-html.dark .monaco-executing-selected-asm-line {
-  background-color: #0e3a47 !important;
+/* 실행 중인 라인 Opcode: 에메랄드 볼드 */
+.monaco-executing-asm-opcode {
+  color: #047857 !important;
+  font-weight: 700 !important;
 }
-html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-asm-linenumber) {
-  background-color: #0e3a47 !important;
-  box-shadow: inset 4px 0 0 0 #007acc !important;
-}
-html.dark .monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber {
-  color: #4fc1ff !important;
+html.dark .monaco-executing-asm-opcode {
+  color: #7EE787 !important;
   font-weight: 700 !important;
 }
 

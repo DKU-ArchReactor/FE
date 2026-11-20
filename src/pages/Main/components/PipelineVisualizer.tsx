@@ -10,8 +10,8 @@ interface PipelineVisualizerProps {
   mode?: "single" | "pipeline";
 }
 
-const MASTER_WIDTH = 1060;
-const MASTER_HEIGHT = 1290;
+const MASTER_WIDTH = 1150;
+const MASTER_HEIGHT = 1390;
 
 const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   currentData,
@@ -63,24 +63,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const singleCycleInst = isSingle
     ? (buffers.IF?.assembly || currentData.stage_activity?.IF?.assembly || currentData.if_stage?.assembly || 'bubble')
     : null;
-  const singleCyclePc = isSingle
-    ? (buffers.IF?.pc || currentData.stage_activity?.IF?.pc || currentData.if_stage?.pc || currentData.global_result?.current_pc)
-    : null;
-
-  // PC 10진수 주소 변환
-  const rawPc = isSingle
-    ? (singleCyclePc || "0x00000000")
-    : (buffers.IF?.pc ? buffers.IF.pc : "0x00000000");
-  const parseDecimalPc = (pcVal?: string | number | null): string => {
-    if (pcVal === null || pcVal === undefined) return "0";
-    const str = String(pcVal).trim();
-    if (!str || str === "bubble" || str === "empty") return "0";
-    const num = str.startsWith("0x") || str.startsWith("0X")
-      ? parseInt(str, 16)
-      : parseInt(str, 10);
-    return Number.isNaN(num) ? str : String(num);
-  };
-  const decimalPc = parseDecimalPc(rawPc);
 
   // 5단계별 명령어
   const ifInst = isSingle ? (singleCycleInst || 'bubble') : (buffers.IF?.assembly || 'bubble');
@@ -95,6 +77,99 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const isExActive = exInst !== 'bubble' && exInst !== 'empty';
   const isMemActive = memInst !== 'bubble' && memInst !== 'empty';
   const isWbActive = wbInst !== 'bubble' && wbInst !== 'empty';
+
+  // 명령어 파싱 및 세부 동작 분류
+  const parseOp = (assembly: string | null | undefined): string => {
+    if (!assembly) return "";
+    const trimmed = assembly.trim().toLowerCase();
+    if (trimmed === "bubble" || trimmed === "empty" || trimmed === "flush" || trimmed === "stall") return "";
+    const match = trimmed.match(/^([a-z0-9_.]+)/);
+    return match ? match[1] : "";
+  };
+
+  const isRType = (op: string) =>
+    /^(add|sub|and|or|xor|sll|srl|sra|slt|sltu|mul|mulh|mulhsu|mulhu|div|divu|rem|remu)$/.test(op);
+  const isITypeAlu = (op: string) =>
+    /^(addi|andi|ori|xori|slti|sltiu|slli|srli|srai|li|mv|not|neg|seqz|snez)$/.test(op);
+  const isLoad = (op: string) =>
+    /^(lw|lh|lb|lhu|lbu)$/.test(op);
+  const isStore = (op: string) =>
+    /^(sw|sh|sb)$/.test(op);
+  const isBranch = (op: string) =>
+    /^(beq|bne|blt|bge|bltu|bgeu|beqz|bnez|bltz|bgez|blez|bgtz)$/.test(op);
+  const isJump = (op: string) =>
+    /^(jal|jalr|j|jr|ret|call|tail)$/.test(op);
+  const isLui = (op: string) => op === "lui";
+  const isAuipc = (op: string) => op === "auipc";
+
+  const usesRs1 = (op: string) =>
+    isRType(op) || isITypeAlu(op) || isLoad(op) || isStore(op) || isBranch(op) || op === "jalr" || op === "jr" || op === "ret" ||
+    (!isRType(op) && !isITypeAlu(op) && !isLoad(op) && !isStore(op) && !isBranch(op) && !isJump(op) && !isLui(op) && !isAuipc(op) && Boolean(op));
+  const usesRs2 = (op: string) =>
+    isRType(op) || isStore(op) || isBranch(op);
+  const usesImm = (op: string) =>
+    isITypeAlu(op) || isLoad(op) || isStore(op) || isBranch(op) || isLui(op) || isAuipc(op) || isJump(op) ||
+    (!isRType(op) && Boolean(op));
+  const usesPc = (op: string) =>
+    isBranch(op) || isJump(op) || isAuipc(op);
+  const writesReg = (op: string) =>
+    isRType(op) || isITypeAlu(op) || isLoad(op) || isLui(op) || isAuipc(op) || op === "jal" || op === "jalr" || op === "call" ||
+    (!isStore(op) && !isBranch(op) && Boolean(op));
+
+  const ifOp = parseOp(ifInst);
+  const idOp = parseOp(idInst);
+  const exOp = parseOp(exInst);
+  const memOp = parseOp(memInst);
+  const wbOp = parseOp(wbInst);
+
+  // [IF 단계 와이어 활성 조건]
+  const ifPcMuxToPcActive = isIfActive;
+  const ifPcToImemActive = isIfActive;
+  const ifPcToPlus4Active = isIfActive;
+  const ifPcToIfIdActive = isIfActive && usesPc(ifOp);
+  const ifPlus4LoopbackActive = isIfActive && !isBranchFlush;
+  const branchLoopbackActive = isBranchFlush || Boolean(cycle_events.control_hazard?.taken);
+  const ifImemToIfIdActive = isIfActive;
+
+  // [ID 단계 와이어 활성 조건]
+  const idTrunkActive = isIdActive;
+  const idControlUnitActive = isIdActive;
+  const idToRegsActive = isIdActive && (usesRs1(idOp) || usesRs2(idOp));
+  const idToImmGenActive = isIdActive && usesImm(idOp);
+  const idRd1ToIdExActive = isIdActive && usesRs1(idOp);
+  const idRd2ToIdExActive = isIdActive && usesRs2(idOp);
+  const idImmToIdExActive = isIdActive && usesImm(idOp);
+  const idPcToIdExActive = isIdActive && usesPc(idOp);
+
+  // [EX 단계 와이어 활성 조건]
+  const exRd1ToAluActive = isExActive && usesRs1(exOp);
+  const exRd2TrunkActive = isExActive && usesRs2(exOp);
+  const exRd2ToAluSrcActive = isExActive && (isRType(exOp) || isBranch(exOp));
+  const exRd2ToWriteDataActive = isExActive && isStore(exOp);
+  const exImmTrunkActive = isExActive && usesImm(exOp);
+  const exImmToAluSrcActive = isExActive && (isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
+  const exAluSrcToAluActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isBranch(exOp) || isLui(exOp) || exOp === "jalr");
+  const exImmToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
+  const exPcToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
+  const exAluToExMemActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || isAuipc(exOp) || exOp === "jalr");
+
+  // [MEM 단계 와이어 활성 조건]
+  const memAluTrunkActive = isMemActive && (isLoad(memOp) || isStore(memOp) || isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
+  const memAluToDmemAddrActive = isMemActive && (isLoad(memOp) || isStore(memOp));
+  const memAluBypassActive = isMemActive && (isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
+  const memWriteDataActive = isMemActive && isStore(memOp);
+  const memDmemReadDataActive = isMemActive && isLoad(memOp);
+
+  // [WB 단계 와이어 활성 조건]
+  const wbAluBypassActive = isWbActive && (isRType(wbOp) || isITypeAlu(wbOp) || isLui(wbOp) || isAuipc(wbOp) || wbOp === "jalr");
+  const wbDmemReadDataActive = isWbActive && isLoad(wbOp);
+  const wbReverseFeedbackActive = isWbActive && writesReg(wbOp);
+
+  const wireStyle = (active: boolean): React.CSSProperties => ({
+    opacity: active ? 1 : 0,
+    transition: "opacity 0.25s ease-in-out",
+    pointerEvents: active ? "auto" : "none",
+  });
 
   // 줌 조절
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)));
@@ -137,7 +212,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(CLK:{clock ?? 0})</span>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono w-16 shrink-0 tabular-nums">({isSingle ? `STEP:${clock ?? 0}` : `CYCLE:${clock ?? 0}`})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}
@@ -211,16 +286,18 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
         style={{ scrollbarGutter: "stable both-edges" }}
       >
         <div
-          className="m-auto shrink-0 transition-[height] duration-150"
+          className="m-auto shrink-0 transition-all duration-150 border-2 border-black dark:border-white"
           style={{
             height: `${zoomLevel * 100}%`,
+            maxHeight: "100%",
+            maxWidth: "100%",
             aspectRatio: `${MASTER_WIDTH} / ${MASTER_HEIGHT}`,
           }}
         >
           <svg
-            viewBox="-60 0 1060 1290"
+            viewBox="-60 -65 1150 1390"
             preserveAspectRatio="xMidYMid meet"
-            className="w-full h-full select-none block"
+            className="w-full h-full select-none block border-2 border-black dark:border-white"
           >
             <defs>
               {/* 정밀 화살표 마커 (끝점 refX=8.5로 선 끝이 박스 경계에 정확히 닿도록 설정) */}
@@ -271,296 +348,455 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             </defs>
 
             {/* ============================================================ */}
-            {/* [좌측 레인] 스테이지 풀네임 뱃지 5개 (확대 규격: x=-52, w=122, h=54) */}
+            {/* [1열: 좌측 열] 스테이지 + 명령어 2층 일체형 통합 카드 5개   */}
+            {/* (규격 20% 축소 조정: x=-40, w=276, h=92, rx=11 / 1층: 헤더 40px, 2층: 명령어 52px) */}
             {/* ============================================================ */}
-            {/* IF: Instruction Fetch */}
-            <rect x="-52" y="105" width="122" height="54" rx="8" fill="#EF4444" />
-            <text x="9" y="126" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Instruction
-            </text>
-            <text x="9" y="146" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Fetch
-            </text>
+            {/* 1. IF: Instruction Fetch (Row center: y=142.5 -> card y=96) */}
+            <g>
+              <rect
+                x="-40"
+                y="96"
+                width="276"
+                height="92"
+                rx="11"
+                fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
+                stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
+                strokeWidth="2.2"
+              />
+              <path
+                d="M -40,107 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
+                fill={isIfActive ? "#EF4444" : "#94A3B8"}
+              />
+              <text
+                x="98"
+                y="116"
+                dominantBaseline="central"
+                fill="#FFFFFF"
+                fontSize="16"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                IF · Instruction Fetch
+              </text>
+              <line
+                x1="-40"
+                y1="136"
+                x2="236"
+                y2="136"
+                stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
+                strokeWidth="1.5"
+              />
+              <text
+                x="98"
+                y="162"
+                dominantBaseline="central"
+                fill={isIfActive ? "#991B1B" : "#94A3B8"}
+                fontSize="19"
+                fontFamily="'D2Coding', Consolas, monospace"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {ifInst}
+              </text>
+            </g>
 
-            {/* ID: Instruction Decode */}
-            <rect x="-52" y="375" width="122" height="54" rx="8" fill="#F97316" />
-            <text x="9" y="396" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Instruction
-            </text>
-            <text x="9" y="416" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Decode
-            </text>
+            {/* 2. ID: Instruction Decode (Row center: y=425.5 -> card y=380) */}
+            <g>
+              <rect
+                x="-40"
+                y="380"
+                width="276"
+                height="92"
+                rx="11"
+                fill={isIdActive ? "#FFF7ED" : "#F8FAFC"}
+                stroke={isIdActive ? "#FB923C" : "#CBD5E1"}
+                strokeWidth="2.2"
+              />
+              <path
+                d="M -40,391 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
+                fill={isIdActive ? "#F97316" : "#94A3B8"}
+              />
+              <text
+                x="98"
+                y="400"
+                dominantBaseline="central"
+                fill="#FFFFFF"
+                fontSize="16"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                ID · Instruction Decode
+              </text>
+              <line
+                x1="-40"
+                y1="420"
+                x2="236"
+                y2="420"
+                stroke={isIdActive ? "#FB923C" : "#CBD5E1"}
+                strokeWidth="1.5"
+              />
+              <text
+                x="98"
+                y="446"
+                dominantBaseline="central"
+                fill={isIdActive ? "#C2410C" : "#94A3B8"}
+                fontSize="19"
+                fontFamily="'D2Coding', Consolas, monospace"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {idInst}
+              </text>
+            </g>
 
-            {/* EX: Execute (1단어 중앙 정렬) */}
-            <rect x="-52" y="670" width="122" height="54" rx="8" fill="#10B981" />
-            <text x="9" y="697" dominantBaseline="central" fill="#FFFFFF" fontSize="18.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Execute
-            </text>
+            {/* 3. EX: Execute (Row center: y=738 -> card y=692) */}
+            <g>
+              <rect
+                x="-40"
+                y="692"
+                width="276"
+                height="92"
+                rx="11"
+                fill={isExActive ? "#F0FDF4" : "#F8FAFC"}
+                stroke={isExActive ? "#10B981" : "#CBD5E1"}
+                strokeWidth="2.2"
+              />
+              <path
+                d="M -40,703 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
+                fill={isExActive ? "#10B981" : "#94A3B8"}
+              />
+              <text
+                x="98"
+                y="712"
+                dominantBaseline="central"
+                fill="#FFFFFF"
+                fontSize="17"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                EX · Execute
+              </text>
+              <line
+                x1="-40"
+                y1="732"
+                x2="236"
+                y2="732"
+                stroke={isExActive ? "#10B981" : "#CBD5E1"}
+                strokeWidth="1.5"
+              />
+              <text
+                x="98"
+                y="758"
+                dominantBaseline="central"
+                fill={isExActive ? "#15803D" : "#94A3B8"}
+                fontSize="19"
+                fontFamily="'D2Coding', Consolas, monospace"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {exInst}
+              </text>
+            </g>
 
-            {/* MEM: Memory Access */}
-            <rect x="-52" y="973" width="122" height="54" rx="8" fill="#0EA5E9" />
-            <text x="9" y="994" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Memory
-            </text>
-            <text x="9" y="1014" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Access
-            </text>
+            {/* 4. MEM: Memory Access (Row center: y=1046 -> card y=1000) */}
+            <g>
+              <rect
+                x="-40"
+                y="1000"
+                width="276"
+                height="92"
+                rx="11"
+                fill={isMemActive ? "#F0F9FF" : "#F8FAFC"}
+                stroke={isMemActive ? "#0EA5E9" : "#CBD5E1"}
+                strokeWidth="2.2"
+              />
+              <path
+                d="M -40,1011 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
+                fill={isMemActive ? "#0EA5E9" : "#94A3B8"}
+              />
+              <text
+                x="98"
+                y="1020"
+                dominantBaseline="central"
+                fill="#FFFFFF"
+                fontSize="16"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                MEM · Memory Access
+              </text>
+              <line
+                x1="-40"
+                y1="1040"
+                x2="236"
+                y2="1040"
+                stroke={isMemActive ? "#0EA5E9" : "#CBD5E1"}
+                strokeWidth="1.5"
+              />
+              <text
+                x="98"
+                y="1066"
+                dominantBaseline="central"
+                fill={isMemActive ? "#0369A1" : "#94A3B8"}
+                fontSize="19"
+                fontFamily="'D2Coding', Consolas, monospace"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {memInst}
+              </text>
+            </g>
 
-            {/* WB: Write Back */}
-            <rect x="-52" y="1199" width="122" height="54" rx="8" fill="#8B5CF6" />
-            <text x="9" y="1220" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Write
-            </text>
-            <text x="9" y="1240" fill="#FFFFFF" fontSize="15.5" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
-              Back
-            </text>
+            {/* 5. WB: Write Back */}
+            <g>
+              <rect
+                x="-40"
+                y="1221"
+                width="276"
+                height="92"
+                rx="11"
+                fill={isWbActive ? "#F5F3FF" : "#F8FAFC"}
+                stroke={isWbActive ? "#8B5CF6" : "#CBD5E1"}
+                strokeWidth="2.2"
+              />
+              <path
+                d="M -40,1232 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
+                fill={isWbActive ? "#8B5CF6" : "#94A3B8"}
+              />
+              <text
+                x="98"
+                y="1241"
+                dominantBaseline="central"
+                fill="#FFFFFF"
+                fontSize="16"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                WB · Write Back
+              </text>
+              <line
+                x1="-40"
+                y1="1261"
+                x2="236"
+                y2="1261"
+                stroke={isWbActive ? "#8B5CF6" : "#CBD5E1"}
+                strokeWidth="1.5"
+              />
+              <text
+                x="98"
+                y="1287"
+                dominantBaseline="central"
+                fill={isWbActive ? "#6D28D9" : "#94A3B8"}
+                fontSize="19"
+                fontFamily="'D2Coding', Consolas, monospace"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {wbInst}
+              </text>
+            </g>
 
             {/* ============================================================ */}
-            {/* [우측 레인] 어셈블리 명령어 뱃지 5개 (수직 1자 정렬: x=714, w=273) */}
+            {/* [2열: 우측 열] 순수 데이터패스 본체 (요소들 우측 30px 이동)    */}
             {/* ============================================================ */}
-            {/* IF Inst */}
-            <rect
-              x="714"
-              y="115"
-              width="273"
-              height="34"
-              rx="6"
-              fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
-              stroke={isIfActive ? "#F87171" : "#E2E8F0"}
-              strokeWidth="1.5"
-            />
-            <text
-              x="850.5"
-              y="137"
-              fill={isIfActive ? "#991B1B" : "#94A3B8"}
-              fontSize="14"
-              fontFamily="'D2Coding', Consolas, monospace"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {ifInst}
-            </text>
-
-            {/* ID Inst */}
-            <rect
-              x="714"
-              y="385"
-              width="273"
-              height="34"
-              rx="6"
-              fill={isIdActive ? "#FFF7ED" : "#F8FAFC"}
-              stroke={isIdActive ? "#FB923C" : "#E2E8F0"}
-              strokeWidth="1.5"
-            />
-            <text
-              x="850.5"
-              y="407"
-              fill={isIdActive ? "#C2410C" : "#94A3B8"}
-              fontSize="14"
-              fontFamily="'D2Coding', Consolas, monospace"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {idInst}
-            </text>
-
-            {/* EX Inst */}
-            <rect
-              x="714"
-              y="680"
-              width="273"
-              height="34"
-              rx="6"
-              fill={isExActive ? "#FEFCE8" : "#F8FAFC"}
-              stroke={isExActive ? "#FACC15" : "#E2E8F0"}
-              strokeWidth="1.5"
-            />
-            <text
-              x="850.5"
-              y="702"
-              fill={isExActive ? "#854D0E" : "#94A3B8"}
-              fontSize="14"
-              fontFamily="'D2Coding', Consolas, monospace"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {exInst}
-            </text>
-
-            {/* MEM Inst */}
-            <rect
-              x="714"
-              y="983"
-              width="273"
-              height="34"
-              rx="6"
-              fill={isMemActive ? "#F0FDF4" : "#F8FAFC"}
-              stroke={isMemActive ? "#4ADE80" : "#E2E8F0"}
-              strokeWidth="1.5"
-            />
-            <text
-              x="850.5"
-              y="1005"
-              fill={isMemActive ? "#15803D" : "#94A3B8"}
-              fontSize="14"
-              fontFamily="'D2Coding', Consolas, monospace"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {memInst}
-            </text>
-
-            {/* WB Inst */}
-            <rect
-              x="714"
-              y="1209"
-              width="273"
-              height="34"
-              rx="6"
-              fill={isWbActive ? "#EFF6FF" : "#F8FAFC"}
-              stroke={isWbActive ? "#60A5FA" : "#E2E8F0"}
-              strokeWidth="1.5"
-            />
-            <text
-              x="850.5"
-              y="1231"
-              fill={isWbActive ? "#1D4ED8" : "#94A3B8"}
-              fontSize="14"
-              fontFamily="'D2Coding', Consolas, monospace"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {wbInst}
-            </text>
-
+            <g transform="translate(210, 0)">
             {/* ============================================================ */}
-            {/* [중앙 레인] 순수 데이터패스 본체                              */}
+            {/* 부품 0: PC MUX (분기 선택기: 0=PC+4, 1=Branch Target - EX/WB와 규격 통일: 100x38, center 380) */}
             {/* ============================================================ */}
-            <g transform="translate(15, 0)">
-            {/* 부품 1: PC (가로 확장 width=240, x=230, center=350, 가로 한 줄 10진수 표기) */}
             <rect
-              x="230"
-              y="68"
-              width="240"
-              height="52"
-              rx="8"
-              fill={isIfActive ? "url(#g-pc)" : "#FFFFFF"}
-              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
+              x="330"
+              y="14"
+              width="100"
+              height="38"
+              rx="19"
+              ry="19"
+              fill={ifPcMuxToPcActive ? "#EFF6FF" : "#F8FAFC"}
+              stroke={ifPcMuxToPcActive ? "#3B82F6" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
-              x="260"
-              y="94"
+              x="380"
+              y="33"
               dominantBaseline="central"
+              fill={ifPcMuxToPcActive ? "#1E40AF" : "#94A3B8"}
+              fontSize="18"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
+              MUX
+            </text>
+
+            {/* PC MUX ➔ PC 직하강 화살표 (MUX 하단 y=52 ➔ PC 상단 y=78) */}
+            <line
+              x1="380"
+              y1="52"
+              x2="380"
+              y2="78"
+              stroke={ifPcMuxToPcActive ? "#EF4444" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={ifPcMuxToPcActive ? "url(#m-arr-red)" : undefined}
+              style={wireStyle(ifPcMuxToPcActive)}
+            />
+
+            {/* 부품 1: PC (세로 확장 height=56, y=80..136, center=380) */}
+            <rect
+              x="260"
+              y="80"
+              width="240"
+              height="56"
+              rx="8"
+              fill={isIfActive ? "url(#g-pc)" : "#F8FAFC"}
+              stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
+              strokeWidth="2"
+            />
+            <text
+              x="380"
+              y="108"
+              dominantBaseline="central"
+              textAnchor="middle"
               className="select-none"
-              fill={isIfActive ? "#991B1B" : "#1E293B"}
-              fontSize="16"
+              fill={isIfActive ? "#991B1B" : "#94A3B8"}
+              fontSize="21"
               fontWeight="bold"
               fontFamily="sans-serif"
             >
               PC
             </text>
-            <text
-              x="300"
-              y="94"
-              dominantBaseline="central"
-              textAnchor="middle"
-              className="select-none"
-              fill={isIfActive ? "#EF4444" : "#94A3B8"}
-              fontSize="15"
-              fontWeight="bold"
-              fontFamily="sans-serif"
-            >
-              ➔
-            </text>
-            <text
-              x="330"
-              y="94"
-              dominantBaseline="central"
-              className="select-none"
-              fill={isIfActive ? "#B91C1C" : "#0F172A"}
-              fontSize="16"
-              fontFamily="'D2Coding', Consolas, monospace"
-              fontWeight="bold"
-            >
-              {decimalPc}
-            </text>
 
             {/* PC ➔ Instruction Memory 직하강 화살표 */}
             <line
-              x1="350"
-              y1="120"
-              x2="350"
-              y2="148"
-              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
-              strokeWidth="3.2"
-              className={isIfActive ? "stream-down-active" : undefined}
-              markerEnd={isIfActive ? "url(#m-arr-red)" : "url(#m-arr-def)"}
+              x1="380"
+              y1="136"
+              x2="380"
+              y2="174"
+              stroke={ifPcToImemActive ? "#EF4444" : "transparent"}
+              strokeWidth="2.8"
+              className={ifPcToImemActive ? "stream-down-active" : undefined}
+              markerEnd={ifPcToImemActive ? "url(#m-arr-red)" : undefined}
+              style={wireStyle(ifPcToImemActive)}
             />
 
-            {/* PC ➔ PC + 4 Adder 분기 화살표 */}
+            {/* PC ➔ PC + 4 Adder 연결 화살표 (x=500 -> 682, y=108) */}
             <path
-              d="M 470,94 L 522,94"
+              d="M 500,108 L 682,108"
               fill="none"
-              stroke={isIfActive ? "#EF4444" : "#94A3B8"}
-              strokeWidth="2.2"
-              markerEnd={isIfActive ? "url(#m-arr-red)" : "url(#m-arr-def)"}
+              stroke={ifPcToPlus4Active ? "#EF4444" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={ifPcToPlus4Active ? "url(#m-arr-red)" : undefined}
+              style={wireStyle(ifPcToPlus4Active)}
             />
-            {/* PC + 4 가산기 */}
+            {/* PC 분기 노드 및 IF/ID BUFFER 직하강 라인 (x=637 일직선 유지, RISC-V 순수 PC 전달) */}
+            <circle
+              cx="637"
+              cy="108"
+              r="3.5"
+              fill={ifPcToIfIdActive ? "#EF4444" : "transparent"}
+              style={wireStyle(ifPcToIfIdActive)}
+            />
+            <line
+              x1="637"
+              y1="108"
+              x2="637"
+              y2="283"
+              stroke={ifPcToIfIdActive ? "#EF4444" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={ifPcToIfIdActive ? "url(#m-arr-red)" : undefined}
+              style={wireStyle(ifPcToIfIdActive)}
+            />
+
+            {/* PC + 4 가산기 (Control Unit과 동일한 center cx=721로 이동) */}
             <polygon
-              points="525,74 615,74 595,114 545,114"
-              fill="#F8FAFC"
-              stroke="#94A3B8"
+              points="676,88 766,88 746,128 696,128"
+              fill={ifPlus4LoopbackActive ? "#FEF2F2" : "#F8FAFC"}
+              stroke={ifPlus4LoopbackActive ? "#EF4444" : "#CBD5E1"}
               strokeWidth="2"
               strokeLinejoin="round"
             />
-            <text x="570" y="94" dominantBaseline="central" fill="#1E293B" fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="721"
+              y="108"
+              dominantBaseline="central"
+              fill={ifPlus4LoopbackActive ? "#991B1B" : "#94A3B8"}
+              fontSize="18"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               + 4
             </text>
-            {/* PC + 4 루프백 피드백 화살표: 상단 y=28, 수직낙하 38px로 세로길이 최적화 */}
+
+            {/* PC + 4 루프백 ➔ PC MUX 입력 0 (포트 0: 상단 x=410 직하강 인입, 우측 회랑 x=800) */}
             <path
-              d="M 570,114 L 570,134 L 635,134 L 635,28 L 350,28 L 350,66"
+              d="M 721,128 L 721,168 L 800,168 L 800,-22 L 410,-22 L 410,12"
               fill="none"
-              stroke="#94A3B8"
-              strokeWidth="1.8"
-              strokeDasharray="5 3"
-              markerEnd="url(#m-arr-def)"
+              stroke={ifPlus4LoopbackActive ? "#EF4444" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={ifPlus4LoopbackActive ? "url(#m-arr-red)" : undefined}
+              style={wireStyle(ifPlus4LoopbackActive)}
             />
 
-            {/* 부품 2: Instruction Memory */}
+            {/* Branch Target Address ➔ PC MUX 입력 1 (포트 1: EX Branch Add ➔ 우측 외곽 회랑 x=835 ➔ 상단 x=350 직하강) */}
+            <path
+              d="M 590,808 L 590,845 L 835,845 L 835,-50 L 350,-50 L 350,12"
+              fill="none"
+              stroke={branchLoopbackActive ? "#EF4444" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={branchLoopbackActive ? "url(#m-arr-red)" : undefined}
+              style={wireStyle(branchLoopbackActive)}
+            />
+
+            {/* 부품 2: Instruction Memory (세로 확장 height=72, y=176..248, center=380) */}
             <rect
-              x="200"
-              y="150"
+              x="230"
+              y="176"
               width="300"
-              height="64"
+              height="72"
               rx="8"
-              fill={isIfActive ? "url(#g-imem)" : "#FFFFFF"}
-              stroke={isIfActive ? "#3B82F6" : "#94A3B8"}
+              fill={isIfActive ? "url(#g-imem)" : "#F8FAFC"}
+              stroke={isIfActive ? "#3B82F6" : "#CBD5E1"}
               strokeWidth="2"
             />
-            <text x="350" y="182" dominantBaseline="central" fill={isIfActive ? "#1E40AF" : "#1E293B"} fontSize="16" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="380"
+              y="212"
+              dominantBaseline="central"
+              fill={isIfActive ? "#1E40AF" : "#94A3B8"}
+              fontSize="21"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               Instruction Memory
             </text>
 
             {/* Instruction Memory ➔ IF/ID BUFFER 직하강 화살표 */}
             <line
-              x1="350"
-              y1="214"
-              x2="350"
-              y2="238"
-              stroke={isIfActive ? "#DC2626" : "#94A3B8"}
-              strokeWidth="3.2"
-              className={isIfActive ? "stream-down-active" : undefined}
-              markerEnd={isIfActive ? "url(#m-arr-red)" : "url(#m-arr-def)"}
+              x1="380"
+              y1="248"
+              x2="380"
+              y2="283"
+              stroke={ifImemToIfIdActive ? "#DC2626" : "transparent"}
+              strokeWidth="2.8"
+              className={ifImemToIfIdActive ? "stream-down-active" : undefined}
+              markerEnd={ifImemToIfIdActive ? "url(#m-arr-red)" : undefined}
+              style={wireStyle(ifImemToIfIdActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 1: IF / ID BUFFER (Y = 240 ~ 266)             */}
+            {/* 파이프라인 버퍼 1: IF / ID BUFFER (가로길이 30% 확장: w=690, x=110) */}
             {/* ============================================================ */}
             <rect
-              x="130"
-              y="240"
-              width="530"
+              x="110"
+              y="285"
+              width="690"
               height="26"
               rx="6"
               fill="url(#g-buffer)"
@@ -568,10 +804,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               strokeWidth="1.6"
             />
             <text
-              x="395"
-              y="258"
+              x="455"
+              y="298"
+              dominantBaseline="central"
               fill="#1E293B"
-              fontSize="13"
+              fontSize="15.5"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -581,115 +818,184 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             </text>
 
             {/* ============================================================ */}
-            {/* [STAGE 2] INSTRUCTION DECODE (ID) : Y = 280 ~ 505            */}
+            {/* [STAGE 2] INSTRUCTION DECODE (ID) : Y = 311 ~ 540            */}
             {/* ============================================================ */}
-            {/* IF/ID BUFFER에서 Register File / Imm Gen / Control Unit으로 분기되는 명령어 버스 (중간점 y=306에서 꺾임) */}
-            <path
-              d="M 350,266 L 350,306 L 250,306 L 250,344"
-              fill="none"
-              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-              strokeWidth="2.6"
-              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+            {/* IF/ID BUFFER 직하강 트렁크 (x=380, y=311 -> 336) */}
+            <line
+              x1="380"
+              y1="311"
+              x2="380"
+              y2="336"
+              stroke={idTrunkActive ? "#EA580C" : "transparent"}
+              strokeWidth="2.8"
+              style={wireStyle(idTrunkActive)}
             />
+            {/* IF/ID BUFFER ➔ Register File 분기 버스 */}
             <path
-              d="M 350,306 L 490,306 L 490,344"
+              d="M 380,336 L 280,336 L 280,366"
               fill="none"
-              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-              strokeWidth="2.2"
-              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+              stroke={idToRegsActive ? "#EA580C" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={idToRegsActive ? "url(#m-arr-orange)" : undefined}
+              style={wireStyle(idToRegsActive)}
             />
+            {/* IF/ID BUFFER ➔ Imm Gen 분기 버스 */}
             <path
-              d="M 490,306 L 600,306 L 600,354"
+              d="M 380,336 L 543,336 L 543,374"
               fill="none"
-              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-              strokeWidth="1.8"
-              strokeDasharray="4 2"
-              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+              stroke={idToImmGenActive ? "#EA580C" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={idToImmGenActive ? "url(#m-arr-orange)" : undefined}
+              style={wireStyle(idToImmGenActive)}
+            />
+            {/* IF/ID BUFFER ➔ Control Unit 분기 버스 */}
+            <path
+              d="M 380,336 L 721,336 L 721,374"
+              fill="none"
+              stroke={idControlUnitActive ? "#EA580C" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : undefined}
+              style={wireStyle(idControlUnitActive)}
             />
 
-            {/* 부품 3: Registers (x=135, width=230) */}
+            {/* 부품 3: Registers (x=165, width=230, y=368..480, center=280) */}
             <rect
-              x="135"
-              y="346"
+              x="165"
+              y="368"
               width="230"
               height="112"
               rx="8"
-              fill={isIdActive ? "url(#g-regfile)" : "#FFFFFF"}
-              stroke={isIdActive ? "#16A34A" : "#94A3B8"}
+              fill={idToRegsActive ? "url(#g-regfile)" : "#F8FAFC"}
+              stroke={idToRegsActive ? "#16A34A" : "#CBD5E1"}
               strokeWidth="2"
             />
-            <text x="250" y="402" dominantBaseline="central" fill={isIdActive ? "#15803D" : "#1E293B"} fontSize="16" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="280"
+              y="424"
+              dominantBaseline="central"
+              fill={idToRegsActive ? "#15803D" : "#94A3B8"}
+              fontSize="21"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               Registers
             </text>
 
-            {/* 부품 4: Imm Gen (타원형 rx=50, ry=48, cx=490) */}
+            {/* 부품 4: Imm Gen (타원형 rx=50, ry=48, cx=543, 우측 끝=593, 라인 간격=44px) */}
             <ellipse
-              cx="490"
-              cy="402"
+              cx="543"
+              cy="424"
               rx="50"
               ry="48"
-              fill={isIdActive ? "#F0F9FF" : "#FFFFFF"}
-              stroke={isIdActive ? "#0284C7" : "#94A3B8"}
+              fill={idToImmGenActive ? "#F0F9FF" : "#F8FAFC"}
+              stroke={idToImmGenActive ? "#0284C7" : "#CBD5E1"}
               strokeWidth="2"
             />
-            <text x="490" y="402" dominantBaseline="central" fill={isIdActive ? "#0369A1" : "#1E293B"} fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="543"
+              y="424"
+              dominantBaseline="central"
+              fill={idToImmGenActive ? "#0369A1" : "#94A3B8"}
+              fontSize="18"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               Imm Gen
             </text>
 
-            {/* 부품 5: Control Unit (cx=600, rx=40, ry=48) */}
+            {/* 부품 5: Control Unit (라인 간격 44px 대칭: 좌측 끝=681, cx=721, rx=40, ry=48) */}
             <ellipse
-              cx="600"
-              cy="402"
+              cx="721"
+              cy="424"
               rx="40"
               ry="48"
-              fill="#F8FAFC"
-              stroke="#94A3B8"
+              fill={idControlUnitActive ? "#FFF7ED" : "#F8FAFC"}
+              stroke={idControlUnitActive ? "#EA580C" : "#CBD5E1"}
               strokeWidth="2"
             />
-            <text x="600" y="394" fill="#1E293B" fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="721"
+              y="415"
+              fill={idControlUnitActive ? "#C2410C" : "#94A3B8"}
+              fontSize="16.5"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               Control
             </text>
-            <text x="600" y="412" fill="#1E293B" fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="721"
+              y="435"
+              fill={idControlUnitActive ? "#C2410C" : "#94A3B8"}
+              fontSize="16.5"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               Unit
             </text>
 
-            {/* ID 단계 출력 3개 버스 ➔ ID/EX BUFFER (Y = 458 ➔ 515) */}
+            {/* ID 단계 출력 버스 ➔ ID/EX BUFFER (Y = 480 ➔ 538) */}
+            {/* 1) Read Data 1 */}
             <line
-              x1="210"
-              y1="458"
-              x2="210"
-              y2="513"
-              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-              strokeWidth="3.2"
-              className={isIdActive ? "stream-down-active" : undefined}
-              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+              x1="240"
+              y1="480"
+              x2="240"
+              y2="538"
+              stroke={idRd1ToIdExActive ? "#EA580C" : "transparent"}
+              strokeWidth="2.8"
+              className={idRd1ToIdExActive ? "stream-down-active" : undefined}
+              markerEnd={idRd1ToIdExActive ? "url(#m-arr-orange)" : undefined}
+              style={wireStyle(idRd1ToIdExActive)}
             />
+            {/* 2) Read Data 2 */}
             <line
-              x1="320"
-              y1="458"
-              x2="320"
-              y2="513"
-              stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-              strokeWidth="3.2"
-              className={isIdActive ? "stream-down-active" : undefined}
-              markerEnd={isIdActive ? "url(#m-arr-orange)" : "url(#m-arr-def)"}
+              x1="350"
+              y1="480"
+              x2="350"
+              y2="538"
+              stroke={idRd2ToIdExActive ? "#EA580C" : "transparent"}
+              strokeWidth="2.8"
+              className={idRd2ToIdExActive ? "stream-down-active" : undefined}
+              markerEnd={idRd2ToIdExActive ? "url(#m-arr-orange)" : undefined}
+              style={wireStyle(idRd2ToIdExActive)}
             />
-            <path
-              d="M 490,458 L 490,486 L 440,486 L 440,513"
-              fill="none"
-              stroke={isIdActive ? "#0284C7" : "#94A3B8"}
-              strokeWidth="2.4"
-              strokeDasharray="5 3"
-              markerEnd={isIdActive ? "url(#m-arr-cyan)" : "url(#m-arr-def)"}
+            {/* 3) Imm */}
+            <line
+              x1="543"
+              y1="472"
+              x2="543"
+              y2="538"
+              stroke={idImmToIdExActive ? "#0284C7" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={idImmToIdExActive ? "url(#m-arr-cyan)" : undefined}
+              style={wireStyle(idImmToIdExActive)}
+            />
+            {/* 4) PC 파이프라인 전달선 (IF/ID ➔ ID/EX, 일직선 수직 라인 x=637) */}
+            <line
+              x1="637"
+              y1="311"
+              x2="637"
+              y2="538"
+              stroke={idPcToIdExActive ? "#EA580C" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={idPcToIdExActive ? "url(#m-arr-orange)" : undefined}
+              style={wireStyle(idPcToIdExActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 2: ID / EX BUFFER (Y = 515 ~ 539)             */}
+            {/* 파이프라인 버퍼 2: ID / EX BUFFER (가로길이 30% 확장: w=690, x=110) */}
             {/* ============================================================ */}
             <rect
-              x="130"
-              y="515"
-              width="530"
+              x="110"
+              y="540"
+              width="690"
               height="26"
               rx="6"
               fill="url(#g-buffer)"
@@ -697,10 +1003,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               strokeWidth="1.6"
             />
             <text
-              x="395"
-              y="533"
+              x="455"
+              y="553"
+              dominantBaseline="central"
               fill="#1E293B"
-              fontSize="13"
+              fontSize="15.5"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -710,139 +1017,223 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             </text>
 
             {/* ============================================================ */}
-            {/* [STAGE 3] EXECUTE / ALU (EX) : Y = 555 ~ 830                 */}
+            {/* [STAGE 3] EXECUTE / ALU (EX) : Y = 566 ~ 910                  */}
             {/* ============================================================ */}
-            {/* 1) Read Data 1 (X = 210) ➔ ALU 좌측 입력 포트(X = 210, Y = 668)로 직하강 */}
+            {/* 1) Read Data 1 (X = 240) ➔ ALU 좌측 입력 포트(X = 240, Y = 739)로 직하강 */}
             <line
-              x1="210"
-              y1="541"
-              x2="210"
-              y2="666"
-              stroke={isExActive ? "#D97706" : "#94A3B8"}
-              strokeWidth="3.2"
-              className={isExActive ? "stream-down-active" : undefined}
-              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
-            />
-
-            {/* 2) Read Data 2 (X = 320) ➔ ALUSrc MUX 좌측 입력(X = 320, Y = 600) */}
-            <line
-              x1="320"
-              y1="541"
-              x2="320"
-              y2="600"
-              stroke={isExActive ? "#D97706" : "#94A3B8"}
+              x1="240"
+              y1="566"
+              x2="240"
+              y2="739"
+              stroke={exRd1ToAluActive ? "#D97706" : "transparent"}
               strokeWidth="2.8"
-              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
+              className={exRd1ToAluActive ? "stream-down-active" : undefined}
+              markerEnd={exRd1ToAluActive ? "url(#m-arr-amber)" : undefined}
+              style={wireStyle(exRd1ToAluActive)}
             />
 
-            {/* 3) Imm (X = 440) ➔ ALUSrc MUX 우측 입력(X = 380, Y = 600) 및 Branch Adder 분기 (중간점 y=570에서 꺾임) */}
+            {/* 2) Read Data 2 Trunk (X = 350, Y = 566 -> 595) */}
+            <line
+              x1="350"
+              y1="566"
+              x2="350"
+              y2="595"
+              stroke={exRd2TrunkActive ? "#D97706" : "transparent"}
+              strokeWidth="2.8"
+              style={wireStyle(exRd2TrunkActive)}
+            />
+            {/* Read Data 2 ➔ ALUSrc MUX 좌측 입력(X = 350, Y = 595 -> 663) */}
+            <line
+              x1="350"
+              y1="595"
+              x2="350"
+              y2="663"
+              stroke={exRd2ToAluSrcActive ? "#D97706" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={exRd2ToAluSrcActive ? "url(#m-arr-amber)" : undefined}
+              style={wireStyle(exRd2ToAluSrcActive)}
+            />
+            {/* Read Data 2 분기 ➔ EX/MEM 버퍼 (Data Memory Write Data용, x=480 직하강) */}
             <path
-              d="M 440,541 L 440,570 L 380,570 L 380,600"
+              d="M 350,595 L 480,595 L 480,908"
               fill="none"
-              stroke={isExActive ? "#0284C7" : "#94A3B8"}
-              strokeWidth="2.4"
-              strokeDasharray="5 3"
-              markerEnd={isExActive ? "url(#m-arr-cyan)" : "url(#m-arr-def)"}
+              stroke={exRd2ToWriteDataActive ? "#D97706" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={exRd2ToWriteDataActive ? "url(#m-arr-amber)" : undefined}
+              style={wireStyle(exRd2ToWriteDataActive)}
+            />
+            <circle
+              cx="350"
+              cy="595"
+              r="3.5"
+              fill={exRd2ToWriteDataActive ? "#D97706" : "transparent"}
+              style={wireStyle(exRd2ToWriteDataActive)}
             />
 
-            {/* ALUSrc MUX (알약형 / Stadium Capsule: x=300, y=600, w=100, h=36, rx=18) */}
+            {/* 3) Imm Trunk (X = 543, Y = 566 -> 630) */}
+            <line
+              x1="543"
+              y1="566"
+              x2="543"
+              y2="630"
+              stroke={exImmTrunkActive ? "#0284C7" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              style={wireStyle(exImmTrunkActive)}
+            />
+            {/* Imm ➔ ALUSrc MUX 우측 입력(X = 410, Y = 663) 분기 */}
+            <path
+              d="M 543,630 L 410,630 L 410,663"
+              fill="none"
+              stroke={exImmToAluSrcActive ? "#0284C7" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={exImmToAluSrcActive ? "url(#m-arr-cyan)" : undefined}
+              style={wireStyle(exImmToAluSrcActive)}
+            />
+            <circle
+              cx="543"
+              cy="630"
+              r="3.5"
+              fill={exImmToAluSrcActive ? "#0284C7" : "transparent"}
+              style={wireStyle(exImmToAluSrcActive)}
+            />
+
+            {/* ALUSrc MUX (알약형 / Stadium Capsule: x=330, y=665, w=100, h=38, rx=19, center 380) */}
             <rect
-              x="300"
-              y="600"
+              x="330"
+              y="665"
               width="100"
-              height="36"
-              rx="18"
-              ry="18"
-              fill={isExActive ? "#EFF6FF" : "#FFFFFF"}
-              stroke={isExActive ? "#3B82F6" : "#94A3B8"}
+              height="38"
+              rx="19"
+              ry="19"
+              fill={exAluSrcToAluActive ? "#EFF6FF" : "#F8FAFC"}
+              stroke={exAluSrcToAluActive ? "#3B82F6" : "#CBD5E1"}
               strokeWidth="2"
             />
-            <text x="350" y="618" dominantBaseline="central" fill={isExActive ? "#1E40AF" : "#1E293B"} fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="380"
+              y="684"
+              dominantBaseline="central"
+              fill={exAluSrcToAluActive ? "#1E40AF" : "#94A3B8"}
+              fontSize="18"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               MUX
             </text>
 
-            {/* ALUSrc MUX 출력 (X = 350, Y = 636) ➔ ALU 우측 입력 포트(X = 350, Y = 668) */}
+            {/* ALUSrc MUX 출력 (X = 380, Y = 703) ➔ ALU 우측 입력 포트(X = 380, Y = 739) */}
             <line
-              x1="350"
-              y1="636"
-              x2="350"
-              y2="666"
-              stroke={isExActive ? "#D97706" : "#94A3B8"}
-              strokeWidth="3.2"
-              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
+              x1="380"
+              y1="703"
+              x2="380"
+              y2="739"
+              stroke={exAluSrcToAluActive ? "#D97706" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={exAluSrcToAluActive ? "url(#m-arr-amber)" : undefined}
+              style={wireStyle(exAluSrcToAluActive)}
             />
 
-            {/* 부품 6: ALU (교과서 완만한 V홈 사다리꼴 실루엣, center x=280) */}
-            <g className={isExActive ? "glow-active-ex" : undefined}>
+            {/* 부품 6: ALU (center x=310, y=741..869, h=128) */}
+            <g className={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "glow-active-ex" : undefined}>
               <polygon
                 points="
-                  150,668
-                  240,668
-                  280,708
-                  320,668
-                  410,668
-                  375,788
-                  185,788
+                  180,741
+                  270,741
+                  310,783
+                  350,741
+                  440,741
+                  405,869
+                  215,869
                 "
-                fill={isExActive ? "#FEF9C3" : "#FFFFFF"}
-                stroke={isExActive ? "#D97706" : "#94A3B8"}
+                fill={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#FEF9C3" : "#F8FAFC"}
+                stroke={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#D97706" : "#CBD5E1"}
                 strokeWidth="2"
                 strokeLinejoin="round"
               />
-              <text x="280" y="745" dominantBaseline="central" fill={isExActive ? "#78350F" : "#1E293B"} fontSize="16" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle" letterSpacing="2">
+              <text
+                x="310"
+                y="825"
+                dominantBaseline="central"
+                fill={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#78350F" : "#94A3B8"}
+                fontSize="21"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+                letterSpacing="2"
+              >
                 ALU
               </text>
             </g>
 
-            {/* 우측 Branch Adder */}
-            <path
-              d="M 440,570 L 440,605 L 560,605 L 560,683"
-              fill="none"
-              stroke="#94A3B8"
-              strokeWidth="2"
-              strokeDasharray="5 3"
-              markerEnd="url(#m-arr-def)"
+            {/* 우측 Branch Adder (center 590: 좌측 포트 x=543, 우측 포트 x=637 수직 직하강) */}
+            {/* Branch Add 입력 1: Imm (좌측 포트 x=543, y=630 -> 743 수직 직하강) */}
+            <line
+              x1="543"
+              y1="630"
+              x2="543"
+              y2="743"
+              stroke={exImmToBranchAddActive ? "#0284C7" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={exImmToBranchAddActive ? "url(#m-arr-cyan)" : undefined}
+              style={wireStyle(exImmToBranchAddActive)}
+            />
+            {/* Branch Add 입력 2: PC (우측 포트 x=637 수직 직하강) */}
+            <line
+              x1="637"
+              y1="566"
+              x2="637"
+              y2="743"
+              stroke={exPcToBranchAddActive ? "#D97706" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray="6 3"
+              markerEnd={exPcToBranchAddActive ? "url(#m-arr-amber)" : undefined}
+              style={wireStyle(exPcToBranchAddActive)}
             />
             <polygon
-              points="510,685 610,685 590,725 530,725"
-              fill="#F8FAFC"
-              stroke="#94A3B8"
+              points="515,745 665,745 635,808 545,808"
+              fill={branchLoopbackActive ? "#FEF2F2" : exPcToBranchAddActive ? "#FEF9C3" : "#F8FAFC"}
+              stroke={branchLoopbackActive ? "#EF4444" : exPcToBranchAddActive ? "#D97706" : "#CBD5E1"}
               strokeWidth="2"
               strokeLinejoin="round"
             />
-            <text x="560" y="705" dominantBaseline="central" fill="#1E293B" fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="590"
+              y="776.5"
+              dominantBaseline="central"
+              fill={branchLoopbackActive ? "#991B1B" : exPcToBranchAddActive ? "#78350F" : "#94A3B8"}
+              fontSize="20"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               Branch Add
             </text>
-            <line
-              x1="560"
-              y1="725"
-              x2="560"
-              y2="838"
-              stroke="#94A3B8"
-              strokeWidth="2"
-              strokeDasharray="5 3"
-              markerEnd="url(#m-arr-def)"
-            />
 
-            {/* ALU 출력(X = 280, Y = 788) ➔ EX/MEM BUFFER (Y = 840) 직하강 */}
+            {/* ALU 출력(X = 310, Y = 869) ➔ EX/MEM BUFFER (Y = 910) 직하강 */}
             <line
-              x1="280"
-              y1="788"
-              x2="280"
-              y2="838"
-              stroke={isExActive ? "#D97706" : "#94A3B8"}
-              strokeWidth="3.4"
-              className={isExActive ? "stream-down-active" : undefined}
-              markerEnd={isExActive ? "url(#m-arr-amber)" : "url(#m-arr-def)"}
+              x1="310"
+              y1="869"
+              x2="310"
+              y2="908"
+              stroke={exAluToExMemActive ? "#D97706" : "transparent"}
+              strokeWidth="2.8"
+              className={exAluToExMemActive ? "stream-down-active" : undefined}
+              markerEnd={exAluToExMemActive ? "url(#m-arr-amber)" : undefined}
+              style={wireStyle(exAluToExMemActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 3: EX / MEM BUFFER (Y = 840 ~ 864)            */}
+            {/* 파이프라인 버퍼 3: EX / MEM BUFFER (가로길이 30% 확장: w=690, x=110) */}
             {/* ============================================================ */}
             <rect
-              x="130"
-              y="840"
-              width="530"
+              x="110"
+              y="910"
+              width="690"
               height="26"
               rx="6"
               fill="url(#g-buffer)"
@@ -850,10 +1241,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               strokeWidth="1.6"
             />
             <text
-              x="395"
-              y="858"
+              x="455"
+              y="923"
+              dominantBaseline="central"
               fill="#1E293B"
-              fontSize="13"
+              fontSize="15.5"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -863,60 +1255,104 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             </text>
 
             {/* ============================================================ */}
-            {/* [STAGE 4] MEMORY ACCESS (MEM) : Y = 880 ~ 1095               */}
+            {/* [STAGE 4] MEMORY ACCESS (MEM) : Y = 936 ~ 1156               */}
             {/* ============================================================ */}
-            {/* EX/MEM 버퍼에서 내려온 ALU Result 분기 */}
-            <path
-              d="M 280,866 L 280,943"
-              fill="none"
-              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
-              strokeWidth="3.2"
-              markerEnd={isMemActive ? "url(#m-arr-green)" : "url(#m-arr-def)"}
+            {/* ALU Result Trunk (X = 310, Y = 936 -> 965) */}
+            <line
+              x1="310"
+              y1="936"
+              x2="310"
+              y2="965"
+              stroke={memAluTrunkActive ? "#16A34A" : "transparent"}
+              strokeWidth="2.8"
+              style={wireStyle(memAluTrunkActive)}
             />
-            {/* EX/MEM 버퍼와 Data Memory 중간 위치(y=905)에서 분기되는 ALU Result Bypass */}
+            {/* 1) ALU Result 분기 ➔ Data Memory Address 입력 (X = 310, Y = 965 -> 994) */}
+            <line
+              x1="310"
+              y1="965"
+              x2="310"
+              y2="994"
+              stroke={memAluToDmemAddrActive ? "#16A34A" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={memAluToDmemAddrActive ? "url(#m-arr-green)" : undefined}
+              style={wireStyle(memAluToDmemAddrActive)}
+            />
+            {/* 2) ALU Result Bypass (EX/MEM ➔ MEM/WB 버퍼 직행, X = 225) */}
             <path
-              d="M 280,905 L 195,905 L 195,1103"
+              d="M 310,965 L 225,965 L 225,1154"
               fill="none"
-              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
-              strokeWidth="2.6"
+              stroke={memAluBypassActive ? "#16A34A" : "transparent"}
+              strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={isMemActive ? "url(#m-arr-green)" : "url(#m-arr-def)"}
+              markerEnd={memAluBypassActive ? "url(#m-arr-green)" : undefined}
+              style={wireStyle(memAluBypassActive)}
+            />
+            <circle
+              cx="310"
+              cy="965"
+              r="3.5"
+              fill={memAluBypassActive ? "#16A34A" : "transparent"}
+              style={wireStyle(memAluBypassActive)}
             />
 
-            {/* 부품 7: Data Memory (미니멀 라운드 박스, x=240, width=280) */}
+            {/* 3) Write Data (sw 명령어용: EX/MEM 버퍼 ➔ Data Memory Write Data 포트, X = 480) */}
+            <line
+              x1="480"
+              y1="936"
+              x2="480"
+              y2="994"
+              stroke={memWriteDataActive ? "#16A34A" : "transparent"}
+              strokeWidth="2.8"
+              className={memWriteDataActive ? "stream-down-active" : undefined}
+              markerEnd={memWriteDataActive ? "url(#m-arr-green)" : undefined}
+              style={wireStyle(memWriteDataActive)}
+            />
+
+            {/* 부품 7: Data Memory (미니멀 라운드 박스, x=270, width=280, y=996..1106, center=410) */}
             <rect
-              x="240"
-              y="945"
+              x="270"
+              y="996"
               width="280"
               height="110"
               rx="8"
-              fill={isMemActive ? "url(#g-dmem)" : "#FFFFFF"}
-              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
+              fill={memAluToDmemAddrActive ? "url(#g-dmem)" : "#F8FAFC"}
+              stroke={memAluToDmemAddrActive ? "#16A34A" : "#CBD5E1"}
               strokeWidth="2"
             />
-            <text x="380" y="1000" dominantBaseline="central" fill={isMemActive ? "#14532D" : "#1E293B"} fontSize="16" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="410"
+              y="1051"
+              dominantBaseline="central"
+              fill={memAluToDmemAddrActive ? "#14532D" : "#94A3B8"}
+              fontSize="21"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               Data Memory
             </text>
 
-            {/* Data Memory 출력 ➔ MEM/WB BUFFER */}
+            {/* Data Memory 출력 ➔ MEM/WB BUFFER (X = 470) */}
             <line
-              x1="440"
-              y1="1055"
-              x2="440"
-              y2="1103"
-              stroke={isMemActive ? "#16A34A" : "#94A3B8"}
-              strokeWidth="3.2"
-              className={isMemActive ? "stream-down-active" : undefined}
-              markerEnd={isMemActive ? "url(#m-arr-green)" : "url(#m-arr-def)"}
+              x1="470"
+              y1="1106"
+              x2="470"
+              y2="1154"
+              stroke={memDmemReadDataActive ? "#16A34A" : "transparent"}
+              strokeWidth="2.8"
+              className={memDmemReadDataActive ? "stream-down-active" : undefined}
+              markerEnd={memDmemReadDataActive ? "url(#m-arr-green)" : undefined}
+              style={wireStyle(memDmemReadDataActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 4: MEM / WB BUFFER (Y = 1105 ~ 1131)          */}
+            {/* 파이프라인 버퍼 4: MEM / WB BUFFER (가로길이 30% 확장: w=690, x=110) */}
             {/* ============================================================ */}
             <rect
-              x="130"
-              y="1105"
-              width="530"
+              x="110"
+              y="1156"
+              width="690"
               height="26"
               rx="6"
               fill="url(#g-buffer)"
@@ -924,10 +1360,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               strokeWidth="1.6"
             />
             <text
-              x="395"
-              y="1123"
+              x="455"
+              y="1169"
+              dominantBaseline="central"
               fill="#1E293B"
-              fontSize="13"
+              fontSize="15.5"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -937,40 +1374,53 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             </text>
 
             {/* ============================================================ */}
-            {/* [STAGE 5] WRITE-BACK (WB) : Y = 1145 ~ 1320                  */}
+            {/* [STAGE 5] WRITE-BACK (WB) : Y = 1182 ~ 1350                  */}
             {/* ============================================================ */}
-            {/* 1) ALU Result Bypass ➔ WB MUX 좌측 입력 (중간점 y=1168에서 꺾임) */}
+            {/* 1) ALU Result Bypass ➔ WB MUX 좌측 입력 (X = 225 -> 410) */}
             <path
-              d="M 195,1131 L 195,1168 L 345,1168 L 345,1206"
+              d="M 225,1182 L 225,1218 L 410,1218 L 410,1256"
               fill="none"
-              stroke={isWbActive ? "#2563EB" : "#94A3B8"}
-              strokeWidth="2.6"
+              stroke={wbAluBypassActive ? "#2563EB" : "transparent"}
+              strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={isWbActive ? "url(#m-arr-blue)" : "url(#m-arr-def)"}
+              markerEnd={wbAluBypassActive ? "url(#m-arr-blue)" : undefined}
+              style={wireStyle(wbAluBypassActive)}
             />
 
-            {/* 2) Data Memory Read Data ➔ WB MUX 우측 입력 (중간점 y=1168에서 꺾임) */}
-            <path
-              d="M 440,1131 L 440,1168 L 405,1168 L 405,1206"
-              fill="none"
-              stroke={isWbActive ? "#2563EB" : "#94A3B8"}
-              strokeWidth="3"
-              markerEnd={isWbActive ? "url(#m-arr-blue)" : "url(#m-arr-def)"}
+            {/* 2) Data Memory Read Data ➔ WB MUX 우측 입력 (X = 470 직선 직하강) */}
+            <line
+              x1="470"
+              y1="1182"
+              x2="470"
+              y2="1256"
+              stroke={wbDmemReadDataActive ? "#2563EB" : "transparent"}
+              strokeWidth="2.8"
+              markerEnd={wbDmemReadDataActive ? "url(#m-arr-blue)" : undefined}
+              style={wireStyle(wbDmemReadDataActive)}
             />
 
-            {/* 부품 8: WB MUX (알약형 / Stadium Capsule: x=325, y=1208, w=100, h=36, rx=18) */}
+            {/* 부품 8: WB MUX (알약형 / Stadium Capsule: x=390, y=1258, w=100, h=38, rx=19, center 440) */}
             <rect
-              x="325"
-              y="1208"
+              x="390"
+              y="1258"
               width="100"
-              height="36"
-              rx="18"
-              ry="18"
-              fill={isWbActive ? "#DBEAFE" : "#FFFFFF"}
-              stroke={isWbActive ? "#2563EB" : "#94A3B8"}
+              height="38"
+              rx="19"
+              ry="19"
+              fill={wbAluBypassActive || wbDmemReadDataActive ? "#DBEAFE" : "#F8FAFC"}
+              stroke={wbAluBypassActive || wbDmemReadDataActive ? "#2563EB" : "#CBD5E1"}
               strokeWidth="2"
             />
-            <text x="375" y="1226" dominantBaseline="central" fill={isWbActive ? "#1E40AF" : "#1E293B"} fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+            <text
+              x="440"
+              y="1277"
+              dominantBaseline="central"
+              fill={wbAluBypassActive || wbDmemReadDataActive ? "#1E40AF" : "#94A3B8"}
+              fontSize="18"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
               MUX
             </text>
 
@@ -978,13 +1428,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             {/* ★ 역방향 피드백 버스 (WB MUX ➔ ID RegFile Write Data In)     */}
             {/* ============================================================ */}
             <path
-              d="M 375,1244 L 375,1275 L 85,1275 L 85,402 L 135,402"
+              d="M 440,1296 L 440,1315 L 85,1315 L 85,424 L 165,424"
               fill="none"
-              stroke={isWbActive ? "#2563EB" : "#CBD5E1"}
-              strokeWidth={isWbActive ? "3.4" : "2.2"}
-              strokeDasharray={isWbActive ? "9 5" : undefined}
-              className={isWbActive ? "stream-feedback-active" : undefined}
-              markerEnd={isWbActive ? "url(#m-arr-blue)" : "url(#m-arr-def)"}
+              stroke={wbReverseFeedbackActive ? "#2563EB" : "transparent"}
+              strokeWidth="2.8"
+              strokeDasharray={wbReverseFeedbackActive ? "6 3" : undefined}
+              className={wbReverseFeedbackActive ? "stream-feedback-active" : undefined}
+              markerEnd={wbReverseFeedbackActive ? "url(#m-arr-blue)" : undefined}
+              style={wireStyle(wbReverseFeedbackActive)}
             />
             </g>
           </svg>

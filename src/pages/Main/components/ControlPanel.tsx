@@ -13,6 +13,7 @@ interface ControlPanelProps {
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
+  isCompiling?: boolean; // 컴파일 진행 중 여부
   mode?: "single" | "pipeline"; // Single-Cycle(Serial) 또는 5-Stage Pipeline(Parallel) 모드
   // C ↔ ASM 모드 제어
   editorTarget?: "c" | "asm";
@@ -34,6 +35,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onJumpToCycle,
   onChangeSpeed,
   isReady = true,
+  isCompiling = false,
   mode = "pipeline",
   editorTarget = "c",
   onChangeEditorTarget,
@@ -55,8 +57,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
             <button
               type="button"
+              disabled={isCompiling}
               onClick={() => onChangeEditorTarget?.("c")}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : "C 소스 코드 작성 모드"}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
+                isCompiling ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              } ${
                 editorTarget === "c"
                   ? isSingle
                     ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
@@ -68,8 +74,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
             <button
               type="button"
+              disabled={isCompiling}
               onClick={() => onChangeEditorTarget?.("asm")}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : "어셈블리(ASM) 직접 작성 모드"}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
+                isCompiling ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              } ${
                 editorTarget === "asm"
                   ? isSingle
                     ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
@@ -113,19 +123,25 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
 
-        {/* [사이클 정보] (모바일 숨김, 하단 콘솔로 이동 예정) */}
-        <div className="hidden md:flex items-baseline gap-1 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5">
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
-            Cycle:
+        {/* [스텝 / 사이클 정보] */}
+        <div className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5 w-[84px]">
+          <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider font-medium shrink-0 w-10 text-right">
+            {isSingle ? "Step:" : "Cycle:"}
           </span>
-          <span className={`text-base font-bold transition-colors ${
-            isSingle
-              ? "text-[#005FB8] dark:text-[#DCDCAA]"
-              : "text-[#7C3AED] dark:text-[#C084FC]"
-          }`}>
-            {currentCycle}
-          </span>
-          <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">/{maxCycle}</span>
+          <div className="flex items-baseline gap-0.5 font-mono tabular-nums">
+            <span
+              className={`text-base font-bold transition-colors ${
+                isSingle
+                  ? "text-[#005FB8] dark:text-[#DCDCAA]"
+                  : "text-[#7C3AED] dark:text-[#C084FC]"
+              }`}
+            >
+              {currentCycle}
+            </span>
+            <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+              /{maxCycle}
+            </span>
+          </div>
         </div>
         
         <div className="hidden md:flex flex-1 min-w-0 items-center gap-2 relative">
@@ -179,11 +195,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </svg>
         </button>
 
-        {/* 3) 이전 스텝 버튼 */}
+        {/* 3) 이전 스텝/사이클 버튼 */}
         <button
           onClick={onStepBack}
           disabled={!isReady || currentCycle <= 0}
-          title="이전 단계 (Step Back)"
+          title={isSingle ? "이전 스텝 (Step Back)" : "이전 사이클 (Cycle Back)"}
           className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -219,11 +235,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <span className="w-10 text-center tracking-wide">{isPlaying ? "PAUSE" : "PLAY"}</span>
         </button>
 
-        {/* 5) 다음 스텝 버튼 */}
+        {/* 5) 다음 스텝/사이클 버튼 */}
         <button
           onClick={onStepForward}
           disabled={!isReady || currentCycle >= maxCycle}
-          title="한 단계 실행 (Step Over / Forward)"
+          title={isSingle ? "다음 스텝 실행 (Step Forward)" : "다음 사이클 진행 (Cycle Forward)"}
           className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

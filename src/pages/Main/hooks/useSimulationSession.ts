@@ -20,7 +20,6 @@ type TargetSessionState = {
     single: SimulationResult | null;
     pipeline: SimulationResult | null;
   };
-  simulationEngineMode: "single" | "pipeline";
   activeBuildId: string | null;
   activeSimulationToken: string | null;
 };
@@ -28,7 +27,6 @@ type TargetSessionState = {
 const initialTargetState: TargetSessionState = {
   resultWorkspace: "",
   simulationCache: { single: null, pipeline: null },
-  simulationEngineMode: "single",
   activeBuildId: null,
   activeSimulationToken: null,
 };
@@ -71,6 +69,14 @@ export function useSimulationSession({
   const [buildResult, setBuildResult] = useState<BuildCompileResponse | null>(null);
   const requests = useRef(new RequestGeneration());
 
+  // 작성 모드(C vs ASM)가 변경되더라도 시뮬레이션 모드(single vs pipeline)는 전역으로 일관되게 유지
+  const [simulationEngineMode, setSimulationEngineMode] = useState<"single" | "pipeline">("single");
+  const simulationEngineModeRef = useRef(simulationEngineMode);
+  simulationEngineModeRef.current = simulationEngineMode;
+
+  // ASM 직접 작성 모드의 어셈블/시뮬레이션 에러 독립 관리 (C 에디터 에러와 분리)
+  const [asmError, setAsmError] = useState("");
+
   // C 모드와 ASM 모드의 시뮬레이션 상태를 각각 독립적으로 캐싱
   const [sessions, setSessions] = useState<Record<SimulationTarget, TargetSessionState>>({
     c: { ...initialTargetState },
@@ -84,7 +90,6 @@ export function useSimulationSession({
       ? (cWorkspaceKey ?? workspaceKey)
       : (asmWorkspaceKey ?? workspaceKey);
 
-  const simulationEngineMode = currentSession.simulationEngineMode;
   const isSingleEngine = simulationEngineMode === "single";
 
   const isCurrentWorkspaceReady = currentSession.resultWorkspace === activeWorkspaceKey;
@@ -119,6 +124,14 @@ export function useSimulationSession({
     requests.current.invalidate();
     setTranslationBusy(false);
     setBuildResult(null);
+    if (target === "asm") {
+      setAsmError("");
+    } else if (target === "c") {
+      setTranslationError("");
+    } else {
+      setAsmError("");
+      setTranslationError("");
+    }
     if (target) {
       setSessions((prev) => ({
         ...prev,
@@ -234,7 +247,7 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-      } = await compileTranslation(translationSource, sessions.c.simulationEngineMode, {
+      } = await compileTranslation(translationSource, simulationEngineMode, {
         ...request,
         fileId: request.capture ? savedFileId : null,
         onCompiled: (result) => {
@@ -262,10 +275,15 @@ export function useSimulationSession({
       setTranslationAssembly(assembly);
       callbacks.onCompilationComplete?.();
 
-      if (!simulationResult)
+      // 컴파일 도중 사용자가 모드를 변경했을 수 있으므로 최신 모드 결과 선택
+      const latestMode = simulationEngineModeRef.current;
+      const targetSimulationResult =
+        (latestMode === "single" ? singleSimulationResult : pipelineSimulationResult) ?? simulationResult;
+
+      if (!targetSimulationResult)
         setTranslationError("선택한 모드의 실행 결과를 받지 못했습니다. 다시 실행해 주세요.");
-      if (simulationResult) {
-        callbacks.onSimulationComplete(simulationResult);
+      if (targetSimulationResult) {
+        callbacks.onSimulationComplete(targetSimulationResult);
         callbacks.triggerPlaybackFeedback("check");
       }
     } catch (error) {
@@ -312,7 +330,7 @@ export function useSimulationSession({
       },
     }));
     setTranslationBusy(true);
-    setTranslationError("");
+    setAsmError("");
 
     try {
       const {
@@ -322,7 +340,7 @@ export function useSimulationSession({
         pipelineSimulationResult,
         buildId,
         simulationToken,
-        } = await compileAssemblyDirectly(codeToSimulate, sessions.asm.simulationEngineMode, {
+        } = await compileAssemblyDirectly(codeToSimulate, simulationEngineMode, {
         ...request,
         onCompiled: (result) => {
           if (request.isCurrent()) compiledResult = result;
@@ -349,10 +367,15 @@ export function useSimulationSession({
       setTranslationAssembly(assembly);
       callbacks.onCompilationComplete?.();
 
-      if (!simulationResult)
-        setTranslationError("선택한 모드의 실행 결과를 받지 못했습니다. 다시 실행해 주세요.");
-      if (simulationResult) {
-        callbacks.onSimulationComplete(simulationResult);
+      // 컴파일 도중 사용자가 모드를 변경했을 수 있으므로 최신 모드 결과 선택
+      const latestMode = simulationEngineModeRef.current;
+      const targetSimulationResult =
+        (latestMode === "single" ? singleSimulationResult : pipelineSimulationResult) ?? simulationResult;
+
+      if (!targetSimulationResult)
+        setAsmError("선택한 모드의 실행 결과를 받지 못했습니다. 다시 실행해 주세요.");
+      if (targetSimulationResult) {
+        callbacks.onSimulationComplete(targetSimulationResult);
         callbacks.triggerPlaybackFeedback("check");
       }
     } catch (err) {
@@ -368,7 +391,7 @@ export function useSimulationSession({
           },
         }));
       }
-      setTranslationError(err instanceof Error ? err.message : "어셈블리 시뮬레이션 요청에 실패했습니다.");
+      setAsmError(err instanceof Error ? err.message : "어셈블리 시뮬레이션 요청에 실패했습니다.");
     } finally {
       if (request.isCurrent()) setTranslationBusy(false);
     }
@@ -378,19 +401,21 @@ export function useSimulationSession({
     m: "single" | "pipeline",
     callbacks: SimulationCallbacks
   ) => {
+    if (m === simulationEngineMode) return;
+
+    // 컴파일이 진행 중일 때는 기존 요청을 abort/초기화하지 않고 모드만 전환합니다.
+    // 컴파일이 완료되면 최신 모드(m)의 시뮬레이션 결과가 자동으로 화면에 렌더링됩니다.
+    if (translationBusy) {
+      setSimulationEngineMode(m);
+      return;
+    }
+
     const request = beginRequest();
-    setTranslationBusy(false);
     if (callbacks.isPlaying || callbacks.currentCycle > 0) {
       callbacks.triggerPlaybackFeedback("reset");
     }
 
-    setSessions((prev) => ({
-      ...prev,
-      [activeTarget]: {
-        ...prev[activeTarget],
-        simulationEngineMode: m,
-      },
-    }));
+    setSimulationEngineMode(m);
 
     const cachedResult = currentSession.simulationCache[m];
     if (cachedResult) {
@@ -432,7 +457,14 @@ export function useSimulationSession({
           callbacks.onSimulationComplete(simResult);
         }
       } catch {
-        if (request.isCurrent()) setTranslationError("시뮬레이션 모드 전환에 실패했습니다. 다시 실행해 주세요.");
+        if (request.isCurrent()) {
+          const msg = "시뮬레이션 모드 전환에 실패했습니다. 다시 실행해 주세요.";
+          if (activeTarget === "asm") {
+            setAsmError(msg);
+          } else {
+            setTranslationError(msg);
+          }
+        }
       } finally {
         if (request.isCurrent()) setTranslationBusy(false);
       }
@@ -446,6 +478,8 @@ export function useSimulationSession({
     loadingMessage,
     isSingleEngine,
     mappedAssemblyRows,
+    asmError,
+    setAsmError,
     clearSimulationCache,
     handleTranslationCompile,
     handleAssemblySimulation,

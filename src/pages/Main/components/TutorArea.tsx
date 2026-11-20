@@ -21,6 +21,7 @@ export interface TutorAreaProps {
   currentActiveAsmIndex?: number | null;
   isUserSelected?: boolean;
   activeTarget?: "c" | "asm";
+  mode?: "single" | "pipeline";
   onClose?: () => void;
 }
 
@@ -54,9 +55,11 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   currentActiveAsmIndex: providedActiveAsmIndex,
   isUserSelected = false,
   activeTarget = "c",
+  mode = "pipeline",
   onClose,
 }) => {
   const isCompiled = Boolean(simulationData);
+  const isSingleMode = mode === "single" || simulationData?.simulator?.mode === "single";
 
   // 1. C 소스 코드 라인별 배열
   const cLines = useMemo(() => {
@@ -172,9 +175,9 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   // ----------------------------------------------------
   if (loadingMessage) {
     return (
-      <div className="flex-1 bg-white dark:bg-[#1E1E1E] rounded-md shadow-2xs border border-[#E5E5E5] dark:border-[#333333] p-4 flex flex-col items-center justify-center text-center gap-2.5">
-        <div className="w-7 h-7 border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-semibold text-[#005FB8] dark:text-[#007ACC]">{loadingMessage}</span>
+      <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] p-4 flex flex-col items-center justify-center text-center gap-2.5 transition-colors duration-150">
+        <div className="w-7 h-7 border-2 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-semibold text-[var(--ar-accent)]">{loadingMessage}</span>
       </div>
     );
   }
@@ -544,11 +547,11 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC]">
-                      현재 사이클({currentCycleData.clock} Clock) 실행 분석
+                      {isSingleMode ? `현재 스텝(${currentCycleData.clock} Step) 실행 분석` : `현재 사이클(${currentCycleData.clock} Cycle) 실행 분석`}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400 dark:text-[#858585]">
-                    Cycle {currentCycleData.clock} / {simulationData?.summary?.total_cycles || 0}
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-[#858585] tabular-nums">
+                    {isSingleMode ? `Step ${currentCycleData.clock} / ${simulationData?.summary?.total_cycles || 0}` : `Cycle ${currentCycleData.clock} / ${simulationData?.summary?.total_cycles || 0}`}
                   </span>
                 </div>
 

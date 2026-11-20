@@ -24,7 +24,6 @@ const DEFAULT_CUSTOM_ASSEMBLY = [
   "add  t2, t0, t1",
   "slli a0, t2, 2",
   "ret",
-  "",
 ].join("\n");
 
 const MainPage: React.FC = () => {
@@ -238,6 +237,7 @@ const MainPage: React.FC = () => {
       customAssembly={customAssembly}
       translationBusy={fileMgr.translationBusy}
       translationError={fileMgr.translationError}
+      asmError={simSession.asmError}
       translationSelectedLine={translationSelectedLine}
       translationSelectedAsmIndex={translationSelectedAsmIndex}
       onUpdateTranslationSource={(val) =>
@@ -279,7 +279,12 @@ const MainPage: React.FC = () => {
           onResetSimulation();
         }
       }}
-      onCustomAssemblyChange={(value) => { setAssistantHint(null); simSession.clearSimulationCache(); setCustomAssembly(value); }}
+      onCustomAssemblyChange={(value) => {
+        setAssistantHint(null);
+        simSession.clearSimulationCache();
+        simSession.setAsmError("");
+        setCustomAssembly(value);
+      }}
       onSimulateAssembly={() => {
         setAssistantHint(null);
         return simSession.handleAssemblySimulation(customAssembly, {
@@ -293,6 +298,7 @@ const MainPage: React.FC = () => {
         playback.triggerPlaybackFeedback("trash");
         setCustomAssembly(DEFAULT_CUSTOM_ASSEMBLY);
         simSession.clearSimulationCache();
+        simSession.setAsmError("");
         playback.setCurrentCycle(0);
         playback.setIsPlaying(false);
       }}
@@ -349,9 +355,11 @@ const handleMobileViewportSelect = (index: number) => {
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={playback.isSimulationReady}
+            isCompiling={fileMgr.translationBusy}
             mode={simSession.simulationEngineMode}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
+              if (fileMgr.translationBusy) return;
               setAssistantHint(null);
               setSourceSelection(null);
               setEditorTarget(target);

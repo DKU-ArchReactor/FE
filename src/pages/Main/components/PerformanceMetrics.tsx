@@ -6,13 +6,15 @@ import TutorPerformanceSummary from './TutorPerformanceSummary';
 interface PerformanceMetricsProps {
   simulationData: SimulationResult | null;
   currentCycle: number;
+  mode?: "single" | "pipeline";
 }
 
-export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulationData, currentCycle }) => {
+export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulationData, currentCycle, mode }) => {
   const stats = useMemo(() => performanceStats(simulationData, currentCycle), [simulationData, currentCycle]);
+  const isSingle = mode === "single" || stats.isSingle;
 
   return (
-    <div className="w-full min-h-0 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
+    <div className="w-full max-h-full min-h-0 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
       {/* 1. 상단 타이틀 바 (지표 전용 퍼플 액센트 바) */}
       <div className="h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-purple-500">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -26,25 +28,25 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
         </span>
       </div>
 
-      {/* 2. 지표 카드 본문 (내부 요소가 절대 잘리지 않도록 자연스러운 높이 유지) */}
-      <div className="min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
+      {/* 2. 지표 카드 본문 (펼쳤을 때 최대 높이 초과 시 스크롤바 생성) */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 [scrollbar-gutter:stable]">
         {/* 상단 2단 KPI 요약 카드 */}
         <div className="grid grid-cols-2 gap-2 shrink-0">
           {/* CPI 카드 */}
           <div className="p-2.5 rounded-lg bg-[var(--ar-header-bg)] border border-[var(--ar-border)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-[var(--ar-text-muted)] uppercase tracking-wider">
-                CPI (Cycles / Inst)
+                {isSingle ? "CPI (Steps / Inst)" : "CPI (Cycles / Inst)"}
               </span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
               <span className="text-2xl font-black font-mono text-[var(--ar-accent)]">
                 {simulationData ? stats.cpi : '—'}
               </span>
-              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">clk/inst</span>
+              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">{isSingle ? "step/inst" : "clk/inst"}</span>
             </div>
             <span className="text-[9px] text-[var(--ar-text-muted)] mt-0.5">
-              {stats.cpi === '—' ? '완료 명령어가 없거나 지표가 제공되지 않았습니다' : '선택 시점까지의 사이클 / 완료 명령어'}
+              {stats.cpi === '—' ? '완료 명령어가 없거나 지표가 제공되지 않았습니다' : isSingle ? '선택 시점까지의 스텝 / 완료 명령어' : '선택 시점까지의 사이클 / 완료 명령어'}
             </span>
           </div>
 
@@ -52,17 +54,17 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
           <div className="p-2.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
-                IPC (Inst / Cycle)
+                {isSingle ? "IPC (Inst / Step)" : "IPC (Inst / Cycle)"}
               </span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
               <span className="text-2xl font-black font-mono text-emerald-700 dark:text-[#7EE787]">
                 {simulationData ? stats.ipc : '—'}
               </span>
-              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">inst/clk</span>
+              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">{isSingle ? "inst/step" : "inst/clk"}</span>
             </div>
             <span className="text-[9px] text-[#57606A] dark:text-[#858585] mt-0.5">
-              1클럭당 평균 완수율
+              {isSingle ? "1스텝당 평균 완수율" : "1클록당 평균 완수율"}
             </span>
           </div>
         </div>
