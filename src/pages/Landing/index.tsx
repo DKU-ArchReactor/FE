@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { learningExamples } from "@/data/learningExamples";
 import { getPreviewState } from "./previewState";
+import { ArchLogo } from "@/components/ArchLogo";
 import "./landing.css";
 
 const stages = ["IF", "ID", "EX", "MEM", "WB"];
@@ -453,9 +454,12 @@ export default function LandingPage() {
       </a>
       <header className="landing-header">
         <div className="landing-nav-wrap">
-          <Link to="/" className="landing-brand" aria-label="ArchReactor 홈">
-            <BrandMark />
-            ArchReactor
+          <Link to="/" className="landing-brand group" aria-label="ArchReactor 홈">
+            <ArchLogo className="landing-mark w-[22px] h-[22px] md:w-[27px] md:h-[27px] text-current transition-colors duration-150 drop-shadow-xs shrink-0 ar-logo-wobble" />
+            <div className="landing-brand-text">
+              <span className="landing-brand-title">ArchReactor</span>
+              <span className="landing-brand-badge">RV32I</span>
+            </div>
           </Link>
           <nav
             className={`landing-nav ${menuOpen ? "is-open" : ""}`}

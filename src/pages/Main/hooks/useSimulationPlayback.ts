@@ -32,6 +32,31 @@ export function useSimulationPlayback({
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
 
+  // C 모드와 ASM 모드 간 전환 시 각 모드의 사이클 및 재생 상태를 복원하기 위한 캐시
+  const targetCycleCache = useRef<Record<"c" | "asm", { cycle: number; isPlaying: boolean; playSpeed: number }>>({
+    c: { cycle: 0, isPlaying: false, playSpeed: 1000 },
+    asm: { cycle: 0, isPlaying: false, playSpeed: 1000 },
+  });
+  const prevTargetRef = useRef<"c" | "asm">(editorTarget);
+
+  // 모드(editorTarget)가 바뀔 때 이전 모드의 사이클을 저장하고 새 모드의 사이클로 복원
+  useEffect(() => {
+    const prevTarget = prevTargetRef.current;
+    if (prevTarget !== editorTarget) {
+      targetCycleCache.current[prevTarget] = {
+        cycle: currentCycle,
+        isPlaying: false,
+        playSpeed,
+      };
+
+      const restored = targetCycleCache.current[editorTarget];
+      const validCycle = historyList.length > 0 ? Math.min(restored.cycle, historyList.length) : 0;
+      setCurrentCycle(validCycle);
+      setIsPlaying(false);
+      prevTargetRef.current = editorTarget;
+    }
+  }, [editorTarget, historyList.length, currentCycle, playSpeed]);
+
   const [playbackFeedback, setPlaybackFeedback] = useState<{
     type: "play" | "pause" | "reset" | "trash" | "check";
     id: number;

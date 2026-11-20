@@ -400,7 +400,7 @@ test("full workspace connects captured run to the actual assistant popup", async
     .filter({visible: true})
     .click();
   // Desktop and mobile controls coexist; exercise the visible control.
-  const stepForward = page.getByTitle("한 단계 실행 (Step Over / Forward)", { exact: true }).filter({visible: true});
+  const stepForward = page.getByTitle("다음 스텝 실행 (Step Forward)", { exact: true }).filter({visible: true});
   await expect(stepForward).toBeEnabled();
   await stepForward.click();
   await attach(page).click();

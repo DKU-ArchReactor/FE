@@ -20,15 +20,11 @@ import { getLearningExample } from "@/data/learningExamples";
 import { instructionCycleForPc } from "./utils/instructionFlow";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
-  "# RISC-V 32IM 어셈블리 직접 작성",
-  ".globl main",
-  "main:",
-  "    addi x1, x0, 5",
-  "    addi x2, x0, 10",
-  "    add  x3, x1, x2",
-  "    slli x4, x3, 2",
-  "    ret",
-  "",
+  "addi t0, zero, 5",
+  "addi t1, zero, 10",
+  "add  t2, t0, t1",
+  "slli a0, t2, 2",
+  "ret",
 ].join("\n");
 
 const MainPage: React.FC = () => {
@@ -80,9 +76,15 @@ const MainPage: React.FC = () => {
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
   const auth = useAuthSession();
-  const workspaceKey = JSON.stringify([fileMgr.translationSource, customAssembly, editorTarget, auth.epoch]);
+  const cWorkspaceKey = JSON.stringify([fileMgr.translationSource, auth.epoch]);
+  const asmWorkspaceKey = JSON.stringify([customAssembly, auth.epoch]);
+  const workspaceKey = editorTarget === "c" ? cWorkspaceKey : asmWorkspaceKey;
+
   const simSession = useSimulationSession({
     workspaceKey,
+    editorTarget,
+    cWorkspaceKey,
+    asmWorkspaceKey,
     savedFileId: auth.authenticated ? fileMgr.savedTranslationFileId : null,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
@@ -246,6 +248,7 @@ const MainPage: React.FC = () => {
       customAssembly={customAssembly}
       translationBusy={fileMgr.translationBusy}
       translationError={fileMgr.translationError}
+      asmError={simSession.asmError}
       translationSelectedLine={translationSelectedLine}
       translationSelectedAsmIndex={translationSelectedAsmIndex}
       onUpdateTranslationSource={(val) =>
@@ -287,7 +290,12 @@ const MainPage: React.FC = () => {
           onResetSimulation();
         }
       }}
-      onCustomAssemblyChange={(value) => { setAssistantHint(null); simSession.clearSimulationCache(); setCustomAssembly(value); }}
+      onCustomAssemblyChange={(value) => {
+        setAssistantHint(null);
+        simSession.clearSimulationCache();
+        simSession.setAsmError("");
+        setCustomAssembly(value);
+      }}
       onSimulateAssembly={() => {
         setAssistantHint(null);
         return simSession.handleAssemblySimulation(customAssembly, {
@@ -301,6 +309,7 @@ const MainPage: React.FC = () => {
         playback.triggerPlaybackFeedback("trash");
         setCustomAssembly(DEFAULT_CUSTOM_ASSEMBLY);
         simSession.clearSimulationCache();
+        simSession.setAsmError("");
         playback.setCurrentCycle(0);
         playback.setIsPlaying(false);
       }}
@@ -357,13 +366,12 @@ const handleMobileViewportSelect = (index: number) => {
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={playback.isSimulationReady}
+            isCompiling={fileMgr.translationBusy}
             mode={simSession.simulationEngineMode}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
+              if (fileMgr.translationBusy) return;
               setAssistantHint(null);
-              if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
-                playback.triggerPlaybackFeedback("reset");
-              }
               setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {

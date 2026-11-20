@@ -5,6 +5,7 @@ interface RegisterVisualizerProps {
   prevRegisters?: Record<string, string>;
   playSpeed?: number;
   cycle?: number;
+  mode?: 'single' | 'pipeline';
 }
 
 // 16진수 문자열을 사람이 읽기 편한 부호 있는 10진수로 변환 (32비트 2의 보수)
@@ -91,6 +92,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   prevRegisters,
   playSpeed = 1000,
   cycle = 0,
+  mode = 'pipeline',
 }) => {
   // x0부터 x31까지 고정 순서 (32개)
   const regKeys = REG_KEYS;
@@ -144,8 +146,8 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
             REGISTERS (x0 ~ x31)
           </h3>
         </div>
-        <span className="hidden md:inline text-[10px] text-[var(--ar-text-muted)] font-mono shrink-0">
-          CLK:{cycle ?? 0}
+        <span className="hidden md:inline text-[10px] text-[var(--ar-text-muted)] font-mono shrink-0 w-16 text-right tabular-nums">
+          {mode === 'single' ? `STEP:${cycle ?? 0}` : `CYCLE:${cycle ?? 0}`}
         </span>
       </div>
 

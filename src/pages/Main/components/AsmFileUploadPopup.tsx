@@ -6,44 +6,36 @@ const ASM_TEMPLATES = [
   {
     title: "기본 산술 연산 (Basic ALU)",
     desc: "addi, add, sub 명령어를 사용한 기초 레지스터 연산",
-    code: `# RISC-V 32IM 기본 산술 연산 예제
-.globl main
-main:
-    addi x1, x0, 10      # x1 = 10
-    addi x2, x0, 20      # x2 = 20
-    add  x3, x1, x2      # x3 = x1 + x2 (30)
-    sub  x4, x3, x1      # x4 = x3 - x1 (20)
-    ret
+    code: `addi t0, zero, 10
+addi t1, zero, 20
+add  t2, t0, t1
+sub  a0, t2, t0
+ret
 `,
   },
   {
     title: "반복문 카운터 (Loop Counter)",
     desc: "조건 분기(bne)를 이용한 1부터 5까지의 합 계산 루프",
-    code: `# RISC-V 32IM 루프 카운터 예제
-.globl main
-main:
-    addi x1, x0, 0       # x1 (sum) = 0
-    addi x2, x0, 1       # x2 (i) = 1
-    addi x3, x0, 6       # x3 (limit) = 6
+    code: `addi t0, zero, 0
+addi t1, zero, 1
+addi t2, zero, 6
 loop:
-    add  x1, x1, x2      # sum += i
-    addi x2, x2, 1       # i++
-    bne  x2, x3, loop    # if i != 6 goto loop
-    ret
+add  t0, t0, t1
+addi t1, t1, 1
+bne  t1, t2, loop
+addi a0, t0, 0
+ret
 `,
   },
   {
     title: "메모리 로드 및 스토어 (Load & Store)",
     desc: "스택 포인터(sp)를 활용한 lw, sw 메모리 데이터 전송",
-    code: `# RISC-V 32IM 메모리 접근 예제
-.globl main
-main:
-    addi sp, sp, -16     # 스택 프레임 16바이트 할당
-    addi x5, x0, 42      # x5 = 42
-    sw   x5, 8(sp)       # sp + 8 주소에 x5 저장
-    lw   x6, 8(sp)       # sp + 8 주소에서 x6로 로드
-    addi sp, sp, 16      # 스택 복원
-    ret
+    code: `addi sp, sp, -16
+addi t0, zero, 42
+sw   t0, 8(sp)
+lw   a0, 8(sp)
+addi sp, sp, 16
+ret
 `,
   },
 ];
@@ -56,6 +48,7 @@ type Props = {
   savedFiles?: FileSummary[];
   currentFileId?: string | null;
   onOpenSavedFile?: (fileId: string) => void;
+  mode?: "single" | "pipeline";
 };
 
 export default function AsmFileUploadPopup({
@@ -66,7 +59,9 @@ export default function AsmFileUploadPopup({
   savedFiles = [],
   currentFileId,
   onOpenSavedFile,
+  mode = "pipeline",
 }: Props) {
+  const isPipeline = mode === "pipeline";
   const popupRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
@@ -242,7 +237,11 @@ export default function AsmFileUploadPopup({
               onClick={() => fileInputRef.current?.click()}
               className={`rounded-lg border-2 border-dashed p-3.5 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all duration-150 ${
                 isDragOver
-                  ? "border-[#005FB8] dark:border-[#007ACC] bg-blue-50/70 dark:bg-[#007ACC]/10 text-[#005FB8] dark:text-[#79C0FF] scale-[1.01]"
+                  ? isPipeline
+                    ? "border-[#7C3AED] dark:border-[#8B5CF6] bg-purple-50/70 dark:bg-[#7C3AED]/10 text-[#7C3AED] dark:text-[#C084FC] scale-[1.01]"
+                    : "border-[#005FB8] dark:border-[#007ACC] bg-blue-50/70 dark:bg-[#007ACC]/10 text-[#005FB8] dark:text-[#79C0FF] scale-[1.01]"
+                  : isPipeline
+                  ? "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] text-[#57606A] dark:text-[#858585] hover:border-[#7C3AED] dark:hover:border-[#8B5CF6] hover:text-[#7C3AED] dark:hover:text-[#C084FC] hover:bg-purple-50/30 dark:hover:bg-[#2D2D2D]"
                   : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] text-[#57606A] dark:text-[#858585] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-slate-50 dark:hover:bg-[#2D2D2D]"
               }`}
             >
@@ -320,7 +319,9 @@ export default function AsmFileUploadPopup({
                       title="클릭하여 어셈블리 에디터에 열기"
                       className={`w-full px-2.5 py-1.5 rounded text-left transition-colors flex items-center justify-between gap-2 cursor-pointer group/row ${
                         isSelected
-                          ? "bg-blue-50/80 dark:bg-[#007ACC]/15 text-[#005FB8] dark:text-[#79C0FF]"
+                          ? isPipeline
+                            ? "bg-purple-50/80 dark:bg-purple-950/40 text-[#7C3AED] dark:text-[#C084FC]"
+                            : "bg-blue-50/80 dark:bg-[#007ACC]/15 text-[#005FB8] dark:text-[#79C0FF]"
                           : "hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E]"
                       }`}
                     >
@@ -331,7 +332,11 @@ export default function AsmFileUploadPopup({
                         <span
                           className={`text-xs font-mono truncate ${
                             isSelected
-                              ? "font-bold text-[#005FB8] dark:text-[#79C0FF]"
+                              ? isPipeline
+                                ? "font-bold text-[#7C3AED] dark:text-[#C084FC]"
+                                : "font-bold text-[#005FB8] dark:text-[#79C0FF]"
+                              : isPipeline
+                              ? "text-[#1F2328] dark:text-[#CCCCCC] group-hover/row:text-[#7C3AED] dark:group-hover/row:text-[#C084FC]"
                               : "text-[#1F2328] dark:text-[#CCCCCC] group-hover/row:text-[#005FB8] dark:group-hover/row:text-[#79C0FF]"
                           }`}
                         >
@@ -349,7 +354,11 @@ export default function AsmFileUploadPopup({
                           type="button"
                           onClick={(e) => handleDownloadSavedFile(e, f)}
                           title="로컬 파일로 다운로드"
-                          className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                          className={`p-1 rounded text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer ${
+                            isPipeline
+                              ? "hover:text-[#7C3AED] dark:hover:text-[#C084FC]"
+                              : "hover:text-[#005FB8] dark:hover:text-[#79C0FF]"
+                          }`}
                         >
                           <svg
                             className="w-3.5 h-3.5 stroke-current"
@@ -398,7 +407,13 @@ export default function AsmFileUploadPopup({
                   className="w-full px-2.5 py-2 rounded text-left transition-colors flex flex-col gap-0.5 cursor-pointer hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E] group/row"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#005FB8] dark:text-[#79C0FF] group-hover/row:underline">
+                    <span
+                      className={`text-xs font-semibold group-hover/row:underline ${
+                        isPipeline
+                          ? "text-[#7C3AED] dark:text-[#C084FC]"
+                          : "text-[#005FB8] dark:text-[#79C0FF]"
+                      }`}
+                    >
                       {tmpl.title}
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">로드 ➔</span>
