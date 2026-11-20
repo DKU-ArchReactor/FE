@@ -167,7 +167,7 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
     'input-a-pc':'M150 265V340H1030V585H770V625',
     'input-b-register':'M315 520H390V700H525',
     'input-b-immediate':'M510 505V575H525V700',
-    'mux-to-alu':'M525 700H650V735H710',
+    'mux-to-alu':'M525 700H690V781H730',
     'memory-address':'M990 810H1120V812H1200',
     'memory-control':'M960 450H1165V805H1200',
     'store-data':'M195 560V800H335V1030H1100V865H1200',
@@ -211,7 +211,7 @@ export function transferMotion(transfer:InstructionTransfer,path?:string) {
   const commands=path?.match(/[MHV]/g)??[];
   const portPadding=(horizontal:boolean)=>horizontal?width/2+6:26;
   const startPadding=route?((transfer.id==='decode-immediate'||transfer.id==='memory-address')?26:transfer.source==='mux'||transfer.source==='operand-mux'?0:portPadding(commands[1]==='H')):0;
-  const endPadding=route?((transfer.id==='decode-immediate'||transfer.id==='memory-address')?26:transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
+  const endPadding=route?((transfer.id==='decode-immediate'||transfer.id==='memory-address'||transfer.id==='mux-to-alu')?26:transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
   return {value,width,route,startPadding,endPadding,distance};
 }

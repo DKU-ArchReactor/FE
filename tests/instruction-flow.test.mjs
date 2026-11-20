@@ -294,3 +294,19 @@ test('memory address words keep visible travel on wide and compact paths',()=>{
     assert.ok(Math.hypot(first.x-last.x,first.y-last.y)>100);
   }
 });
+
+
+test('input MUX output reaches the slanted ALU boundary and keeps space outside the widened MUX',()=>{
+  const current=frame();
+  const flow=buildInstructionFlow(item('add',['x11','x12'],['x10']),current,null,simulation(current));
+  const transfer=instructionTransfers(flow).find(value=>value.id==='mux-to-alu');
+  for(const scale of [1,1.35]) {
+    const path=instructionPaths(flow,1,false,scale)['mux-to-alu'];
+    const end=transferPoint(path,1);
+    const fraction=(end.y-625*scale)/(205*scale);
+    assert.ok(fraction>0&&fraction<1);
+    assert.ok(end.x>=710+24*fraction&&end.x<=1010-24*fraction);
+    assert.match(path,/H690/);
+    assert.ok(transferMotion({...transfer,value:'0x80000000'},path).distance>200);
+  }
+});
