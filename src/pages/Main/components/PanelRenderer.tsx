@@ -197,6 +197,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           }
           isUserSelected={translationSelectedLine !== null || translationSelectedAsmIndex !== null}
           activeTarget={editorTarget}
+          mode={simulationMode}
           onClose={onCloseTutor}
         />
       );
@@ -219,6 +220,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           prevRegisters={prevData?.global_result.registers}
           playSpeed={playSpeed}
           cycle={currentCycle}
+          mode={simulationMode}
         />
       );
 
@@ -241,6 +243,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           onJumpToCycle={onJumpToCycle}
           mappedRows={mappedAssemblyRows}
           mode={simulationMode}
+          loadingMessage={loadingMessage}
         />
       );
 
@@ -249,6 +252,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
         <PerformanceMetrics
           simulationData={simulationData}
           currentCycle={currentCycle}
+          mode={simulationMode}
         />
       );
 

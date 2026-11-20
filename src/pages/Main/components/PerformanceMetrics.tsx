@@ -6,10 +6,12 @@ import TutorPerformanceSummary from './TutorPerformanceSummary';
 interface PerformanceMetricsProps {
   simulationData: SimulationResult | null;
   currentCycle: number;
+  mode?: "single" | "pipeline";
 }
 
-export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulationData, currentCycle }) => {
+export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulationData, currentCycle, mode }) => {
   const stats = useMemo(() => performanceStats(simulationData, currentCycle), [simulationData, currentCycle]);
+  const isSingle = mode === "single" || stats.isSingle;
 
   return (
     <div className="w-full max-h-full min-h-0 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col overflow-hidden select-none transition-colors duration-150">
@@ -34,17 +36,17 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
           <div className="p-2.5 rounded-lg bg-[var(--ar-header-bg)] border border-[var(--ar-border)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-[var(--ar-text-muted)] uppercase tracking-wider">
-                CPI (Cycles / Inst)
+                {isSingle ? "CPI (Steps / Inst)" : "CPI (Cycles / Inst)"}
               </span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
               <span className="text-2xl font-black font-mono text-[var(--ar-accent)]">
                 {simulationData ? stats.cpi : '—'}
               </span>
-              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">clk/inst</span>
+              <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">{isSingle ? "step/inst" : "clk/inst"}</span>
             </div>
             <span className="text-[9px] text-[var(--ar-text-muted)] mt-0.5">
-              {stats.cpi === '—' ? '완료 명령어가 없거나 지표가 제공되지 않았습니다' : '선택 시점까지의 사이클 / 완료 명령어'}
+              {stats.cpi === '—' ? '완료 명령어가 없거나 지표가 제공되지 않았습니다' : isSingle ? '선택 시점까지의 스텝 / 완료 명령어' : '선택 시점까지의 사이클 / 완료 명령어'}
             </span>
           </div>
 
@@ -52,17 +54,17 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
           <div className="p-2.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
-                IPC (Inst / Cycle)
+                {isSingle ? "IPC (Inst / Step)" : "IPC (Inst / Cycle)"}
               </span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
               <span className="text-2xl font-black font-mono text-emerald-700 dark:text-[#7EE787]">
                 {simulationData ? stats.ipc : '—'}
               </span>
-              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">inst/clk</span>
+              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">{isSingle ? "inst/step" : "inst/clk"}</span>
             </div>
             <span className="text-[9px] text-[#57606A] dark:text-[#858585] mt-0.5">
-              1클럭당 평균 완수율
+              {isSingle ? "1스텝당 평균 완수율" : "1클록당 평균 완수율"}
             </span>
           </div>
         </div>

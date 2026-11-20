@@ -355,9 +355,11 @@ const handleMobileViewportSelect = (index: number) => {
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={playback.isSimulationReady}
+            isCompiling={fileMgr.translationBusy}
             mode={simSession.simulationEngineMode}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
+              if (fileMgr.translationBusy) return;
               setAssistantHint(null);
               setSourceSelection(null);
               setEditorTarget(target);

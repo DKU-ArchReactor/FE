@@ -212,7 +212,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">(CLK:{clock ?? 0})</span>
+          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono w-16 shrink-0 tabular-nums">({isSingle ? `STEP:${clock ?? 0}` : `CYCLE:${clock ?? 0}`})</span>
         </div>
 
         {/* 이벤트 뱃지 & 줌 컨트롤 */}

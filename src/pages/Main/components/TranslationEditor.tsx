@@ -320,7 +320,7 @@ export default function TranslationEditor({
             title="현재 소스 코드를 서버에 저장"
           >
             {isSaving ? (
-              <span className="w-3 h-3 rounded-full border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent animate-spin shrink-0" />
+              <span className="w-3 h-3 rounded-full border-2 border-[var(--ar-accent)] border-t-transparent animate-spin shrink-0" />
             ) : saveSuccess ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">
                 ✓

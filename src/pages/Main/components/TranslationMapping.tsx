@@ -932,13 +932,13 @@ export default function TranslationMapping({
       ) : busy || (!assembly && rows.length === 0) ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E]">
           {busy ? (
-            <div className="w-7 h-7 border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent rounded-full animate-spin mb-3" />
+            <div className="w-7 h-7 border-2 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin mb-3" />
           ) : (
             <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
               📜
             </div>
           )}
-          <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+          <p className={`text-xs font-semibold ${busy ? "text-[var(--ar-accent)]" : "text-[#1F2328] dark:text-[#CCCCCC]"}`}>
             {busy
               ? "컴파일 및 어셈블리 매핑 중…"
               : error

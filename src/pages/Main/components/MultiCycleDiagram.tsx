@@ -28,6 +28,7 @@ interface MultiCycleDiagramProps {
   onJumpToCycle?: (cycle: number) => void;
   mappedRows?: MappedAssemblyRow[];
   mode?: 'single' | 'pipeline';
+  loadingMessage?: string | null;
 }
 
 const COL_WIDTH = 40;
@@ -40,6 +41,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   onJumpToCycle,
   mappedRows = [],
   mode,
+  loadingMessage,
 }) => {
   const leftScrollRef = useRef<HTMLDivElement>(null);
   const rightScrollRef = useRef<HTMLDivElement>(null);
@@ -236,14 +238,24 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
               </span>
             </div>
           )}
-          <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585] font-semibold px-2 py-0.5 rounded bg-[#EAEAEA] dark:bg-[#333333]">
-            {totalCycles > 0 ? `${totalCycles} Cycles` : 'Ready'}
+          <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585] font-semibold px-2 py-0.5 rounded bg-[#EAEAEA] dark:bg-[#333333] min-w-[70px] text-center inline-block tabular-nums">
+            {totalCycles > 0 ? (isSingleMode ? `${totalCycles} Steps` : `${totalCycles} Cycles`) : 'Ready'}
           </span>
         </div>
       </div>
 
       {/* 2. 계단식 타이밍 매트릭스 테이블 */}
-      {!simulationData || traceRows.length === 0 ? (
+      {loadingMessage ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-3 bg-[var(--ar-panel-bg)]">
+          <div className="w-8 h-8 border-3 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-semibold text-[var(--ar-accent)]">{loadingMessage}</p>
+          <p className="text-xs text-[var(--ar-text-muted)]">
+            {isSingleMode
+              ? '싱글 사이클 타이밍 다이어그램 결과를 준비하고 있습니다.'
+              : '파이프라인 타이밍 다이어그램 결과를 준비하고 있습니다.'}
+          </p>
+        </div>
+      ) : !simulationData || traceRows.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-[#57606A] dark:text-[#858585] gap-1.5 bg-[#F8F8F8] dark:bg-[#1E1E1E]">
           <span className="text-xl">📊</span>
           <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
@@ -253,7 +265,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
           </span>
           <span className="text-[11px] text-[#57606A] dark:text-[#858585]">
             {isSingleMode
-              ? '사이클별 각 명령어의 직렬 완료 단계(DONE)를 한눈에 추적합니다.'
+              ? '스텝별 각 명령어의 직렬 완료 단계(DONE)를 한눈에 추적합니다.'
               : '사이클별 각 명령어의 진행 단계(IF·ID·EX·MEM·WB)와 버블(BBL)/스톨(STL) 발생 위치를 한눈에 추적합니다.'}
           </span>
         </div>
@@ -307,7 +319,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                         ? `${highlightTint.row} ${highlightTint.leftBorder} text-[#1F2328] dark:text-[#CCCCCC]`
                         : 'bg-white dark:bg-[#1E1E1E] border-l-transparent hover:bg-[#F6F8FA] dark:hover:bg-[#252526] text-[#24292F] dark:text-[#CCCCCC]'
                       }`}
-                    title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 인출 사이클로 이동)`}
+                    title={`${row.pc ? `${row.pc}: ` : ''}${row.assembly} (클릭 시 ${isSingleMode ? '해당 스텝' : '인출 사이클'}으로 이동)`}
                   >
                     {/* 좌측: 행 순번 + Opcode(고정폭) + Operands (에디터 컬럼 정렬과 100% 일치) */}
                     <div className="flex items-center min-w-0 flex-1">
@@ -412,10 +424,10 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                               : 'text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5'
                         }`}
                       style={{ width: `${COL_WIDTH}px` }}
-                      title={`Clock ${cIdx + 1}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
+                      title={`${isSingleMode ? 'Step' : 'Cycle'} ${cIdx + 1}${hasStall ? ' (Stall/Bubble 발생)' : hasFlush ? ' (Branch Flush/Bubble 발생)' : ''
                         }`}
                     >
-                      <span>C{cIdx + 1}</span>
+                      <span>{isSingleMode ? 'S' : 'C'}{cIdx + 1}</span>
                       {(hasStall || hasFlush) && !isCurrent && (
                         <span
                           className={`w-1.5 h-1.5 rounded-full absolute top-0.5 right-0.5 ${hasStall ? 'bg-amber-500' : 'bg-purple-500'
