@@ -480,8 +480,8 @@ export default function InstructionFlowDiagram({
             d={shape}
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.6 + emphasis * 1.4 : 2.2}
-            strokeOpacity={active ? 0.72 + emphasis * 0.28 : 1}
+            strokeWidth={active ? 2.6 + emphasis * 3 : 2.2}
+            strokeOpacity={active ? 0.5 + emphasis * 0.5 : 1}
           />
         ) : (
           <rect
@@ -494,8 +494,8 @@ export default function InstructionFlowDiagram({
             rx="8"
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.6 + emphasis * 1.4 : 2.2}
-            strokeOpacity={active ? 0.72 + emphasis * 0.28 : 1}
+            strokeWidth={active ? 2.6 + emphasis * 3 : 2.2}
+            strokeOpacity={active ? 0.5 + emphasis * 0.5 : 1}
           />
         )}
         {[
