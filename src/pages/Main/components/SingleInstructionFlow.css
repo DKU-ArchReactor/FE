@@ -45,9 +45,15 @@
   --ar-flow-region-bg: var(--ar-panel-bg);
 }
 @media (prefers-reduced-motion: reduce) {
+  .flow-device-active {
+    stroke-width: 2.6;
+    stroke-opacity: 1;
+  }
   .flow-arrow-stream {
     stroke-dashoffset: 0;
     stroke-dasharray: none;
+    stroke-width: 3.2;
+    stroke-opacity: 1;
   }
   .flow-token {
     display: none;

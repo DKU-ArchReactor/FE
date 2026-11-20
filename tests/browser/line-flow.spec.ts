@@ -16,16 +16,22 @@ async function seek(page: Page, id: string) {
 test('arrow stream follows the data cursor and freezes with Pause without losing the moving value',async({page})=>{
   await page.goto('/tests/browser/line-flow.html');await page.waitForLoadState('networkidle');await frozenTime(page);
   await page.goto('/tests/browser/line-flow.html');await pause(page);
-  const stream=page.locator('[data-flow-stream]');await expect(stream).toHaveAttribute('stroke-dasharray','8 5');
+  const stream=page.locator('[data-flow-stream]');await expect(stream).toHaveAttribute('stroke-dasharray','16 10');
+  const surface=page.locator('.flow-device-active').first();
+  const initialBorder=await surface.getAttribute('stroke-width');
   await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(250);
   const first=await stream.getAttribute('stroke-dashoffset');await page.clock.runFor(200);
   expect(await stream.getAttribute('stroke-dashoffset')).not.toBe(first);await expect(page.locator('.flow-packet')).toBeVisible();
+  expect(await surface.getAttribute('stroke-width')).not.toBe(initialBorder);
   await pause(page);const stopped=await stream.getAttribute('stroke-dashoffset');
+  const stoppedBorder=await surface.getAttribute('stroke-width');
   await page.clock.runFor(1200);expect(await stream.getAttribute('stroke-dashoffset')).toBe(stopped);
+  expect(await surface.getAttribute('stroke-width')).toBe(stoppedBorder);
   await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(150);
   expect(await stream.getAttribute('stroke-dashoffset')).not.toBe(stopped);
   await page.emulateMedia({reducedMotion:'reduce'});
   expect(await stream.evaluate(n=>getComputedStyle(n).strokeDasharray)).toBe('none');
+  expect(await surface.evaluate(n=>getComputedStyle(n).strokeWidth)).toBe('2.6px');
 });
 
 test('neutral devices have clear outlines and bus-specific accents match the active legend in both themes',async({page})=>{

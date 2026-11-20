@@ -229,6 +229,8 @@ export default function InstructionFlowDiagram({
     ? { x: point.x - motion.width / 2, y: point.y - 23, w: motion.width, h: 46 }
     : undefined;
   const color = finished ? "var(--ar-text-muted)" : COLORS[transfer.kind];
+  // One gentle emphasis per transfer, driven by the same pausable playback clock.
+  const emphasis = Math.sin(Math.PI * progress) ** 2;
   const reached = (key: string) =>
     arrived.includes(key) ||
     (transfer.id === key && (finished || progress >= 0.95));
@@ -474,14 +476,17 @@ export default function InstructionFlowDiagram({
         {shape ? (
           <path
             data-device-surface="true"
+            className={active ? "flow-device-active" : undefined}
             d={shape}
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.6 : 2.2}
+            strokeWidth={active ? 2.6 + emphasis * 1.4 : 2.2}
+            strokeOpacity={active ? 0.72 + emphasis * 0.28 : 1}
           />
         ) : (
           <rect
             data-device-surface="true"
+            className={active ? "flow-device-active" : undefined}
             x={b.x}
             y={b.y}
             width={b.w}
@@ -489,7 +494,8 @@ export default function InstructionFlowDiagram({
             rx="8"
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.6 : 2.2}
+            strokeWidth={active ? 2.6 + emphasis * 1.4 : 2.2}
+            strokeOpacity={active ? 0.72 + emphasis * 0.28 : 1}
           />
         )}
         {[
@@ -915,9 +921,10 @@ export default function InstructionFlowDiagram({
                 d={path}
                 fill="none"
                 stroke={color}
-                strokeWidth="2.8"
-                strokeDasharray={transfer.kind === "control" ? "6 5" : "8 5"}
-                strokeDashoffset={-progress * motion.distance}
+                strokeWidth={3.2 + emphasis * 0.6}
+                strokeOpacity={0.75 + emphasis * 0.25}
+                strokeDasharray={transfer.kind === "control" ? "12 10" : "16 10"}
+                strokeDashoffset={-progress * (transfer.kind === "control" ? 88 : 104)}
                 strokeLinejoin="round"
                 markerEnd={`url(#${id}-${transfer.kind})`}
               />
