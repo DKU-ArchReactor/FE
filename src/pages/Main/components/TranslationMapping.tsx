@@ -6,7 +6,8 @@ import type { editor } from "monaco-editor";
 import { useTheme } from "@/context/ThemeContext";
 import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
 import { RISCV_LANGUAGE_ID, riscvLanguageDef } from "../utils/riscvLanguage";
-import type { StageBuffer, CycleEvents } from "@/type/simulation";
+import type { StageBuffer, CycleEvents, SimulationResult } from "@/type/simulation";
+import { buildMultiCycleTraceRows, type TraceRow } from "../utils/multiCycleTrace";
 import type { FileSummary } from "@/type/file";
 import AsmFileUploadPopup from "./AsmFileUploadPopup";
 
@@ -36,6 +37,8 @@ type Props = {
     WB?: StageBuffer | null;
   };
   cycleEvents?: CycleEvents | null;
+  simulationData?: SimulationResult | null;
+  playbackCycle?: number;
   mode?: "single" | "pipeline"; // 싱글 사이클 모드 vs 5단계 파이프라인 모드
   currentActiveStep?: number | null; // Single 모드에서 현재 실행 중인 어셈블리 행 인덱스 (0~17)
   activeTarget?: "c" | "asm";
@@ -116,8 +119,10 @@ export default function TranslationMapping({
   executionLine,
   onSelectLine,
   stageBuffers,
-  prevStageBuffers,
+  prevStageBuffers: _prevStageBuffers,
   cycleEvents,
+  simulationData,
+  playbackCycle,
   mode = "pipeline",
   currentActiveStep,
   activeTarget = "c",
@@ -557,25 +562,75 @@ export default function TranslationMapping({
     }
   };
 
+  // MultiCycleDiagram과 100% 동일한 다중 사이클 추적 행 생성 (단일 진실 공급원)
+  const traceRows = useMemo<TraceRow[]>(() => {
+    if (!simulationData?.history?.length || mode === "single") return [];
+    return buildMultiCycleTraceRows(simulationData.history, false);
+  }, [simulationData, mode]);
+
   // 파이프라인 스테이지별 활성 명령어 매핑 (현재 클록 사이클 기준)
-  // 스테이지 이름, 스톨(지연) 여부, 플러시(버블) 여부를 함께 기록
-  const activeStagesByInst = useMemo(() => {
-    const map: Record<string, { stage: string; isStall: boolean; isBubble: boolean }[]> = {};
-    if (!stageBuffers || mode === "single") return map;
+  // MultiCycleDiagram과 정확히 1:1로 일치하도록 행 인덱스(PC/순서) 기반으로 매핑
+  const activeStagesByRow = useMemo(() => {
+    const map: Record<number, { stage: string; isStall: boolean; isBubble: boolean }[]> = {};
+    if (mode === "single") return map;
 
-    const hasGlobalStall = Boolean(cycleEvents?.stall?.has_stall);
-    const stallStage = cycleEvents?.stall?.stage; // 예: "ID"
+    // 1순위: 다이어그램과 동일한 traceRows 기반 매핑
+    if (traceRows.length > 0 && playbackCycle && playbackCycle >= 1) {
+      const cIdx = playbackCycle - 1;
+      traceRows.forEach((tRow) => {
+        const cell = tRow.cells[cIdx];
+        if (!cell) return;
 
-    const hasGlobalFlush = Boolean(cycleEvents?.control_hazard?.has_flush);
-    const flushedStages = cycleEvents?.control_hazard?.flushed_stages || ["IF", "ID"];
+        const targetPc = tRow.pc ? parseInt(tRow.pc, 16) : null;
+        let matchedRowIdx = -1;
 
-    // 1. 현재 파이프라인 버퍼에 존재하는 명령어들 매핑
-    STAGES_CONFIG.forEach(({ key, name }) => {
-      const buf = stageBuffers[key];
-      if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
-        const norm = buf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
-        if (norm) {
-          if (!map[norm]) map[norm] = [];
+        if (targetPc !== null && !isNaN(targetPc)) {
+          // 1) row.pc가 있는 경우 직접 비교
+          matchedRowIdx = rows.findIndex(
+            (r) => r.pc && parseInt(r.pc, 16) === targetPc
+          );
+          // 2) row.pc가 없는 순수 ASM 모드: PC = index * 4
+          if (matchedRowIdx === -1) {
+            const estimatedIdx = Math.floor(targetPc / 4);
+            if (estimatedIdx >= 0 && estimatedIdx < rows.length) {
+              matchedRowIdx = estimatedIdx;
+            }
+          }
+        }
+
+        // 3) 텍스트 폴백 (단, 아직 스테이지가 할당되지 않은 행 우선)
+        if (matchedRowIdx === -1 && tRow.assembly) {
+          const normAsm = tRow.assembly.replace(/\s+/g, " ").trim().toLowerCase();
+          matchedRowIdx = rows.findIndex(
+            (r, idx) => !map[idx] && r.text.replace(/\s+/g, " ").trim().toLowerCase() === normAsm
+          );
+        }
+
+        if (matchedRowIdx !== -1) {
+          if (!map[matchedRowIdx]) map[matchedRowIdx] = [];
+          if (!map[matchedRowIdx].some((s) => s.stage === cell.stage)) {
+            map[matchedRowIdx].push({
+              stage: cell.stage,
+              isStall: Boolean(cell.isStall),
+              isBubble: Boolean(cell.isBubble),
+            });
+          }
+        }
+      });
+
+      return map;
+    }
+
+    // 2순위 (폴백): traceRows가 없는 경우 stageBuffers 기반 매핑
+    if (stageBuffers) {
+      const hasGlobalStall = Boolean(cycleEvents?.stall?.has_stall);
+      const stallStage = cycleEvents?.stall?.stage;
+      const hasGlobalFlush = Boolean(cycleEvents?.control_hazard?.has_flush);
+      const flushedStages = cycleEvents?.control_hazard?.flushed_stages || ["IF", "ID"];
+
+      STAGES_CONFIG.forEach(({ key, name }) => {
+        const buf = stageBuffers[key];
+        if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
           const isStalled =
             buf.status === "stalled" ||
             buf.status === "stall" ||
@@ -586,34 +641,25 @@ export default function TranslationMapping({
             buf.flush_info?.is_flushed === true ||
             (hasGlobalFlush && flushedStages.includes(name));
 
-          if (!map[norm].some((s) => s.stage === name)) {
-            map[norm].push({ stage: name, isStall: isStalled, isBubble });
+          const norm = buf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
+          const targetPc = buf.pc ? parseInt(buf.pc, 16) : null;
+
+          let matchedRowIdx = -1;
+          if (targetPc !== null && !isNaN(targetPc)) {
+            matchedRowIdx = rows.findIndex((r) => r.pc && parseInt(r.pc, 16) === targetPc);
+            if (matchedRowIdx === -1) {
+              const estimatedIdx = Math.floor(targetPc / 4);
+              if (estimatedIdx >= 0 && estimatedIdx < rows.length) matchedRowIdx = estimatedIdx;
+            }
           }
-        }
-      }
-    });
+          if (matchedRowIdx === -1) {
+            matchedRowIdx = rows.findIndex((r, idx) => !map[idx] && r.text.replace(/\s+/g, " ").trim().toLowerCase() === norm);
+          }
 
-    // 2. 분기 플러시(Flush)가 일어났을 때: 이전 사이클에서 IF/ID에 들어있던 명령어가 현재 버블로 변환되었을 경우
-    // 현재 버퍼의 IF/ID가 'nop' 또는 'bubble'로 바뀌었더라도, 플러시된 원래 명령어를 찾아 BBL 뱃지 추가
-    if (hasGlobalFlush && prevStageBuffers) {
-      flushedStages.forEach((stgName) => {
-        const key = stgName as "IF" | "ID" | "EX" | "MEM" | "WB";
-        const prevBuf = prevStageBuffers[key];
-        const curBuf = stageBuffers[key];
-
-        // 이전 사이클에 실제 명령어가 있었는데 이번 사이클에 버블/nop으로 대체된 경우
-        if (
-          prevBuf &&
-          prevBuf.assembly &&
-          prevBuf.assembly !== "bubble" &&
-          prevBuf.assembly !== "empty" &&
-          (!curBuf || curBuf.assembly === "bubble" || curBuf.assembly === "nop" || curBuf.status === "flushed" || curBuf.flush_info?.is_flushed)
-        ) {
-          const prevNorm = prevBuf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
-          if (prevNorm) {
-            if (!map[prevNorm]) map[prevNorm] = [];
-            if (!map[prevNorm].some((s) => s.stage === stgName && s.isBubble)) {
-              map[prevNorm].push({ stage: stgName, isStall: false, isBubble: true });
+          if (matchedRowIdx !== -1) {
+            if (!map[matchedRowIdx]) map[matchedRowIdx] = [];
+            if (!map[matchedRowIdx].some((s) => s.stage === name)) {
+              map[matchedRowIdx].push({ stage: name, isStall: isStalled, isBubble });
             }
           }
         }
@@ -621,7 +667,7 @@ export default function TranslationMapping({
     }
 
     return map;
-  }, [stageBuffers, prevStageBuffers, cycleEvents, mode]);
+  }, [traceRows, playbackCycle, rows, mode, stageBuffers, cycleEvents]);
 
   // 헬퍼: 타겟 요소(그룹 마지막 행)가 컨테이너 뷰포트 하단에 완전히 드러나도록 스크롤
   const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
@@ -723,19 +769,17 @@ export default function TranslationMapping({
     >
       {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수, 우측 상태 문구) */}
       <header
-        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors ${
-          activeTarget === "asm"
+        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors ${activeTarget === "asm"
             ? "border-l-2 border-l-amber-500 bg-[var(--ar-header-bg)]"
             : "border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] bg-[var(--ar-header-bg)]"
-        }`}
+          }`}
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
-              activeTarget === "asm"
+            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${activeTarget === "asm"
                 ? "bg-amber-500 scale-100"
                 : "bg-transparent scale-0"
-            }`}
+              }`}
           />
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
             RISC-V ASSEMBLY
@@ -851,11 +895,10 @@ export default function TranslationMapping({
           {/* 어셈블리 시뮬레이션 버튼 (ASM 모드일 때만 활성화 & C 에디터 컴파일 버튼과 동일한 액센트/이펙트, C 모드일 때는 비활성화 회색 처리) */}
           <button
             type="button"
-            className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${
-              activeTarget === "asm"
+            className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${activeTarget === "asm"
                 ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 cursor-pointer shadow-2xs"
                 : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
-            }`}
+              }`}
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
             title={activeTarget === "asm" ? "어셈블리 빌드 및 시뮬레이션 준비" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
@@ -963,8 +1006,7 @@ export default function TranslationMapping({
               isMatched && !matchingIndices.has(index - 1);
             const { opcode, operands } = splitInstruction(row.text);
 
-            const normRowText = row.text.replace(/\s+/g, " ").trim().toLowerCase();
-            const activeStages = activeStagesByInst[normRowText] || [];
+            const activeStages = activeStagesByRow[index] || [];
             const isCurrentSingleActive =
               mode === "single" && currentActiveStep === index;
 
@@ -1199,37 +1241,33 @@ export default function TranslationMapping({
                               </span>
                             )}
 
-                            {/* 2. 플러시(버블) 발생 시: 다이어그램 헤더와 1:1 동일한 둥근 캡슐 BBL 뱃지(구름/버블 SVG 포함) 표시 */}
-                            {isBubble && !isStall && (
+                            {/* 2. 플러시(버블) 발생 시: 다이어그램과 1:1 동일한 단일 BBL 캡슐 뱃지 표시 */}
+                            {isBubble && !isStall ? (
                               <span
                                 className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-[#182C3D] text-sky-500 dark:text-sky-300 border border-sky-400 dark:border-sky-400 text-[8.5px] font-black shadow-2xs animate-in zoom-in-95 duration-100"
-                                title="플러시(Bubble): 분기/점프로 인해 무효화되어 버블(NOP)로 변환됨"
+                                title={`플러시(Bubble): 분기/점프로 인해 무효화되어 ${stg} 단계에서 버블(NOP)로 변환됨`}
                               >
                                 <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                                   <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
                                 </svg>
                                 <span className="inline-block -translate-y-[0.5px]">BBL</span>
                               </span>
-                            )}
-
-                            {/* 3. 스테이지 뱃지 (버블인 경우 반투명 딤 처리, 정상인 경우 선명한 솔리드) */}
-                            <span
-                              className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${isBubble
-                                  ? "bg-slate-400/60 dark:bg-slate-600/60 text-white/90 line-through decoration-white/70"
-                                  : isStall
+                            ) : (
+                              /* 3. 정상 또는 스톨 실행 중인 스테이지 뱃지 */
+                              <span
+                                className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${isStall
                                     ? `${cfg?.badgeBg || "bg-slate-700 text-white"} ring-1 ring-amber-400 ring-offset-0.5`
                                     : cfg?.badgeBg || "bg-slate-700 text-white"
-                                }`}
-                              title={
-                                isBubble
-                                  ? `분기 예측 실패로 플러시(버블) 처리된 ${stg} 단계`
-                                  : isStall
+                                  }`}
+                                title={
+                                  isStall
                                     ? `스톨로 인해 지연되어 유지 중인 ${stg} 단계`
                                     : `${stg} 단계 실행 중`
-                              }
-                            >
-                              {stg}
-                            </span>
+                                }
+                              >
+                                {stg}
+                              </span>
+                            )}
                           </div>
                         );
                       })}

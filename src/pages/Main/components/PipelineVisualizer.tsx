@@ -10,7 +10,7 @@ interface PipelineVisualizerProps {
   mode?: "single" | "pipeline";
 }
 
-const MASTER_WIDTH = 1150;
+const MASTER_WIDTH = 1220;
 const MASTER_HEIGHT = 1390;
 
 const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
@@ -122,6 +122,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const memOp = parseOp(memInst);
   const wbOp = parseOp(wbInst);
 
+  // [개발/작업용 디버그 플래그] true: 평소에 모든 선을 회색(#94A3B8)으로 표시, false: 평소에 모든 선을 투명하게 숨김
+  const DEBUG_SHOW_ALL_WIRES = true;
+
+  const inactiveStroke = DEBUG_SHOW_ALL_WIRES ? "#94A3B8" : "transparent";
+  const inactiveMarker = DEBUG_SHOW_ALL_WIRES ? "url(#m-arr-def)" : undefined;
+
   // [IF 단계 와이어 활성 조건]
   const ifPcMuxToPcActive = isIfActive;
   const ifPcToImemActive = isIfActive;
@@ -149,9 +155,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const exImmTrunkActive = isExActive && usesImm(exOp);
   const exImmToAluSrcActive = isExActive && (isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
   const exAluSrcToAluActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isBranch(exOp) || isLui(exOp) || exOp === "jalr");
+  const exBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
   const exImmToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
   const exPcToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exAluToExMemActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || isAuipc(exOp) || exOp === "jalr");
+  const exAluToExMemActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
 
   // [MEM 단계 와이어 활성 조건]
   const memAluTrunkActive = isMemActive && (isLoad(memOp) || isStore(memOp) || isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
@@ -166,10 +173,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const wbReverseFeedbackActive = isWbActive && writesReg(wbOp);
 
   const wireStyle = (active: boolean): React.CSSProperties => ({
-    opacity: active ? 1 : 0,
+    opacity: (DEBUG_SHOW_ALL_WIRES || active) ? 1 : 0,
     transition: "opacity 0.25s ease-in-out",
-    pointerEvents: active ? "auto" : "none",
+    pointerEvents: (DEBUG_SHOW_ALL_WIRES || active) ? "auto" : "none",
   });
+
+  // 순차 전파 애니메이션 헬퍼
+  const wireStepClass = (active: boolean, step: 0 | 1 | 2 | 3) => (active ? `wire-step-${step}` : undefined);
+  const dotStepClass = (active: boolean, step: 0 | 1 | 2 | 3) => (active ? `dot-step-${step}` : undefined);
+  const boxStepClass = (active: boolean, step: 0 | 1 | 2 | 3) => (active ? `box-step-${step}` : undefined);
 
   // 줌 조절
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)));
@@ -178,31 +190,102 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
-      {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일 */}
+      {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일: 2.0초 주기로 Step 0 -> 1 -> 2 -> 3 순차 전파 */}
       <style>{`
-        @keyframes streamDown {
-          from { stroke-dashoffset: 28; }
-          to { stroke-dashoffset: 0; }
+        @keyframes pulseStep0 {
+          0%       { stroke-dashoffset: 52; opacity: 0.35; stroke-width: 2.8; }
+          10%, 25% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
+          40%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          85%      { stroke-dashoffset: -52; opacity: 0.8; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -78; opacity: 0.35; stroke-width: 2.8; }
         }
-        @keyframes streamUp {
-          from { stroke-dashoffset: 0; }
-          to { stroke-dashoffset: 28; }
+        @keyframes pulseStep1 {
+          0%, 15%  { stroke-dashoffset: 52; opacity: 0.25; stroke-width: 2.8; }
+          25%, 45% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
+          60%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          85%      { stroke-dashoffset: -52; opacity: 0.8; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -78; opacity: 0.25; stroke-width: 2.8; }
         }
-        .stream-down-active {
+        @keyframes pulseStep2 {
+          0%, 38%  { stroke-dashoffset: 52; opacity: 0.25; stroke-width: 2.8; }
+          48%, 70% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
+          80%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          90%      { stroke-dashoffset: -39; opacity: 0.8; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -52; opacity: 0.25; stroke-width: 2.8; }
+        }
+        @keyframes pulseStep3 {
+          0%, 62%  { stroke-dashoffset: 52; opacity: 0.25; stroke-width: 2.8; }
+          72%, 92% { stroke-dashoffset: 26; opacity: 1.0;  stroke-width: 3.6; }
+          98%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+          100%     { stroke-dashoffset: -26; opacity: 0.35; stroke-width: 2.8; }
+        }
+
+        .wire-step-0 {
           stroke-dasharray: 8 5;
-          animation: streamDown 0.8s linear infinite;
+          animation: pulseStep0 2.0s linear infinite;
         }
-        .stream-feedback-active {
-          stroke-dasharray: 9 5;
-          animation: streamUp 1.1s linear infinite;
+        .wire-step-1 {
+          stroke-dasharray: 8 5;
+          animation: pulseStep1 2.0s linear infinite;
         }
-        @keyframes pulseGlowAmber {
-          0%, 100% { filter: drop-shadow(0 0 3px rgba(245, 158, 11, 0.35)); }
-          50% { filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.8)); }
+        .wire-step-2 {
+          stroke-dasharray: 8 5;
+          animation: pulseStep2 2.0s linear infinite;
         }
-        .glow-active-ex {
-          animation: pulseGlowAmber 1.6s ease-in-out infinite;
+        .wire-step-3 {
+          stroke-dasharray: 8 5;
+          animation: pulseStep3 2.0s linear infinite;
         }
+
+        @keyframes dotPulse0 {
+          0%, 100% { r: 3.5; opacity: 0.5; }
+          15%      { r: 5.5; opacity: 1.0; }
+          35%      { r: 3.5; opacity: 0.85; }
+        }
+        @keyframes dotPulse1 {
+          0%, 15%, 100% { r: 3.5; opacity: 0.5; }
+          35%           { r: 5.5; opacity: 1.0; }
+          55%           { r: 3.5; opacity: 0.85; }
+        }
+        @keyframes dotPulse2 {
+          0%, 38%, 100% { r: 3.5; opacity: 0.5; }
+          58%           { r: 5.5; opacity: 1.0; }
+          78%           { r: 3.5; opacity: 0.85; }
+        }
+        @keyframes dotPulse3 {
+          0%, 62%, 100% { r: 3.5; opacity: 0.5; }
+          82%           { r: 5.5; opacity: 1.0; }
+          98%           { r: 3.5; opacity: 0.85; }
+        }
+        .dot-step-0 { animation: dotPulse0 2.0s ease-in-out infinite; }
+        .dot-step-1 { animation: dotPulse1 2.0s ease-in-out infinite; }
+        .dot-step-2 { animation: dotPulse2 2.0s ease-in-out infinite; }
+        .dot-step-3 { animation: dotPulse3 2.0s ease-in-out infinite; }
+
+        @keyframes boxPulse0 {
+          0%, 100% { stroke-width: 2px; }
+          15%      { stroke-width: 3.2px; }
+          35%      { stroke-width: 2px; }
+        }
+        @keyframes boxPulse1 {
+          0%, 15%, 100% { stroke-width: 2px; }
+          35%           { stroke-width: 3.2px; }
+          55%           { stroke-width: 2px; }
+        }
+        @keyframes boxPulse2 {
+          0%, 38%, 100% { stroke-width: 2px; }
+          58%           { stroke-width: 3.2px; }
+          78%           { stroke-width: 2px; }
+        }
+        @keyframes boxPulse3 {
+          0%, 62%, 100% { stroke-width: 2px; }
+          82%           { stroke-width: 3.2px; }
+          98%           { stroke-width: 2px; }
+        }
+        .box-step-0 { animation: boxPulse0 2.0s ease-in-out infinite; }
+        .box-step-1 { animation: boxPulse1 2.0s ease-in-out infinite; }
+        .box-step-2 { animation: boxPulse2 2.0s ease-in-out infinite; }
+        .box-step-3 { animation: boxPulse3 2.0s ease-in-out infinite; }
       `}</style>
 
       {/* 1. 상단 헤더 & 컨트롤러 */}
@@ -295,7 +378,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           }}
         >
           <svg
-            viewBox="-60 -65 1150 1390"
+            viewBox="-75 -65 1220 1390"
             preserveAspectRatio="xMidYMid meet"
             className="w-full h-full select-none block border-2 border-black dark:border-white"
           >
@@ -305,7 +388,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#94A3B8" />
               </marker>
               <marker id="m-arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#DC2626" />
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#EF4444" />
               </marker>
               <marker id="m-arr-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
                 <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#EA580C" />
@@ -317,34 +400,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#16A34A" />
               </marker>
               <marker id="m-arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#2563EB" />
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#0284C7" />
+              </marker>
+              <marker id="m-arr-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#8B5CF6" />
               </marker>
               <marker id="m-arr-cyan" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
                 <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#0891B2" />
               </marker>
-
-              {/* 하드웨어 부품 그라데이션 */}
-              <linearGradient id="g-pc" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#FEE2E2" />
-                <stop offset="100%" stopColor="#FECACA" />
-              </linearGradient>
-              <linearGradient id="g-imem" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#EFF6FF" />
-                <stop offset="100%" stopColor="#DBEAFE" />
-              </linearGradient>
-              <linearGradient id="g-regfile" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#F0FDF4" />
-                <stop offset="100%" stopColor="#DCFCE7" />
-              </linearGradient>
-              <linearGradient id="g-dmem" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#ECFDF5" />
-                <stop offset="100%" stopColor="#D1FAE5" />
-              </linearGradient>
-              <linearGradient id="g-buffer" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#F1F5F9" />
-                <stop offset="50%" stopColor="#E2E8F0" />
-                <stop offset="100%" stopColor="#F1F5F9" />
-              </linearGradient>
             </defs>
 
             {/* ============================================================ */}
@@ -410,12 +473,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isIdActive ? "#FFF7ED" : "#F8FAFC"}
-                stroke={isIdActive ? "#FB923C" : "#CBD5E1"}
+                stroke={isIdActive ? "#EA580C" : "#CBD5E1"}
                 strokeWidth="2.2"
               />
               <path
                 d="M -40,391 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
-                fill={isIdActive ? "#F97316" : "#94A3B8"}
+                fill={isIdActive ? "#EA580C" : "#94A3B8"}
               />
               <text
                 x="98"
@@ -434,7 +497,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="420"
                 x2="236"
                 y2="420"
-                stroke={isIdActive ? "#FB923C" : "#CBD5E1"}
+                stroke={isIdActive ? "#EA580C" : "#CBD5E1"}
                 strokeWidth="1.5"
               />
               <text
@@ -460,19 +523,19 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isExActive ? "#F0FDF4" : "#F8FAFC"}
-                stroke={isExActive ? "#10B981" : "#CBD5E1"}
+                stroke={isExActive ? "#16A34A" : "#CBD5E1"}
                 strokeWidth="2.2"
               />
               <path
                 d="M -40,703 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
-                fill={isExActive ? "#10B981" : "#94A3B8"}
+                fill={isExActive ? "#16A34A" : "#94A3B8"}
               />
               <text
                 x="98"
                 y="712"
                 dominantBaseline="central"
                 fill="#FFFFFF"
-                fontSize="17"
+                fontSize="16"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -484,7 +547,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="732"
                 x2="236"
                 y2="732"
-                stroke={isExActive ? "#10B981" : "#CBD5E1"}
+                stroke={isExActive ? "#16A34A" : "#CBD5E1"}
                 strokeWidth="1.5"
               />
               <text
@@ -510,12 +573,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="92"
                 rx="11"
                 fill={isMemActive ? "#F0F9FF" : "#F8FAFC"}
-                stroke={isMemActive ? "#0EA5E9" : "#CBD5E1"}
+                stroke={isMemActive ? "#0284C7" : "#CBD5E1"}
                 strokeWidth="2.2"
               />
               <path
                 d="M -40,1011 a 11,11 0 0 1 11,-11 h 254 a 11,11 0 0 1 11,11 v 29 h -276 z"
-                fill={isMemActive ? "#0EA5E9" : "#94A3B8"}
+                fill={isMemActive ? "#0284C7" : "#94A3B8"}
               />
               <text
                 x="98"
@@ -534,7 +597,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 y1="1040"
                 x2="236"
                 y2="1040"
-                stroke={isMemActive ? "#0EA5E9" : "#CBD5E1"}
+                stroke={isMemActive ? "#0284C7" : "#CBD5E1"}
                 strokeWidth="1.5"
               />
               <text
@@ -604,7 +667,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             {/* ============================================================ */}
             {/* [2열: 우측 열] 순수 데이터패스 본체 (요소들 우측 30px 이동)    */}
             {/* ============================================================ */}
-            <g transform="translate(210, 0)">
+            <g key={clock ?? 0} transform="translate(210, 0)">
             {/* ============================================================ */}
             {/* 부품 0: PC MUX (분기 선택기: 0=PC+4, 1=Branch Target - EX/WB와 규격 통일: 100x38, center 380) */}
             {/* ============================================================ */}
@@ -615,15 +678,16 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               height="38"
               rx="19"
               ry="19"
-              fill={ifPcMuxToPcActive ? "#EFF6FF" : "#F8FAFC"}
-              stroke={ifPcMuxToPcActive ? "#3B82F6" : "#CBD5E1"}
+              className={boxStepClass(ifPcMuxToPcActive, 0)}
+              fill={ifPcMuxToPcActive ? "#FEF2F2" : "#F8FAFC"}
+              stroke={ifPcMuxToPcActive ? "#EF4444" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
               x="380"
               y="33"
               dominantBaseline="central"
-              fill={ifPcMuxToPcActive ? "#1E40AF" : "#94A3B8"}
+              fill={ifPcMuxToPcActive ? "#991B1B" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
@@ -638,9 +702,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="52"
               x2="380"
               y2="78"
-              stroke={ifPcMuxToPcActive ? "#EF4444" : "transparent"}
+              stroke={ifPcMuxToPcActive ? "#EF4444" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={ifPcMuxToPcActive ? "url(#m-arr-red)" : undefined}
+              className={wireStepClass(ifPcMuxToPcActive, 0)}
+              markerEnd={ifPcMuxToPcActive ? "url(#m-arr-red)" : inactiveMarker}
               style={wireStyle(ifPcMuxToPcActive)}
             />
 
@@ -651,7 +716,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="240"
               height="56"
               rx="8"
-              fill={isIfActive ? "url(#g-pc)" : "#F8FAFC"}
+              className={boxStepClass(isIfActive, 0)}
+              fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
               stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
               strokeWidth="2"
             />
@@ -662,7 +728,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               textAnchor="middle"
               className="select-none"
               fill={isIfActive ? "#991B1B" : "#94A3B8"}
-              fontSize="21"
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
             >
@@ -675,52 +741,56 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="136"
               x2="380"
               y2="174"
-              stroke={ifPcToImemActive ? "#EF4444" : "transparent"}
+              stroke={ifPcToImemActive ? "#EF4444" : inactiveStroke}
               strokeWidth="2.8"
-              className={ifPcToImemActive ? "stream-down-active" : undefined}
-              markerEnd={ifPcToImemActive ? "url(#m-arr-red)" : undefined}
+              className={wireStepClass(ifPcToImemActive, 1)}
+              markerEnd={ifPcToImemActive ? "url(#m-arr-red)" : inactiveMarker}
               style={wireStyle(ifPcToImemActive)}
             />
 
-            {/* PC ➔ PC + 4 Adder 연결 화살표 (x=500 -> 682, y=108) */}
+            {/* PC ➔ PC + 4 Adder 연결 화살표 (x=500 -> 756, y=108) */}
             <path
-              d="M 500,108 L 682,108"
+              d="M 500,108 L 756,108"
               fill="none"
-              stroke={ifPcToPlus4Active ? "#EF4444" : "transparent"}
+              stroke={ifPcToPlus4Active ? "#EF4444" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={ifPcToPlus4Active ? "url(#m-arr-red)" : undefined}
+              className={wireStepClass(ifPcToPlus4Active, 1)}
+              markerEnd={ifPcToPlus4Active ? "url(#m-arr-red)" : inactiveMarker}
               style={wireStyle(ifPcToPlus4Active)}
             />
-            {/* PC 분기 노드 및 IF/ID BUFFER 직하강 라인 (x=637 일직선 유지, RISC-V 순수 PC 전달) */}
+            {/* PC 분기 노드 및 IF/ID BUFFER 직하강 라인 (x=652 일직선 유지, RISC-V 순수 PC 전달) */}
             <circle
-              cx="637"
+              cx="652"
               cy="108"
               r="3.5"
-              fill={ifPcToIfIdActive ? "#EF4444" : "transparent"}
+              className={dotStepClass(ifPcToIfIdActive, 1)}
+              fill={ifPcToIfIdActive ? "#EF4444" : inactiveStroke}
               style={wireStyle(ifPcToIfIdActive)}
             />
             <line
-              x1="637"
+              x1="652"
               y1="108"
-              x2="637"
+              x2="652"
               y2="283"
-              stroke={ifPcToIfIdActive ? "#EF4444" : "transparent"}
+              stroke={ifPcToIfIdActive ? "#EF4444" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={ifPcToIfIdActive ? "url(#m-arr-red)" : undefined}
+              className={wireStepClass(ifPcToIfIdActive, 1)}
+              markerEnd={ifPcToIfIdActive ? "url(#m-arr-red)" : inactiveMarker}
               style={wireStyle(ifPcToIfIdActive)}
             />
 
-            {/* PC + 4 가산기 (Control Unit과 동일한 center cx=721로 이동) */}
+            {/* PC + 4 가산기 (Control Unit과 동일한 center cx=801로 이동) */}
             <polygon
-              points="676,88 766,88 746,128 696,128"
+              points="756,88 846,88 826,128 776,128"
+              className={boxStepClass(ifPlus4LoopbackActive, 1)}
               fill={ifPlus4LoopbackActive ? "#FEF2F2" : "#F8FAFC"}
               stroke={ifPlus4LoopbackActive ? "#EF4444" : "#CBD5E1"}
               strokeWidth="2"
               strokeLinejoin="round"
             />
             <text
-              x="721"
+              x="801"
               y="108"
               dominantBaseline="central"
               fill={ifPlus4LoopbackActive ? "#991B1B" : "#94A3B8"}
@@ -732,24 +802,26 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               + 4
             </text>
 
-            {/* PC + 4 루프백 ➔ PC MUX 입력 0 (포트 0: 상단 x=410 직하강 인입, 우측 회랑 x=800) */}
+            {/* PC + 4 루프백 ➔ PC MUX 입력 0 (포트 0: 상단 x=410 직하강 인입, 우측 회랑 x=870) */}
             <path
-              d="M 721,128 L 721,168 L 800,168 L 800,-22 L 410,-22 L 410,12"
+              d="M 801,128 L 801,168 L 870,168 L 870,-22 L 410,-22 L 410,12"
               fill="none"
-              stroke={ifPlus4LoopbackActive ? "#EF4444" : "transparent"}
+              stroke={ifPlus4LoopbackActive ? "#EF4444" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={ifPlus4LoopbackActive ? "url(#m-arr-red)" : undefined}
+              className={wireStepClass(ifPlus4LoopbackActive, 2)}
+              markerEnd={ifPlus4LoopbackActive ? "url(#m-arr-red)" : inactiveMarker}
               style={wireStyle(ifPlus4LoopbackActive)}
             />
 
-            {/* Branch Target Address ➔ PC MUX 입력 1 (포트 1: EX Branch Add ➔ 우측 외곽 회랑 x=835 ➔ 상단 x=350 직하강) */}
+            {/* Branch Target Address ➔ PC MUX 입력 1 (포트 1: EX Branch Add ➔ 우측 외곽 회랑 x=905 ➔ 상단 x=350 직하강) */}
             <path
-              d="M 590,808 L 590,845 L 835,845 L 835,-50 L 350,-50 L 350,12"
+              d="M 615,808 L 615,845 L 905,845 L 905,-50 L 350,-50 L 350,12"
               fill="none"
-              stroke={branchLoopbackActive ? "#EF4444" : "transparent"}
+              stroke={branchLoopbackActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={branchLoopbackActive ? "url(#m-arr-red)" : undefined}
+              className={wireStepClass(branchLoopbackActive, 3)}
+              markerEnd={branchLoopbackActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(branchLoopbackActive)}
             />
 
@@ -760,16 +832,17 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="300"
               height="72"
               rx="8"
-              fill={isIfActive ? "url(#g-imem)" : "#F8FAFC"}
-              stroke={isIfActive ? "#3B82F6" : "#CBD5E1"}
+              className={boxStepClass(isIfActive, 1)}
+              fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
+              stroke={isIfActive ? "#EF4444" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
               x="380"
               y="212"
               dominantBaseline="central"
-              fill={isIfActive ? "#1E40AF" : "#94A3B8"}
-              fontSize="21"
+              fill={isIfActive ? "#991B1B" : "#94A3B8"}
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -783,32 +856,32 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="248"
               x2="380"
               y2="283"
-              stroke={ifImemToIfIdActive ? "#DC2626" : "transparent"}
+              stroke={ifImemToIfIdActive ? "#EF4444" : inactiveStroke}
               strokeWidth="2.8"
-              className={ifImemToIfIdActive ? "stream-down-active" : undefined}
-              markerEnd={ifImemToIfIdActive ? "url(#m-arr-red)" : undefined}
+              className={wireStepClass(ifImemToIfIdActive, 2)}
+              markerEnd={ifImemToIfIdActive ? "url(#m-arr-red)" : inactiveMarker}
               style={wireStyle(ifImemToIfIdActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 1: IF / ID BUFFER (가로길이 30% 확장: w=690, x=110) */}
+            {/* 파이프라인 버퍼 1: IF / ID BUFFER (데이터 파이프라인 열 w=614, x=110) */}
             {/* ============================================================ */}
             <rect
               x="110"
               y="285"
-              width="690"
+              width="614"
               height="26"
               rx="6"
-              fill="url(#g-buffer)"
+              fill="#F1F5F9"
               stroke="#94A3B8"
               strokeWidth="1.6"
             />
             <text
-              x="455"
+              x="383"
               y="298"
               dominantBaseline="central"
               fill="#1E293B"
-              fontSize="15.5"
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -826,36 +899,40 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="311"
               x2="380"
               y2="336"
-              stroke={idTrunkActive ? "#EA580C" : "transparent"}
+              stroke={idTrunkActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
+              className={wireStepClass(idTrunkActive, 0)}
               style={wireStyle(idTrunkActive)}
             />
             {/* IF/ID BUFFER ➔ Register File 분기 버스 */}
             <path
               d="M 380,336 L 280,336 L 280,366"
               fill="none"
-              stroke={idToRegsActive ? "#EA580C" : "transparent"}
+              stroke={idToRegsActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={idToRegsActive ? "url(#m-arr-orange)" : undefined}
+              className={wireStepClass(idToRegsActive, 1)}
+              markerEnd={idToRegsActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idToRegsActive)}
             />
             {/* IF/ID BUFFER ➔ Imm Gen 분기 버스 */}
             <path
-              d="M 380,336 L 543,336 L 543,374"
+              d="M 380,336 L 578,336 L 578,366"
               fill="none"
-              stroke={idToImmGenActive ? "#EA580C" : "transparent"}
+              stroke={idToImmGenActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={idToImmGenActive ? "url(#m-arr-orange)" : undefined}
+              className={wireStepClass(idToImmGenActive, 1)}
+              markerEnd={idToImmGenActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idToImmGenActive)}
             />
             {/* IF/ID BUFFER ➔ Control Unit 분기 버스 */}
             <path
-              d="M 380,336 L 721,336 L 721,374"
+              d="M 380,336 L 801,336 L 801,366"
               fill="none"
-              stroke={idControlUnitActive ? "#EA580C" : "transparent"}
+              stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : undefined}
+              className={wireStepClass(idControlUnitActive, 1)}
+              markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idControlUnitActive)}
             />
 
@@ -866,16 +943,17 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="230"
               height="112"
               rx="8"
-              fill={idToRegsActive ? "url(#g-regfile)" : "#F8FAFC"}
-              stroke={idToRegsActive ? "#16A34A" : "#CBD5E1"}
+              className={boxStepClass(idToRegsActive, 1)}
+              fill={idToRegsActive ? "#FFF7ED" : "#F8FAFC"}
+              stroke={idToRegsActive ? "#EA580C" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
               x="280"
               y="424"
               dominantBaseline="central"
-              fill={idToRegsActive ? "#15803D" : "#94A3B8"}
-              fontSize="21"
+              fill={idToRegsActive ? "#C2410C" : "#94A3B8"}
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -883,44 +961,59 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               Registers
             </text>
 
-            {/* 부품 4: Imm Gen (타원형 rx=50, ry=48, cx=543, 우측 끝=593, 라인 간격=44px) */}
+            {/* 부품 4: Imm Gen (세로형 타원 rx=44, ry=58, cx=578, cy=424) */}
             <ellipse
-              cx="543"
+              cx="578"
               cy="424"
-              rx="50"
-              ry="48"
-              fill={idToImmGenActive ? "#F0F9FF" : "#F8FAFC"}
-              stroke={idToImmGenActive ? "#0284C7" : "#CBD5E1"}
+              rx="44"
+              ry="58"
+              className={boxStepClass(idToImmGenActive, 1)}
+              fill={idToImmGenActive ? "#FFF7ED" : "#F8FAFC"}
+              stroke={idToImmGenActive ? "#EA580C" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
-              x="543"
-              y="424"
+              x="578"
+              y="412"
               dominantBaseline="central"
-              fill={idToImmGenActive ? "#0369A1" : "#94A3B8"}
+              fill={idToImmGenActive ? "#C2410C" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
             >
-              Imm Gen
+              Imm
+            </text>
+            <text
+              x="578"
+              y="436"
+              dominantBaseline="central"
+              fill={idToImmGenActive ? "#C2410C" : "#94A3B8"}
+              fontSize="18"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
+              Gen
             </text>
 
-            {/* 부품 5: Control Unit (라인 간격 44px 대칭: 좌측 끝=681, cx=721, rx=40, ry=48) */}
+            {/* 부품 5: Control Unit (세로형 타원 rx=44, ry=58, cx=801, cy=424) */}
             <ellipse
-              cx="721"
+              cx="801"
               cy="424"
-              rx="40"
-              ry="48"
+              rx="44"
+              ry="58"
+              className={boxStepClass(idControlUnitActive, 1)}
               fill={idControlUnitActive ? "#FFF7ED" : "#F8FAFC"}
               stroke={idControlUnitActive ? "#EA580C" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
-              x="721"
-              y="415"
+              x="801"
+              y="412"
+              dominantBaseline="central"
               fill={idControlUnitActive ? "#C2410C" : "#94A3B8"}
-              fontSize="16.5"
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -928,10 +1021,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               Control
             </text>
             <text
-              x="721"
-              y="435"
+              x="801"
+              y="436"
+              dominantBaseline="central"
               fill={idControlUnitActive ? "#C2410C" : "#94A3B8"}
-              fontSize="16.5"
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -946,10 +1040,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="480"
               x2="240"
               y2="538"
-              stroke={idRd1ToIdExActive ? "#EA580C" : "transparent"}
+              stroke={idRd1ToIdExActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
-              className={idRd1ToIdExActive ? "stream-down-active" : undefined}
-              markerEnd={idRd1ToIdExActive ? "url(#m-arr-orange)" : undefined}
+              className={wireStepClass(idRd1ToIdExActive, 2)}
+              markerEnd={idRd1ToIdExActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idRd1ToIdExActive)}
             />
             {/* 2) Read Data 2 */}
@@ -958,56 +1052,104 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="480"
               x2="350"
               y2="538"
-              stroke={idRd2ToIdExActive ? "#EA580C" : "transparent"}
+              stroke={idRd2ToIdExActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
-              className={idRd2ToIdExActive ? "stream-down-active" : undefined}
-              markerEnd={idRd2ToIdExActive ? "url(#m-arr-orange)" : undefined}
+              className={wireStepClass(idRd2ToIdExActive, 2)}
+              markerEnd={idRd2ToIdExActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idRd2ToIdExActive)}
             />
             {/* 3) Imm */}
             <line
-              x1="543"
-              y1="472"
-              x2="543"
+              x1="578"
+              y1="482"
+              x2="578"
               y2="538"
-              stroke={idImmToIdExActive ? "#0284C7" : "transparent"}
+              stroke={idImmToIdExActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={idImmToIdExActive ? "url(#m-arr-cyan)" : undefined}
+              className={wireStepClass(idImmToIdExActive, 2)}
+              markerEnd={idImmToIdExActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idImmToIdExActive)}
             />
-            {/* 4) PC 파이프라인 전달선 (IF/ID ➔ ID/EX, 일직선 수직 라인 x=637) */}
+            {/* 4) PC 파이프라인 전달선 (IF/ID ➔ ID/EX, 일직선 수직 라인 x=652) */}
             <line
-              x1="637"
+              x1="652"
               y1="311"
-              x2="637"
+              x2="652"
               y2="538"
-              stroke={idPcToIdExActive ? "#EA580C" : "transparent"}
+              stroke={idPcToIdExActive ? "#EA580C" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={idPcToIdExActive ? "url(#m-arr-orange)" : undefined}
+              className={wireStepClass(idPcToIdExActive, 1)}
+              markerEnd={idPcToIdExActive ? "url(#m-arr-orange)" : inactiveMarker}
               style={wireStyle(idPcToIdExActive)}
+            />
+            {/* 5) Control Unit ➔ ID/EX SIGNAL BUFFER [EX, M, WB] 3분기 제어 버스 */}
+            <path
+              d="M 801,482 L 801,508 M 755,508 L 847,508"
+              fill="none"
+              stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
+              strokeWidth="2.4"
+              className={wireStepClass(idControlUnitActive, 2)}
+              style={wireStyle(idControlUnitActive)}
+            />
+            {/* 분기 1: EX 셀 인입 (X = 755) */}
+            <line
+              x1="755"
+              y1="508"
+              x2="755"
+              y2="538"
+              stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
+              strokeWidth="2"
+              className={wireStepClass(idControlUnitActive, 2)}
+              markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
+              style={wireStyle(idControlUnitActive)}
+            />
+            {/* 분기 2: M 셀 인입 (X = 801) */}
+            <line
+              x1="801"
+              y1="508"
+              x2="801"
+              y2="538"
+              stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
+              strokeWidth="2"
+              className={wireStepClass(idControlUnitActive, 2)}
+              markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
+              style={wireStyle(idControlUnitActive)}
+            />
+            {/* 분기 3: WB 셀 인입 (X = 847) */}
+            <line
+              x1="847"
+              y1="508"
+              x2="847"
+              y2="538"
+              stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
+              strokeWidth="2"
+              className={wireStepClass(idControlUnitActive, 2)}
+              markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
+              style={wireStyle(idControlUnitActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 2: ID / EX BUFFER (가로길이 30% 확장: w=690, x=110) */}
+            {/* 파이프라인 버퍼 2: ID / EX BUFFER (데이터 614px + 시그널 138px) */}
             {/* ============================================================ */}
+            {/* 데이터 버퍼 (X = 110 ~ 724) */}
             <rect
               x="110"
               y="540"
-              width="690"
+              width="614"
               height="26"
               rx="6"
-              fill="url(#g-buffer)"
+              fill="#F1F5F9"
               stroke="#94A3B8"
               strokeWidth="1.6"
             />
             <text
-              x="455"
+              x="382"
               y="553"
               dominantBaseline="central"
               fill="#1E293B"
-              fontSize="15.5"
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -1015,6 +1157,126 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             >
               ID / EX BUFFER
             </text>
+
+            {/* 시그널 버퍼 (X = 732 ~ 870) : [ EX | M | WB ] */}
+            <g>
+              <rect
+                x="732"
+                y="540"
+                width="138"
+                height="26"
+                rx="6"
+                fill="#F1F5F9"
+                stroke="#94A3B8"
+                strokeWidth="1.6"
+              />
+              <line x1="778" y1="540" x2="778" y2="566" stroke="#CBD5E1" strokeWidth="1" />
+              <line x1="824" y1="540" x2="824" y2="566" stroke="#CBD5E1" strokeWidth="1" />
+              
+              {/* EX 셀 (X = 732 ~ 778) */}
+              <rect
+                x="733"
+                y="541"
+                width="44"
+                height="24"
+                rx="5"
+                fill={isExActive ? "#F0FDF4" : "transparent"}
+              />
+              <text
+                x="755"
+                y="553"
+                dominantBaseline="central"
+                fill={isExActive ? "#15803D" : "#94A3B8"}
+                fontSize="18"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                EX
+              </text>
+
+              {/* M 셀 (X = 778 ~ 824) */}
+              <rect
+                x="779"
+                y="541"
+                width="44"
+                height="24"
+                rx="5"
+                fill={isMemActive ? "#F0F9FF" : "transparent"}
+              />
+              <text
+                x="801"
+                y="553"
+                dominantBaseline="central"
+                fill={isMemActive ? "#0369A1" : "#94A3B8"}
+                fontSize="18"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                M
+              </text>
+
+              {/* WB 셀 (X = 824 ~ 870) */}
+              <rect
+                x="825"
+                y="541"
+                width="44"
+                height="24"
+                rx="5"
+                fill={isWbActive ? "#F5F3FF" : "transparent"}
+              />
+              <text
+                x="847"
+                y="553"
+                dominantBaseline="central"
+                fill={isWbActive ? "#6D28D9" : "#94A3B8"}
+                fontSize="18"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                WB
+              </text>
+            </g>
+
+            {/* EX 제어선: ID/EX EX셀 ➔ ALUSrc MUX 우측면 인입 */}
+            <path
+              d="M 755,566 L 755,684 L 430,684"
+              fill="none"
+              stroke={exAluSrcToAluActive ? "#16A34A" : inactiveStroke}
+              strokeWidth="2"
+              strokeDasharray="4 3"
+              className={wireStepClass(exAluSrcToAluActive, 1)}
+              markerEnd={exAluSrcToAluActive ? "url(#m-arr-green)" : inactiveMarker}
+              style={wireStyle(exAluSrcToAluActive)}
+            />
+            {/* 컨트롤 신호 전달선 1: M ➔ M (ID/EX M셀 ➔ EX/MEM M셀 수직 직하강) */}
+            <line
+              x1="801"
+              y1="566"
+              x2="801"
+              y2="908"
+              stroke={isExActive ? "#16A34A" : inactiveStroke}
+              strokeWidth="2"
+              strokeDasharray="5 3"
+              className={wireStepClass(isExActive, 1)}
+              markerEnd={isExActive ? "url(#m-arr-green)" : inactiveMarker}
+              style={wireStyle(isExActive)}
+            />
+            {/* 컨트롤 신호 전달선 2: WB ➔ WB (ID/EX WB셀 ➔ EX/MEM WB셀 수직 직하강) */}
+            <line
+              x1="847"
+              y1="566"
+              x2="847"
+              y2="908"
+              stroke={isExActive ? "#16A34A" : inactiveStroke}
+              strokeWidth="2"
+              strokeDasharray="5 3"
+              className={wireStepClass(isExActive, 1)}
+              markerEnd={isExActive ? "url(#m-arr-green)" : inactiveMarker}
+              style={wireStyle(isExActive)}
+            />
 
             {/* ============================================================ */}
             {/* [STAGE 3] EXECUTE / ALU (EX) : Y = 566 ~ 910                  */}
@@ -1025,10 +1287,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="566"
               x2="240"
               y2="739"
-              stroke={exRd1ToAluActive ? "#D97706" : "transparent"}
+              stroke={exRd1ToAluActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
-              className={exRd1ToAluActive ? "stream-down-active" : undefined}
-              markerEnd={exRd1ToAluActive ? "url(#m-arr-amber)" : undefined}
+              className={wireStepClass(exRd1ToAluActive, 0)}
+              markerEnd={exRd1ToAluActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exRd1ToAluActive)}
             />
 
@@ -1038,8 +1300,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="566"
               x2="350"
               y2="595"
-              stroke={exRd2TrunkActive ? "#D97706" : "transparent"}
+              stroke={exRd2TrunkActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
+              className={wireStepClass(exRd2TrunkActive, 0)}
               style={wireStyle(exRd2TrunkActive)}
             />
             {/* Read Data 2 ➔ ALUSrc MUX 좌측 입력(X = 350, Y = 595 -> 663) */}
@@ -1048,55 +1311,61 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="595"
               x2="350"
               y2="663"
-              stroke={exRd2ToAluSrcActive ? "#D97706" : "transparent"}
+              stroke={exRd2ToAluSrcActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={exRd2ToAluSrcActive ? "url(#m-arr-amber)" : undefined}
+              className={wireStepClass(exRd2ToAluSrcActive, 1)}
+              markerEnd={exRd2ToAluSrcActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exRd2ToAluSrcActive)}
             />
             {/* Read Data 2 분기 ➔ EX/MEM 버퍼 (Data Memory Write Data용, x=480 직하강) */}
             <path
               d="M 350,595 L 480,595 L 480,908"
               fill="none"
-              stroke={exRd2ToWriteDataActive ? "#D97706" : "transparent"}
+              stroke={exRd2ToWriteDataActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={exRd2ToWriteDataActive ? "url(#m-arr-amber)" : undefined}
+              className={wireStepClass(exRd2ToWriteDataActive, 1)}
+              markerEnd={exRd2ToWriteDataActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exRd2ToWriteDataActive)}
             />
             <circle
               cx="350"
               cy="595"
               r="3.5"
-              fill={exRd2ToWriteDataActive ? "#D97706" : "transparent"}
+              className={dotStepClass(exRd2ToWriteDataActive, 1)}
+              fill={exRd2ToWriteDataActive ? "#16A34A" : inactiveStroke}
               style={wireStyle(exRd2ToWriteDataActive)}
             />
 
-            {/* 3) Imm Trunk (X = 543, Y = 566 -> 630) */}
+            {/* 3) Imm Trunk (X = 578, Y = 566 -> 630) */}
             <line
-              x1="543"
+              x1="578"
               y1="566"
-              x2="543"
+              x2="578"
               y2="630"
-              stroke={exImmTrunkActive ? "#0284C7" : "transparent"}
+              stroke={exImmTrunkActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
+              className={wireStepClass(exImmTrunkActive, 0)}
               style={wireStyle(exImmTrunkActive)}
             />
             {/* Imm ➔ ALUSrc MUX 우측 입력(X = 410, Y = 663) 분기 */}
             <path
-              d="M 543,630 L 410,630 L 410,663"
+              d="M 578,630 L 410,630 L 410,663"
               fill="none"
-              stroke={exImmToAluSrcActive ? "#0284C7" : "transparent"}
+              stroke={exImmToAluSrcActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={exImmToAluSrcActive ? "url(#m-arr-cyan)" : undefined}
+              className={wireStepClass(exImmToAluSrcActive, 1)}
+              markerEnd={exImmToAluSrcActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exImmToAluSrcActive)}
             />
             <circle
-              cx="543"
+              cx="578"
               cy="630"
               r="3.5"
-              fill={exImmToAluSrcActive ? "#0284C7" : "transparent"}
+              className={dotStepClass(exImmToAluSrcActive, 1)}
+              fill={exImmToAluSrcActive ? "#16A34A" : inactiveStroke}
               style={wireStyle(exImmToAluSrcActive)}
             />
 
@@ -1108,15 +1377,16 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               height="38"
               rx="19"
               ry="19"
-              fill={exAluSrcToAluActive ? "#EFF6FF" : "#F8FAFC"}
-              stroke={exAluSrcToAluActive ? "#3B82F6" : "#CBD5E1"}
+              className={boxStepClass(exAluSrcToAluActive, 1)}
+              fill={exAluSrcToAluActive ? "#F0FDF4" : "#F8FAFC"}
+              stroke={exAluSrcToAluActive ? "#16A34A" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
               x="380"
               y="684"
               dominantBaseline="central"
-              fill={exAluSrcToAluActive ? "#1E40AF" : "#94A3B8"}
+              fill={exAluSrcToAluActive ? "#15803D" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
@@ -1131,14 +1401,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="703"
               x2="380"
               y2="739"
-              stroke={exAluSrcToAluActive ? "#D97706" : "transparent"}
+              stroke={exAluSrcToAluActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={exAluSrcToAluActive ? "url(#m-arr-amber)" : undefined}
+              className={wireStepClass(exAluSrcToAluActive, 2)}
+              markerEnd={exAluSrcToAluActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exAluSrcToAluActive)}
             />
 
             {/* 부품 6: ALU (center x=310, y=741..869, h=128) */}
-            <g className={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "glow-active-ex" : undefined}>
+            <g>
               <polygon
                 points="
                   180,741
@@ -1149,8 +1420,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   405,869
                   215,869
                 "
-                fill={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#FEF9C3" : "#F8FAFC"}
-                stroke={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#D97706" : "#CBD5E1"}
+                className={boxStepClass(exAluToExMemActive || (isExActive && isBranch(exOp)), 2)}
+                fill={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#F0FDF4" : "#F8FAFC"}
+                stroke={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#16A34A" : "#CBD5E1"}
                 strokeWidth="2"
                 strokeLinejoin="round"
               />
@@ -1158,8 +1430,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 x="310"
                 y="825"
                 dominantBaseline="central"
-                fill={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#78350F" : "#94A3B8"}
-                fontSize="21"
+                fill={exAluToExMemActive || (isExActive && isBranch(exOp)) ? "#15803D" : "#94A3B8"}
+                fontSize="18"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -1169,49 +1441,64 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </text>
             </g>
 
-            {/* 우측 Branch Adder (center 590: 좌측 포트 x=543, 우측 포트 x=637 수직 직하강) */}
-            {/* Branch Add 입력 1: Imm (좌측 포트 x=543, y=630 -> 743 수직 직하강) */}
+            {/* 우측 Branch Adder (center 615: 좌측 포트 x=578, 우측 포트 x=652 수직 직하강) */}
+            {/* Branch Add 입력 1: Imm (좌측 포트 x=578, y=630 -> 743 수직 직하강) */}
             <line
-              x1="543"
+              x1="578"
               y1="630"
-              x2="543"
+              x2="578"
               y2="743"
-              stroke={exImmToBranchAddActive ? "#0284C7" : "transparent"}
+              stroke={exImmToBranchAddActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={exImmToBranchAddActive ? "url(#m-arr-cyan)" : undefined}
+              className={wireStepClass(exImmToBranchAddActive, 1)}
+              markerEnd={exImmToBranchAddActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exImmToBranchAddActive)}
             />
-            {/* Branch Add 입력 2: PC (우측 포트 x=637 수직 직하강) */}
+            {/* Branch Add 입력 2: PC (우측 포트 x=652 수직 직하강) */}
             <line
-              x1="637"
+              x1="652"
               y1="566"
-              x2="637"
+              x2="652"
               y2="743"
-              stroke={exPcToBranchAddActive ? "#D97706" : "transparent"}
+              stroke={exPcToBranchAddActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={exPcToBranchAddActive ? "url(#m-arr-amber)" : undefined}
+              className={wireStepClass(exPcToBranchAddActive, 1)}
+              markerEnd={exPcToBranchAddActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exPcToBranchAddActive)}
             />
             <polygon
-              points="515,745 665,745 635,808 545,808"
-              fill={branchLoopbackActive ? "#FEF2F2" : exPcToBranchAddActive ? "#FEF9C3" : "#F8FAFC"}
-              stroke={branchLoopbackActive ? "#EF4444" : exPcToBranchAddActive ? "#D97706" : "#CBD5E1"}
+              points="550,745 680,745 650,808 580,808"
+              className={boxStepClass(exBranchAddActive, 2)}
+              fill={exBranchAddActive ? "#F0FDF4" : "#F8FAFC"}
+              stroke={exBranchAddActive ? "#16A34A" : "#CBD5E1"}
               strokeWidth="2"
               strokeLinejoin="round"
             />
             <text
-              x="590"
-              y="776.5"
+              x="615"
+              y="765"
               dominantBaseline="central"
-              fill={branchLoopbackActive ? "#991B1B" : exPcToBranchAddActive ? "#78350F" : "#94A3B8"}
-              fontSize="20"
+              fill={exBranchAddActive ? "#15803D" : "#94A3B8"}
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
             >
-              Branch Add
+              Branch
+            </text>
+            <text
+              x="615"
+              y="789"
+              dominantBaseline="central"
+              fill={exBranchAddActive ? "#15803D" : "#94A3B8"}
+              fontSize="18"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
+              Add
             </text>
 
             {/* ALU 출력(X = 310, Y = 869) ➔ EX/MEM BUFFER (Y = 910) 직하강 */}
@@ -1220,32 +1507,33 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="869"
               x2="310"
               y2="908"
-              stroke={exAluToExMemActive ? "#D97706" : "transparent"}
+              stroke={exAluToExMemActive ? "#16A34A" : inactiveStroke}
               strokeWidth="2.8"
-              className={exAluToExMemActive ? "stream-down-active" : undefined}
-              markerEnd={exAluToExMemActive ? "url(#m-arr-amber)" : undefined}
+              className={wireStepClass(exAluToExMemActive, 3)}
+              markerEnd={exAluToExMemActive ? "url(#m-arr-green)" : inactiveMarker}
               style={wireStyle(exAluToExMemActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 3: EX / MEM BUFFER (가로길이 30% 확장: w=690, x=110) */}
+            {/* 파이프라인 버퍼 3: EX / MEM BUFFER (데이터 660px + 시그널 92px) */}
             {/* ============================================================ */}
+            {/* 데이터 버퍼 (X = 110 ~ 770) */}
             <rect
               x="110"
               y="910"
-              width="690"
+              width="660"
               height="26"
               rx="6"
-              fill="url(#g-buffer)"
+              fill="#F1F5F9"
               stroke="#94A3B8"
               strokeWidth="1.6"
             />
             <text
-              x="455"
+              x="440"
               y="923"
               dominantBaseline="central"
               fill="#1E293B"
-              fontSize="15.5"
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -1253,6 +1541,90 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             >
               EX / MEM BUFFER
             </text>
+
+            {/* 시그널 버퍼 (X = 778 ~ 870) : [ M | WB ] */}
+            <g>
+              <rect
+                x="778"
+                y="910"
+                width="92"
+                height="26"
+                rx="6"
+                fill="#F1F5F9"
+                stroke="#94A3B8"
+                strokeWidth="1.6"
+              />
+              <line x1="824" y1="910" x2="824" y2="936" stroke="#CBD5E1" strokeWidth="1" />
+
+              {/* M 셀 (X = 778 ~ 824) */}
+              <rect
+                x="779"
+                y="911"
+                width="44"
+                height="24"
+                rx="5"
+                fill={isMemActive ? "#F0F9FF" : "transparent"}
+              />
+              <text
+                x="801"
+                y="923"
+                dominantBaseline="central"
+                fill={isMemActive ? "#0369A1" : "#94A3B8"}
+                fontSize="18"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                M
+              </text>
+
+              {/* WB 셀 (X = 824 ~ 870) */}
+              <rect
+                x="825"
+                y="911"
+                width="44"
+                height="24"
+                rx="5"
+                fill={isWbActive ? "#F5F3FF" : "transparent"}
+              />
+              <text
+                x="847"
+                y="923"
+                dominantBaseline="central"
+                fill={isWbActive ? "#6D28D9" : "#94A3B8"}
+                fontSize="18"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                WB
+              </text>
+            </g>
+
+            {/* MEM 제어선: EX/MEM M셀 ➔ Data Memory 우측면 중간 인입 */}
+            <path
+              d="M 801,936 L 801,1051 L 550,1051"
+              fill="none"
+              stroke={memAluToDmemAddrActive ? "#0284C7" : inactiveStroke}
+              strokeWidth="2"
+              strokeDasharray="4 3"
+              className={wireStepClass(memAluToDmemAddrActive, 1)}
+              markerEnd={memAluToDmemAddrActive ? "url(#m-arr-blue)" : inactiveMarker}
+              style={wireStyle(memAluToDmemAddrActive)}
+            />
+            {/* 컨트롤 신호 전달선: WB ➔ WB (EX/MEM WB셀 ➔ MEM/WB WB셀 수직 직하강) */}
+            <line
+              x1="847"
+              y1="936"
+              x2="847"
+              y2="1154"
+              stroke={isMemActive ? "#0284C7" : inactiveStroke}
+              strokeWidth="2"
+              strokeDasharray="5 3"
+              className={wireStepClass(isMemActive, 1)}
+              markerEnd={isMemActive ? "url(#m-arr-blue)" : inactiveMarker}
+              style={wireStyle(isMemActive)}
+            />
 
             {/* ============================================================ */}
             {/* [STAGE 4] MEMORY ACCESS (MEM) : Y = 936 ~ 1156               */}
@@ -1263,8 +1635,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="936"
               x2="310"
               y2="965"
-              stroke={memAluTrunkActive ? "#16A34A" : "transparent"}
+              stroke={memAluTrunkActive ? "#0284C7" : inactiveStroke}
               strokeWidth="2.8"
+              className={wireStepClass(memAluTrunkActive, 0)}
               style={wireStyle(memAluTrunkActive)}
             />
             {/* 1) ALU Result 분기 ➔ Data Memory Address 입력 (X = 310, Y = 965 -> 994) */}
@@ -1273,26 +1646,29 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="965"
               x2="310"
               y2="994"
-              stroke={memAluToDmemAddrActive ? "#16A34A" : "transparent"}
+              stroke={memAluToDmemAddrActive ? "#0284C7" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={memAluToDmemAddrActive ? "url(#m-arr-green)" : undefined}
+              className={wireStepClass(memAluToDmemAddrActive, 1)}
+              markerEnd={memAluToDmemAddrActive ? "url(#m-arr-blue)" : inactiveMarker}
               style={wireStyle(memAluToDmemAddrActive)}
             />
             {/* 2) ALU Result Bypass (EX/MEM ➔ MEM/WB 버퍼 직행, X = 225) */}
             <path
               d="M 310,965 L 225,965 L 225,1154"
               fill="none"
-              stroke={memAluBypassActive ? "#16A34A" : "transparent"}
+              stroke={memAluBypassActive ? "#0284C7" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={memAluBypassActive ? "url(#m-arr-green)" : undefined}
+              className={wireStepClass(memAluBypassActive, 1)}
+              markerEnd={memAluBypassActive ? "url(#m-arr-blue)" : inactiveMarker}
               style={wireStyle(memAluBypassActive)}
             />
             <circle
               cx="310"
               cy="965"
               r="3.5"
-              fill={memAluBypassActive ? "#16A34A" : "transparent"}
+              className={dotStepClass(memAluBypassActive, 1)}
+              fill={memAluBypassActive ? "#0284C7" : inactiveStroke}
               style={wireStyle(memAluBypassActive)}
             />
 
@@ -1302,10 +1678,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="936"
               x2="480"
               y2="994"
-              stroke={memWriteDataActive ? "#16A34A" : "transparent"}
+              stroke={memWriteDataActive ? "#0284C7" : inactiveStroke}
               strokeWidth="2.8"
-              className={memWriteDataActive ? "stream-down-active" : undefined}
-              markerEnd={memWriteDataActive ? "url(#m-arr-green)" : undefined}
+              className={wireStepClass(memWriteDataActive, 0)}
+              markerEnd={memWriteDataActive ? "url(#m-arr-blue)" : inactiveMarker}
               style={wireStyle(memWriteDataActive)}
             />
 
@@ -1316,16 +1692,17 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="280"
               height="110"
               rx="8"
-              fill={memAluToDmemAddrActive ? "url(#g-dmem)" : "#F8FAFC"}
-              stroke={memAluToDmemAddrActive ? "#16A34A" : "#CBD5E1"}
+              className={boxStepClass(memAluToDmemAddrActive, 1)}
+              fill={memAluToDmemAddrActive ? "#F0F9FF" : "#F8FAFC"}
+              stroke={memAluToDmemAddrActive ? "#0284C7" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
               x="410"
               y="1051"
               dominantBaseline="central"
-              fill={memAluToDmemAddrActive ? "#14532D" : "#94A3B8"}
-              fontSize="21"
+              fill={memAluToDmemAddrActive ? "#0369A1" : "#94A3B8"}
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -1339,32 +1716,33 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="1106"
               x2="470"
               y2="1154"
-              stroke={memDmemReadDataActive ? "#16A34A" : "transparent"}
+              stroke={memDmemReadDataActive ? "#0284C7" : inactiveStroke}
               strokeWidth="2.8"
-              className={memDmemReadDataActive ? "stream-down-active" : undefined}
-              markerEnd={memDmemReadDataActive ? "url(#m-arr-green)" : undefined}
+              className={wireStepClass(memDmemReadDataActive, 2)}
+              markerEnd={memDmemReadDataActive ? "url(#m-arr-blue)" : inactiveMarker}
               style={wireStyle(memDmemReadDataActive)}
             />
 
             {/* ============================================================ */}
-            {/* 파이프라인 버퍼 4: MEM / WB BUFFER (가로길이 30% 확장: w=690, x=110) */}
+            {/* 파이프라인 버퍼 4: MEM / WB BUFFER (데이터 706px + 시그널 46px) */}
             {/* ============================================================ */}
+            {/* 데이터 버퍼 (X = 110 ~ 816) */}
             <rect
               x="110"
               y="1156"
-              width="690"
+              width="706"
               height="26"
               rx="6"
-              fill="url(#g-buffer)"
+              fill="#F1F5F9"
               stroke="#94A3B8"
               strokeWidth="1.6"
             />
             <text
-              x="455"
+              x="463"
               y="1169"
               dominantBaseline="central"
               fill="#1E293B"
-              fontSize="15.5"
+              fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
               textAnchor="middle"
@@ -1373,6 +1751,44 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               MEM / WB BUFFER
             </text>
 
+            {/* 시그널 버퍼 (X = 824 ~ 870) : [ WB ] */}
+            <g>
+              <rect
+                x="824"
+                y="1156"
+                width="46"
+                height="26"
+                rx="6"
+                fill={isWbActive ? "#F5F3FF" : "#F1F5F9"}
+                stroke={isWbActive ? "#8B5CF6" : "#94A3B8"}
+                strokeWidth="1.6"
+              />
+              <text
+                x="847"
+                y="1169"
+                dominantBaseline="central"
+                fill={isWbActive ? "#6D28D9" : "#94A3B8"}
+                fontSize="18"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                textAnchor="middle"
+              >
+                WB
+              </text>
+            </g>
+
+            {/* WB 제어선: MEM/WB WB셀 ➔ WB MUX 우측면 인입 */}
+            <path
+              d="M 847,1182 L 847,1277 L 490,1277"
+              fill="none"
+              stroke={wbAluBypassActive || wbDmemReadDataActive ? "#8B5CF6" : inactiveStroke}
+              strokeWidth="2"
+              strokeDasharray="4 3"
+              className={wireStepClass(wbAluBypassActive || wbDmemReadDataActive, 1)}
+              markerEnd={wbAluBypassActive || wbDmemReadDataActive ? "url(#m-arr-purple)" : inactiveMarker}
+              style={wireStyle(wbAluBypassActive || wbDmemReadDataActive)}
+            />
+
             {/* ============================================================ */}
             {/* [STAGE 5] WRITE-BACK (WB) : Y = 1182 ~ 1350                  */}
             {/* ============================================================ */}
@@ -1380,10 +1796,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             <path
               d="M 225,1182 L 225,1218 L 410,1218 L 410,1256"
               fill="none"
-              stroke={wbAluBypassActive ? "#2563EB" : "transparent"}
+              stroke={wbAluBypassActive ? "#8B5CF6" : inactiveStroke}
               strokeWidth="2.8"
               strokeDasharray="6 3"
-              markerEnd={wbAluBypassActive ? "url(#m-arr-blue)" : undefined}
+              className={wireStepClass(wbAluBypassActive, 0)}
+              markerEnd={wbAluBypassActive ? "url(#m-arr-purple)" : inactiveMarker}
               style={wireStyle(wbAluBypassActive)}
             />
 
@@ -1393,9 +1810,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y1="1182"
               x2="470"
               y2="1256"
-              stroke={wbDmemReadDataActive ? "#2563EB" : "transparent"}
+              stroke={wbDmemReadDataActive ? "#8B5CF6" : inactiveStroke}
               strokeWidth="2.8"
-              markerEnd={wbDmemReadDataActive ? "url(#m-arr-blue)" : undefined}
+              className={wireStepClass(wbDmemReadDataActive, 0)}
+              markerEnd={wbDmemReadDataActive ? "url(#m-arr-purple)" : inactiveMarker}
               style={wireStyle(wbDmemReadDataActive)}
             />
 
@@ -1407,15 +1825,16 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               height="38"
               rx="19"
               ry="19"
-              fill={wbAluBypassActive || wbDmemReadDataActive ? "#DBEAFE" : "#F8FAFC"}
-              stroke={wbAluBypassActive || wbDmemReadDataActive ? "#2563EB" : "#CBD5E1"}
+              className={boxStepClass(wbAluBypassActive || wbDmemReadDataActive, 1)}
+              fill={wbAluBypassActive || wbDmemReadDataActive ? "#F5F3FF" : "#F8FAFC"}
+              stroke={wbAluBypassActive || wbDmemReadDataActive ? "#8B5CF6" : "#CBD5E1"}
               strokeWidth="2"
             />
             <text
               x="440"
               y="1277"
               dominantBaseline="central"
-              fill={wbAluBypassActive || wbDmemReadDataActive ? "#1E40AF" : "#94A3B8"}
+              fill={wbAluBypassActive || wbDmemReadDataActive ? "#6D28D9" : "#94A3B8"}
               fontSize="18"
               fontWeight="bold"
               fontFamily="sans-serif"
@@ -1430,11 +1849,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             <path
               d="M 440,1296 L 440,1315 L 85,1315 L 85,424 L 165,424"
               fill="none"
-              stroke={wbReverseFeedbackActive ? "#2563EB" : "transparent"}
+              stroke={wbReverseFeedbackActive ? "#8B5CF6" : inactiveStroke}
               strokeWidth="2.8"
-              strokeDasharray={wbReverseFeedbackActive ? "6 3" : undefined}
-              className={wbReverseFeedbackActive ? "stream-feedback-active" : undefined}
-              markerEnd={wbReverseFeedbackActive ? "url(#m-arr-blue)" : undefined}
+              strokeDasharray="6 3"
+              className={wireStepClass(wbReverseFeedbackActive, 2)}
+              markerEnd={wbReverseFeedbackActive ? "url(#m-arr-purple)" : inactiveMarker}
               style={wireStyle(wbReverseFeedbackActive)}
             />
             </g>
