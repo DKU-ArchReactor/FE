@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import type { SimulationResult } from "@/type/simulation";
 
 interface ControlPanelProps {
@@ -39,7 +39,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isReady = true,
   isCompiling = false,
   mode = "pipeline",
-  simulationData = null,
+  simulationData: _simulationData = null,
   editorTarget = "c",
   onChangeEditorTarget,
   onChangeSimulationMode,
