@@ -23,6 +23,9 @@ test('single-cycle devices use neutral outlines and one active accent in both th
       await seek(page,id);
       const inactive=await page.locator('[data-flow-node][data-flow-active="false"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('rect,path')!).stroke));
       expect(new Set(inactive).size).toBe(1);
+      const surfaces=await page.locator('[data-flow-node][data-flow-active="false"] [data-device-surface]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).fill));
+      expect(new Set(surfaces).size).toBe(1);
+      expect(surfaces[0]).not.toBe(await page.locator('[data-hardware-region="cpu"]').evaluate(n=>getComputedStyle(n).fill));
       const accent=await page.locator('[data-flow-route] > path').last().evaluate(n=>getComputedStyle(n).stroke);
       expect(accent).not.toBe(inactive[0]);accents.push(accent);
     }

@@ -3,9 +3,10 @@
   --ar-flow-wire: #94a3b8;
   --ar-flow-accent: #005fb8;
   --ar-flow-token-bg: #005fb8;
-  --ar-flow-active-bg: #eff6ff;
+  --ar-flow-device-bg: #f8fafc;
+  --ar-flow-active-bg: #f1f5f9;
   --ar-flow-result-bg: #f1f5f9;
-  --ar-flow-region-bg: #f8fafc;
+  --ar-flow-region-bg: var(--ar-panel-bg);
 }
 .ar-single-flow-diagram {
   font-family: "Inter", "Malgun Gothic", system-ui, sans-serif;
@@ -18,9 +19,10 @@
   --ar-flow-wire: #64748b;
   --ar-flow-accent: #79c0ff;
   --ar-flow-token-bg: #1f6feb;
-  --ar-flow-active-bg: #172b40;
+  --ar-flow-device-bg: #22272f;
+  --ar-flow-active-bg: #2b3440;
   --ar-flow-result-bg: #252d38;
-  --ar-flow-region-bg: var(--ar-header-bg);
+  --ar-flow-region-bg: var(--ar-panel-bg);
 }
 @media (prefers-reduced-motion: reduce) {
   .flow-token {

@@ -420,7 +420,9 @@ export default function InstructionFlowDiagram({
         : unit === "cu"
           ? `M${b.x + 18} ${b.y}H${b.x + b.w - 18}L${b.x + b.w} ${b.y + sy(18)}V${b.y + b.h - sy(18)}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}L${b.x} ${b.y + b.h - sy(18)}V${b.y + sy(18)}Z`
           : undefined;
-    const fill = active ? "var(--ar-flow-active-bg)" : "var(--ar-panel-bg)";
+    const fill = active
+      ? "var(--ar-flow-active-bg)"
+      : "var(--ar-flow-device-bg)";
     return (
       <g
         key={unit}
@@ -461,19 +463,21 @@ export default function InstructionFlowDiagram({
             width={b.w}
             height={b.h}
             rx="8"
-            fill="var(--ar-panel-bg)"
+            fill="var(--ar-flow-device-bg)"
             stroke={stroke}
           />
         )}
         {shape ? (
           <path
+            data-device-surface="true"
             d={shape}
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 3 : 1.5}
+            strokeWidth={active ? 2.2 : 1.5}
           />
         ) : (
           <rect
+            data-device-surface="true"
             x={b.x}
             y={b.y}
             width={b.w}
@@ -481,7 +485,7 @@ export default function InstructionFlowDiagram({
             rx="8"
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 3 : 1.5}
+            strokeWidth={active ? 2.2 : 1.5}
           />
         )}
         {[
@@ -770,17 +774,27 @@ export default function InstructionFlowDiagram({
               <marker
                 key={kind}
                 id={`${id}-${kind}`}
-                viewBox="0 0 12 12"
-                refX="10"
-                refY="6"
-                markerWidth="9"
-                markerHeight="9"
-                markerUnits="userSpaceOnUse"
+                viewBox="0 0 10 10"
+                refX="8.5"
+                refY="5"
+                markerWidth="5"
+                markerHeight="5"
                 orient="auto"
               >
-                <path d="M0 0L11 6L0 12Z" fill={stroke} />
+                <path d="M0 1.2L9 5L0 8.8Z" fill={stroke} />
               </marker>
             ))}
+            <marker
+              id={`${id}-inactive`}
+              viewBox="0 0 10 10"
+              refX="8.5"
+              refY="5"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M0 1.2L9 5L0 8.8Z" fill="var(--ar-flow-wire)" />
+            </marker>
           </defs>
           <rect
             x="-110"
@@ -848,10 +862,10 @@ export default function InstructionFlowDiagram({
                 d={paths[wire.key]}
                 fill="none"
                 stroke="var(--ar-flow-wire)"
-                strokeOpacity=".75"
-                strokeWidth={wire.system ? 5 : 2.5}
+                strokeWidth={wire.system ? 2.8 : 2}
                 strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
                 strokeLinejoin="round"
+                markerEnd={`url(#${id}-inactive)`}
               />
             </g>
           ))}
@@ -861,14 +875,14 @@ export default function InstructionFlowDiagram({
                 d={path}
                 fill="none"
                 stroke="var(--ar-panel-bg)"
-                strokeWidth="10"
+                strokeWidth="6"
                 strokeLinejoin="round"
               />
               <path
                 d={path}
                 fill="none"
                 stroke={color}
-                strokeWidth={transfer.kind === "control" ? 3.5 : 5}
+                strokeWidth="2.8"
                 strokeDasharray={
                   transfer.kind === "control" ? "6 5" : undefined
                 }
@@ -953,7 +967,6 @@ export default function InstructionFlowDiagram({
                   strokeDasharray={
                     transfer.kind === "control" ? "5 3" : undefined
                   }
-                  style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
                 />
                 <text
                   x={point.x}
