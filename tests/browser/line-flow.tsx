@@ -58,6 +58,10 @@ if (geometry && cases[geometry]) {
     dp.registers.rs1={num:15,value:'0x0001003C'};dp.immediate={dec:8};dp.next_pc='0x00010044';
     if(dp.registers.rd)dp.registers.rd.write_data='0x00010040';
   }
+  if(geometry==='lw' && new URLSearchParams(location.search).has('large')) {
+    dp.data_memory.read_data='0x80000000';
+    if(dp.registers.rd)dp.registers.rd.write_data='0x80000000';
+  }
 }
 const rows = run.tutor!.asm_instructions!.map(item => ({pc: item.pc!, text: item.text, sourceLine: item.source_line ?? null}));
 export function LineFlowHarness() {

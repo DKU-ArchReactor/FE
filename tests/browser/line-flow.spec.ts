@@ -70,7 +70,7 @@ test('a load decodes its actual encoded fields, selects registers by fields and 
   await expect(page.locator('[data-transfer]')).toContainText('rs1·rs2 필드');
 });
 
-test('supplementary actions stay below the diagram and instructions, register alignment and operation labels are explicit',async({page})=>{
+test('instructions, register alignment and operation labels are explicit without supplementary actions',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
   await expect(page.locator('[data-current-instruction]')).toContainText('lw a5,-4(s0)');
   await expect(page.getByRole('button',{name:'전체 상태',exact:true})).toHaveCount(0);
@@ -79,8 +79,8 @@ test('supplementary actions stay below the diagram and instructions, register al
     const node=text.closest<SVGGElement>('[data-flow-node]')!;
     return text.getAttribute('text-anchor')==='middle'&&Number(text.getAttribute('x'))===Number(node.dataset.x)+Number(node.dataset.width)/2;
   });expect(alignment).toBe(true);
-  const footer=page.locator('[data-supplementary-explanations]');await expect(footer).toContainText('보충 설명');
-  const diagram=await page.locator('svg[data-layout]').boundingBox(),supplement=await footer.boundingBox();expect(supplement!.y).toBeGreaterThanOrEqual(diagram!.y+diagram!.height-1);
+  await expect(page.locator('[data-supplementary-explanations]')).toHaveCount(0);
+  await expect(page.locator('[data-cpu-package]')).toBeVisible();
   await expect(page.locator('[data-flow-node="alu"] > text').first()).toHaveText('ALU');
   await seek(page,'decode-immediate');await expect(page.locator('[data-transfer-value]')).toHaveText('0xFFC');
   await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(250);
@@ -89,6 +89,31 @@ test('supplementary actions stay below the diagram and instructions, register al
   await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(550);
   await expect(page.locator('[data-transfer]')).toHaveAttribute('data-transfer','memory-address');await expect(page.locator('.flow-packet')).toBeVisible();
   await expect(page.locator('[data-flow-node="alu"] [data-device-status]')).toHaveAttribute('data-device-status','주소 전달');
+});
+
+test('memory address stays visible throughout travel and large MUX words fit; explanations remain screen sized',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw&large=1');await pause(page);
+  await seek(page,'memory-address');
+  const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();
+  for(let i=0;i<48;i++) {
+    await page.clock.runFor(duration/50);
+    await expect(page.locator('.flow-packet')).toBeVisible();
+    await expect(page.locator('.flow-packet')).toHaveAttribute('data-moving-value','0x7FFFFFFC');
+    expect(await page.locator('.flow-packet').evaluate(n=>getComputedStyle(n).opacity)).toBe('1');
+  }
+  await pause(page);await seek(page,'writeback');
+  await expect(page.locator('[data-flow-node="mux"]')).toContainText('-2147483648');
+  const fit=await page.locator('[data-flow-node="mux"]').evaluate(n=>{
+    const x=Number(n.getAttribute('data-x')),w=Number(n.getAttribute('data-width'));
+    return [...n.querySelectorAll('text')].filter(t=>!t.closest('[data-device-status]')).every(t=>{const b=t.getBBox();return b.x>=x+18&&b.x+b.width<=x+w-18;});
+  });expect(fit).toBe(true);
+  for(const width of [1400,760]) {
+    await page.setViewportSize({width,height:1000});
+    const text=page.locator('[data-operation-description]');await expect(text).toBeVisible();
+    expect(await text.evaluate(n=>parseFloat(getComputedStyle(n).fontSize))).toBeGreaterThanOrEqual(13);
+    expect(await page.locator('main').innerText()).not.toMatch(/\?{2,}|\uFFFD|\\u[0-9a-f]{4}/i);
+  }
 });
 
 test('actual operands and results remain visible as device inputs and outputs',async({page})=>{
@@ -114,16 +139,16 @@ test('register shifts transport the register word and immediate shifts transport
 
 test('large hardware details show real addition, selectable carry bits, PC components and instruction decoding',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
-  await page.getByRole('button',{name:'ALU 내부',exact:true}).click();
+  await page.getByRole('button',{name:'ALU 역할과 동작 보기',exact:true}).click();
   const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await expect(dialog.locator('[data-numeric-equation]')).toContainText('11 + 7 → 18');
   await expect(dialog).toContainText('전가산기');await page.getByLabel('가산기 비트 구간').selectOption('1');await expect(dialog.getByRole('columnheader',{name:'15',exact:true})).toBeVisible();
   await dialog.getByText('전가산기 한 개 자세히',{exact:true}).click();await page.getByLabel('전가산기 비트 선택').selectOption('1');
   await expect(dialog.locator('[data-full-adder]')).toContainText('1 XOR 1 XOR 1 = 1');await expect(dialog.locator('[data-full-adder]')).toContainText('2번 자리로 전달');
   expect(await dialog.locator('[data-alu-formula]').evaluate(n=>parseFloat(getComputedStyle(n).fontSize))).toBeGreaterThanOrEqual(24);
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
-  await page.getByRole('button',{name:'PC 회로',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('PC 선택 MUX');await expect(page.getByRole('dialog')).toContainText('0x00010040');
+  await page.getByRole('button',{name:'PC 가산·선택 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('PC 선택 MUX');await expect(page.getByRole('dialog')).toContainText('0x00010040');
   await page.getByRole('button',{name:'닫기',exact:true}).click();
-  await page.getByRole('button',{name:'해독',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('funct7');await expect(page.getByRole('dialog')).toContainText('x14');
+  await page.getByRole('button',{name:'명령어 해독 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('funct7');await expect(page.getByRole('dialog')).toContainText('x14');
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('[data-flow-playing]')).toHaveAttribute('data-flow-playing','false');
 });
@@ -133,7 +158,7 @@ test('jump address explanation keeps CORE ALU placeholders separate from real PC
   await seek(page,'pc-base');await expect(page.locator('[data-transfer-value]')).toContainText('0x0001003C');
   await seek(page,'calculate');await expect(page.locator('[data-flow-node="pc-select"]')).toHaveAttribute('data-flow-active','true');
   await expect(page.locator('[data-flow-node="alu"]')).toHaveAttribute('data-flow-active','false');
-  await page.getByRole('button',{name:'ALU 내부',exact:true}).click();await expect(page.getByRole('dialog').locator('[data-numeric-equation]')).toHaveCount(0);await expect(page.getByRole('dialog')).toContainText('PC 주소 연산');
+  await page.getByRole('button',{name:'ALU 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog').locator('[data-numeric-equation]')).toHaveCount(0);await expect(page.getByRole('dialog')).toContainText('PC 주소 연산');
 });
 
 test('reference store example distinguishes the ALU address from the register data on its buses',async({page})=>{
@@ -142,7 +167,7 @@ test('reference store example distinguishes the ALU address from the register da
   await expect(page.locator('[data-flow-node="alu"]')).toContainText('s0 + 4');
   await seek(page,'memory-address');await expect(page.locator('[data-transfer-value]')).toHaveText('0x00002004');await expect(page.locator('[data-transfer]')).toContainText('Address Bus');
   await seek(page,'store-data');await expect(page.locator('[data-transfer-value]')).toHaveText('305419896 · 0x12345678');await expect(page.locator('[data-transfer]')).toContainText('t1');await expect(page.locator('[data-transfer]')).toContainText('Data Bus');
-  await page.getByRole('button',{name:'ALU 내부',exact:true}).click();const dialog=page.getByRole('dialog');
+  await page.getByRole('button',{name:'ALU 역할과 동작 보기',exact:true}).click();const dialog=page.getByRole('dialog');
   await expect(dialog.getByLabel('주소와 데이터의 구분')).toContainText('0x00002004');await expect(dialog.getByLabel('주소와 데이터의 구분')).toContainText('0x12345678');
 });
 

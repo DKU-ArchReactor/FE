@@ -8,7 +8,7 @@ const exports = {};
 vm.runInNewContext(ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, {exports});
 const {buildInstructionFlow,instructionTransfers,transferPoint,instructionPaths,transferTimeline,instructionFlowDuration} = exports;
 const {instructionFields} = exports;
-const {immediateField}=exports;
+const {immediateField,transferMotion}=exports;
 const item = (op, reads, writes) => ({pc: '0x10000', text: `${op} a0,a1,a2`, explanation: {opcode: op, reads, writes}});
 const frame = (op = 'add') => ({clock: 0, buffers: {}, cycle_events: {runtime_error: {has_error: false}},
   global_result: {registers: {x10: '0x0000000C'}, metrics: {accumulated_instructions: 1}},
@@ -277,5 +277,20 @@ test('the same packet joins both sides of each MUX without jumping',()=>{
       const b=timeline[transfers.findIndex(value=>value.id===after)].motion;
       assert.deepEqual(JSON.parse(JSON.stringify(transferPoint(paths[before],1,a.startPadding,a.endPadding))),JSON.parse(JSON.stringify(transferPoint(paths[after],0,b.startPadding,b.endPadding))));
     }
+  }
+});
+
+
+test('memory address words keep visible travel on wide and compact paths',()=>{
+  const current=frame('lw');
+  const flow=buildInstructionFlow(item('lw',['x11'],['x10']),current,null,simulation(current));
+  const transfer=instructionTransfers(flow).find(value=>value.id==='memory-address');
+  for(const compact of [false,true]) {
+    const path=instructionPaths(flow,1,compact)['memory-address'];
+    const motion=transferMotion({...transfer,value:'0x7FFFFFFC'},path);
+    assert.ok(motion.distance>150);
+    const first=transferPoint(path,0,motion.startPadding,motion.endPadding);
+    const last=transferPoint(path,1,motion.startPadding,motion.endPadding);
+    assert.ok(Math.hypot(first.x-last.x,first.y-last.y)>100);
   }
 });

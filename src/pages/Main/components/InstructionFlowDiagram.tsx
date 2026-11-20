@@ -24,9 +24,9 @@ const BOXES: Record<TransferUnit, Box> = {
   registers: { x: 35, y: 390, w: 280, h: 210 },
   immediate: { x: 415, y: 390, w: 190, h: 125 },
   cu: { x: 690, y: 390, w: 270, h: 180 },
-  "operand-mux": { x: 420, y: 625, w: 210, h: 100 },
+  "operand-mux": { x: 375, y: 625, w: 300, h: 100 },
   alu: { x: 710, y: 625, w: 300, h: 205 },
-  mux: { x: 420, y: 865, w: 210, h: 100 },
+  mux: { x: 375, y: 865, w: 300, h: 100 },
   "pc-select": { x: 55, y: 865, w: 240, h: 180 },
   "instruction-memory": { x: 1200, y: 230, w: 320, h: 210 },
   memory: { x: 1200, y: 705, w: 320, h: 210 },
@@ -46,7 +46,7 @@ const TITLES: Record<TransferUnit, string> = {
 };
 const ROLES: Record<TransferUnit, string> = {
   pc: "명령어 주소",
-  decoder: "opcode 연산 · rd 기록 · rs1/rs2 읽기",
+  decoder: "CU의 해독 회로 · 명령어 필드 분리",
   cu: "계산·읽기·쓰기를 제어",
   registers: "입력·계산 결과 보관",
   immediate: "상수 생성",
@@ -159,8 +159,7 @@ export default function InstructionFlowDiagram({
         1.35,
         Math.max(
           1,
-          (height * (compact ? 1470 : 1830)) /
-            (width * (compact ? 1408 : 1080)),
+          (height * (compact ? 1470 : 1830)) / (width * (compact ? 1298 : 970)),
         ),
       );
       setCanvas((previous) =>
@@ -237,7 +236,19 @@ export default function InstructionFlowDiagram({
         ? `ALU가 ${addressFormula}로 계산한 주소를 Address Bus로 보냅니다.`
         : flow.store && transfer.id === "store-data"
           ? `${storeName ?? "rs2"}의 하위 ${flow.width}비트를 Data Bus로 보냅니다. CU가 메모리 쓰기를 제어합니다.`
-          : transfer.detail;
+          : transfer.id === "calculate" && !flow.jump && !flow.system
+            ? flow.load || flow.store
+              ? `ALU의 가산기가 ${addressFormula}를 계산해 메모리 접근 주소를 만듭니다.`
+              : lesson.category === "pass"
+                ? "상위 즉치값을 결과의 상위 20비트에 놓고 하위 12비트를 0으로 채웁니다."
+                : flow.branch
+                  ? `ALU가 두 입력을 ${lesson.operator} 조건으로 비교합니다. 비교 결과는 다음 PC 선택에 사용됩니다.`
+                  : `CU가 ${flow.op.toUpperCase()} 연산을 선택합니다. ALU는 두 입력에 ${lesson.operator} 연산을 적용하고 32비트 결과를 출력합니다.`
+            : transfer.id === "read-control"
+              ? "명령어의 rs1·rs2 필드가 읽을 레지스터 번호를 지정합니다. 레지스터 파일은 선택된 번호의 값을 출력합니다."
+              : transfer.id === "decode-control"
+                ? `해독 회로가 opcode·funct 필드를 해석합니다. CU는 ${flow.op.toUpperCase()}에 필요한 연산과 레지스터·메모리 제어 신호를 선택합니다.`
+                : transfer.detail;
   const specialEncoding =
     decoded && ["1110011", "0001111"].includes(decoded.opcode);
   const signal = (value?: boolean) =>
@@ -275,7 +286,9 @@ export default function InstructionFlowDiagram({
         ? reached("writeback")
           ? `${flow.writes[0]} ← ${short(flow.writeValue)}`
           : `기록 대상 ${flow.writes[0]} · 대기`
-        : "레지스터 기록 없음",
+        : decoded?.rd === 0
+          ? "x0 쓰기는 버림 · 항상 0"
+          : "레지스터 값 유지",
     ],
     immediate: [
       flow.usesImmediate || flow.branch
@@ -301,15 +314,15 @@ export default function InstructionFlowDiagram({
         : "입력 대기",
     ],
     alu: flow.jump
-      ? ["PC ????", "?? ?????"]
+      ? ["ALU 사용 안 함", "PC 회로에서 주소 계산"]
       : flow.system
         ? ["환경 요청", "ALU 사용 안 함"]
         : [
-            `A ${!flow.pcRelative && !flow.registerInputs.length ? short(flow.input1) : reached("input-a") ? short(flow.input1) : "입력 대기"}`,
-            `B ${reached("mux-to-alu") ? (flow.amount == null ? short(flow.input2) : `${flow.amount}비트 이동`) : "입력 대기"}`,
+            `A ${!flow.pcRelative && !flow.registerInputs.length ? short(flow.input1) : reached("input-a") ? short(flow.input1) : "← " + (flow.pcRelative ? "PC" : "레지스터")}`,
+            `${lesson.operator} ${reached("mux-to-alu") ? (flow.amount == null ? short(flow.input2) : `${flow.amount}비트 이동`) : "B ← 입력 MUX"}`,
             flow.branch
               ? `비교 ${reached("calculate") ? (flow.taken == null ? "미제공" : flow.taken ? "성립" : "불성립") : "대기"}`
-              : `→ ${reached("calculate") ? short(flow.result) : "계산 대기"}`,
+              : `= ${reached("calculate") ? short(flow.result) : "결과 대기"}`,
           ],
     mux: [
       hasWrite
@@ -330,30 +343,27 @@ export default function InstructionFlowDiagram({
     ],
     "instruction-memory": [
       `주소 ${flow.pc ?? "미제공"}`,
-      `${flow.op.toUpperCase()} · 32비트 명령어`,
       flow.raw ?? "기계어 미제공",
-      "해독 회로에 명령어 전달",
     ],
     memory:
       flow.load || flow.store
         ? [
             `주소 ${reached("memory-address") ? (flow.address ?? "미제공") : "전달 대기"}`,
             `${flow.width / 8}바이트 ${flow.load ? "읽기" : "쓰기"}`,
-            `${flow.store ? (storeName ?? "rs2") : "값"} ${reached("load-data") || reached("store-data") || reached("discard-load") ? `→ ${short(flow.memoryValue)}` : "전달 대기"}`,
+            reached("load-data") ||
+            reached("store-data") ||
+            reached("discard-load")
+              ? short(flow.memoryValue)
+              : "값 대기",
             flow.error
-              ? "접근 오류 · 성공값 미표시"
+              ? "접근 오류"
               : flow.load && flow.width < 32
                 ? /^(lb|lh)$/.test(flow.op)
                   ? "부호 확장 → 32비트"
                   : "0 확장 → 32비트"
-                : "32비트 데이터 경로",
+                : "",
           ]
-        : [
-            "이번 명령어는 접근 안 함",
-            "메모리 읽기·쓰기 없음",
-            "계산은 레지스터에서",
-            "Load / Store에서 사용",
-          ],
+        : ["이번 명령은 사용 안 함"],
   };
   const node = (unit: TransferUnit) => {
     const b = boxes[unit],
@@ -393,7 +403,9 @@ export default function InstructionFlowDiagram({
       ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
       : unit === "alu"
         ? `M${b.x} ${b.y}H${b.x + b.w / 2 - 25}L${b.x + b.w / 2} ${b.y + sy(15)}L${b.x + b.w / 2 + 25} ${b.y}H${b.x + b.w}L${b.x + b.w - 24} ${b.y + b.h}H${b.x + 24}Z`
-        : undefined;
+        : unit === "cu"
+          ? `M${b.x + 18} ${b.y}H${b.x + b.w - 18}L${b.x + b.w} ${b.y + sy(18)}V${b.y + b.h - sy(18)}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}L${b.x} ${b.y + b.h - sy(18)}V${b.y + sy(18)}Z`
+          : undefined;
     const fill = active
       ? `color-mix(in srgb, ${color} 8%, var(--ar-panel-bg))`
       : "var(--ar-panel-bg)";
@@ -482,6 +494,19 @@ export default function InstructionFlowDiagram({
             ))}
           </g>
         )}
+        {(unit === "memory" || unit === "instruction-memory") && (
+          <rect
+            x={b.x + 6}
+            y={b.y + sy(6)}
+            width={b.w - 12}
+            height={b.h - sy(12)}
+            rx="4"
+            fill="none"
+            stroke={stroke}
+            strokeOpacity=".4"
+            data-memory-bank="true"
+          />
+        )}
         <text
           x={b.x + b.w / 2}
           y={b.y + sy(unit === "alu" ? 53 : mux ? 33 : 40)}
@@ -519,16 +544,21 @@ export default function InstructionFlowDiagram({
             x={b.x + b.w / 2}
             y={b.y + sy(unit === "alu" ? 82 : 66)}
             textAnchor="middle"
-            fontSize={22}
-            fill="var(--ar-text-muted)"
+            fontSize={unit === "alu" ? 24 : 22}
+            fontWeight={unit === "alu" ? 800 : 400}
+            fill={unit === "alu" ? COLORS.data : "var(--ar-text-muted)"}
           >
             {unit === "alu"
-              ? flow.load || flow.store
-                ? `주소 = ${addressFormula}`
-                : lesson.category === "adder"
-                  ? `가산기 · A ${lesson.operator} B`
-                  : lesson.unit
-              : ROLES[unit]}
+              ? flow.jump || flow.system
+                ? "연산 경로 비활성"
+                : flow.load || flow.store
+                  ? `ADD · ${addressFormula}`
+                  : lesson.category === "adder"
+                    ? `${flow.op.toUpperCase()} · 가산기`
+                    : `${flow.op.toUpperCase()} · ${lesson.operator}`
+              : unit === "registers" && flow.store
+                ? "읽은 값을 메모리에 저장"
+                : ROLES[unit]}
           </text>
         )}
         {unit === "registers" && (
@@ -544,7 +574,17 @@ export default function InstructionFlowDiagram({
             32 × 32비트 · x0 = 0
           </text>
         )}
-        {lines[unit].map((line, i) => {
+        {unit === "alu" && !flow.jump && !flow.system && (
+          <rect
+            x={b.x + 26}
+            y={b.y + sy(163)}
+            width={b.w - 52}
+            height={sy(34)}
+            rx="6"
+            fill="color-mix(in srgb, #087fce 12%, var(--ar-panel-bg))"
+          />
+        )}
+        {lines[unit].filter(Boolean).map((line, i) => {
           const baseline =
             b.y +
             sy(
@@ -566,6 +606,9 @@ export default function InstructionFlowDiagram({
           return (
             <text
               key={i}
+              data-alu-equation={
+                unit === "alu" && !flow.jump && !flow.system ? i : undefined
+              }
               x={b.x + b.w / 2}
               y={baseline}
               textAnchor="middle"
@@ -577,12 +620,22 @@ export default function InstructionFlowDiagram({
                       ? 22
                       : 28
                     : unit === "registers"
-                      ? 28
-                      : 30
+                      ? i === lines[unit].length - 1
+                        ? 22
+                        : 28
+                      : unit === "alu"
+                        ? 28
+                        : unit === "memory" || unit === "instruction-memory"
+                          ? 25
+                          : 30
               }
-              fontWeight="650"
+              fontWeight={unit === "alu" && i === 2 ? 800 : 650}
               opacity={overlap ? 0 : 1}
-              fill="var(--ar-text-primary)"
+              fill={
+                unit === "alu" && i === 2
+                  ? COLORS.data
+                  : "var(--ar-text-primary)"
+              }
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {line}
@@ -634,240 +687,254 @@ export default function InstructionFlowDiagram({
     );
   };
   return (
-    <div ref={area} className="h-full min-h-0 w-full min-w-0 overflow-hidden">
-      <svg
-        viewBox={
-          compact ? `-210 0 1470 ${sy(1408)}` : `-210 0 1830 ${sy(1080)}`
-        }
-        preserveAspectRatio="xMidYMin meet"
-        className="ar-single-flow-diagram block h-full w-full font-sans"
-        role="group"
-        aria-label="CPU 내부 장치와 메모리·버스의 싱글 사이클 구조"
-        data-layout="hardware-architecture"
-        data-layout-compact={compact}
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
+      <div
+        className="mx-3 mb-2 shrink-0 rounded-lg border-l-4 bg-[var(--ar-header-bg)] px-3 py-2.5"
+        style={{ borderLeftColor: color }}
+        aria-label="현재 장치 동작"
+        data-transfer={transfer.id}
       >
-        <defs>
-          {Object.entries(COLORS).map(([kind, stroke]) => (
-            <marker
-              key={kind}
-              id={`${id}-${kind}`}
-              viewBox="0 0 12 12"
-              refX="10"
-              refY="6"
-              markerWidth="9"
-              markerHeight="9"
-              markerUnits="userSpaceOnUse"
-              orient="auto"
-            >
-              <path d="M0 0L11 6L0 12Z" fill={stroke} />
-            </marker>
-          ))}
-        </defs>
-        <rect
-          x="-110"
-          y={sy(130)}
-          width="1176"
-          height={sy(920)}
-          rx="16"
-          fill="var(--ar-header-bg)"
-          stroke="var(--ar-border)"
-          strokeWidth="2"
-          data-hardware-region="cpu"
-        />
-        <text
-          x="-90"
-          y={sy(157)}
-          fontSize="20"
-          fontWeight="800"
-          fill="var(--ar-text-primary)"
+        <p className="text-sm font-bold text-[var(--ar-text-primary)]">
+          {index + 1} / {count} · {transfer.title}
+        </p>
+        <p
+          className="mt-1 break-words font-mono text-sm font-semibold"
+          style={{ color }}
+          data-transfer-value="true"
         >
-          CPU · 칩 내부 장치
-        </text>
-        <rect
-          x={compact ? 16 : 1180}
-          y={sy(compact ? 1120 : 130)}
-          width={compact ? 1050 : 365}
-          height={sy(compact ? 285 : 920)}
-          rx="16"
-          fill="var(--ar-header-bg)"
-          stroke="var(--ar-border)"
-          strokeWidth="2"
-          data-hardware-region="memory"
-        />
-        <text
-          x={compact ? 35 : 1200}
-          y={sy(compact ? 1147 : 157)}
-          fontSize="20"
-          fontWeight="800"
-          fill="var(--ar-text-primary)"
+          {transfer.value == null
+            ? "미제공"
+            : transfer.kind === "address" ||
+                transfer.id === "fetch-instruction" ||
+                transfer.id === "decode-immediate"
+              ? transfer.value
+              : displayValue(transfer.value)}
+        </p>
+        <p
+          className="mt-1 text-[13px] leading-relaxed text-[var(--ar-text-secondary)]"
+          data-operation-description="true"
         >
-          메모리 · CPU 외부
-        </text>
-        {WIRES.map((wire) => (
+          {detailText}
+        </p>
+      </div>
+      <div ref={area} className="min-h-0 flex-1 overflow-hidden">
+        <svg
+          viewBox={
+            compact
+              ? `-210 ${sy(110)} 1470 ${sy(1298)}`
+              : `-210 ${sy(110)} 1830 ${sy(970)}`
+          }
+          preserveAspectRatio="xMidYMin meet"
+          className="ar-single-flow-diagram block h-full w-full font-sans"
+          role="group"
+          aria-label="CPU 내부 장치와 메모리·버스의 싱글 사이클 구조"
+          data-layout="hardware-architecture"
+          data-layout-compact={compact}
+        >
+          <defs>
+            {Object.entries(COLORS).map(([kind, stroke]) => (
+              <marker
+                key={kind}
+                id={`${id}-${kind}`}
+                viewBox="0 0 12 12"
+                refX="10"
+                refY="6"
+                markerWidth="9"
+                markerHeight="9"
+                markerUnits="userSpaceOnUse"
+                orient="auto"
+              >
+                <path d="M0 0L11 6L0 12Z" fill={stroke} />
+              </marker>
+            ))}
+          </defs>
+          <rect
+            x="-110"
+            y={sy(130)}
+            width="1176"
+            height={sy(920)}
+            rx="24"
+            fill="var(--ar-header-bg)"
+            stroke="var(--ar-text-muted)"
+            strokeWidth="3"
+            data-hardware-region="cpu"
+          />
           <g
-            key={wire.key}
-            data-circuit-wire={wire.key}
-            data-memory-connection={wire.system || undefined}
-            data-wire-visible={showWire(wire.key)}
-            opacity={showWire(wire.key) ? 1 : 0}
+            data-cpu-package="true"
             aria-hidden="true"
+            stroke="var(--ar-text-muted)"
+            strokeWidth="4"
           >
-            <path
-              d={paths[wire.key]}
-              fill="none"
-              stroke={COLORS[wire.kind]}
-              strokeOpacity=".19"
-              strokeWidth={wire.system ? 5 : 2.5}
-              strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
-              strokeLinejoin="round"
-            />
+            {Array.from({ length: 12 }, (_, i) => (
+              <path
+                key={i}
+                d={`M${-40 + i * 90} ${sy(118)}v${sy(12)}M${-40 + i * 90} ${sy(1050)}v${sy(12)}M-122 ${sy(205 + i * 68)}h12M1066 ${sy(205 + i * 68)}h12`}
+              />
+            ))}
           </g>
-        ))}
-        {path && (
-          <g data-flow-route={transfer.id} data-active="true">
-            <path
-              d={path}
-              fill="none"
-              stroke="var(--ar-panel-bg)"
-              strokeWidth="10"
-              strokeLinejoin="round"
-            />
-            <path
-              d={path}
-              fill="none"
-              stroke={color}
-              strokeWidth={transfer.kind === "control" ? 3.5 : 5}
-              strokeDasharray={transfer.kind === "control" ? "6 5" : undefined}
-              strokeLinejoin="round"
-              markerEnd={`url(#${id}-${transfer.kind})`}
-            />
-          </g>
-        )}
-        {(Object.keys(BOXES) as TransferUnit[]).map(node)}
-        <g
-          data-bus-legend="true"
-          aria-label="CPU와 메모리를 연결하는 주소·데이터·제어 경로"
-        >
           <text
-            x={compact ? 35 : 1200}
-            y={sy(compact ? 1080 : 515)}
-            fontSize="19"
+            x="-90"
+            y={sy(157)}
+            fontSize="26"
             fontWeight="800"
             fill="var(--ar-text-primary)"
           >
-            CPU ↔ 메모리 연결
+            CPU · 내부 회로
           </text>
-          {(["address", "data", "control"] as const).map((kind, i) => (
-            <g key={kind} data-system-bus-label={kind}>
+          <rect
+            x={compact ? 16 : 1180}
+            y={sy(compact ? 1120 : 130)}
+            width={compact ? 1050 : 365}
+            height={sy(compact ? 285 : 920)}
+            rx="16"
+            fill="var(--ar-header-bg)"
+            stroke="var(--ar-border)"
+            strokeWidth="2"
+            data-hardware-region="memory"
+          />
+          <text
+            x={compact ? 35 : 1200}
+            y={sy(compact ? 1147 : 157)}
+            fontSize="20"
+            fontWeight="800"
+            fill="var(--ar-text-primary)"
+          >
+            메모리 · CPU 외부
+          </text>
+          {WIRES.map((wire) => (
+            <g
+              key={wire.key}
+              data-circuit-wire={wire.key}
+              data-memory-connection={wire.system || undefined}
+              data-wire-visible={showWire(wire.key)}
+              opacity={showWire(wire.key) ? 1 : 0}
+              aria-hidden="true"
+            >
               <path
-                d={
-                  compact
-                    ? `M${35 + i * 340} ${sy(1100)}h28`
-                    : `M1205 ${sy(550 + i * 36)}H1240`
-                }
-                stroke={COLORS[kind]}
-                strokeWidth={kind === "control" ? 2.5 : 5}
-                strokeDasharray={kind === "control" ? "5 4" : undefined}
+                d={paths[wire.key]}
+                fill="none"
+                stroke={COLORS[wire.kind]}
+                strokeOpacity=".19"
+                strokeWidth={wire.system ? 5 : 2.5}
+                strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
+                strokeLinejoin="round"
               />
-              <text
-                x={compact ? 75 + i * 340 : 1255}
-                y={sy(compact ? 1106 : 556 + i * 36)}
-                fontSize={compact ? 15 : 17}
-                fontWeight="700"
-                fill={COLORS[kind]}
-              >
-                {kind === "address"
-                  ? "Address Bus · 주소"
-                  : kind === "data"
-                    ? "Data Bus · 값·명령어"
-                    : "Control Bus · 읽기·쓰기"}
-              </text>
             </g>
           ))}
-        </g>
-        <g aria-label="현재 장치 동작" data-transfer={transfer.id}>
-          <rect
-            x="16"
-            y={sy(10)}
-            width={compact ? 1140 : 1528}
-            height={sy(94)}
-            rx="12"
-            fill="var(--ar-header-bg)"
-            stroke={color}
-            strokeWidth="1.5"
-          />
-          <text x="36" y={sy(36)} fontSize="19" fontWeight="800" fill={color}>
-            {index + 1} / {count} · {transfer.title}
-          </text>
-          <text
-            x="36"
-            y={sy(67)}
-            fontSize="23"
-            fontWeight="750"
-            fill="var(--ar-text-primary)"
-            data-transfer-value="true"
-          >
-            {transfer.value == null
-              ? "미제공"
-              : transfer.kind === "address" ||
-                  transfer.id === "fetch-instruction" ||
-                  transfer.id === "decode-immediate"
-                ? transfer.value
-                : displayValue(transfer.value)}
-          </text>
-          <text x="36" y={sy(91)} fontSize="16" fill="var(--ar-text-muted)">
-            {detailText}
-          </text>
-        </g>
-
-        {point && packet && (
-          <g className="flow-token">
-            <g
-              className={
-                transfer.kind === "control"
-                  ? "flow-control-word flow-packet"
-                  : "flow-data-word flow-packet"
-              }
-              data-label-kind={transfer.kind}
-              data-moving-value={motion.value}
-              data-packet-x={point.x}
-              data-packet-y={point.y}
-              aria-label={`이동 중인 ${transfer.kind === "control" ? "선택·제어 정보" : "값"} ${motion.value}`}
-            >
-              <rect
-                data-flow-marker="true"
-                x={packet.x}
-                y={packet.y}
-                width={packet.w}
-                height={packet.h}
-                rx="6"
-                fill={
-                  transfer.kind === "control" ? "var(--ar-panel-bg)" : color
-                }
-                stroke={
-                  transfer.kind === "control" ? color : "var(--ar-panel-bg)"
-                }
-                strokeWidth="1.8"
-                strokeDasharray={
-                  transfer.kind === "control" ? "5 3" : undefined
-                }
-                style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
+          {path && (
+            <g data-flow-route={transfer.id} data-active="true">
+              <path
+                d={path}
+                fill="none"
+                stroke="var(--ar-panel-bg)"
+                strokeWidth="10"
+                strokeLinejoin="round"
               />
-              <text
-                x={point.x}
-                y={point.y + 10}
-                textAnchor="middle"
-                fontSize="32"
-                fontWeight="750"
-                className="font-mono"
-                fill={transfer.kind === "control" ? color : "#fff"}
-              >
-                {motion.value}
-              </text>
+              <path
+                d={path}
+                fill="none"
+                stroke={color}
+                strokeWidth={transfer.kind === "control" ? 3.5 : 5}
+                strokeDasharray={
+                  transfer.kind === "control" ? "6 5" : undefined
+                }
+                strokeLinejoin="round"
+                markerEnd={`url(#${id}-${transfer.kind})`}
+              />
             </g>
+          )}
+          {(Object.keys(BOXES) as TransferUnit[]).map(node)}
+          <g
+            data-bus-legend="true"
+            aria-label="CPU와 메모리를 연결하는 주소·데이터·제어 경로"
+          >
+            <text
+              x={compact ? 35 : 1200}
+              y={sy(compact ? 1080 : 515)}
+              fontSize="19"
+              fontWeight="800"
+              fill="var(--ar-text-primary)"
+            >
+              CPU ↔ 메모리 연결
+            </text>
+            {(["address", "data", "control"] as const).map((kind, i) => (
+              <g key={kind} data-system-bus-label={kind}>
+                <path
+                  d={
+                    compact
+                      ? `M${35 + i * 340} ${sy(1100)}h28`
+                      : `M1205 ${sy(550 + i * 36)}H1240`
+                  }
+                  stroke={COLORS[kind]}
+                  strokeWidth={kind === "control" ? 2.5 : 5}
+                  strokeDasharray={kind === "control" ? "5 4" : undefined}
+                />
+                <text
+                  x={compact ? 75 + i * 340 : 1255}
+                  y={sy(compact ? 1106 : 556 + i * 36)}
+                  fontSize={compact ? 15 : 17}
+                  fontWeight="700"
+                  fill={COLORS[kind]}
+                >
+                  {kind === "address"
+                    ? "Address Bus · 주소"
+                    : kind === "data"
+                      ? "Data Bus · 값·명령어"
+                      : "Control Bus · 읽기·쓰기"}
+                </text>
+              </g>
+            ))}
           </g>
-        )}
-      </svg>
+
+          {point && packet && (
+            <g className="flow-token">
+              <g
+                className={
+                  transfer.kind === "control"
+                    ? "flow-control-word flow-packet"
+                    : "flow-data-word flow-packet"
+                }
+                data-label-kind={transfer.kind}
+                data-moving-value={motion.value}
+                data-packet-x={point.x}
+                data-packet-y={point.y}
+                aria-label={`이동 중인 ${transfer.kind === "control" ? "선택·제어 정보" : "값"} ${motion.value}`}
+              >
+                <rect
+                  data-flow-marker="true"
+                  x={packet.x}
+                  y={packet.y}
+                  width={packet.w}
+                  height={packet.h}
+                  rx="6"
+                  fill={
+                    transfer.kind === "control" ? "var(--ar-panel-bg)" : color
+                  }
+                  stroke={
+                    transfer.kind === "control" ? color : "var(--ar-panel-bg)"
+                  }
+                  strokeWidth="1.8"
+                  strokeDasharray={
+                    transfer.kind === "control" ? "5 3" : undefined
+                  }
+                  style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
+                />
+                <text
+                  x={point.x}
+                  y={point.y + 10}
+                  textAnchor="middle"
+                  fontSize="32"
+                  fontWeight="750"
+                  className="font-mono"
+                  fill={transfer.kind === "control" ? color : "#fff"}
+                >
+                  {motion.value}
+                </text>
+              </g>
+            </g>
+          )}
+        </svg>
+      </div>
     </div>
   );
 }

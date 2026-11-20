@@ -216,40 +216,6 @@ export default function SingleInstructionFlow({
           onInspect={inspect}
         />
       </div>
-      <aside
-        className="flex shrink-0 justify-end px-3 pb-2 pt-1"
-        aria-label="보충 설명"
-        data-supplementary-explanations="true"
-      >
-        <div className="text-right">
-          <p className="mb-1 text-[10px] font-medium text-[var(--ar-text-muted)]">
-            보충 설명
-          </p>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              className="rounded border border-[var(--ar-border)] px-2 py-1 text-[11px] hover:bg-[var(--ar-header-bg)]"
-              onClick={() => inspect("alu")}
-            >
-              ALU 내부
-            </button>
-            <button
-              type="button"
-              className="rounded border border-[var(--ar-border)] px-2 py-1 text-[11px] hover:bg-[var(--ar-header-bg)]"
-              onClick={() => inspect("pc-select")}
-            >
-              PC 회로
-            </button>
-            <button
-              type="button"
-              className="rounded border border-[var(--ar-border)] px-2 py-1 text-[11px] hover:bg-[var(--ar-header-bg)]"
-              onClick={() => inspect("decoder")}
-            >
-              해독
-            </button>
-          </div>
-        </div>
-      </aside>
       {detail && (
         <InstructionHardwareDetail
           flow={flow}

@@ -160,15 +160,15 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
   const paths:Record<string,string>={
     'fetch-address':'M245 220H285V150H1150V250H1200',
     'fetch-instruction':'M1200 330H1030V282H825',
-    'decode-control':'M780 355V375H825V390',
+    'decode-control':'M825 250H1005V360H825V390',
     'decode-immediate':'M375 355V500H415',
-    'read-control':'M380 355V370H195V390',
+    'read-control':'M335 315H-20V365H195V390',
     'input-a-register':'M315 480H375V590H770V625',
     'input-a-pc':'M150 265V340H1030V585H770V625',
     'input-b-register':'M315 520H390V700H525',
     'input-b-immediate':'M510 505V575H525V700',
     'mux-to-alu':'M525 700H650V735H710',
-    'memory-address':'M1010 680H1135V745H1200',
+    'memory-address':'M990 810H1120V812H1200',
     'memory-control':'M960 450H1165V805H1200',
     'store-data':'M195 560V800H335V1030H1100V865H1200',
     'load-data':'M1200 885H1135V1015H675V940H525',
@@ -192,7 +192,7 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
   if(compact) Object.assign(paths, {
     'fetch-address':'M55 220H-40V1210H55',
     'fetch-instruction':'M55 1295H-75V370H1030V282H825',
-    'memory-address':'M1010 680H1090V1210H1005',
+    'memory-address':'M990 810H1090V1272H1005',
     'memory-control':'M960 450H1100V1270H1005',
     'store-data':'M195 560V800H335V1040H1130V1330H1005',
     'load-data':'M1005 1350H1055V1015H675V940H525',
@@ -203,15 +203,15 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
   })]));
 }
 export function transferMotion(transfer:InstructionTransfer,path?:string) {
-  const value=transfer.kind==='control'?(transfer.id==='read-control'?`Read ${[...(transfer.value??'').matchAll(/\bx\d+\b/g)].map(match=>match[0]).join(', ')||transfer.value||'\uC81C\uC5B4'}`:transfer.value??'\uC81C\uC5B4 \uC2E0\uD638'):transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
+  const value=transfer.kind==='control'?(transfer.id==='read-control'?`${[...(transfer.value??'').matchAll(/\bx\d+\b/g)].map(match=>match[0]).join(', ')||transfer.value||'\uC81C\uC5B4'}`:transfer.value??'\uC81C\uC5B4 \uC2E0\uD638'):transfer.kind==='address'||(transfer.id==='fetch-instruction'||transfer.id==='decode-immediate')?(transfer.value??'\uBBF8\uC81C\uACF5'):displayValue(transfer.value).split(' \u00b7 ')[0];
   const width=Math.max(80,[...value].reduce((sum,char)=>sum+(char.charCodeAt(0)>255?32:19.5),36));
   const route=path?compileTransferRoute(path):undefined;
   // The packet stays centered on the actual wire. Reserve its footprint at ports,
   // but join consecutive MUX transfers at the device center without a position jump.
   const commands=path?.match(/[MHV]/g)??[];
   const portPadding=(horizontal:boolean)=>horizontal?width/2+6:26;
-  const startPadding=route?(transfer.id==='decode-immediate'?26:transfer.source==='mux'||transfer.source==='operand-mux'?0:portPadding(commands[1]==='H')):0;
-  const endPadding=route?(transfer.id==='decode-immediate'?26:transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
+  const startPadding=route?((transfer.id==='decode-immediate'||transfer.id==='memory-address')?26:transfer.source==='mux'||transfer.source==='operand-mux'?0:portPadding(commands[1]==='H')):0;
+  const endPadding=route?((transfer.id==='decode-immediate'||transfer.id==='memory-address')?26:transfer.target==='mux'||transfer.target==='operand-mux'?0:portPadding(commands.at(-1)==='H')):0;
   const distance=route?Math.max(0,route.total-Math.min(startPadding,route.total/2)-Math.min(endPadding,route.total/2)):0;
   return {value,width,route,startPadding,endPadding,distance};
 }
