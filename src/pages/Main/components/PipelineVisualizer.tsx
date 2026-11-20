@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import SingleCycleDatapath from './SingleCycleDatapath';
+import type {InstructionLessonContext} from './InstructionLesson';
 
 interface PipelineVisualizerProps {
+  lessonContext?: InstructionLessonContext;
   currentData: CycleHistoryItem | null;
   prevData?: CycleHistoryItem | null;
   simulationData?: SimulationResult | null;
@@ -19,6 +21,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   simulationData,
   loadingMessage,
   mode = "pipeline",
+  lessonContext,
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const isSingle = mode === "single";
@@ -27,6 +30,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   if (isSingle) {
     return (
       <SingleCycleDatapath
+        lessonContext={lessonContext}
         currentData={currentData}
         prevData={prevData}
         simulationData={simulationData}
