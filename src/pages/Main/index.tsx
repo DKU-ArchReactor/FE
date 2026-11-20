@@ -55,9 +55,26 @@ const MainPage: React.FC = () => {
   const [isMobileCodeView, setIsMobileCodeView] = useState(true);
   const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
   const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
+  const assistantHintTimerRef = useRef<number | null>(null);
   const aiPopupOpenRef = useRef(isAiPopupOpen);
   useEffect(() => { aiPopupOpenRef.current = isAiPopupOpen; }, [isAiPopupOpen]);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
+
+  const clearAssistantHint = useCallback(() => {
+    if (assistantHintTimerRef.current !== null) {
+      window.clearTimeout(assistantHintTimerRef.current);
+      assistantHintTimerRef.current = null;
+    }
+    setAssistantHint(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (assistantHintTimerRef.current !== null) {
+        window.clearTimeout(assistantHintTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -96,7 +113,17 @@ const MainPage: React.FC = () => {
 
   const showAssistantHint = assistantHint?.workspace === workspaceKey && !isAiPopupOpen && !fileMgr.translationBusy;
   const onCompilationComplete = () => {
-    if (!aiPopupOpenRef.current) setAssistantHint({ workspace: workspaceKey, language: editorTarget });
+    if (assistantHintTimerRef.current !== null) {
+      window.clearTimeout(assistantHintTimerRef.current);
+      assistantHintTimerRef.current = null;
+    }
+    // 컴파일 완료 3초 뒤에 힌트 팝업 표시
+    assistantHintTimerRef.current = window.setTimeout(() => {
+      if (!aiPopupOpenRef.current) {
+        setAssistantHint({ workspace: workspaceKey, language: editorTarget });
+      }
+      assistantHintTimerRef.current = null;
+    }, 3000);
   };
 
   const handleClearSelection = useCallback(() => {
@@ -116,7 +143,7 @@ const MainPage: React.FC = () => {
   });
 
   const onResetSimulation = () => {
-    setAssistantHint(null);
+    clearAssistantHint();
     simSession.clearSimulationCache();
     playback.setCurrentCycle(0);
     playback.setIsPlaying(false);
@@ -269,7 +296,7 @@ const MainPage: React.FC = () => {
         );
       }}
       onTranslationCompile={() => {
-        setAssistantHint(null);
+        clearAssistantHint();
         return simSession.handleTranslationCompile({
           onCompilationComplete,
           onSimulationComplete: playback.handleSimulationComplete,
@@ -291,13 +318,13 @@ const MainPage: React.FC = () => {
         }
       }}
       onCustomAssemblyChange={(value) => {
-        setAssistantHint(null);
+        clearAssistantHint();
         simSession.clearSimulationCache();
         simSession.setAsmError("");
         setCustomAssembly(value);
       }}
       onSimulateAssembly={() => {
-        setAssistantHint(null);
+        clearAssistantHint();
         return simSession.handleAssemblySimulation(customAssembly, {
           onCompilationComplete,
           onSimulationComplete: playback.handleSimulationComplete,
@@ -305,7 +332,7 @@ const MainPage: React.FC = () => {
         });
       }}
       onResetCustomAssembly={() => {
-        setAssistantHint(null);
+        clearAssistantHint();
         playback.triggerPlaybackFeedback("trash");
         setCustomAssembly(DEFAULT_CUSTOM_ASSEMBLY);
         simSession.clearSimulationCache();
@@ -335,7 +362,7 @@ const handleMobileViewportSelect = (index: number) => {
   };
 
   const handleMobileAssistantSelect = () => {
-    setAssistantHint(null);
+    clearAssistantHint();
     setIsMobileCodeView(false);
     setIsMobileAssistantViewport(true);
   };
@@ -371,7 +398,7 @@ const handleMobileViewportSelect = (index: number) => {
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
               if (fileMgr.translationBusy) return;
-              setAssistantHint(null);
+              clearAssistantHint();
               setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {
@@ -395,7 +422,7 @@ const handleMobileViewportSelect = (index: number) => {
         <button
           ref={aiButtonRef}
           type="button"
-          onClick={() => { setAssistantHint(null); setIsAiPopupOpen((prev) => !prev); }}
+          onClick={() => { clearAssistantHint(); setIsAiPopupOpen((prev) => !prev); }}
           aria-describedby={showAssistantHint ? 'assistant-compile-hint' : undefined}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
           className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 outline-none group active:scale-95 ${showAssistantHint ? 'ring-2 ring-[var(--ar-accent)] ring-offset-2 shadow-lg' : ''} ${
@@ -424,7 +451,7 @@ const handleMobileViewportSelect = (index: number) => {
             </svg>
           </div>
         </button>
-        {showAssistantHint && <AssistantCompileHint language={assistantHint.language} onDismiss={() => setAssistantHint(null)} onOpen={() => { setAssistantHint(null); setIsAiPopupOpen(true); }} />}
+        {showAssistantHint && <AssistantCompileHint language={assistantHint.language} onDismiss={clearAssistantHint} onOpen={() => { clearAssistantHint(); setIsAiPopupOpen(true); }} />}
         </div>
       </div>
 

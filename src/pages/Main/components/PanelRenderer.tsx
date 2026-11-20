@@ -166,6 +166,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           stageBuffers={currentData?.buffers}
           prevStageBuffers={prevData?.buffers}
           cycleEvents={currentData?.cycle_events}
+          simulationData={simulationData}
+          playbackCycle={currentCycle}
           mode={simulationMode}
           currentActiveStep={
             isSingleEngine
