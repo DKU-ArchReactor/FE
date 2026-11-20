@@ -13,6 +13,41 @@ async function seek(page: Page, id: string) {
   throw new Error(`Transfer not found: ${id}`);
 }
 
+test('changing speed preserves the current transfer and its position while playing or paused',async({page})=>{
+  await page.goto('/tests/browser/line-flow.html?timing=1');await page.waitForLoadState('networkidle');await frozenTime(page);
+  for(const paused of [false,true]) {
+    await page.goto('/tests/browser/line-flow.html?timing=1');await page.getByRole('button',{name:'play',exact:true}).click();
+    await page.clock.runFor(1800);
+    if(paused)await page.getByRole('button',{name:'play',exact:true}).click();
+    const step=await page.locator('[data-transfer]').getAttribute('data-transfer');
+    const elapsed=Number(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed'));
+    const position=await page.locator('.flow-packet').evaluate(n=>[Number(n.getAttribute('data-packet-x')),Number(n.getAttribute('data-packet-y'))]);
+    await page.getByRole('button',{name:'2x',exact:true}).click();
+    await expect(page.locator('[data-transfer]')).toHaveAttribute('data-transfer',step!);
+    expect(Number(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed'))).toBeCloseTo(elapsed/2,1);
+    const after=await page.locator('.flow-packet').evaluate(n=>[Number(n.getAttribute('data-packet-x')),Number(n.getAttribute('data-packet-y'))]);
+    expect(after[0]).toBeCloseTo(position[0],1);expect(after[1]).toBeCloseTo(position[1],1);
+    if(paused)await page.getByRole('button',{name:'play',exact:true}).click();
+    const delay=Number(await page.getByTestId('timing-delay').textContent());
+    await page.clock.runFor(delay-900-1);await expect(page.getByTestId('timing-clock')).toHaveText('1');
+    await page.clock.runFor(1);await expect(page.getByTestId('timing-clock')).toHaveText('2');
+  }
+});
+
+test('jumping to the same last cycle after completion starts that cycle without restarting the program',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?timing=1');
+  await page.getByRole('button',{name:'jump last',exact:true}).click();
+  await page.getByRole('button',{name:'play',exact:true}).click();await expect(page.getByTestId('timing-clock')).toHaveText('4');
+  await page.clock.runFor(Number(await page.getByTestId('timing-delay').textContent())+100);
+  await expect(page.locator('[data-flow-finished]')).toHaveAttribute('data-flow-finished','true');
+  await page.getByRole('button',{name:'jump last',exact:true}).click();
+  await page.getByRole('button',{name:'play',exact:true}).click();
+  await expect(page.getByTestId('timing-clock')).toHaveText('4');
+  await expect(page.locator('[data-flow-finished]')).toHaveAttribute('data-flow-finished','false');
+  await page.clock.runFor(300);await expect(page.locator('.flow-packet')).toBeVisible();
+  await expect(page.getByTestId('timing-clock')).toHaveText('4');
+});
+
 test('instruction completion preserves results and updated PC, clears transfers and replays explicitly',async({page})=>{
   await page.goto('/tests/browser/line-flow.html');await page.waitForLoadState('networkidle');
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);

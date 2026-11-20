@@ -30,6 +30,7 @@ export function useSimulationPlayback({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(1000);
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
+  const [playbackRevision, setPlaybackRevision] = useState(0);
 
   const [playbackFeedback, setPlaybackFeedback] = useState<{
     type: "play" | "pause" | "reset" | "trash" | "check";
@@ -255,9 +256,13 @@ export function useSimulationPlayback({
       return previous + 1;
     });
     if (isSingleEngine) {
-      if (!singleClock.current || singleClock.current.frame !== singleFrame || singleClock.current.duration !== singlePlaybackDelay)
+      if (!singleClock.current || singleClock.current.frame !== singleFrame)
         singleClock.current = {frame: singleFrame, duration: singlePlaybackDelay, remaining: singlePlaybackDelay, started: null};
       const clock = singleClock.current;
+      if (clock.duration !== singlePlaybackDelay) {
+        clock.remaining = clock.remaining * singlePlaybackDelay / clock.duration;
+        clock.duration = singlePlaybackDelay;
+      }
       if (!isPlaying) return;
       onClearSelection();
       clock.started = performance.now();
@@ -348,6 +353,8 @@ export function useSimulationPlayback({
   };
 
   const handleJumpToCycle = (val: number) => {
+    singleClock.current = null;
+    setPlaybackRevision(value => value + 1);
     setFinishedSingleFrame(null);
     setIsPlaying((prev) => {
       if (prev) {
@@ -372,6 +379,7 @@ export function useSimulationPlayback({
     activeCycleIndex,
     currentData,
     singlePlaybackDelay,
+    playbackRevision,
     singlePlaybackFinished: isSingleEngine && currentCycle > 0 && finishedSingleFrame === currentData,
     pauseForFlow,
     prevData,

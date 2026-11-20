@@ -13,6 +13,7 @@ import "./TutorTypography.css";
 export interface InstructionLessonContext {
   isPlaying?: boolean;
   playbackFinished?: boolean;
+  playbackRevision?: number;
   flowDurationMs?: number;
   onPausePlayback?: () => void;
   source?: string;
@@ -127,7 +128,7 @@ export default function InstructionLesson({
         )}
       </div>
       <SingleInstructionFlow
-        key={`${row.pc}-${flow.historyIndex}-${context?.flowDurationMs}`}
+        key={`${row.pc}-${flow.historyIndex}-${context?.playbackRevision ?? 0}`}
         flow={flow}
         duration={context?.flowDurationMs}
         onPause={context?.onPausePlayback}

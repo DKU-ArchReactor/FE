@@ -42,6 +42,7 @@ export default function SingleInstructionFlow({
     running: flow.actual && (isPlaying ?? true),
     globalPlaying: isPlaying,
     local: isPlaying == null,
+    scheduleDuration: totalDuration,
   });
   const [detail, setDetail] = useState<"alu" | "pc-select" | "decoder" | null>(
     null,
@@ -58,16 +59,24 @@ export default function SingleInstructionFlow({
     setDetail(unit);
   };
   // Global Pause also applies to a new frame mounted at the same playback boundary.
-  if (isPlaying != null && clock.globalPlaying !== isPlaying)
+  const globalChanged = isPlaying != null && clock.globalPlaying !== isPlaying;
+  const scaledElapsed =
+    (clock.elapsed * totalDuration) / clock.scheduleDuration;
+  if (globalChanged || clock.scheduleDuration !== totalDuration)
     setClock({
       ...clock,
+      scheduleDuration: totalDuration,
       globalPlaying: isPlaying,
-      running: isPlaying === true || (clock.local && clock.running),
-      local: isPlaying ? false : clock.local,
+      running: globalChanged
+        ? isPlaying === true || (clock.local && clock.running)
+        : clock.running,
+      local: globalChanged && isPlaying ? false : clock.local,
       elapsed:
-        isPlaying && (clock.local || clock.elapsed >= totalDuration)
+        globalChanged &&
+        isPlaying &&
+        (clock.local || clock.elapsed >= clock.scheduleDuration)
           ? 0
-          : clock.elapsed,
+          : scaledElapsed,
     });
   useEffect(() => {
     if (!clock.running) return;
@@ -117,9 +126,10 @@ export default function SingleInstructionFlow({
         running: false,
         globalPlaying: isPlaying,
         local: true,
+        scheduleDuration: totalDuration,
       });
     },
-    [onPause, timeline, transfers.length, isPlaying],
+    [onPause, timeline, transfers.length, isPlaying, totalDuration],
   );
   const chooseUnit = useCallback(
     (unit: TransferUnit) => {
@@ -140,6 +150,7 @@ export default function SingleInstructionFlow({
       ...value,
       globalPlaying: isPlaying,
       local: true,
+      scheduleDuration: totalDuration,
       running: !value.running,
       elapsed: finished ? 0 : value.elapsed,
     }));
@@ -151,6 +162,7 @@ export default function SingleInstructionFlow({
       running: true,
       globalPlaying: isPlaying,
       local: true,
+      scheduleDuration: totalDuration,
     });
   };
   const button =

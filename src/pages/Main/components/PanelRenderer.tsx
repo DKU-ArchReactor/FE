@@ -31,6 +31,7 @@ interface PanelRendererProps {
   onPausePlayback?: () => void;
   isPlaying?: boolean;
   singlePlaybackFinished?: boolean;
+  playbackRevision?: number;
   loadingMessage: string | null;
   simulationMode: "single" | "pipeline";
   isSingleEngine: boolean;
@@ -83,6 +84,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   onPausePlayback,
   isPlaying,
   singlePlaybackFinished,
+  playbackRevision,
   loadingMessage,
   simulationMode,
   isSingleEngine,
@@ -207,7 +209,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "pipeline":
       return (
         <PipelineVisualizer
-          lessonContext={{isPlaying, playbackFinished: singlePlaybackFinished, flowDurationMs: singleFlowDuration(playSpeed), onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
+          lessonContext={{isPlaying, playbackRevision, playbackFinished: singlePlaybackFinished, flowDurationMs: singleFlowDuration(playSpeed), onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
             rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
             selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
             onSelectAsm: (line, index) => onSelectTranslationLine(line, index, false), onJumpToCycle}}
