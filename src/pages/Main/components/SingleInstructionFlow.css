@@ -1,11 +1,41 @@
-.ar-single-flow-diagram { --ar-flow-wire: #758aa2; }
-.ar-single-flow-diagram { font-family: 'Pretendard Tutor', 'Malgun Gothic', system-ui, sans-serif; }
-.ar-single-flow-diagram .font-mono { font-family: 'Cascadia Code', Consolas, 'Pretendard Tutor', monospace; }
-.dark .ar-single-flow-diagram { --ar-flow-wire: #91a7c0; }
+.ar-single-flow {
+  --ar-flow-border: #cbd5e1;
+  --ar-flow-wire: #94a3b8;
+  --ar-flow-accent: #005fb8;
+  --ar-flow-token-bg: #005fb8;
+  --ar-flow-active-bg: #eff6ff;
+  --ar-flow-result-bg: #f1f5f9;
+  --ar-flow-region-bg: #f8fafc;
+}
+.ar-single-flow-diagram {
+  font-family: "Inter", "Malgun Gothic", system-ui, sans-serif;
+}
+.ar-single-flow-diagram .font-mono {
+  font-family: "Cascadia Code", Consolas, "Pretendard Tutor", monospace;
+}
+.dark .ar-single-flow {
+  --ar-flow-border: #4b5563;
+  --ar-flow-wire: #64748b;
+  --ar-flow-accent: #79c0ff;
+  --ar-flow-token-bg: #1f6feb;
+  --ar-flow-active-bg: #172b40;
+  --ar-flow-result-bg: #252d38;
+  --ar-flow-region-bg: var(--ar-header-bg);
+}
 @media (prefers-reduced-motion: reduce) {
-  .flow-token { display: none; }
-  .flow-control-trail { display: none; }
-  .flow-data-trail { display: none; }
-  .flow-packet { display: none; }
-  .flow-data-word { display: none; }
+  .flow-token {
+    display: none;
+  }
+  .flow-control-trail {
+    display: none;
+  }
+  .flow-data-trail {
+    display: none;
+  }
+  .flow-packet {
+    display: none;
+  }
+  .flow-data-word {
+    display: none;
+  }
 }

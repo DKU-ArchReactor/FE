@@ -13,6 +13,25 @@ async function seek(page: Page, id: string) {
   throw new Error(`Transfer not found: ${id}`);
 }
 
+test('single-cycle devices use neutral outlines and one active accent in both themes',async({page})=>{
+  await frozenTime(page);
+  for(const dark of [false,true]) {
+    await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
+    await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
+    const accents:string[]=[];
+    for(const id of ['fetch-address','read-control','input-a']) {
+      await seek(page,id);
+      const inactive=await page.locator('[data-flow-node][data-flow-active="false"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('rect,path')!).stroke));
+      expect(new Set(inactive).size).toBe(1);
+      const accent=await page.locator('[data-flow-route] > path').last().evaluate(n=>getComputedStyle(n).stroke);
+      expect(accent).not.toBe(inactive[0]);accents.push(accent);
+    }
+    expect(new Set(accents).size).toBe(1);
+    await expect(page.locator('[data-circuit-wire="read-control"] path')).toHaveAttribute('stroke-dasharray','6 5');
+    await expect(page.locator('[data-bus-legend]')).toContainText('Control Bus');
+  }
+});
+
 test('bus legend uses readable English labels in wide and compact layouts',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
   for(const size of [{width:1400,height:900},{width:760,height:1000}]) {

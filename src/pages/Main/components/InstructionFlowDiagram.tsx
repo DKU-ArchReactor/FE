@@ -18,7 +18,11 @@ import type { SimulationResult } from "@/type/simulation";
 
 type Flow = ReturnType<typeof buildInstructionFlow>;
 type Box = { x: number; y: number; w: number; h: number };
-const COLORS = { address: "#bc700a", data: "#087fce", control: "#8951ce" };
+const COLORS = {
+  address: "var(--ar-flow-accent)",
+  data: "var(--ar-flow-accent)",
+  control: "var(--ar-flow-accent)",
+};
 const BOXES: Record<TransferUnit, Box> = {
   pc: { x: 55, y: 175, w: 190, h: 120 },
   decoder: { x: 335, y: 175, w: 490, h: 180 },
@@ -408,13 +412,7 @@ export default function InstructionFlowDiagram({
                 : "";
     const mux = unit === "mux" || unit === "operand-mux";
     const statusWidth = Math.max(58, [...status].length * 18 + 20);
-    const stroke = active
-      ? color
-      : unit === "registers"
-        ? "#169b80"
-        : unit === "cu" || unit === "decoder"
-          ? "#9165c3"
-          : "#64839e";
+    const stroke = active ? color : "var(--ar-flow-border)";
     const shape = mux
       ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
       : unit === "alu"
@@ -422,9 +420,7 @@ export default function InstructionFlowDiagram({
         : unit === "cu"
           ? `M${b.x + 18} ${b.y}H${b.x + b.w - 18}L${b.x + b.w} ${b.y + sy(18)}V${b.y + b.h - sy(18)}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}L${b.x} ${b.y + b.h - sy(18)}V${b.y + sy(18)}Z`
           : undefined;
-    const fill = active
-      ? `color-mix(in srgb, ${color} 8%, var(--ar-panel-bg))`
-      : "var(--ar-panel-bg)";
+    const fill = active ? "var(--ar-flow-active-bg)" : "var(--ar-panel-bg)";
     return (
       <g
         key={unit}
@@ -528,7 +524,7 @@ export default function InstructionFlowDiagram({
           y={b.y + sy(unit === "alu" ? 53 : mux ? 33 : 40)}
           textAnchor="middle"
           fontSize={mux ? 26 : 30}
-          fontWeight="800"
+          fontWeight="700"
           fill="var(--ar-text-primary)"
         >
           {TITLES[unit]}
@@ -541,7 +537,7 @@ export default function InstructionFlowDiagram({
               width={statusWidth}
               height={sy(28)}
               rx="5"
-              fill={color}
+              fill="var(--ar-flow-token-bg)"
             />
             <text
               x={b.x + b.w - statusWidth / 2}
@@ -562,7 +558,7 @@ export default function InstructionFlowDiagram({
             textAnchor="middle"
             fontSize={unit === "alu" ? 24 : 22}
             fontWeight={unit === "alu" ? 800 : 400}
-            fill={unit === "alu" ? COLORS.data : "var(--ar-text-muted)"}
+            fill={unit === "alu" && active ? color : "var(--ar-text-muted)"}
           >
             {unit === "alu"
               ? flow.jump || flow.system
@@ -587,7 +583,7 @@ export default function InstructionFlowDiagram({
             textAnchor="middle"
             fontSize="18"
             fontWeight="700"
-            fill={stroke}
+            fill="var(--ar-text-muted)"
           >
             32 × 32비트 · x0 = 0
           </text>
@@ -599,7 +595,7 @@ export default function InstructionFlowDiagram({
             width={b.w - 52}
             height={sy(34)}
             rx="6"
-            fill="color-mix(in srgb, #087fce 12%, var(--ar-panel-bg))"
+            fill="var(--ar-flow-result-bg)"
           />
         )}
         {lines[unit].filter(Boolean).map((line, i) => {
@@ -650,8 +646,8 @@ export default function InstructionFlowDiagram({
               fontWeight={unit === "alu" && i === 2 ? 800 : 650}
               opacity={overlap ? 0 : 1}
               fill={
-                unit === "alu" && i === 2
-                  ? COLORS.data
+                unit === "alu" && i === 2 && active
+                  ? color
                   : "var(--ar-text-primary)"
               }
               style={{ fontVariantNumeric: "tabular-nums" }}
@@ -680,7 +676,7 @@ export default function InstructionFlowDiagram({
               textAnchor="middle"
               fontSize="23"
               fontWeight="700"
-              fill={COLORS.control}
+              fill="var(--ar-text-muted)"
             >
               {specialEncoding
                 ? "SYSTEM / FENCE"
@@ -705,7 +701,7 @@ export default function InstructionFlowDiagram({
     );
   };
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
+    <div className="ar-single-flow flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
       <div
         className="mx-3 mb-2 shrink-0 rounded-lg border-l-4 bg-[var(--ar-header-bg)] px-3 py-2.5"
         style={{ borderLeftColor: color }}
@@ -792,16 +788,16 @@ export default function InstructionFlowDiagram({
             width="1176"
             height={sy(920)}
             rx="24"
-            fill="var(--ar-header-bg)"
-            stroke="var(--ar-text-muted)"
-            strokeWidth="3"
+            fill="var(--ar-flow-region-bg)"
+            stroke="var(--ar-flow-border)"
+            strokeWidth="2"
             data-hardware-region="cpu"
           />
           <g
             data-cpu-package="true"
             aria-hidden="true"
-            stroke="var(--ar-text-muted)"
-            strokeWidth="4"
+            stroke="var(--ar-flow-border)"
+            strokeWidth="3"
           >
             {Array.from({ length: 12 }, (_, i) => (
               <path
@@ -825,8 +821,8 @@ export default function InstructionFlowDiagram({
             width={compact ? 1050 : 365}
             height={sy(compact ? 285 : 920)}
             rx="16"
-            fill="var(--ar-header-bg)"
-            stroke="var(--ar-border)"
+            fill="var(--ar-flow-region-bg)"
+            stroke="var(--ar-flow-border)"
             strokeWidth="2"
             data-hardware-region="memory"
           />
@@ -851,8 +847,8 @@ export default function InstructionFlowDiagram({
               <path
                 d={paths[wire.key]}
                 fill="none"
-                stroke={COLORS[wire.kind]}
-                strokeOpacity=".19"
+                stroke="var(--ar-flow-wire)"
+                strokeOpacity=".75"
                 strokeWidth={wire.system ? 5 : 2.5}
                 strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
                 strokeLinejoin="round"
@@ -903,7 +899,7 @@ export default function InstructionFlowDiagram({
                       ? `M${35 + i * 340} ${sy(1100)}h28`
                       : `M1205 ${sy(550 + i * 46)}H1240`
                   }
-                  stroke={COLORS[kind]}
+                  stroke="var(--ar-flow-wire)"
                   strokeWidth={kind === "control" ? 4 : 6}
                   strokeDasharray={kind === "control" ? "5 4" : undefined}
                 />
@@ -912,7 +908,7 @@ export default function InstructionFlowDiagram({
                   y={sy(compact ? 1106 : 557 + i * 46)}
                   fontSize="26"
                   fontWeight="800"
-                  fill={COLORS[kind]}
+                  fill="var(--ar-text-muted)"
                 >
                   {kind === "address"
                     ? "Address Bus"
@@ -946,7 +942,9 @@ export default function InstructionFlowDiagram({
                   height={packet.h}
                   rx="6"
                   fill={
-                    transfer.kind === "control" ? "var(--ar-panel-bg)" : color
+                    transfer.kind === "control"
+                      ? "var(--ar-panel-bg)"
+                      : "var(--ar-flow-token-bg)"
                   }
                   stroke={
                     transfer.kind === "control" ? color : "var(--ar-panel-bg)"
