@@ -76,16 +76,19 @@ export interface SingleCycleControlSignals {
   alu_op: string;
   mem_read: boolean;
   mem_write: boolean;
-  mem_to_reg: "mem" | "alu" | "pc+4";
+  mem_to_reg: boolean | "mem" | "alu" | "pc+4";
   branch: boolean;
   jump: boolean;
-  pc_src: "pc+4" | "branch/jump";
+  pc_src: "pc+4" | "branch/jump" | "branch_target" | "jump_target";
 }
 
 export interface SingleCycleRegisterSignal {
-  index: number;
+  index?: number;
+  num?: number;
   name: string;
-  value: string;
+  value?: string;
+  write_data?: string | null;
+  write_enabled?: boolean;
 }
 
 export interface SingleCycleDatapath {
@@ -95,9 +98,10 @@ export interface SingleCycleDatapath {
   instruction: {
     raw: string;
     assembly: string;
-    opcode: string;
-    funct3: string | null;
-    funct7: string | null;
+    opcode?: string;
+    op?: string;
+    funct3?: string | null;
+    funct7?: string | null;
   };
   control_signals: SingleCycleControlSignals;
   registers: {
@@ -106,9 +110,11 @@ export interface SingleCycleDatapath {
     rd: SingleCycleRegisterSignal | null;
   };
   immediate: {
-    raw: number;
-    hex: string;
-    decimal: number;
+    raw?: number;
+    hex?: string;
+    decimal?: number;
+    value?: string;
+    dec?: number;
   } | null;
   alu: {
     input_1: string;
@@ -117,9 +123,10 @@ export interface SingleCycleDatapath {
     zero: boolean;
   };
   data_memory: {
-    read_address: string | null;
+    address?: string | null;
+    read_address?: string | null;
     read_data: string | null;
-    write_address: string | null;
+    write_address?: string | null;
     write_data: string | null;
   };
 }
@@ -221,6 +228,8 @@ export interface SimulationRunRequest {
 }
 
 export interface SimulationResult {
+  execution_status?: "COMPLETED" | "CYCLE_LIMIT" | "SIMULATION_ERROR";
+  initial_state?: {registers?: Record<string, string>; metrics?: Partial<GlobalResult['metrics']>};
   assistant_context?: ExecutionDescriptor;
   tutor?: TutorBundle;
   schema_version: string;

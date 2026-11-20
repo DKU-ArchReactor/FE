@@ -16,6 +16,7 @@ import TranslationMapping from "./TranslationMapping";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
+import {singleFlowDuration} from '../utils/instructionFlow';
 
 const EMPTY_REGISTERS: Record<string, string> = {};
 
@@ -27,6 +28,10 @@ interface PanelRendererProps {
   prevData: CycleHistoryItem | null;
   currentCycle: number;
   playSpeed: number;
+  onPausePlayback?: () => void;
+  isPlaying?: boolean;
+  singlePlaybackFinished?: boolean;
+  playbackRevision?: number;
   loadingMessage: string | null;
   simulationMode: "single" | "pipeline";
   isSingleEngine: boolean;
@@ -77,6 +82,10 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   prevData,
   currentCycle,
   playSpeed,
+  onPausePlayback,
+  isPlaying,
+  singlePlaybackFinished,
+  playbackRevision,
   loadingMessage,
   simulationMode,
   isSingleEngine,
@@ -207,6 +216,10 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "pipeline":
       return (
         <PipelineVisualizer
+          lessonContext={{isPlaying, playbackRevision, playbackFinished: singlePlaybackFinished, flowDurationMs: singleFlowDuration(playSpeed), onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
+            rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
+            selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
+            onSelectAsm: (line, index) => onSelectTranslationLine(line, index, false), onJumpToCycle}}
           currentData={currentData}
           prevData={prevData}
           simulationData={simulationData}
