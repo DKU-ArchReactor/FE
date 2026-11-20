@@ -1,4 +1,5 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   displayValue,
   numericPc,
@@ -18,7 +19,11 @@ import type { SimulationResult } from "@/type/simulation";
 
 type Flow = ReturnType<typeof buildInstructionFlow>;
 type Box = { x: number; y: number; w: number; h: number };
-const COLORS = { address: "#bc700a", data: "#087fce", control: "#8951ce" };
+const COLORS = {
+  address: "var(--ar-flow-address)",
+  data: "var(--ar-flow-data)",
+  control: "var(--ar-flow-control)",
+};
 const BOXES: Record<TransferUnit, Box> = {
   pc: { x: 55, y: 175, w: 190, h: 120 },
   decoder: { x: 335, y: 175, w: 490, h: 180 },
@@ -34,16 +39,16 @@ const BOXES: Record<TransferUnit, Box> = {
 };
 const TITLES: Record<TransferUnit, string> = {
   pc: "PC",
-  decoder: "명령어 해독",
-  cu: "CU",
-  registers: "레지스터 파일",
+  decoder: "Instruction Decoder",
+  cu: "Control Unit",
+  registers: "Registers",
   immediate: "Imm Gen",
-  "operand-mux": "입력 MUX",
+  "operand-mux": "MUX",
   alu: "ALU",
-  mux: "기록값 MUX",
-  "pc-select": "PC 가산·선택",
-  "instruction-memory": "명령어 메모리",
-  memory: "데이터 메모리",
+  mux: "MUX",
+  "pc-select": "PC Select",
+  "instruction-memory": "Instruction Memory",
+  memory: "Data Memory",
 };
 const ROLES: Record<TransferUnit, string> = {
   pc: "명령어 주소",
@@ -224,6 +229,8 @@ export default function InstructionFlowDiagram({
     ? { x: point.x - motion.width / 2, y: point.y - 23, w: motion.width, h: 46 }
     : undefined;
   const color = finished ? "var(--ar-text-muted)" : COLORS[transfer.kind];
+  // One gentle emphasis per transfer, driven by the same pausable playback clock.
+  const emphasis = Math.sin(Math.PI * progress) ** 2;
   const reached = (key: string) =>
     arrived.includes(key) ||
     (transfer.id === key && (finished || progress >= 0.95));
@@ -408,13 +415,10 @@ export default function InstructionFlowDiagram({
                 : "";
     const mux = unit === "mux" || unit === "operand-mux";
     const statusWidth = Math.max(58, [...status].length * 18 + 20);
-    const stroke = active
-      ? color
-      : unit === "registers"
-        ? "#169b80"
-        : unit === "cu" || unit === "decoder"
-          ? "#9165c3"
-          : "#64839e";
+    const stroke = active ? color : "var(--ar-flow-device-border)";
+    const textColor = active
+      ? `var(--ar-flow-${transfer.kind}-text)`
+      : "var(--ar-flow-idle-text)";
     const shape = mux
       ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
       : unit === "alu"
@@ -423,8 +427,8 @@ export default function InstructionFlowDiagram({
           ? `M${b.x + 18} ${b.y}H${b.x + b.w - 18}L${b.x + b.w} ${b.y + sy(18)}V${b.y + b.h - sy(18)}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}L${b.x} ${b.y + b.h - sy(18)}V${b.y + sy(18)}Z`
           : undefined;
     const fill = active
-      ? `color-mix(in srgb, ${color} 8%, var(--ar-panel-bg))`
-      : "var(--ar-panel-bg)";
+      ? `color-mix(in srgb, ${color} 6%, var(--ar-flow-device-bg))`
+      : "var(--ar-flow-device-bg)";
     return (
       <g
         key={unit}
@@ -465,19 +469,24 @@ export default function InstructionFlowDiagram({
             width={b.w}
             height={b.h}
             rx="8"
-            fill="var(--ar-panel-bg)"
+            fill="var(--ar-flow-device-bg)"
             stroke={stroke}
           />
         )}
         {shape ? (
           <path
+            data-device-surface="true"
+            className={active ? "flow-device-active" : undefined}
             d={shape}
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 3 : 1.5}
+            strokeWidth={active ? 2.6 + emphasis * 3 : 2.2}
+            strokeOpacity={active ? 0.5 + emphasis * 0.5 : 1}
           />
         ) : (
           <rect
+            data-device-surface="true"
+            className={active ? "flow-device-active" : undefined}
             x={b.x}
             y={b.y}
             width={b.w}
@@ -485,7 +494,8 @@ export default function InstructionFlowDiagram({
             rx="8"
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 3 : 1.5}
+            strokeWidth={active ? 2.6 + emphasis * 3 : 2.2}
+            strokeOpacity={active ? 0.5 + emphasis * 0.5 : 1}
           />
         )}
         {[
@@ -528,8 +538,8 @@ export default function InstructionFlowDiagram({
           y={b.y + sy(unit === "alu" ? 53 : mux ? 33 : 40)}
           textAnchor="middle"
           fontSize={mux ? 26 : 30}
-          fontWeight="800"
-          fill="var(--ar-text-primary)"
+          fontWeight={active ? 800 : 700}
+          fill={textColor}
         >
           {TITLES[unit]}
         </text>
@@ -541,7 +551,7 @@ export default function InstructionFlowDiagram({
               width={statusWidth}
               height={sy(28)}
               rx="5"
-              fill={color}
+              fill="var(--ar-flow-token-bg)"
             />
             <text
               x={b.x + b.w - statusWidth / 2}
@@ -562,7 +572,7 @@ export default function InstructionFlowDiagram({
             textAnchor="middle"
             fontSize={unit === "alu" ? 24 : 22}
             fontWeight={unit === "alu" ? 800 : 400}
-            fill={unit === "alu" ? COLORS.data : "var(--ar-text-muted)"}
+            fill={textColor}
           >
             {unit === "alu"
               ? flow.jump || flow.system
@@ -587,7 +597,7 @@ export default function InstructionFlowDiagram({
             textAnchor="middle"
             fontSize="18"
             fontWeight="700"
-            fill={stroke}
+            fill={textColor}
           >
             32 × 32비트 · x0 = 0
           </text>
@@ -599,7 +609,7 @@ export default function InstructionFlowDiagram({
             width={b.w - 52}
             height={sy(34)}
             rx="6"
-            fill="color-mix(in srgb, #087fce 12%, var(--ar-panel-bg))"
+            fill="var(--ar-flow-result-bg)"
           />
         )}
         {lines[unit].filter(Boolean).map((line, i) => {
@@ -649,11 +659,7 @@ export default function InstructionFlowDiagram({
               }
               fontWeight={unit === "alu" && i === 2 ? 800 : 650}
               opacity={overlap ? 0 : 1}
-              fill={
-                unit === "alu" && i === 2
-                  ? COLORS.data
-                  : "var(--ar-text-primary)"
-              }
+              fill={textColor}
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {line}
@@ -668,7 +674,7 @@ export default function InstructionFlowDiagram({
               textAnchor="middle"
               fontSize="24"
               fontWeight="700"
-              fill="var(--ar-text-primary)"
+              fill={textColor}
             >
               {decoded
                 ? `${decoded.format}\uD615 \u00b7 opcode ${decoded.opcode}`
@@ -680,7 +686,7 @@ export default function InstructionFlowDiagram({
               textAnchor="middle"
               fontSize="23"
               fontWeight="700"
-              fill={COLORS.control}
+              fill={textColor}
             >
               {specialEncoding
                 ? "SYSTEM / FENCE"
@@ -705,7 +711,14 @@ export default function InstructionFlowDiagram({
     );
   };
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
+    <div
+      className="ar-single-flow flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden"
+      style={
+        {
+          "--ar-flow-token-bg": `var(--ar-flow-${transfer.kind}-token)`,
+        } as CSSProperties
+      }
+    >
       <div
         className="mx-3 mb-2 shrink-0 rounded-lg border-l-4 bg-[var(--ar-header-bg)] px-3 py-2.5"
         style={{ borderLeftColor: color }}
@@ -774,17 +787,27 @@ export default function InstructionFlowDiagram({
               <marker
                 key={kind}
                 id={`${id}-${kind}`}
-                viewBox="0 0 12 12"
-                refX="10"
-                refY="6"
-                markerWidth="9"
-                markerHeight="9"
-                markerUnits="userSpaceOnUse"
+                viewBox="0 0 10 10"
+                refX="8.5"
+                refY="5"
+                markerWidth="5"
+                markerHeight="5"
                 orient="auto"
               >
-                <path d="M0 0L11 6L0 12Z" fill={stroke} />
+                <path d="M0 1.2L9 5L0 8.8Z" fill={stroke} />
               </marker>
             ))}
+            <marker
+              id={`${id}-inactive`}
+              viewBox="0 0 10 10"
+              refX="8.5"
+              refY="5"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M0 1.2L9 5L0 8.8Z" fill="var(--ar-flow-wire)" />
+            </marker>
           </defs>
           <rect
             x="-110"
@@ -792,16 +815,16 @@ export default function InstructionFlowDiagram({
             width="1176"
             height={sy(920)}
             rx="24"
-            fill="var(--ar-header-bg)"
-            stroke="var(--ar-text-muted)"
-            strokeWidth="3"
+            fill="var(--ar-flow-region-bg)"
+            stroke="var(--ar-flow-region-border)"
+            strokeWidth="3.5"
             data-hardware-region="cpu"
           />
           <g
             data-cpu-package="true"
             aria-hidden="true"
-            stroke="var(--ar-text-muted)"
-            strokeWidth="4"
+            stroke="var(--ar-flow-region-border)"
+            strokeWidth="2"
           >
             {Array.from({ length: 12 }, (_, i) => (
               <path
@@ -810,6 +833,14 @@ export default function InstructionFlowDiagram({
               />
             ))}
           </g>
+          <rect
+            x="-100"
+            y={sy(135)}
+            width="300"
+            height={sy(32)}
+            rx="4"
+            fill="var(--ar-flow-region-heading-bg)"
+          />
           <text
             x="-90"
             y={sy(157)}
@@ -825,19 +856,27 @@ export default function InstructionFlowDiagram({
             width={compact ? 1050 : 365}
             height={sy(compact ? 285 : 920)}
             rx="16"
-            fill="var(--ar-header-bg)"
-            stroke="var(--ar-border)"
-            strokeWidth="2"
+            fill="var(--ar-flow-region-bg)"
+            stroke="var(--ar-flow-region-border)"
+            strokeWidth="3.5"
             data-hardware-region="memory"
+          />
+          <rect
+            x={compact ? 25 : 1190}
+            y={sy(compact ? 1127 : 137)}
+            width={compact ? 350 : 345}
+            height={sy(32)}
+            rx="4"
+            fill="var(--ar-flow-region-heading-bg)"
           />
           <text
             x={compact ? 35 : 1200}
             y={sy(compact ? 1147 : 157)}
-            fontSize="20"
+            fontSize="24"
             fontWeight="800"
             fill="var(--ar-text-primary)"
           >
-            메모리 · CPU 외부
+            Memory · CPU 외부
           </text>
           {WIRES.map((wire) => (
             <g
@@ -851,11 +890,11 @@ export default function InstructionFlowDiagram({
               <path
                 d={paths[wire.key]}
                 fill="none"
-                stroke={COLORS[wire.kind]}
-                strokeOpacity=".19"
-                strokeWidth={wire.system ? 5 : 2.5}
+                stroke="var(--ar-flow-wire)"
+                strokeWidth={wire.system ? 2.8 : 2}
                 strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
                 strokeLinejoin="round"
+                markerEnd={`url(#${id}-inactive)`}
               />
             </g>
           ))}
@@ -865,17 +904,27 @@ export default function InstructionFlowDiagram({
                 d={path}
                 fill="none"
                 stroke="var(--ar-panel-bg)"
-                strokeWidth="10"
+                strokeWidth="6"
                 strokeLinejoin="round"
               />
               <path
                 d={path}
                 fill="none"
                 stroke={color}
-                strokeWidth={transfer.kind === "control" ? 3.5 : 5}
-                strokeDasharray={
-                  transfer.kind === "control" ? "6 5" : undefined
-                }
+                strokeOpacity=".2"
+                strokeWidth="2.8"
+                strokeLinejoin="round"
+              />
+              <path
+                className="flow-arrow-stream"
+                data-flow-stream="true"
+                d={path}
+                fill="none"
+                stroke={color}
+                strokeWidth={3.2 + emphasis * 0.6}
+                strokeOpacity={0.75 + emphasis * 0.25}
+                strokeDasharray={transfer.kind === "control" ? "12 10" : "16 10"}
+                strokeDashoffset={-progress * (transfer.kind === "control" ? 88 : 104)}
                 strokeLinejoin="round"
                 markerEnd={`url(#${id}-${transfer.kind})`}
               />
@@ -884,44 +933,63 @@ export default function InstructionFlowDiagram({
           {(Object.keys(BOXES) as TransferUnit[]).map(node)}
           <g
             data-bus-legend="true"
-            aria-label="CPU와 메모리를 연결하는 주소·데이터·제어 경로"
+            aria-label="현재 전송의 주소·데이터·제어 종류"
           >
             <text
-              x={compact ? 35 : 1200}
+              x={compact ? 35 : 1220}
               y={sy(compact ? 1080 : 515)}
               fontSize="25"
               fontWeight="800"
               fill="var(--ar-text-primary)"
             >
-              CPU ↔ 메모리 연결
+              전송 신호·버스 구분
             </text>
-            {(["address", "data", "control"] as const).map((kind, i) => (
-              <g key={kind} data-system-bus-label={kind}>
-                <path
-                  d={
-                    compact
-                      ? `M${35 + i * 340} ${sy(1100)}h28`
-                      : `M1205 ${sy(550 + i * 46)}H1240`
-                  }
-                  stroke={COLORS[kind]}
-                  strokeWidth={kind === "control" ? 4 : 6}
-                  strokeDasharray={kind === "control" ? "5 4" : undefined}
-                />
-                <text
-                  x={compact ? 75 + i * 340 : 1255}
-                  y={sy(compact ? 1106 : 557 + i * 46)}
-                  fontSize="26"
-                  fontWeight="800"
-                  fill={COLORS[kind]}
+            {(["address", "data", "control"] as const).map((kind, i) => {
+              const busActive = Boolean(
+                !finished && path && transfer.kind === kind,
+              );
+              return (
+                <g
+                  key={kind}
+                  data-system-bus-label={kind}
+                  data-bus-active={busActive}
                 >
-                  {kind === "address"
-                    ? "Address Bus"
-                    : kind === "data"
-                      ? "Data Bus"
-                      : "Control Bus"}
-                </text>
-              </g>
-            ))}
+                  {busActive && (
+                    <rect
+                      x={compact ? 25 + i * 340 : 1195}
+                      y={sy(compact ? 1084 : 535 + i * 46)}
+                      width={330}
+                      height={sy(34)}
+                      rx="4"
+                      fill={`color-mix(in srgb, ${COLORS[kind]} 8%, var(--ar-panel-bg))`}
+                    />
+                  )}
+                  <path
+                    d={
+                      compact
+                        ? `M${35 + i * 340} ${sy(1100)}h28`
+                        : `M1205 ${sy(550 + i * 46)}H1240`
+                    }
+                    stroke={busActive ? COLORS[kind] : "var(--ar-flow-wire)"}
+                    strokeWidth={busActive ? 7 : kind === "control" ? 4 : 6}
+                    strokeDasharray={kind === "control" ? "5 4" : undefined}
+                  />
+                  <text
+                    x={compact ? 75 + i * 340 : 1255}
+                    y={sy(compact ? 1106 : 557 + i * 46)}
+                    fontSize="26"
+                    fontWeight={busActive ? 800 : 600}
+                    fill={busActive ? COLORS[kind] : "var(--ar-text-muted)"}
+                  >
+                    {kind === "address"
+                      ? "Address Bus"
+                      : kind === "data"
+                        ? "Data Bus"
+                        : "Control Bus"}
+                  </text>
+                </g>
+              );
+            })}
           </g>
 
           {point && packet && (
@@ -946,7 +1014,9 @@ export default function InstructionFlowDiagram({
                   height={packet.h}
                   rx="6"
                   fill={
-                    transfer.kind === "control" ? "var(--ar-panel-bg)" : color
+                    transfer.kind === "control"
+                      ? "var(--ar-panel-bg)"
+                      : "var(--ar-flow-token-bg)"
                   }
                   stroke={
                     transfer.kind === "control" ? color : "var(--ar-panel-bg)"
@@ -955,7 +1025,6 @@ export default function InstructionFlowDiagram({
                   strokeDasharray={
                     transfer.kind === "control" ? "5 3" : undefined
                   }
-                  style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / .12))" }}
                 />
                 <text
                   x={point.x}

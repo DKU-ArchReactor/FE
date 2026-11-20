@@ -13,6 +13,75 @@ async function seek(page: Page, id: string) {
   throw new Error(`Transfer not found: ${id}`);
 }
 
+test('arrow stream follows the data cursor and freezes with Pause without losing the moving value',async({page})=>{
+  await page.goto('/tests/browser/line-flow.html');await page.waitForLoadState('networkidle');await frozenTime(page);
+  await page.goto('/tests/browser/line-flow.html');await pause(page);
+  const stream=page.locator('[data-flow-stream]');await expect(stream).toHaveAttribute('stroke-dasharray','16 10');
+  const surface=page.locator('.flow-device-active').first();
+  const initialBorder=await surface.getAttribute('stroke-width');
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(250);
+  const first=await stream.getAttribute('stroke-dashoffset');await page.clock.runFor(200);
+  expect(await stream.getAttribute('stroke-dashoffset')).not.toBe(first);await expect(page.locator('.flow-packet')).toBeVisible();
+  expect(await surface.getAttribute('stroke-width')).not.toBe(initialBorder);
+  await pause(page);const stopped=await stream.getAttribute('stroke-dashoffset');
+  const stoppedBorder=await surface.getAttribute('stroke-width');
+  await page.clock.runFor(1200);expect(await stream.getAttribute('stroke-dashoffset')).toBe(stopped);
+  expect(await surface.getAttribute('stroke-width')).toBe(stoppedBorder);
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(150);
+  expect(await stream.getAttribute('stroke-dashoffset')).not.toBe(stopped);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  expect(await stream.evaluate(n=>getComputedStyle(n).strokeDasharray)).toBe('none');
+  expect(await surface.evaluate(n=>getComputedStyle(n).strokeWidth)).toBe('2.6px');
+});
+
+test('neutral devices have clear outlines and bus-specific accents match the active legend in both themes',async({page})=>{
+  await frozenTime(page);
+  for(const dark of [false,true]) {
+    await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
+    await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
+    await expect(page.locator('[data-flow-node="registers"] > text').first()).toHaveText('Registers');
+    await expect(page.locator('[data-flow-node="instruction-memory"] > text').first()).toHaveText('Instruction Memory');
+    await expect(page.locator('[data-flow-node="memory"] > text').first()).toHaveText('Data Memory');
+    expect(await page.locator('[data-flow-node="registers"] > text').first().evaluate(n=>getComputedStyle(n).fontFamily)).toBe('sans-serif');
+    expect(await page.locator('.flow-packet text').evaluate(n=>getComputedStyle(n).fontFamily)).toMatch(/D2Coding.*Consolas.*monospace/);
+    const accents:string[]=[];
+    for(const id of ['fetch-address','fetch-instruction','decode-control','read-control','input-a','memory-control']) {
+      await seek(page,id);
+      const inactive=await page.locator('[data-flow-node][data-flow-active="false"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('rect,path')!).stroke));
+      expect(new Set(inactive).size).toBe(1);
+      const idleText=await page.locator('[data-flow-node][data-flow-active="false"] text').evaluateAll(nodes=>nodes.filter(n=>!n.closest('[data-device-status]')).map(n=>getComputedStyle(n).fill));
+      const activeText=await page.locator('[data-flow-node][data-flow-active="true"] text').evaluateAll(nodes=>nodes.filter(n=>!n.closest('[data-device-status]')).map(n=>getComputedStyle(n).fill));
+      expect(new Set(idleText).size).toBe(1);expect(new Set(activeText).size).toBe(1);
+      expect(activeText[0]).not.toBe(idleText[0]);
+      const surfaces=await page.locator('[data-flow-node][data-flow-active="false"] [data-device-surface]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).fill));
+      expect(new Set(surfaces).size).toBe(1);
+      expect(surfaces[0]).not.toBe(await page.locator('[data-hardware-region="cpu"]').evaluate(n=>getComputedStyle(n).fill));
+      const accent=await page.locator('[data-flow-route] > path').last().evaluate(n=>getComputedStyle(n).stroke);
+      expect(accent).not.toBe(inactive[0]);accents.push(accent);
+      const legend=page.locator('[data-system-bus-label][data-bus-active="true"]');
+      await expect(legend).toHaveCount(1);
+      {
+        expect(await legend.locator('text').evaluate(n=>getComputedStyle(n).fill)).toBe(accent);
+        expect(await legend.locator('path').evaluate(n=>getComputedStyle(n).stroke)).toBe(accent);
+      }
+      if(id==='memory-control') {
+        const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+        await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(duration*.55);await pause(page);
+        const packet=await page.locator('.flow-packet').boundingBox();
+        for(const text of await page.locator('[data-bus-legend] text').all()) {
+          const box=await text.boundingBox();
+          expect(packet!.x+packet!.width<=box!.x||packet!.x>=box!.x+box!.width||packet!.y+packet!.height<=box!.y||packet!.y>=box!.y+box!.height).toBe(true);
+        }
+      }
+      const widths=await page.locator('[data-flow-node][data-flow-active="false"] [data-device-surface]').evaluateAll(nodes=>nodes.map(n=>parseFloat(getComputedStyle(n).strokeWidth)));
+      expect(widths.every(width=>width>=2)).toBe(true);
+    }
+    expect(new Set(accents).size).toBe(3);
+    await expect(page.locator('[data-circuit-wire="read-control"] path')).toHaveAttribute('stroke-dasharray','6 5');
+    await expect(page.locator('[data-bus-legend]')).toContainText('Control Bus');
+  }
+});
+
 test('bus legend uses readable English labels in wide and compact layouts',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
   for(const size of [{width:1400,height:900},{width:760,height:1000}]) {
@@ -243,9 +312,9 @@ test('large hardware details show real addition, selectable carry bits, PC compo
   await expect(dialog.locator('[data-full-adder]')).toContainText('1 XOR 1 XOR 1 = 1');await expect(dialog.locator('[data-full-adder]')).toContainText('2번 자리로 전달');
   expect(await dialog.locator('[data-alu-formula]').evaluate(n=>parseFloat(getComputedStyle(n).fontSize))).toBeGreaterThanOrEqual(24);
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
-  await page.getByRole('button',{name:'PC 가산·선택 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('PC 선택 MUX');await expect(page.getByRole('dialog')).toContainText('0x00010040');
+  await page.getByRole('button',{name:'PC Select 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('PC 선택 MUX');await expect(page.getByRole('dialog')).toContainText('0x00010040');
   await page.getByRole('button',{name:'닫기',exact:true}).click();
-  await page.getByRole('button',{name:'명령어 해독 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('funct7');await expect(page.getByRole('dialog')).toContainText('x14');
+  await page.getByRole('button',{name:'Instruction Decoder 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('funct7');await expect(page.getByRole('dialog')).toContainText('x14');
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('[data-flow-playing]')).toHaveAttribute('data-flow-playing','false');
 });
@@ -274,6 +343,11 @@ test('load and store use distinct bus directions; arithmetic does not access dat
     await page.goto(`/tests/browser/line-flow.html?geometry=${op}`);await pause(page);const seen:string[]=[];
     for(let i=0;i<30;i++) {
       seen.push(await page.locator('[data-transfer]').getAttribute('data-transfer')??'');
+      if(await page.locator('[data-flow-route]').count()) {
+        const kind=await page.locator('.flow-packet').getAttribute('data-label-kind');
+        await expect(page.locator('[data-bus-active="true"]')).toHaveCount(1);
+        await expect(page.locator('[data-bus-active="true"]')).toHaveAttribute('data-system-bus-label',kind!);
+      } else await expect(page.locator('[data-bus-active="true"]')).toHaveCount(0);
       const next=page.getByRole('button',{name:'다음 흐름',exact:true});if(await next.isDisabled())break;await next.click();
     }
     if(op==='lw'||op==='sw') {expect(seen).toContain('memory-address');expect(seen).toContain('memory-control');expect(seen).toContain(op==='lw'?'load-data':'store-data');}
@@ -350,7 +424,7 @@ test('MUXes receive and release the same value at the same point',async({page})=
 
 test('clicking a device opens its own operation and allows replay with the keyboard',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
-  const memory=page.getByRole('button',{name:'데이터 메모리 역할과 동작 보기'});await memory.focus();await memory.press('Enter');
+  const memory=page.getByRole('button',{name:'Data Memory 역할과 동작 보기'});await memory.focus();await memory.press('Enter');
   await expect(page.locator('[data-transfer]')).toHaveAttribute('data-transfer','memory-address');
   await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(350);
   expect(Number(await page.locator('[data-flow-elapsed]').getAttribute('data-flow-elapsed'))).toBeGreaterThan(350);
