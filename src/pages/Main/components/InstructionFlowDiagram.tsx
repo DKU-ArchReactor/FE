@@ -810,15 +810,15 @@ export default function InstructionFlowDiagram({
             height={sy(920)}
             rx="24"
             fill="var(--ar-flow-region-bg)"
-            stroke="var(--ar-flow-border)"
-            strokeWidth="2"
+            stroke="var(--ar-flow-region-border)"
+            strokeWidth="3.5"
             data-hardware-region="cpu"
           />
           <g
             data-cpu-package="true"
             aria-hidden="true"
-            stroke="var(--ar-flow-border)"
-            strokeWidth="3"
+            stroke="var(--ar-flow-region-border)"
+            strokeWidth="2"
           >
             {Array.from({ length: 12 }, (_, i) => (
               <path
@@ -827,6 +827,14 @@ export default function InstructionFlowDiagram({
               />
             ))}
           </g>
+          <rect
+            x="-100"
+            y={sy(135)}
+            width="300"
+            height={sy(32)}
+            rx="4"
+            fill="var(--ar-flow-region-heading-bg)"
+          />
           <text
             x="-90"
             y={sy(157)}
@@ -843,18 +851,26 @@ export default function InstructionFlowDiagram({
             height={sy(compact ? 285 : 920)}
             rx="16"
             fill="var(--ar-flow-region-bg)"
-            stroke="var(--ar-flow-border)"
-            strokeWidth="2"
+            stroke="var(--ar-flow-region-border)"
+            strokeWidth="3.5"
             data-hardware-region="memory"
+          />
+          <rect
+            x={compact ? 25 : 1190}
+            y={sy(compact ? 1127 : 137)}
+            width={compact ? 350 : 345}
+            height={sy(32)}
+            rx="4"
+            fill="var(--ar-flow-region-heading-bg)"
           />
           <text
             x={compact ? 35 : 1200}
             y={sy(compact ? 1147 : 157)}
-            fontSize="20"
+            fontSize="24"
             fontWeight="800"
             fill="var(--ar-text-primary)"
           >
-            메모리 · CPU 외부
+            Memory · CPU 외부
           </text>
           {WIRES.map((wire) => (
             <g
