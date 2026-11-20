@@ -80,20 +80,34 @@ export default function InstructionLesson({
   const target =
     occurrences.find((index) => index >= flow.historyIndex) ??
     occurrences[occurrences.length - 1];
-  if (!simulationData)
+  if (!simulationData || !row || !item) {
+    const emptyFlow = buildInstructionFlow(undefined, null, null, null);
     return (
-      <div className="p-6 text-sm leading-7 text-[var(--ar-text-muted)]">
-        코드를 컴파일하고 실행하면 C·ASM 줄별 데이터 흐름을 확인할 수 있습니다.
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-[var(--ar-text-primary)]">
+        <div
+          className="flex h-14 min-h-14 shrink-0 items-center justify-between gap-x-3 border-b border-[var(--ar-border)] px-3 py-2"
+          data-current-instruction="true"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-medium text-[var(--ar-text-muted)]">
+              명령어 · —
+            </p>
+            <h3 className="truncate font-mono text-base font-bold text-[var(--ar-text-muted)]">
+              —
+            </h3>
+          </div>
+          <span className="shrink-0 whitespace-nowrap text-[10px] text-[var(--ar-text-muted)]">
+            CORE clock —
+          </span>
+        </div>
+        <SingleInstructionFlow
+          flow={emptyFlow}
+          isPlaying={false}
+          playbackFinished={true}
+        />
       </div>
     );
-  if (!row || !item)
-    return (
-      <div className="p-6 text-sm leading-7 text-[var(--ar-text-muted)]">
-        {line != null && !row
-          ? "선택한 C 줄에 연결된 실행 명령어가 없습니다. 선언·주석·최적화 또는 매핑 정보 누락으로 명령어가 없을 수 있습니다."
-          : "C 줄이나 ASM 명령어를 선택하거나 한 클록 진행하세요. 선택한 줄의 해설이 제공되지 않으면 실행 경로를 추정하지 않습니다."}
-      </div>
-    );
+  }
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-[var(--ar-text-primary)]">
       <div

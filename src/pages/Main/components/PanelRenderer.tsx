@@ -219,7 +219,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           lessonContext={{isPlaying, playbackRevision, playbackFinished: singlePlaybackFinished, flowDurationMs: singleFlowDuration(playSpeed), onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
             rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
             selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
-            onSelectAsm: (line, index) => onSelectTranslationLine(line, index, false), onJumpToCycle}}
+            onSelectAsm: (line: number | null, index: number) => onSelectTranslationLine(line, index, false), onJumpToCycle}}
           currentData={currentData}
           prevData={prevData}
           simulationData={simulationData}

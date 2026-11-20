@@ -395,6 +395,7 @@ const handleMobileViewportSelect = (index: number) => {
             isReady={playback.isSimulationReady}
             isCompiling={fileMgr.translationBusy}
             mode={simSession.simulationEngineMode}
+            simulationData={simSession.simulationData}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
               if (fileMgr.translationBusy) return;
