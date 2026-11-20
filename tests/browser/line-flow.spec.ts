@@ -23,6 +23,10 @@ test('neutral devices have clear outlines and bus-specific accents match the act
       await seek(page,id);
       const inactive=await page.locator('[data-flow-node][data-flow-active="false"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('rect,path')!).stroke));
       expect(new Set(inactive).size).toBe(1);
+      const idleText=await page.locator('[data-flow-node][data-flow-active="false"] text').evaluateAll(nodes=>nodes.filter(n=>!n.closest('[data-device-status]')).map(n=>getComputedStyle(n).fill));
+      const activeText=await page.locator('[data-flow-node][data-flow-active="true"] text').evaluateAll(nodes=>nodes.filter(n=>!n.closest('[data-device-status]')).map(n=>getComputedStyle(n).fill));
+      expect(new Set(idleText).size).toBe(1);expect(new Set(activeText).size).toBe(1);
+      expect(activeText[0]).not.toBe(idleText[0]);
       const surfaces=await page.locator('[data-flow-node][data-flow-active="false"] [data-device-surface]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).fill));
       expect(new Set(surfaces).size).toBe(1);
       expect(surfaces[0]).not.toBe(await page.locator('[data-hardware-region="cpu"]').evaluate(n=>getComputedStyle(n).fill));

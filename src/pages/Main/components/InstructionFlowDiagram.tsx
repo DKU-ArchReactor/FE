@@ -414,6 +414,9 @@ export default function InstructionFlowDiagram({
     const mux = unit === "mux" || unit === "operand-mux";
     const statusWidth = Math.max(58, [...status].length * 18 + 20);
     const stroke = active ? color : "var(--ar-flow-device-border)";
+    const textColor = active
+      ? `var(--ar-flow-${transfer.kind}-text)`
+      : "var(--ar-flow-idle-text)";
     const shape = mux
       ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
       : unit === "alu"
@@ -529,8 +532,8 @@ export default function InstructionFlowDiagram({
           y={b.y + sy(unit === "alu" ? 53 : mux ? 33 : 40)}
           textAnchor="middle"
           fontSize={mux ? 26 : 30}
-          fontWeight="700"
-          fill="var(--ar-text-primary)"
+          fontWeight={active ? 800 : 700}
+          fill={textColor}
         >
           {TITLES[unit]}
         </text>
@@ -563,7 +566,7 @@ export default function InstructionFlowDiagram({
             textAnchor="middle"
             fontSize={unit === "alu" ? 24 : 22}
             fontWeight={unit === "alu" ? 800 : 400}
-            fill={unit === "alu" && active ? color : "var(--ar-text-muted)"}
+            fill={textColor}
           >
             {unit === "alu"
               ? flow.jump || flow.system
@@ -588,7 +591,7 @@ export default function InstructionFlowDiagram({
             textAnchor="middle"
             fontSize="18"
             fontWeight="700"
-            fill="var(--ar-text-muted)"
+            fill={textColor}
           >
             32 × 32비트 · x0 = 0
           </text>
@@ -650,11 +653,7 @@ export default function InstructionFlowDiagram({
               }
               fontWeight={unit === "alu" && i === 2 ? 800 : 650}
               opacity={overlap ? 0 : 1}
-              fill={
-                unit === "alu" && i === 2 && active
-                  ? color
-                  : "var(--ar-text-primary)"
-              }
+              fill={textColor}
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {line}
@@ -669,7 +668,7 @@ export default function InstructionFlowDiagram({
               textAnchor="middle"
               fontSize="24"
               fontWeight="700"
-              fill="var(--ar-text-primary)"
+              fill={textColor}
             >
               {decoded
                 ? `${decoded.format}\uD615 \u00b7 opcode ${decoded.opcode}`
@@ -681,7 +680,7 @@ export default function InstructionFlowDiagram({
               textAnchor="middle"
               fontSize="23"
               fontWeight="700"
-              fill="var(--ar-text-muted)"
+              fill={textColor}
             >
               {specialEncoding
                 ? "SYSTEM / FENCE"
