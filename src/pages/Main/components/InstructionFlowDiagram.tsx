@@ -14,6 +14,7 @@ import {
   type buildInstructionFlow,
 } from "../utils/instructionFlow";
 import { aluLesson } from "../utils/hardwareLesson";
+import type { SimulationResult } from "@/type/simulation";
 
 type Flow = ReturnType<typeof buildInstructionFlow>;
 type Box = { x: number; y: number; w: number; h: number };
@@ -107,6 +108,9 @@ export default function InstructionFlowDiagram({
   arrived,
   onUnit,
   onInspect,
+  finished = false,
+  completionLabel,
+  executionStatus,
 }: {
   flow: Flow;
   transfer: InstructionTransfer;
@@ -116,6 +120,9 @@ export default function InstructionFlowDiagram({
   arrived: string[];
   onUnit: (unit: TransferUnit) => void;
   onInspect: (unit: "alu" | "pc-select" | "decoder") => void;
+  finished?: boolean;
+  completionLabel?: string;
+  executionStatus?: SimulationResult["execution_status"];
 }) {
   const id = useId().replace(/:/g, "");
   const area = useRef<HTMLDivElement>(null);
@@ -204,20 +211,22 @@ export default function InstructionFlowDiagram({
     () => transferMotion(transfer, path),
     [transfer, path],
   );
-  const point = motion.route
-    ? pointOnTransfer(
-        motion.route,
-        progress,
-        motion.startPadding,
-        motion.endPadding,
-      )
-    : undefined;
+  const point =
+    !finished && motion.route
+      ? pointOnTransfer(
+          motion.route,
+          progress,
+          motion.startPadding,
+          motion.endPadding,
+        )
+      : undefined;
   const packet = point
     ? { x: point.x - motion.width / 2, y: point.y - 23, w: motion.width, h: 46 }
     : undefined;
-  const color = COLORS[transfer.kind];
+  const color = finished ? "var(--ar-text-muted)" : COLORS[transfer.kind];
   const reached = (key: string) =>
-    arrived.includes(key) || (transfer.id === key && progress >= 0.95);
+    arrived.includes(key) ||
+    (transfer.id === key && (finished || progress >= 0.95));
   const decoded = instructionFields(flow.raw);
   const baseName =
     decoded?.rs1 == null
@@ -270,7 +279,12 @@ export default function InstructionFlowDiagram({
               : "불성립: PC + 4"
           : "순차: PC + 4";
   const lines: Record<TransferUnit, string[]> = {
-    pc: [flow.pc?.replace(/^0x0+(?=[\da-f])/i, "0x") ?? "미제공"],
+    pc: [
+      (finished && flow.completed ? flow.nextPc : flow.pc)?.replace(
+        /^0x0+(?=[\da-f])/i,
+        "0x",
+      ) ?? "미제공",
+    ],
     decoder: [flow.raw ?? "기계어 미제공"],
     cu: [
       `ALU: ${flow.system ? "사용 안 함" : flow.load || flow.store ? "ADD · 주소 계산" : flow.op.toUpperCase()}`,
@@ -367,9 +381,11 @@ export default function InstructionFlowDiagram({
   };
   const node = (unit: TransferUnit) => {
     const b = boxes[unit],
-      active = transfer.source === unit || transfer.target === unit;
-    const status =
-      transfer.source === unit && transfer.target === unit
+      active =
+        !finished && (transfer.source === unit || transfer.target === unit);
+    const status = !active
+      ? ""
+      : transfer.source === unit && transfer.target === unit
         ? unit === "alu"
           ? flow.load || flow.store
             ? "주소 계산"
@@ -556,9 +572,11 @@ export default function InstructionFlowDiagram({
                   : lesson.category === "adder"
                     ? `${flow.op.toUpperCase()} · 가산기`
                     : `${flow.op.toUpperCase()} · ${lesson.operator}`
-              : unit === "registers" && flow.store
-                ? "읽은 값을 메모리에 저장"
-                : ROLES[unit]}
+              : unit === "pc" && finished && flow.completed
+                ? "다음 명령어 주소"
+                : unit === "registers" && flow.store
+                  ? "읽은 값을 메모리에 저장"
+                  : ROLES[unit]}
           </text>
         )}
         {unit === "registers" && (
@@ -695,27 +713,47 @@ export default function InstructionFlowDiagram({
         data-transfer={transfer.id}
       >
         <p className="text-sm font-bold text-[var(--ar-text-primary)]">
-          {index + 1} / {count} · {transfer.title}
+          {finished
+            ? completionLabel
+            : `${index + 1} / ${count} · ${transfer.title}`}
         </p>
         <p
           className="mt-1 break-words font-mono text-sm font-semibold"
           style={{ color }}
           data-transfer-value="true"
         >
-          {transfer.value == null
-            ? "미제공"
-            : transfer.kind === "address" ||
-                transfer.id === "fetch-instruction" ||
-                transfer.id === "decode-immediate"
-              ? transfer.value
-              : displayValue(transfer.value)}
+          {finished && flow.completed
+            ? `실행 PC ${flow.pc ?? "미제공"} → 다음 PC ${flow.nextPc ?? "미제공"}`
+            : transfer.value == null
+              ? "미제공"
+              : transfer.kind === "address" ||
+                  transfer.id === "fetch-instruction" ||
+                  transfer.id === "decode-immediate"
+                ? transfer.value
+                : displayValue(transfer.value)}
         </p>
         <p
           className="mt-1 text-[13px] leading-relaxed text-[var(--ar-text-secondary)]"
           data-operation-description="true"
         >
-          {detailText}
+          {finished
+            ? flow.completed
+              ? "레지스터와 메모리의 실행 결과를 유지합니다. 다시 보기로 이 명령어의 처리 과정을 확인할 수 있습니다."
+              : "설명 재생이 끝났습니다. 확인되지 않은 실행 결과는 표시하지 않습니다."
+            : detailText}
         </p>
+        {finished && executionStatus && (
+          <p
+            className="mt-1 text-xs font-semibold"
+            data-execution-status={executionStatus}
+          >
+            {executionStatus === "COMPLETED"
+              ? "프로그램 실행 완료 · 서버 확인"
+              : executionStatus === "CYCLE_LIMIT"
+                ? "최대 클록 수 도달 · 실행 중단"
+                : "시뮬레이션 오류 · 실행 중단"}
+          </p>
+        )}
       </div>
       <div ref={area} className="min-h-0 flex-1 overflow-hidden">
         <svg
@@ -821,7 +859,7 @@ export default function InstructionFlowDiagram({
               />
             </g>
           ))}
-          {path && (
+          {!finished && path && (
             <g data-flow-route={transfer.id} data-active="true">
               <path
                 d={path}

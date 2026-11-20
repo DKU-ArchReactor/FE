@@ -12,6 +12,7 @@ import "./TutorTypography.css";
 
 export interface InstructionLessonContext {
   isPlaying?: boolean;
+  playbackFinished?: boolean;
   flowDurationMs?: number;
   onPausePlayback?: () => void;
   source?: string;
@@ -131,6 +132,12 @@ export default function InstructionLesson({
         duration={context?.flowDurationMs}
         onPause={context?.onPausePlayback}
         isPlaying={context?.isPlaying}
+        playbackFinished={flow.actual && context?.playbackFinished}
+        executionStatus={
+          flow.actual && flow.historyIndex === simulationData.history.length - 1
+            ? simulationData.execution_status
+            : undefined
+        }
       />
     </div>
   );

@@ -13,6 +13,55 @@ async function seek(page: Page, id: string) {
   throw new Error(`Transfer not found: ${id}`);
 }
 
+test('instruction completion preserves results and updated PC, clears transfers and replays explicitly',async({page})=>{
+  await page.goto('/tests/browser/line-flow.html');await page.waitForLoadState('networkidle');
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
+  await seek(page,'next-pc');
+  const next=await page.locator('[data-transfer-value]').textContent();
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();
+  await page.clock.runFor(Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'))+50);
+  await expect(page.locator('[data-flow-finished]')).toHaveAttribute('data-flow-finished','true');
+  await expect(page.locator('[data-transfer]')).toContainText('명령어 처리 완료');
+  await expect(page.locator('[data-transfer-value]')).toContainText(next!.split(' · ')[1] ?? next!);
+  await expect(page.locator('[data-flow-node="registers"]')).toContainText('18');
+  await expect(page.locator('.flow-packet')).toHaveCount(0);
+  await expect(page.locator('[data-device-status]')).toHaveCount(0);
+  await expect(page.locator('[data-flow-route]')).toHaveCount(0);
+  await expect(page.locator('[data-flow-active="true"]')).toHaveCount(0);
+  await expect(page.locator('[data-flow-node="pc"]')).toContainText('다음 명령어 주소');
+  await expect(page.locator('[data-execution-status]')).toHaveCount(0);
+  await page.getByRole('button',{name:'흐름 다시 보기',exact:true}).click();
+  await expect(page.locator('[data-flow-finished]')).toHaveAttribute('data-flow-finished','false');
+  await expect(page.locator('.flow-packet')).toBeVisible();
+});
+
+test('last-cycle global Pause resumes in place and natural completion stops without looping',async({page})=>{
+  await frozenTime(page);await page.goto('/tests/browser/line-flow.html?timing=1&execution_status=COMPLETED');
+  for(let i=0;i<4;i++)await page.getByRole('button',{name:'step',exact:true}).click();
+  await page.getByRole('button',{name:'play',exact:true}).click();await page.clock.runFor(300);
+  await page.getByRole('button',{name:'play',exact:true}).click();
+  await expect(page.getByTestId('global-playing')).toHaveText('false');
+  await expect(page.getByTestId('timing-clock')).toHaveText('4');
+  await page.getByRole('button',{name:'play',exact:true}).click();
+  await expect(page.getByTestId('timing-clock')).toHaveText('4');
+  await page.clock.runFor(Number(await page.getByTestId('timing-delay').textContent())+100);
+  await expect(page.getByTestId('global-playing')).toHaveText('false');
+  await expect(page.locator('[data-flow-finished]')).toHaveAttribute('data-flow-finished','true');
+  await expect(page.locator('[data-execution-status="COMPLETED"]')).toContainText('서버 확인');
+  await expect(page.locator('.flow-packet')).toHaveCount(0);
+  await page.clock.runFor(30000);await expect(page.getByTestId('timing-clock')).toHaveText('4');
+  await page.getByRole('button',{name:'play',exact:true}).click();
+  await expect(page.getByTestId('timing-clock')).toHaveText('1');
+});
+
+for(const status of ['CYCLE_LIMIT','SIMULATION_ERROR'])test(`program ${status} never displays successful program completion`,async({page})=>{
+  await frozenTime(page);await page.goto(`/tests/browser/line-flow.html?execution_status=${status}`);await pause(page);
+  await page.getByRole('button',{name:'next clock',exact:true}).click();await pause(page);await seek(page,'next-pc');
+  await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(3000);
+  await expect(page.locator('[data-execution-status]')).toHaveAttribute('data-execution-status',status);
+  await expect(page.locator('[data-execution-status]')).not.toContainText('프로그램 실행 완료');
+});
+
 test('CPU contains its devices, memory is outside, and the architecture fits without scrollbars',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html');
   for(const size of [{width:1400,height:900},{width:760,height:1000},{width:390,height:844},{width:844,height:390}]) {

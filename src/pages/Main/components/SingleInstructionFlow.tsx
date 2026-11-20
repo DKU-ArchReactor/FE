@@ -10,17 +10,22 @@ import {
 import InstructionFlowDiagram from "./InstructionFlowDiagram";
 import InstructionHardwareDetail from "./InstructionHardwareDetail";
 import "./SingleInstructionFlow.css";
+import type { SimulationResult } from "@/type/simulation";
 
 export default function SingleInstructionFlow({
   flow,
   duration = singleFlowDuration(1000),
   onPause,
   isPlaying,
+  executionStatus,
+  playbackFinished,
 }: {
   flow: ReturnType<typeof buildInstructionFlow>;
   duration?: number;
   onPause?: () => void;
   isPlaying?: boolean;
+  executionStatus?: SimulationResult["execution_status"];
+  playbackFinished?: boolean;
 }) {
   const transfers = useMemo(() => instructionTransfers(flow), [flow]);
   const paths = useMemo(() => instructionPaths(flow), [flow]);
@@ -46,6 +51,7 @@ export default function SingleInstructionFlow({
     setClock((value) => ({
       ...value,
       running: false,
+      elapsed: playbackFinished ? totalDuration : value.elapsed,
       local: true,
       globalPlaying: isPlaying,
     }));
@@ -86,6 +92,12 @@ export default function SingleInstructionFlow({
   );
   const index = activeIndex < 0 ? timeline.length - 1 : activeIndex;
   const entry = timeline[index];
+  const finished = playbackFinished || clock.elapsed >= totalDuration;
+  const completionLabel = flow.completed
+    ? "명령어 처리 완료"
+    : flow.error
+      ? "오류 시점 확인 완료"
+      : "설명 재생 완료";
   const progress = entry.travel
     ? Math.max(
         0,
@@ -129,7 +141,7 @@ export default function SingleInstructionFlow({
       globalPlaying: isPlaying,
       local: true,
       running: !value.running,
-      elapsed: value.elapsed >= totalDuration ? 0 : value.elapsed,
+      elapsed: finished ? 0 : value.elapsed,
     }));
   };
   const replay = () => {
@@ -149,12 +161,17 @@ export default function SingleInstructionFlow({
       data-flow-playing={clock.running}
       data-flow-elapsed={clock.elapsed}
       data-flow-step-duration={entry.duration}
+      data-flow-finished={finished}
     >
       <div className="grid h-[68px] shrink-0 grid-cols-1 content-center gap-1 px-3 py-1 sm:h-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <div className="flex min-w-0 items-center gap-2">
           <span className="whitespace-nowrap text-[11px] text-[var(--ar-text-muted)]">
-            {clock.running ? "흐름 재생 중" : "흐름 일시정지"} · 전체{" "}
-            {Number((totalDuration / 1000).toFixed(1))}초
+            {finished
+              ? completionLabel
+              : clock.running
+                ? "흐름 재생 중"
+                : "흐름 일시정지"}{" "}
+            · 전체 {Number((totalDuration / 1000).toFixed(1))}초
           </span>
         </div>
         <div
@@ -206,6 +223,9 @@ export default function SingleInstructionFlow({
       )}
       <div className="min-h-0 flex-1 overflow-hidden px-1 pb-1">
         <InstructionFlowDiagram
+          finished={finished}
+          completionLabel={completionLabel}
+          executionStatus={executionStatus}
           flow={flow}
           transfer={transfers[index]}
           progress={progress}

@@ -228,6 +228,7 @@ export interface SimulationRunRequest {
 }
 
 export interface SimulationResult {
+  execution_status?: "COMPLETED" | "CYCLE_LIMIT" | "SIMULATION_ERROR";
   initial_state?: {registers?: Record<string, string>; metrics?: Partial<GlobalResult['metrics']>};
   assistant_context?: ExecutionDescriptor;
   tutor?: TutorBundle;

@@ -29,6 +29,7 @@ export function useSimulationPlayback({
   const [currentCycle, setCurrentCycle] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(1000);
+  const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
 
   const [playbackFeedback, setPlaybackFeedback] = useState<{
     type: "play" | "pause" | "reset" | "trash" | "check";
@@ -231,6 +232,7 @@ export function useSimulationPlayback({
     editorTarget === "asm" ? null : (translationSelectedLine ?? activeExecutionCLine);
 
   const handleSimulationComplete = () => {
+    setFinishedSingleFrame(null);
     setIsPlaying(false);
     setCurrentCycle(0);
     setPlaySpeed(1000);
@@ -259,7 +261,7 @@ export function useSimulationPlayback({
       if (!isPlaying) return;
       onClearSelection();
       clock.started = performance.now();
-      timerRef.current = window.setTimeout(() => {clock.remaining = 0;clock.started = null;advance();}, clock.remaining);
+      timerRef.current = window.setTimeout(() => {clock.remaining = 0;clock.started = null;if(singlePlaybackFrame >= totalCycles)setFinishedSingleFrame(singleFrame);advance();}, clock.remaining);
       return () => {
         if (timerRef.current !== null) clearTimeout(timerRef.current);
         if (clock.started !== null) {
@@ -279,10 +281,12 @@ export function useSimulationPlayback({
     // Manual flow controls detach from CPU playback. The next global Play starts
     // this instruction afresh, while the diagram's own Pause/Resume keeps its cursor.
     singleClock.current = null;
+    setFinishedSingleFrame(null);
     setIsPlaying(false);
   };
 
   const handleStepBack = () => {
+    setFinishedSingleFrame(null);
     setIsPlaying((prev) => {
       if (prev) {
         triggerPlaybackFeedback("pause");
@@ -294,6 +298,7 @@ export function useSimulationPlayback({
   };
 
   const handleStepForward = () => {
+    setFinishedSingleFrame(null);
     setIsPlaying((prev) => {
       if (prev) {
         triggerPlaybackFeedback("pause");
@@ -310,8 +315,9 @@ export function useSimulationPlayback({
     const maxPos = totalCycles;
 
     onClearSelection();
+    setFinishedSingleFrame(null);
 
-    if (currentPos >= maxPos) {
+    if (currentPos >= maxPos && (!isSingleEngine || (!isPlaying && singleClock.current?.remaining === 0))) {
       setCurrentCycle(isSingleEngine && maxPos > 0 ? 1 : 0);
       setIsPlaying(true);
       triggerPlaybackFeedback("play");
@@ -326,6 +332,7 @@ export function useSimulationPlayback({
   };
 
   const handleReset = () => {
+    setFinishedSingleFrame(null);
     setIsPlaying(false);
     onClearSelection();
     setCurrentCycle(0);
@@ -333,6 +340,7 @@ export function useSimulationPlayback({
   };
 
   const handleResetAndPlay = () => {
+    setFinishedSingleFrame(null);
     onClearSelection();
     setCurrentCycle(isSingleEngine && totalCycles > 0 ? 1 : 0);
     setIsPlaying(true);
@@ -340,6 +348,7 @@ export function useSimulationPlayback({
   };
 
   const handleJumpToCycle = (val: number) => {
+    setFinishedSingleFrame(null);
     setIsPlaying((prev) => {
       if (prev) {
         triggerPlaybackFeedback("pause");
@@ -363,6 +372,7 @@ export function useSimulationPlayback({
     activeCycleIndex,
     currentData,
     singlePlaybackDelay,
+    singlePlaybackFinished: isSingleEngine && currentCycle > 0 && finishedSingleFrame === currentData,
     pauseForFlow,
     prevData,
     currentActiveRow,

@@ -62,6 +62,8 @@ export const runSimulation = async (
 
   const tutor = response.data?.tutor;
   const assistant_context = response.data?.assistant_context;
+  const serverStatus = response.data?.execution_status;
+  const execution_status = serverStatus === "COMPLETED" || serverStatus === "CYCLE_LIMIT" || serverStatus === "SIMULATION_ERROR" ? serverStatus : undefined;
   seedTutor(tutor);
   let resultData = response.data;
 
@@ -107,6 +109,6 @@ export const runSimulation = async (
   }
 
   const normalized = normalizeSimulationResult(resultData as SimulationResult);
-  return { ...normalized, tutor, assistant_context };
+  return { ...normalized, ...(execution_status ? {execution_status} : {}), tutor, assistant_context };
 };
 
