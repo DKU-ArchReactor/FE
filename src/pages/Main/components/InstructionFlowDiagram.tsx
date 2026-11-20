@@ -889,10 +889,19 @@ export default function InstructionFlowDiagram({
                 d={path}
                 fill="none"
                 stroke={color}
+                strokeOpacity=".2"
                 strokeWidth="2.8"
-                strokeDasharray={
-                  transfer.kind === "control" ? "6 5" : undefined
-                }
+                strokeLinejoin="round"
+              />
+              <path
+                className="flow-arrow-stream"
+                data-flow-stream="true"
+                d={path}
+                fill="none"
+                stroke={color}
+                strokeWidth="2.8"
+                strokeDasharray={transfer.kind === "control" ? "6 5" : "8 5"}
+                strokeDashoffset={-progress * motion.distance}
                 strokeLinejoin="round"
                 markerEnd={`url(#${id}-${transfer.kind})`}
               />

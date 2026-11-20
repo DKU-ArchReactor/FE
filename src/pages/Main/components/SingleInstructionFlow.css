@@ -41,6 +41,10 @@
   --ar-flow-region-bg: var(--ar-panel-bg);
 }
 @media (prefers-reduced-motion: reduce) {
+  .flow-arrow-stream {
+    stroke-dashoffset: 0;
+    stroke-dasharray: none;
+  }
   .flow-token {
     display: none;
   }
