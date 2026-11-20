@@ -177,7 +177,7 @@ export function instructionPaths(flow:ReturnType<typeof buildInstructionFlow>,sc
     'input-b-immediate':'M510 505V575H525V700',
     'mux-to-alu':'M525 700H690V781H730',
     'memory-address':'M990 810H1120V812H1200',
-    'memory-control':'M960 450H1165V805H1200',
+    'memory-control':'M960 450H1075V805H1200',
     'store-data':'M195 560V800H335V1030H1100V865H1200',
     'load-data':'M1200 885H1135V1015H675V940H525',
     'result-alu':'M860 830V990H675V940H525',

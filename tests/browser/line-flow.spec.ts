@@ -13,13 +13,13 @@ async function seek(page: Page, id: string) {
   throw new Error(`Transfer not found: ${id}`);
 }
 
-test('single-cycle devices use neutral outlines and one active accent in both themes',async({page})=>{
+test('neutral devices have clear outlines and bus-specific accents match the active legend in both themes',async({page})=>{
   await frozenTime(page);
   for(const dark of [false,true]) {
     await page.goto('/tests/browser/line-flow.html?geometry=lw');await pause(page);
     await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
     const accents:string[]=[];
-    for(const id of ['fetch-address','read-control','input-a']) {
+    for(const id of ['fetch-address','fetch-instruction','read-control','memory-control']) {
       await seek(page,id);
       const inactive=await page.locator('[data-flow-node][data-flow-active="false"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('rect,path')!).stroke));
       expect(new Set(inactive).size).toBe(1);
@@ -28,8 +28,25 @@ test('single-cycle devices use neutral outlines and one active accent in both th
       expect(surfaces[0]).not.toBe(await page.locator('[data-hardware-region="cpu"]').evaluate(n=>getComputedStyle(n).fill));
       const accent=await page.locator('[data-flow-route] > path').last().evaluate(n=>getComputedStyle(n).stroke);
       expect(accent).not.toBe(inactive[0]);accents.push(accent);
+      const legend=page.locator('[data-system-bus-label][data-bus-active="true"]');
+      await expect(legend).toHaveCount(id==='read-control'?0:1);
+      if(id!=='read-control') {
+        expect(await legend.locator('text').evaluate(n=>getComputedStyle(n).fill)).toBe(accent);
+        expect(await legend.locator('path').evaluate(n=>getComputedStyle(n).stroke)).toBe(accent);
+      }
+      if(id==='memory-control') {
+        const duration=Number(await page.locator('[data-flow-step-duration]').getAttribute('data-flow-step-duration'));
+        await page.getByRole('button',{name:'흐름 재생',exact:true}).click();await page.clock.runFor(duration*.55);await pause(page);
+        const packet=await page.locator('.flow-packet').boundingBox();
+        for(const text of await page.locator('[data-bus-legend] text').all()) {
+          const box=await text.boundingBox();
+          expect(packet!.x+packet!.width<=box!.x||packet!.x>=box!.x+box!.width||packet!.y+packet!.height<=box!.y||packet!.y>=box!.y+box!.height).toBe(true);
+        }
+      }
+      const widths=await page.locator('[data-flow-node][data-flow-active="false"] [data-device-surface]').evaluateAll(nodes=>nodes.map(n=>parseFloat(getComputedStyle(n).strokeWidth)));
+      expect(widths.every(width=>width>=2)).toBe(true);
     }
-    expect(new Set(accents).size).toBe(1);
+    expect(new Set(accents).size).toBe(3);
     await expect(page.locator('[data-circuit-wire="read-control"] path')).toHaveAttribute('stroke-dasharray','6 5');
     await expect(page.locator('[data-bus-legend]')).toContainText('Control Bus');
   }

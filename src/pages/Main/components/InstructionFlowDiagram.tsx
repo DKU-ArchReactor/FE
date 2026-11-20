@@ -1,4 +1,5 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   displayValue,
   numericPc,
@@ -19,9 +20,9 @@ import type { SimulationResult } from "@/type/simulation";
 type Flow = ReturnType<typeof buildInstructionFlow>;
 type Box = { x: number; y: number; w: number; h: number };
 const COLORS = {
-  address: "var(--ar-flow-accent)",
-  data: "var(--ar-flow-accent)",
-  control: "var(--ar-flow-accent)",
+  address: "var(--ar-flow-address)",
+  data: "var(--ar-flow-data)",
+  control: "var(--ar-flow-control)",
 };
 const BOXES: Record<TransferUnit, Box> = {
   pc: { x: 55, y: 175, w: 190, h: 120 },
@@ -412,7 +413,7 @@ export default function InstructionFlowDiagram({
                 : "";
     const mux = unit === "mux" || unit === "operand-mux";
     const statusWidth = Math.max(58, [...status].length * 18 + 20);
-    const stroke = active ? color : "var(--ar-flow-border)";
+    const stroke = active ? color : "var(--ar-flow-device-border)";
     const shape = mux
       ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
       : unit === "alu"
@@ -421,7 +422,7 @@ export default function InstructionFlowDiagram({
           ? `M${b.x + 18} ${b.y}H${b.x + b.w - 18}L${b.x + b.w} ${b.y + sy(18)}V${b.y + b.h - sy(18)}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}L${b.x} ${b.y + b.h - sy(18)}V${b.y + sy(18)}Z`
           : undefined;
     const fill = active
-      ? "var(--ar-flow-active-bg)"
+      ? `color-mix(in srgb, ${color} 6%, var(--ar-flow-device-bg))`
       : "var(--ar-flow-device-bg)";
     return (
       <g
@@ -473,7 +474,7 @@ export default function InstructionFlowDiagram({
             d={shape}
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.2 : 1.5}
+            strokeWidth={active ? 2.6 : 2.2}
           />
         ) : (
           <rect
@@ -485,7 +486,7 @@ export default function InstructionFlowDiagram({
             rx="8"
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.2 : 1.5}
+            strokeWidth={active ? 2.6 : 2.2}
           />
         )}
         {[
@@ -705,7 +706,14 @@ export default function InstructionFlowDiagram({
     );
   };
   return (
-    <div className="ar-single-flow flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
+    <div
+      className="ar-single-flow flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden"
+      style={
+        {
+          "--ar-flow-token-bg": `var(--ar-flow-${transfer.kind}-token)`,
+        } as CSSProperties
+      }
+    >
       <div
         className="mx-3 mb-2 shrink-0 rounded-lg border-l-4 bg-[var(--ar-header-bg)] px-3 py-2.5"
         style={{ borderLeftColor: color }}
@@ -897,7 +905,7 @@ export default function InstructionFlowDiagram({
             aria-label="CPU와 메모리를 연결하는 주소·데이터·제어 경로"
           >
             <text
-              x={compact ? 35 : 1200}
+              x={compact ? 35 : 1220}
               y={sy(compact ? 1080 : 515)}
               fontSize="25"
               fontWeight="800"
@@ -905,33 +913,52 @@ export default function InstructionFlowDiagram({
             >
               CPU ↔ 메모리 연결
             </text>
-            {(["address", "data", "control"] as const).map((kind, i) => (
-              <g key={kind} data-system-bus-label={kind}>
-                <path
-                  d={
-                    compact
-                      ? `M${35 + i * 340} ${sy(1100)}h28`
-                      : `M1205 ${sy(550 + i * 46)}H1240`
-                  }
-                  stroke="var(--ar-flow-wire)"
-                  strokeWidth={kind === "control" ? 4 : 6}
-                  strokeDasharray={kind === "control" ? "5 4" : undefined}
-                />
-                <text
-                  x={compact ? 75 + i * 340 : 1255}
-                  y={sy(compact ? 1106 : 557 + i * 46)}
-                  fontSize="26"
-                  fontWeight="800"
-                  fill="var(--ar-text-muted)"
+            {(["address", "data", "control"] as const).map((kind, i) => {
+              const busActive = Boolean(
+                !finished && transfer.systemBus && transfer.kind === kind,
+              );
+              return (
+                <g
+                  key={kind}
+                  data-system-bus-label={kind}
+                  data-bus-active={busActive}
                 >
-                  {kind === "address"
-                    ? "Address Bus"
-                    : kind === "data"
-                      ? "Data Bus"
-                      : "Control Bus"}
-                </text>
-              </g>
-            ))}
+                  {busActive && (
+                    <rect
+                      x={compact ? 25 + i * 340 : 1195}
+                      y={sy(compact ? 1084 : 535 + i * 46)}
+                      width={330}
+                      height={sy(34)}
+                      rx="4"
+                      fill={`color-mix(in srgb, ${COLORS[kind]} 8%, var(--ar-panel-bg))`}
+                    />
+                  )}
+                  <path
+                    d={
+                      compact
+                        ? `M${35 + i * 340} ${sy(1100)}h28`
+                        : `M1205 ${sy(550 + i * 46)}H1240`
+                    }
+                    stroke={busActive ? COLORS[kind] : "var(--ar-flow-wire)"}
+                    strokeWidth={busActive ? 7 : kind === "control" ? 4 : 6}
+                    strokeDasharray={kind === "control" ? "5 4" : undefined}
+                  />
+                  <text
+                    x={compact ? 75 + i * 340 : 1255}
+                    y={sy(compact ? 1106 : 557 + i * 46)}
+                    fontSize="26"
+                    fontWeight={busActive ? 800 : 600}
+                    fill={busActive ? COLORS[kind] : "var(--ar-text-muted)"}
+                  >
+                    {kind === "address"
+                      ? "Address Bus"
+                      : kind === "data"
+                        ? "Data Bus"
+                        : "Control Bus"}
+                  </text>
+                </g>
+              );
+            })}
           </g>
 
           {point && packet && (

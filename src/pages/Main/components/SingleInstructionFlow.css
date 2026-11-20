@@ -1,10 +1,14 @@
 .ar-single-flow {
   --ar-flow-border: #cbd5e1;
+  --ar-flow-device-border: #8797ac;
   --ar-flow-wire: #94a3b8;
-  --ar-flow-accent: #005fb8;
-  --ar-flow-token-bg: #005fb8;
+  --ar-flow-address: #b56a08;
+  --ar-flow-data: #087fce;
+  --ar-flow-control: #8951ce;
+  --ar-flow-address-token: #965600;
+  --ar-flow-data-token: #0969b0;
+  --ar-flow-control-token: #7540ae;
   --ar-flow-device-bg: #f8fafc;
-  --ar-flow-active-bg: #f1f5f9;
   --ar-flow-result-bg: #f1f5f9;
   --ar-flow-region-bg: var(--ar-panel-bg);
 }
@@ -16,11 +20,15 @@
 }
 .dark .ar-single-flow {
   --ar-flow-border: #4b5563;
+  --ar-flow-device-border: #7c899b;
   --ar-flow-wire: #64748b;
-  --ar-flow-accent: #79c0ff;
-  --ar-flow-token-bg: #1f6feb;
+  --ar-flow-address: #e6ae64;
+  --ar-flow-data: #79c0ff;
+  --ar-flow-control: #c6a0f6;
+  --ar-flow-address-token: #965600;
+  --ar-flow-data-token: #1f6feb;
+  --ar-flow-control-token: #7540ae;
   --ar-flow-device-bg: #22272f;
-  --ar-flow-active-bg: #2b3440;
   --ar-flow-result-bg: #252d38;
   --ar-flow-region-bg: var(--ar-panel-bg);
 }
