@@ -61,7 +61,8 @@ export function useWorkspaceSplitter() {
       const rect = leftPaneContainerRef.current.getBoundingClientRect();
       const currentY = e.clientY - rect.top;
       const percent = (currentY / rect.height) * 100;
-      setLeftTopHeightPercent(Math.max(25, Math.min(80, Math.round(percent * 10) / 10)));
+      // Keep at least 40% visible tutor space, including divider and panel padding.
+      setLeftTopHeightPercent(Math.max(25, Math.min(59, Math.round(percent * 10) / 10)));
     };
 
     const handleMouseUp = () => {

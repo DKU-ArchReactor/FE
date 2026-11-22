@@ -21,6 +21,8 @@ import {singleFlowDuration} from '../utils/instructionFlow';
 const EMPTY_REGISTERS: Record<string, string> = {};
 
 interface PanelRendererProps {
+  tutorSelection?:{kind:'c'|'asm';revision:number};
+  onTutorSelect?:(kind:'c'|'asm')=>void;
   onSourceSelection?: (selection: EditorSelection | null) => void;
   panelKey: PanelKey;
   simulationData: SimulationResult | null;
@@ -77,6 +79,8 @@ interface PanelRendererProps {
 export const PanelRenderer: React.FC<PanelRendererProps> = ({
   panelKey,
   onSourceSelection,
+  tutorSelection,
+  onTutorSelect,
   simulationData,
   currentData,
   prevData,
@@ -139,7 +143,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           error={translationError}
           selectedLine={translationSelectedLine}
           executionLine={activeExecutionCLine}
-          onSelectLine={onSelectTranslationLine}
+          onSelectLine={(...args)=>{if(args[0]!=null)onTutorSelect?.('c');onSelectTranslationLine(...args);}}
           savedFiles={savedFiles}
           isLoggedIn={isLoggedIn}
           currentFileId={fileId}
@@ -162,7 +166,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           selectedLine={translationSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           executionLine={activeExecutionCLine}
-          onSelectLine={onSelectTranslationLine}
+          onSelectLine={(...args)=>{if(args[0]!=null||args[1]!=null)onTutorSelect?.('asm');onSelectTranslationLine(...args);}}
           stageBuffers={currentData?.buffers}
           prevStageBuffers={prevData?.buffers}
           cycleEvents={currentData?.cycle_events}
@@ -191,6 +195,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "tutor":
       return (
         <TutorArea
+          selectionKind={tutorSelection?.kind}
+          selectionRevision={tutorSelection?.revision}
+          isPlaying={isPlaying}
           simulationData={simulationData}
           currentCycleData={currentData}
           loadingMessage={loadingMessage}
