@@ -23,6 +23,10 @@ const ROW_HEIGHT = 28;
 const LEFT_COL_WIDTH = 300;
 const EMPTY_HISTORY: CycleHistoryItem[] = [];
 
+// 버퍼(오버스캔) 설정: 스크롤 시 화면 밖 여유 행/열을 사전 렌더링하여 깜빡임 방지
+const OVERSCAN_ROWS = 8;
+const OVERSCAN_COLS = 10;
+
 export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   simulationData,
   currentCycle,
@@ -64,7 +68,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       col: 'bg-blue-600/12 dark:bg-blue-500/20',
       row: 'bg-blue-50/70 dark:bg-blue-950/35',
       leftBorder: 'border-l-[#005FB8] dark:border-l-[#007ACC]',
-      activeHeader: 'bg-[#005FB8] dark:bg-[#007ACC] text-white',
+      activeHeader: 'bg-[#005FB8] dark:border-l-[#007ACC] text-white',
     }
     : {
       col: 'bg-purple-500/12 dark:bg-purple-500/20',
@@ -82,7 +86,55 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
     hScrollbarHeight,
     handleLeftScroll,
     handleRightScroll,
+    scrollState,
   } = useSyncedScroll(history.length, traceRows, activeCycleCol, COL_WIDTH, ROW_HEIGHT);
+
+  // DOM 폭발 방지를 위한 행(Row) 및 열(Column) 가상화 윈도우 계산
+  const { startRow, endRow } = useMemo(() => {
+    if (traceRows.length === 0) return { startRow: 0, endRow: 0 };
+    const start = Math.max(
+      0,
+      Math.floor(scrollState.scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS
+    );
+    const end = Math.min(
+      traceRows.length - 1,
+      Math.ceil((scrollState.scrollTop + scrollState.viewportHeight) / ROW_HEIGHT) + OVERSCAN_ROWS
+    );
+    return {
+      startRow: start,
+      endRow: Math.max(start, end),
+    };
+  }, [scrollState.scrollTop, scrollState.viewportHeight, traceRows.length]);
+
+  const { startCol, endCol } = useMemo(() => {
+    if (history.length === 0) return { startCol: 0, endCol: 0 };
+    const start = Math.max(
+      0,
+      Math.floor(scrollState.scrollLeft / COL_WIDTH) - OVERSCAN_COLS
+    );
+    const end = Math.min(
+      history.length - 1,
+      Math.ceil((scrollState.scrollLeft + scrollState.viewportWidth) / COL_WIDTH) + OVERSCAN_COLS
+    );
+    return {
+      startCol: start,
+      endCol: Math.max(start, end),
+    };
+  }, [scrollState.scrollLeft, scrollState.viewportWidth, history.length]);
+
+  const topSpacerHeight = startRow * ROW_HEIGHT;
+  const bottomSpacerHeight = Math.max(0, (traceRows.length - 1 - endRow) * ROW_HEIGHT);
+  const visibleRows = useMemo(
+    () => traceRows.slice(startRow, endRow + 1),
+    [traceRows, startRow, endRow]
+  );
+
+  const leftSpacerWidth = startCol * COL_WIDTH;
+  const rightSpacerWidth = Math.max(0, (history.length - 1 - endCol) * COL_WIDTH);
+  const visibleCycles = useMemo(
+    () => history.slice(startCol, endCol + 1),
+    [history, startCol, endCol]
+  );
 
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
@@ -238,14 +290,18 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
               <span>Instruction</span>
             </div>
 
-            {/* 좌측 명령어 행 목록 */}
+            {/* 좌측 명령어 행 목록 (가상화 윈도우 적용) */}
             <div
               className="flex flex-col"
               style={{
                 paddingBottom: hScrollbarHeight > 0 ? `${hScrollbarHeight}px` : undefined,
               }}
             >
-              {traceRows.map((row, rIdx) => {
+              {topSpacerHeight > 0 && (
+                <div style={{ height: `${topSpacerHeight}px`, flexShrink: 0 }} />
+              )}
+              {visibleRows.map((row, sliceIdx) => {
+                const rIdx = startRow + sliceIdx;
                 const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
                 const isRowActiveNow = Boolean(activeCellNow);
 
@@ -339,13 +395,16 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                   </div>
                 );
               })}
+              {bottomSpacerHeight > 0 && (
+                <div style={{ height: `${bottomSpacerHeight}px`, flexShrink: 0 }} />
+              )}
             </div>
           </div>
 
           {/* 좌측 명령어 열과 우측 그리드 사이를 분리하는 절대 사라지지 않는 독립된 1px 물리 세로 디바이더선 */}
           <div className="w-[1px] shrink-0 bg-[#E5E5E5] dark:bg-[#333333] z-20" />
 
-          {/* 우측 사이클 그리드 영역 (C0 ~ CN 가로·세로 스크롤 전용 컨테이너, overflow-overlay 지원) */}
+          {/* 우측 사이클 그리드 영역 (가상화 윈도우 적용: C0 ~ CN 가로·세로 스크롤 전용 컨테이너) */}
           <div
             ref={rightScrollRef}
             onScroll={handleRightScroll}
@@ -357,9 +416,13 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                 width: `${history.length * COL_WIDTH}px`,
               }}
             >
-              {/* 상단 사이클 번호 헤더 행 (Sticky Top) */}
+              {/* 상단 사이클 번호 헤더 행 (Sticky Top & 열 가상화) */}
               <div className="h-7 shrink-0 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] sticky top-0 bg-[#F3F3F3] dark:bg-[#252526] z-10">
-                {history.map((item, cIdx) => {
+                {leftSpacerWidth > 0 && (
+                  <div style={{ width: `${leftSpacerWidth}px`, flexShrink: 0 }} />
+                )}
+                {visibleCycles.map((item, sliceIdx) => {
+                  const cIdx = startCol + sliceIdx;
                   const isCurrent = cIdx === activeCycleCol;
                   const hasStall = item.cycle_events?.stall?.has_stall;
                   const hasFlush = item.cycle_events?.control_hazard?.has_flush;
@@ -391,11 +454,17 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     </button>
                   );
                 })}
+                {rightSpacerWidth > 0 && (
+                  <div style={{ width: `${rightSpacerWidth}px`, flexShrink: 0 }} />
+                )}
               </div>
 
-              {/* 본문 행 영역 */}
+              {/* 본문 행 및 셀 영역 (2D 행·열 가상화 적용) */}
               <div className="relative">
-                {traceRows.map((row) => {
+                {topSpacerHeight > 0 && (
+                  <div style={{ height: `${topSpacerHeight}px`, flexShrink: 0 }} />
+                )}
+                {visibleRows.map((row) => {
                   const activeCellNow = activeCycleCol >= 0 ? row.cells[activeCycleCol] : null;
                   const isRowActiveNow = Boolean(activeCellNow);
 
@@ -404,7 +473,11 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                       key={row.id}
                       className="h-[28px] shrink-0 flex items-stretch border-b border-[#E5E5E5] dark:border-[#333333] relative transition-colors"
                     >
-                      {history.map((_, cIdx) => {
+                      {leftSpacerWidth > 0 && (
+                        <div style={{ width: `${leftSpacerWidth}px`, flexShrink: 0 }} />
+                      )}
+                      {visibleCycles.map((_, colSliceIdx) => {
+                        const cIdx = startCol + colSliceIdx;
                         const cell = row.cells[cIdx];
                         const isCurrentCol = cIdx === activeCycleCol;
                         const isCrosshair = isCurrentCol || isRowActiveNow;
@@ -540,9 +613,15 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                           </div>
                         );
                       })}
+                      {rightSpacerWidth > 0 && (
+                        <div style={{ width: `${rightSpacerWidth}px`, flexShrink: 0 }} />
+                      )}
                     </div>
                   );
                 })}
+                {bottomSpacerHeight > 0 && (
+                  <div style={{ height: `${bottomSpacerHeight}px`, flexShrink: 0 }} />
+                )}
               </div>
             </div>
           </div>

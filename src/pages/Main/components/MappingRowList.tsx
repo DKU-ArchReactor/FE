@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useEffect } from "react";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
 import type { StageBuffer, CycleEvents, SimulationResult } from "@/type/simulation";
-import { buildMultiCycleTraceRows, type TraceRow } from "../utils/multiCycleTrace";
 import { splitInstruction } from "@/utils/instructionFormat";
 import { STAGES_CONFIG } from "../utils/riscvMonacoTheme";
+import { isBubbleOrNop } from "../utils/pipelineWireState";
 
 interface MappingRowListProps {
   rows: MappedAssemblyRow[];
@@ -41,67 +41,28 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const rowElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  const traceRows = useMemo<TraceRow[]>(() => {
-    if (!simulationData?.history?.length || mode === "single") return [];
-    return buildMultiCycleTraceRows(simulationData.history, false);
-  }, [simulationData, mode]);
-
+  // 2,000사이클 전체를 훑는 불필요한 TraceRow[] 생성을 제거하고, 현재 활성 사이클의 5개 스테이지를 즉시 매핑 (메모리 절감)
   const activeStagesByRow = useMemo(() => {
     const map: Record<number, { stage: string; isStall: boolean; isBubble: boolean }[]> = {};
     if (mode === "single") return map;
 
-    if (traceRows.length > 0 && playbackCycle && playbackCycle >= 1) {
-      const cIdx = playbackCycle - 1;
-      traceRows.forEach((tRow) => {
-        const cell = tRow.cells[cIdx];
-        if (!cell) return;
+    const cycleItem =
+      playbackCycle && playbackCycle >= 1 && simulationData?.history
+        ? simulationData.history[playbackCycle - 1]
+        : null;
 
-        const targetPc = tRow.pc ? parseInt(tRow.pc, 16) : null;
-        let matchedRowIdx = -1;
+    const targetBuffers = cycleItem?.buffers || stageBuffers;
+    const targetEvents = cycleItem?.cycle_events || cycleEvents;
 
-        if (targetPc !== null && !isNaN(targetPc)) {
-          matchedRowIdx = rows.findIndex(
-            (r) => r.pc && parseInt(r.pc, 16) === targetPc
-          );
-          if (matchedRowIdx === -1) {
-            const estimatedIdx = Math.floor(targetPc / 4);
-            if (estimatedIdx >= 0 && estimatedIdx < rows.length) {
-              matchedRowIdx = estimatedIdx;
-            }
-          }
-        }
-
-        if (matchedRowIdx === -1 && tRow.assembly) {
-          const normAsm = tRow.assembly.replace(/\s+/g, " ").trim().toLowerCase();
-          matchedRowIdx = rows.findIndex(
-            (r, idx) => !map[idx] && r.text.replace(/\s+/g, " ").trim().toLowerCase() === normAsm
-          );
-        }
-
-        if (matchedRowIdx !== -1) {
-          if (!map[matchedRowIdx]) map[matchedRowIdx] = [];
-          if (!map[matchedRowIdx].some((s) => s.stage === cell.stage)) {
-            map[matchedRowIdx].push({
-              stage: cell.stage,
-              isStall: Boolean(cell.isStall),
-              isBubble: Boolean(cell.isBubble),
-            });
-          }
-        }
-      });
-
-      return map;
-    }
-
-    if (stageBuffers) {
-      const hasGlobalStall = Boolean(cycleEvents?.stall?.has_stall);
-      const stallStage = cycleEvents?.stall?.stage;
-      const hasGlobalFlush = Boolean(cycleEvents?.control_hazard?.has_flush);
-      const flushedStages = cycleEvents?.control_hazard?.flushed_stages || ["IF", "ID"];
+    if (targetBuffers) {
+      const hasGlobalStall = Boolean(targetEvents?.stall?.has_stall);
+      const stallStage = targetEvents?.stall?.stage;
+      const hasGlobalFlush = Boolean(targetEvents?.control_hazard?.has_flush);
+      const flushedStages = targetEvents?.control_hazard?.flushed_stages || ["IF", "ID"];
 
       STAGES_CONFIG.forEach(({ key, name }) => {
-        const buf = stageBuffers[key];
-        if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
+        const buf = targetBuffers[key as keyof typeof targetBuffers];
+        if (buf && buf.assembly && !isBubbleOrNop(buf.assembly, buf.status)) {
           const isStalled =
             buf.status === "stalled" ||
             buf.status === "stall" ||
@@ -138,7 +99,7 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
     }
 
     return map;
-  }, [traceRows, playbackCycle, rows, mode, stageBuffers, cycleEvents]);
+  }, [playbackCycle, simulationData, stageBuffers, cycleEvents, rows, mode]);
 
   const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
     const container = containerRef.current;

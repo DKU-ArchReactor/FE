@@ -129,6 +129,42 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   isLoggedIn,
   onCloseTutor,
 }) => {
+  const onSelectAsmCallback = React.useCallback(
+    (line: number | null, index: number) => onSelectTranslationLine(line, index, false),
+    [onSelectTranslationLine]
+  );
+
+  // 불필요한 인라인 객체 재생성 방지: React.memo의 얕은 비교가 작동하도록 lessonContext 메모이제이션
+  const lessonContext = React.useMemo(
+    () => ({
+      isPlaying,
+      playbackRevision,
+      playbackFinished: singlePlaybackFinished,
+      flowDurationMs: playSpeed,
+      onPausePlayback,
+      source: editorTarget === "c" ? translationSource : undefined,
+      rows: mappedAssemblyRows,
+      selectedAsmIndex: translationSelectedAsmIndex,
+      selectedCLine: editorTarget === "c" ? translationSelectedLine : undefined,
+      onSelectAsm: onSelectAsmCallback,
+      onJumpToCycle,
+    }),
+    [
+      isPlaying,
+      playbackRevision,
+      singlePlaybackFinished,
+      playSpeed,
+      onPausePlayback,
+      editorTarget,
+      translationSource,
+      mappedAssemblyRows,
+      translationSelectedAsmIndex,
+      translationSelectedLine,
+      onSelectAsmCallback,
+      onJumpToCycle,
+    ]
+  );
+
   switch (panelKey) {
     case "cSource":
       return (
@@ -225,19 +261,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       if (simulationMode === "single") {
         return (
           <SingleCycleDatapath
-            lessonContext={{
-              isPlaying,
-              playbackRevision,
-              playbackFinished: singlePlaybackFinished,
-              flowDurationMs: playSpeed,
-              onPausePlayback,
-              source: editorTarget === "c" ? translationSource : undefined,
-              rows: mappedAssemblyRows,
-              selectedAsmIndex: translationSelectedAsmIndex,
-              selectedCLine: editorTarget === "c" ? translationSelectedLine : undefined,
-              onSelectAsm: (line: number | null, index: number) => onSelectTranslationLine(line, index, false),
-              onJumpToCycle,
-            }}
+            lessonContext={lessonContext}
             currentData={currentData}
             prevData={prevData}
             simulationData={simulationData}
@@ -247,19 +271,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       }
       return (
         <PipelineVisualizer
-          lessonContext={{
-            isPlaying,
-            playbackRevision,
-            playbackFinished: singlePlaybackFinished,
-            flowDurationMs: playSpeed,
-            onPausePlayback,
-            source: editorTarget === "c" ? translationSource : undefined,
-            rows: mappedAssemblyRows,
-            selectedAsmIndex: translationSelectedAsmIndex,
-            selectedCLine: editorTarget === "c" ? translationSelectedLine : undefined,
-            onSelectAsm: (line: number | null, index: number) => onSelectTranslationLine(line, index, false),
-            onJumpToCycle,
-          }}
+          lessonContext={lessonContext}
           currentData={currentData}
           prevData={prevData}
           simulationData={simulationData}
