@@ -32,9 +32,11 @@ const bundle: TutorBundle = {
   cycle_explanations: [{history_index: 0, cycle: 0, events: [{type: 'branch', title: '제어 흐름 판단', summary: '분기', detail: 'CORE가 보고한 분기 목적지 0x10008'}]}],
 };
 seedTutor(bundle);
-const simulation = {...single, tutor: bundle} as SimulationResult;
+const forcePipeline=new URLSearchParams(location.search).get('mode')==='pipeline';
+const simulation = {...single,simulator:{...single.simulator,mode:forcePipeline?'pipeline':'single'}, tutor: bundle} as SimulationResult;
 const mappedRows = [{pc: '0x10000', text: 'addi a0, zero, 3', sourceLine: 1},
-  {pc: '0x10004', text: 'addi a1, a0, 1', sourceLine: 1}, {pc: '0x10008', text: 'nop', sourceLine: null}];
+  {pc: '0x10004', text: 'addi a1, a0, 1', sourceLine: 1}, {pc: '0x10008', text: 'nop', sourceLine: null},
+  {pc:'0x1000C',text:'addi a2, a1, 1',sourceLine:2}];
 const followHistory = [0, 1].map(index => ({...simulation.history[0], stage_activity: undefined,
   buffers: {...simulation.history[0].buffers, EX: null, MEM: null, WB: null, ID: null,
     IF: {pc: index ? '0x10004' : '0x10000', assembly: index ? 'addi a1,a0,1' : 'addi a0,zero,3', status: 'normal'}}}));
@@ -46,8 +48,10 @@ export function TutorHarness() {
   const [asmIndex, setAsmIndex] = useState(0);
   const [followStep, setFollowStep] = useState<number | null>(null);
   const [pipeline, setPipeline] = useState(false);
+  const [playing,setPlaying]=useState(false);
+  const [intent,setIntent]=useState({kind:'asm' as 'c'|'asm',revision:0});
   const followed = followStep == null ? simulation : {...simulation, history: followHistory,
-    simulator: {...simulation.simulator, mode: pipeline ? 'pipeline' : 'single'}};
+    simulator: {...simulation.simulator, mode: pipeline||forcePipeline ? 'pipeline' : 'single'}};
   const current = followStep == null ? simulation.history[0] : followHistory[followStep];
   const displayed = pipeline && followStep != null ? {...current, buffers: {...current.buffers, EX: current.buffers.IF, IF: null}} : current;
   const data = pipeline && followStep != null ? {...followed, history: followed.history.map((step, index) => index === followStep ? displayed : step)} : followed;
@@ -59,7 +63,12 @@ export function TutorHarness() {
     <button onClick={() => {setSelected(false); setFollowStep(0);}}>follow first step</button>
     <button onClick={() => {setSelected(false); setFollowStep(1);}}>follow next step</button>
     <button onClick={() => setPipeline(!pipeline)}>toggle pipeline focus</button>
+    <button onClick={()=>setPlaying(true)}>global play</button><output data-testid="playback-state">{playing?'playing':'paused'}</output>
+    <button onClick={()=>setIntent(value=>({kind:'c',revision:value.revision+1}))}>click C source</button>
+    <button onClick={()=>setIntent(value=>({kind:'asm',revision:value.revision+1}))}>click ASM source</button>
     <TutorArea simulationData={data as SimulationResult} currentCycleData={displayed} translationSource={'int x = 3;\nreturn x;'}
+      isPlaying={playing}
+      selectionKind={intent.kind} selectionRevision={intent.revision}
       mappedRows={mappedRows}
       isUserSelected={selected}
       selectedTranslationLine={selected ? sourceLine : null} selectedAsmIndex={selected ? asmIndex : null} activeTarget={target} />
