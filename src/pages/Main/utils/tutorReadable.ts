@@ -19,6 +19,10 @@ export function explainStall(cycle:CycleHistoryItem|null,stage:string){
 
 // Hide data-availability notices; retain actual teaching and observed values.
 export function tutorReadingText(text:string){
+  text=text.replace(/\((?:old\((\w+)\)|(\w+))\s*\+\s*(-?\d+)\)\s*&\s*~1/gi,(_,old:string,reg:string,offset:string)=>`${old?`명령어 실행 전 ${old}`:reg} 값에 ${offset}바이트를 더한 뒤, 주소의 맨 오른쪽 비트를 0으로 만든 주소`)
+    .replace(/u32\((\w+)\s*\+\s*(-?\d+)\)/gi,(_,reg:string,offset:string)=>`${reg}의 주소에 ${offset}바이트를 더해 32비트로 유지한 주소`)
+    .replace(/s32\((\w+)\)/gi,'$1을 부호 있는 32비트 정수로 해석한 값')
+    .replace(/u32\((\w+)\)/gi,'$1을 부호 없는 32비트 정수로 해석한 값');
   return text.split(/(?<=[.!?])\s+|\n/).filter(sentence=>!/(?:기록|정보|값|원인|경로|해설|시점).*(?:제공되지|미제공|기록에 없|기록이 없|확인되지|확인할 수 없)|기록만으로.*확인/.test(sentence)).join('\n').trim();
 }
 

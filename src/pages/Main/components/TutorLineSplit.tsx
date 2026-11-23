@@ -39,13 +39,13 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
   ]:[];
   return <div className="dev-tutor-line-split" data-has-c={hasC} data-single-screen={singleScreen}>
     {hasC&&(!singleScreen||view==='c')&&<TutorDetailHost key={`c-${line}`} inline label="C 줄 자세히 보기" onOpen={()=>{if(row)onSelect(row.index);}}><aside className="dev-tutor-c-panel" aria-label="선택한 C 줄 설명">
-      <header><strong>{line!=null?`C L${line}`:'C 위치 미확인'}</strong></header>
+      <header><strong>{line!=null?`C: L${line}`:'C 위치 미확인'}</strong></header>
       <div className="dev-tutor-c-reading"><div className="dev-tutor-c-explanation"><code title={cText}>{cText.trim()||'선택 명령어의 C 위치 정보가 없습니다.'}</code>
         <p><TutorText text={cAnalysis?.summary??'시작 코드·어셈블리 직접 작성·디버그 정보 누락 등으로 C 줄이 확인되지 않을 수 있습니다.'}/></p>
         </div>{lineExplanation&&<small className="dev-tutor-c-mapping"><span>연결된 ASM의 동작</span>{lineExplanation.summary}</small>}
       </div>
       <footer>
-        {cAnalysis&&<TutorDetailPages title="C 설명 자세히" context={`C ${line} · ${cText}`} pages={[
+        {cAnalysis&&<TutorDetailPages title="C 설명 자세히" context={`C: L${line} · ${cText.trim()}`} pages={[
           {title:cAnalysis.type,blocks:[{label:'선택한 코드',text:cText},{label:'이 코드의 의미',text:cAnalysis.summary},{label:'컴파일 결과를 읽는 방법',text:cAnalysis.detail}]},
           ...(lineExplanation?[{title:'C와 어셈블리 연결',blocks:[{text:lineExplanation.summary},{text:lineExplanation.detail}]}]:[]),
         ]}/>}
@@ -66,11 +66,11 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
         {row&&instruction?<>
           <div className="dev-tutor-asm-reading">
             <code className="dev-tutor-asm-code">{row.text}</code>
-            <div className="dev-tutor-asm-meta"><span>ASM L{row.index+1}</span><span>{instruction.action}</span></div>
+            <div className="dev-tutor-asm-meta"><span>ASM: L{row.index+1}</span><span>{instruction.action}</span></div>
             <p className="dev-tutor-asm-meaning" title={instruction.explanation}><TutorText text={instruction.explanation}/></p>
             {latest&&<div className="dev-tutor-asm-result" data-observed><strong>실제 실행 · {latest[0]}</strong><p><TutorText text={latest[1].summary}/></p></div>}
           </div>
-          <footer><TutorDetailPages title="자세히 보기" context={row.text} pages={pages}/>
+          <footer><TutorDetailPages title="자세히 보기" context={`ASM: L${row.index+1} · ${row.text}`} pages={pages}/>
             {!hasC&&<><TutorCycleEvidence bundle={simulation.tutor} historyIndex={historyIndex} compact/><TutorPerformanceSummary bundle={simulation.tutor} historyIndex={historyIndex}/></>}
           </footer>
         </>:<p className="dev-tutor-no-asm">이 C 줄에 연결된 어셈블리 명령어가 없습니다.</p>}

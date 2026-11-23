@@ -500,9 +500,6 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                         <p className="text-[13px] text-[var(--ar-text-primary)] leading-6">
                           <TutorText text={instDetail.explanation} />
                         </p>
-                        {instDetail.operation && instDetail.operation !== instDetail.explanation && <p className="rounded-md border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-2 font-mono text-xs leading-6 break-all text-[var(--ar-text-primary)]">
-                          {instDetail.operation}
-                        </p>}
                         <TutorInstructionEvidence item={instructionAt(simulationData?.tutor, asmRow.pc)} bundle={simulationData?.tutor} historyIndex={historyIndex} focused={isRowSelectedFocus} />
 
                         {/* 하드웨어 아키텍처 관점 (스택, 레지스터, 파이프라인 단계) */}

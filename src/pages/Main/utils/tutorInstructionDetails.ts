@@ -97,7 +97,8 @@ export function tutorInstructionDetails(item:TutorInstruction,bundle?:TutorBundl
     ...(teaching?.concepts??[]).map(concept=>({title:concept.title,blocks:[
       {text:concept.plain??concept.explanation},
       {label:'학습 예제 · 현재 실행값과 별개',text:concept.example},
-      {label:'헷갈리기 쉬운 점',text:concept.question+'\n'+concept.answer},
+      {label:'질문',text:concept.question,kind:'question' as const},
+      {label:'답변',text:concept.answer,kind:'answer' as const},
       ...(concept.plain?[{label:'원리와 주의사항',text:concept.explanation}]:[]),
       ...concept.sources.filter(source=>source.url.startsWith('https://')).map(source=>({label:'참고 자료',text:source.title,href:source.url})),
     ]})),

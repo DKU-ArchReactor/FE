@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import {tutorReadingText} from '../utils/tutorReadable';
 
-export type ReadingSection = { title: string; blocks: { label?: string; text: string; href?:string }[] };
+export type ReadingSection = { title: string; blocks: { label?: string; text: string; href?:string;kind?:'question'|'answer' }[] };
 
 /** Pages contain complete reading units; arrows never scroll the viewport. */
 export default function TutorReader({ sections, documentKey }: { sections: ReadingSection[]; documentKey: string }) {
@@ -21,7 +21,8 @@ export default function TutorReader({ sections, documentKey }: { sections: Readi
       measure.className = 'tutor-reading-block';
       Object.assign(measure.style, { position: 'fixed', visibility: 'hidden', width: `${width}px`, pointerEvents: 'none', top: '0', left: '-10000px' });
       element.append(measure);
-      const size = (text: string, label?: string) => {
+      const size = (text: string, label?: string,kind?:'question'|'answer') => {
+        measure.dataset.kind=kind??'';
         measure.replaceChildren();
         if (label) { const caption=document.createElement('strong');caption.textContent=label;measure.append(caption); }
         const paragraph=document.createElement('p');paragraph.textContent=text;measure.append(paragraph);
@@ -31,18 +32,27 @@ export default function TutorReader({ sections, documentKey }: { sections: Readi
       for (const section of sections) {
         let page: ReadingSection = { title: section.title, blocks: [] };
         let used=0;
-        for (const block of section.blocks) {
+        for (let blockIndex=0;blockIndex<section.blocks.length;blockIndex++) {
+          const block=section.blocks[blockIndex];
+          const answer=section.blocks[blockIndex+1];
+          if(block.kind==='question'&&answer?.kind==='answer'){
+            const pair=[block,answer].map(value=>({...value,text:tutorReadingText(value.text)}));
+            const pairHeight=pair.reduce((total,value)=>total+size(value.text,value.label,value.kind),0);
+            if(page.blocks.length&&used+pairHeight>height){result.push(page);page={title:section.title,blocks:[]};used=0;}
+            page.blocks.push(...pair);used+=pairHeight;blockIndex++;
+            continue;
+          }
           let text=tutorReadingText(block.text);
           if (!text) continue;
           while (text) {
-            const fullHeight=size(text,block.label);
+            const fullHeight=size(text,block.label,block.kind);
             if (used+fullHeight<=height) {page.blocks.push({...block,text});used+=fullHeight;break;}
             if (page.blocks.length) { result.push(page);page={title:section.title,blocks:[]};used=0;continue; }
             // A temporarily collapsed panel cannot fit even one labelled line.
             // Keep the paragraph intact until ResizeObserver sees its final height.
-            if(size(text.slice(0,1),block.label)>height){page.blocks.push({...block,text});break;}
+            if(size(text.slice(0,1),block.label,block.kind)>height){page.blocks.push({...block,text});break;}
             let low=1,high=text.length;
-            while(low<high){const middle=Math.ceil((low+high)/2);if(size(text.slice(0,middle),block.label)<=height)low=middle;else high=middle-1;}
+            while(low<high){const middle=Math.ceil((low+high)/2);if(size(text.slice(0,middle),block.label,block.kind)<=height)low=middle;else high=middle-1;}
             // Prefer a nearby sentence or word boundary without dropping text.
             const prefix=text.slice(0,low);
             const boundary=Math.max(prefix.lastIndexOf('. ')+1,prefix.lastIndexOf(' '));
@@ -73,8 +83,8 @@ export default function TutorReader({ sections, documentKey }: { sections: Readi
     if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1);}
   }}>
     <header><h3>{page?.title ?? sections[0]?.title}</h3><span aria-live="polite">{topicPages.length>1 ? `${topicIndex+1} / ${topicPages.length}` : ''}</span></header>
-    <div ref={viewport} className="tutor-reader-viewport">
-      {page?.blocks.map((block,i)=><div className="tutor-reading-block" key={`${index}-${i}`}>{block.label&&<strong>{block.label}</strong>}<p>{block.href?.startsWith('https://')?<a href={block.href} target="_blank" rel="noopener noreferrer">{block.text}</a>:block.text}</p></div>)}
+    <div ref={viewport} className="tutor-reader-viewport" data-question-answer={page?.blocks.some(block=>block.kind==='question')}>
+      {page?.blocks.map((block,i)=><div className="tutor-reading-block" data-kind={block.kind} key={`${index}-${i}`}>{block.label&&<strong>{block.label}</strong>}<p>{block.href?.startsWith('https://')?<a href={block.href} target="_blank" rel="noopener noreferrer">{block.text}</a>:block.text}</p></div>)}
     </div>
     {topicPages.length>1 && <nav aria-label="설명 페이지 이동" className="tutor-reader-arrows">
       <button aria-label="이전 설명" disabled={topicIndex===0} onClick={()=>move(-1)}>‹</button>
