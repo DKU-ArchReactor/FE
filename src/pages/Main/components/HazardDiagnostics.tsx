@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 
 interface HazardDiagnosticsProps {
@@ -151,5 +151,5 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
   );
 };
 
-export default HazardDiagnostics;
+export default memo(HazardDiagnostics);
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { FileSummary } from "@/type/file";
 import { getFiles, getFileById, saveFile } from "@/api/file";
+import { getAccessToken, useAuthSession } from "@/api/authSession";
 
 export const DEFAULT_TRANSLATION_SOURCE =
   "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
@@ -16,9 +17,8 @@ export function useFileManager(
   const [cFileName, setCFileName] = useState<string>(example?.fileName ?? "main.c");
   const [asmFileName, setAsmFileName] = useState<string>("main.s");
   const [savedFiles, setSavedFiles] = useState<FileSummary[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(
-    () => !!localStorage.getItem("access_token")
-  );
+  const auth = useAuthSession();
+  const isLoggedIn = auth.authenticated;
 
   const loadedInitialFileIdRef = useRef<string | null>(null);
   const onInitialResetRef = useRef(onInitialResetSimulation);
@@ -36,14 +36,13 @@ export function useFileManager(
 
   // 로그인 상태 및 파일 목록 불러오기
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
+    if (!isLoggedIn) {
       return;
     }
     getFiles()
       .then((list) => setSavedFiles(list))
       .catch((err) => console.error("Saved file list fetch error:", err));
-  }, []);
+  }, [isLoggedIn, auth.epoch]);
 
   const updateTranslationSource = useCallback(
     (
@@ -88,7 +87,7 @@ export function useFileManager(
   );
 
   const handleSaveTranslationFile = async (nameToSave?: string): Promise<boolean> => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (!token) {
       alert("파일 저장은 로그인 후 이용할 수 있습니다.");
       return false;
@@ -117,7 +116,7 @@ export function useFileManager(
   };
 
   const handleSaveAssemblyFile = async (content: string, nameToSave?: string): Promise<boolean> => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (!token) {
       alert("파일 저장은 로그인 후 이용할 수 있습니다.");
       return false;
@@ -188,10 +187,9 @@ export function useFileManager(
     asmFileName,
     setAsmFileName,
     cContent: translationSource,
-    savedFiles,
+    savedFiles: isLoggedIn ? savedFiles : [],
     setSavedFiles,
     isLoggedIn,
-    setIsLoggedIn,
     translationSource,
     setTranslationSource,
     translationAssembly,

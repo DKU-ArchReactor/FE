@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React from "react";
 import type { FileSummary } from "@/type/file";
-import { getFileById } from "@/api/file";
+import { useUploadPopup } from "../hooks/useUploadPopup";
 
 const C_TEMPLATES = [
   {
@@ -86,83 +86,18 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
   mode = "pipeline",
 }) => {
   const isPipeline = mode === "pipeline";
-  const popupRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [popupPos, setPopupPos] = useState<{ top: number; left: number }>({
-    top: 0,
-    left: 0,
-  });
-
-  // 팝업 위치 계산 (업로드 버튼 바로 아래, 우하단으로 펼쳐지도록 버튼의 왼쪽 정렬)
-  const updatePopupPos = useCallback(() => {
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      const popupWidth = 360;
-      const left = Math.max(
-        12,
-        Math.min(window.innerWidth - popupWidth - 12, rect.left)
-      );
-      const top = rect.bottom + 6;
-      setPopupPos({ top, left });
-    }
-  }, [anchorRef]);
-
-  // 팝업 열릴 때 위치 계산 및 리사이즈/스크롤 이벤트 동기화
-  useEffect(() => {
-    if (isOpen) {
-      updatePopupPos();
-      window.addEventListener("resize", updatePopupPos);
-      window.addEventListener("scroll", updatePopupPos, true);
-      return () => {
-        window.removeEventListener("resize", updatePopupPos);
-        window.removeEventListener("scroll", updatePopupPos, true);
-      };
-    }
-  }, [isOpen, updatePopupPos]);
-
-  // 외부 클릭 시 업로드 팝업 닫기
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(target) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(target)
-      ) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, onClose, anchorRef]);
+  const {
+    popupRef,
+    fileInputRef,
+    isDragOver,
+    popupPos,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleDownloadSavedFile,
+  } = useUploadPopup(isOpen, onClose, anchorRef, 360, onFile);
 
   if (!isOpen) return null;
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      onFile(files[0]);
-      onClose();
-    }
-  };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -171,33 +106,6 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
       onClose();
     }
     event.target.value = "";
-  };
-
-  // 저장된 파일 목록에서 개별 파일 로컬 다운로드 핸들러
-  const handleDownloadSavedFile = async (
-    e: React.MouseEvent,
-    file: FileSummary
-  ) => {
-    e.stopPropagation();
-    try {
-      const detail = await getFileById(file.file_id);
-      const blob = new Blob([detail.content], {
-        type: "text/plain;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download =
-        detail.title ||
-        `${file.title || "source"}.${file.lang === "asm" ? "s" : "c"}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("File download error:", err);
-      alert("파일을 다운로드하지 못했습니다.");
-    }
   };
 
   return (

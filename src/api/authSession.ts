@@ -2,9 +2,28 @@ import { useSyncExternalStore } from "react";
 
 let previousToken: string | null | undefined;
 let session = { epoch: 0, authenticated: false };
+
+export function getAccessToken(): string | null {
+  return localStorage.getItem("access_token");
+}
+
+export function setAuthTokens(accessToken: string, tokenType?: string): void {
+  localStorage.setItem("access_token", accessToken);
+  if (tokenType) {
+    localStorage.setItem("token_type", tokenType);
+  }
+  notifyAuthChanged();
+}
+
+export function clearAuthTokens(): void {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("token_type");
+  notifyAuthChanged();
+}
+
 // Tokens stay in the existing auth storage. Only an opaque generation reaches UI state.
 export function getAuthSession() {
-  const token = localStorage.getItem("access_token");
+  const token = getAccessToken();
   if (token !== previousToken) {
     previousToken = token;
     session = { epoch: session.epoch + 1, authenticated: Boolean(token) };
