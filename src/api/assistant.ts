@@ -1,5 +1,4 @@
 import type { EditorSource, ExecutionContext, ExecutionReference } from "@/type/assistant";
-import { getAccessToken } from "@/api/authSession";
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 export type ChatEvent =
   | { type: "delta"; text: string }
@@ -130,7 +129,7 @@ export async function streamChat(
   context?: ExecutionContext,
   editorSource?: EditorSource,
 ): Promise<void> {
-  const token = getAccessToken();
+  const token = localStorage.getItem("access_token");
   if (!token)
     throw new ChatApiError(
       "AI 어시스턴트는 로그인 후 이용할 수 있습니다.",

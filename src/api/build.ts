@@ -1,4 +1,4 @@
-import { seedTutor } from "@/api/tutorCache";
+import { seedTutor } from "@/pages/Main/utils/tutorAnalysis";
 import apiConfig from "@/api/config";
 import type { BuildCompileRequest, BuildCompileResponse, BuildLog } from "@/type/build";
 

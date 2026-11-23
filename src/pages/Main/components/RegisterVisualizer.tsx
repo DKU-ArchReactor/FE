@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatSignedDecimal } from '../utils/memoryLayout';
 
 interface RegisterVisualizerProps {
   registers: Record<string, string>;
@@ -7,14 +8,6 @@ interface RegisterVisualizerProps {
   cycle?: number;
   mode?: 'single' | 'pipeline';
 }
-
-// 16진수 문자열을 사람이 읽기 편한 부호 있는 10진수로 변환 (32비트 2의 보수)
-const formatSignedDec = (hexStr: string): string => {
-  const num = parseInt(hexStr, 16);
-  if (isNaN(num)) return '0';
-  const signed = num | 0;
-  return signed.toLocaleString();
-};
 
 type RegisterGroup = 'zero' | 'special' | 'args' | 'saved' | 'temp';
 
@@ -108,8 +101,10 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
     prevRegsRef.current = registers;
 
     if (!referencePrev) {
-      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
-      return;
+      const timer = window.setTimeout(() => {
+        setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     const changed = new Set<string>();
@@ -123,16 +118,24 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
     });
 
     if (changed.size > 0) {
-      setPulsingKeys(changed);
+      const startTimer = window.setTimeout(() => {
+        setPulsingKeys(changed);
+      }, 0);
       // 속도의 절반(50%) 동안 점등 상태 유지 후 원래 파스텔 색상으로 복귀
       const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
-      const timer = window.setTimeout(() => {
+      const endTimer = window.setTimeout(() => {
         setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
       }, halfDuration);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(startTimer);
+        clearTimeout(endTimer);
+      };
     } else {
-      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      const timer = window.setTimeout(() => {
+        setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
@@ -155,7 +158,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1 md:px-1.5 py-0.5 divide-y divide-[var(--ar-border-subtle)]">
         {regKeys.map((regKey, idx) => {
           const val = registers[regKey] || '0x00000000';
-          const decStr = formatSignedDec(val);
+          const decStr = formatSignedDecimal(val);
           const isPulsing = pulsingKeys.has(regKey);
           const hasVal = val !== '0x00000000';
           const meta = REGISTER_METAS[regKey] || { abi: regKey, group: 'temp' as RegisterGroup };

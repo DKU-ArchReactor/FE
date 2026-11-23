@@ -1,7 +1,5 @@
 // Presentation adapter only. Educational explanations come from the TUTOR service.
 import api from '@/api/config';
-import { getTutorCache, hasTutorCache, putTutorCache, seedTutor, tutorCacheKey } from '@/api/tutorCache';
-export { seedTutor };
 export interface RuleExplanation {
   kind: 'c' | 'asm' | 'crt'; category: string; title: string;
   summary: string; detail: string; opcode?: string | null; operands?: string | null;
@@ -56,31 +54,44 @@ export interface TutorBundle {
     type: string; title: string; summary: string; detail: string;
   }[] }[];
 }
+const cache = new Map<string, RuleExplanation>();
+const key = (kind: string, text: string, line = 1, pc?: string) => JSON.stringify([kind, text, line, pc]);
+function put(k: string, value: RuleExplanation) {
+  if (cache.size >= 4096 && !cache.has(k)) cache.delete(cache.keys().next().value!);
+  cache.set(k, value);
+}
+export function seedTutor(bundle?: TutorBundle | null) {
+  bundle?.c_lines?.forEach(x => put(key('c', x.text, x.line), x.explanation));
+  bundle?.asm_instructions?.forEach(x => {
+    put(key('asm', x.text), x.explanation);
+    if (x.runtime_explanation) put(key('crt', x.text, 1, x.pc), x.runtime_explanation);
+  });
+}
 export async function fetchTutor(items: {kind: 'c'|'asm'|'crt'; text: string; line?: number; pc?: string}[], signal: AbortSignal) {
-  const unique = new Map(items.map(x => [tutorCacheKey(x.kind, x.text, x.line ?? 1, x.pc), x]));
-  const missing = [...unique].filter(([k]) => !hasTutorCache(k));
+  const unique = new Map(items.map(x => [key(x.kind, x.text, x.line ?? 1, x.pc), x]));
+  const missing = [...unique].filter(([k]) => !cache.has(k));
   let changed = false;
   for (let start = 0; start < missing.length; start += 128) {
     const chunk = missing.slice(start, start + 128);
     const {data} = await api.post<{items: RuleExplanation[]}>('/api/v1/tutor/explain', {items: chunk.map(([, x]) => x)}, {signal});
     if (signal.aborted) return false;
-    chunk.forEach(([k], i) => putTutorCache(k, data.items[i]));
+    chunk.forEach(([k], i) => put(k, data.items[i]));
     changed = true;
   }
   return changed;
 }
 const pending: RuleExplanation = {kind: 'c', category: 'pending', title: '해설 대기', summary: '해설을 불러오는 중입니다.', detail: ''};
 export function analyzeCLine(text: string, line: number) {
-  const x = getTutorCache(tutorCacheKey('c', text, line)) ?? pending;
+  const x = cache.get(key('c', text, line)) ?? pending;
   return {type: x.title, badgeColor: 'bg-slate-100 text-slate-700 border border-slate-200', summary: x.summary, detail: x.detail};
 }
 export function analyzeAsmInstruction(text: string, verified?: RuleExplanation) {
-  const x = verified ?? getTutorCache(tutorCacheKey('asm', text)) ?? pending;
+  const x = verified ?? cache.get(key('asm', text)) ?? pending;
   return {opcode: x.opcode ?? '', operands: x.operands ?? '', action: x.title, explanation: x.summary,
     operation: x.operation, hardwareDetail: x.detail};
 }
 export function analyzeCrtInstruction(text: string, pc?: string) {
-  const x = getTutorCache(tutorCacheKey('crt', text, 1, pc)) ?? pending;
+  const x = cache.get(key('crt', text, 1, pc)) ?? pending;
   return {title: x.title, badge: x.category === 'unmapped' ? '미확인' : '문맥', summary: x.summary, detail: x.detail, role: x.title, instructionDetail: analyzeAsmInstruction(text)};
 }
 

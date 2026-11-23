@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page, type ConsoleMessage, type Response } from "@playwright/test";
 
 export const TEST_USER = {
   email: process.env.E2E_USER_EMAIL || "test@dankook.ac.kr",
@@ -42,7 +42,7 @@ export const test = base.extend<{
         runtimeErrors.push(err);
       };
 
-      const onConsole = (msg: any) => {
+      const onConsole = (msg: ConsoleMessage) => {
         if (msg.type() === "warning" || msg.type() === "error") {
           const text: string = msg.text();
           if (/mixed content|https|insecure request|upgrade-insecure-requests/i.test(text)) {
@@ -51,7 +51,7 @@ export const test = base.extend<{
         }
       };
 
-      const onResponse = (response: any) => {
+      const onResponse = (response: Response) => {
         const status = response.status();
         const url = response.url();
         const method = response.request().method();
