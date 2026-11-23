@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useMemo } from "react";
 import type { FileSummary } from "@/type/file";
-import { getFileById } from "@/api/file";
+import { getAccessToken } from "@/api/authSession";
+import { useUploadPopup } from "../hooks/useUploadPopup";
 
 const ASM_TEMPLATES = [
   {
@@ -62,60 +63,7 @@ export default function AsmFileUploadPopup({
   mode = "pipeline",
 }: Props) {
   const isPipeline = mode === "pipeline";
-  const popupRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
-  const [isDragOver, setIsDragOver] = useState(false);
-  const isLoggedIn = !!localStorage.getItem("access_token");
-
-  // 저장된 파일 중 어셈블리(.s, .asm, lang=asm) 필터링
-  const savedAsmFiles = useMemo(() => {
-    return savedFiles.filter(
-      (f) =>
-        f.lang === "asm" ||
-        f.title.toLowerCase().endsWith(".s") ||
-        f.title.toLowerCase().endsWith(".asm")
-    );
-  }, [savedFiles]);
-
-  const updatePopupPos = useCallback(() => {
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      const popupWidth = 340;
-      const left = Math.max(12, Math.min(window.innerWidth - popupWidth - 12, rect.left));
-      const top = rect.bottom + 6;
-      setPopupPos({ top, left });
-    }
-  }, [anchorRef]);
-
-  useEffect(() => {
-    if (isOpen) {
-      updatePopupPos();
-      window.addEventListener("resize", updatePopupPos);
-      window.addEventListener("scroll", updatePopupPos, true);
-      return () => {
-        window.removeEventListener("resize", updatePopupPos);
-        window.removeEventListener("scroll", updatePopupPos, true);
-      };
-    }
-  }, [isOpen, updatePopupPos]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(target) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(target)
-      ) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, anchorRef, onClose]);
+  const isLoggedIn = !!getAccessToken();
 
   const readAsmFile = (file: File) => {
     const reader = new FileReader();
@@ -128,6 +76,27 @@ export default function AsmFileUploadPopup({
     reader.readAsText(file);
   };
 
+  const {
+    popupRef,
+    fileInputRef,
+    isDragOver,
+    popupPos,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleDownloadSavedFile,
+  } = useUploadPopup(isOpen, onClose, anchorRef, 340, readAsmFile);
+
+  // 저장된 파일 중 어셈블리(.s, .asm, lang=asm) 필터링
+  const savedAsmFiles = useMemo(() => {
+    return savedFiles.filter(
+      (f) =>
+        f.lang === "asm" ||
+        f.title.toLowerCase().endsWith(".s") ||
+        f.title.toLowerCase().endsWith(".asm")
+    );
+  }, [savedFiles]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -135,50 +104,6 @@ export default function AsmFileUploadPopup({
       onClose();
     }
     e.target.value = "";
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      readAsmFile(file);
-      onClose();
-    }
-  };
-
-  // 저장된 파일 목록에서 개별 파일 로컬 다운로드 핸들러
-  const handleDownloadSavedFile = async (e: React.MouseEvent, file: FileSummary) => {
-    e.stopPropagation();
-    try {
-      const detail = await getFileById(file.file_id);
-      const blob = new Blob([detail.content], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = detail.title || `${file.title || "source"}.s`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("File download error:", err);
-      alert("파일을 다운로드하지 못했습니다.");
-    }
   };
 
   return (
@@ -352,7 +277,7 @@ export default function AsmFileUploadPopup({
                         )}
                         <button
                           type="button"
-                          onClick={(e) => handleDownloadSavedFile(e, f)}
+                          onClick={(e) => handleDownloadSavedFile(e, f, "s")}
                           title="로컬 파일로 다운로드"
                           className={`p-1 rounded text-[#57606A] dark:text-[#858585] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer ${
                             isPipeline

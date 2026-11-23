@@ -1,4 +1,4 @@
-import { seedTutor } from "@/pages/Main/utils/tutorAnalysis";
+import { seedTutor } from "@/api/tutorCache";
 import apiConfig from "@/api/config";
 import type { SimulationRunRequest, SimulationResult, CycleHistoryItem } from "@/type/simulation";
 

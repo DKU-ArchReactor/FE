@@ -242,4 +242,4 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   );
 };
 
-export default RegisterVisualizer;
+export default React.memo(RegisterVisualizer);

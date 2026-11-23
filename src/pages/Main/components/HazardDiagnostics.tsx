@@ -151,5 +151,5 @@ export const HazardDiagnostics: React.FC<HazardDiagnosticsProps> = ({
   );
 };
 
-export default HazardDiagnostics;
+export default React.memo(HazardDiagnostics);
 

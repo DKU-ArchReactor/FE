@@ -463,4 +463,4 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   );
 };
 
-export default MemorySegmentVisualizer;
+export default React.memo(MemorySegmentVisualizer);
