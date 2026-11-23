@@ -49,3 +49,11 @@
 .tutor-cycle-card-title>span[data-kind=STL]>svg{display:block}
 .tutor-cycle-card-title>span[data-kind=BBL]{display:flex;padding:0;border:0;background:transparent;border-radius:0;line-height:1}
 .tutor-cycle-card-title>span[data-kind=BBL]>svg{display:block}
+.tutor-cycle-card-body[data-has-c=false]>.tutor-cycle-code{grid-column:1/-1}
+.tutor-cycle-response{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;align-items:stretch}
+.tutor-cycle-response>section:only-child{grid-column:1/-1}
+.tutor-cycle-response p{margin-bottom:0}
+.tutor-cycle-card-title h3{min-width:0}
+.tutor-cycle-card-title>span{flex-shrink:0}
+.tutor-cycle-card-title small{text-align:right}
+@container(max-width:500px){.tutor-cycle-response{grid-template-columns:minmax(0,1fr)}}
