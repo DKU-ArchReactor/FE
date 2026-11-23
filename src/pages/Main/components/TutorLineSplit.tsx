@@ -31,8 +31,8 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
   const observations=details?[...details.observations].sort((a,b)=>a[1].history_index-b[1].history_index):[];
   const latest=observations.at(-1);
   const pages:TutorDetailPage[]=row&&instruction?[
-    {title:'명령어 해설',blocks:[{label:'이 명령어의 의미',text:instruction.explanation},...(instruction.operation?[{label:'동작 식',text:instruction.operation}]:[])]},
-    ...(observations.length?[{title:'실제 실행',blocks:observations.map(([stage,value])=>({label:`Step ${value.step} · ${stage}`,text:value.summary}))}]:[{title:'실제 실행',blocks:[{text:details?.valueNotice??'실행값 기록이 제공되지 않았습니다.'}]}]),
+    {title:'명령어 해설',blocks:[{label:'이 명령어의 의미',text:instruction.explanation}]},
+    ...(observations.length?[{title:'실제 실행',blocks:observations.map(([stage,value])=>({label:`Step ${value.step} · ${stage}`,text:value.summary}))}]:[]),
     ...(details?.pages??[]),
     ...(instruction.hardwareDetail?[{title:'명령어 원리와 주의사항',blocks:[{text:instruction.hardwareDetail}]}]:[]),
     ...(row.sourceLine==null?[{title:'소스 위치와 실행 문맥',blocks:[{text:analyzeCrtInstruction(row.text,row.pc).summary},{text:analyzeCrtInstruction(row.text,row.pc).detail}]}]:[]),
@@ -68,8 +68,7 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
             <code className="dev-tutor-asm-code">{row.text}</code>
             <div className="dev-tutor-asm-meta"><span>ASM L{row.index+1}</span><span>{instruction.action}</span></div>
             <p className="dev-tutor-asm-meaning" title={instruction.explanation}><TutorText text={instruction.explanation}/></p>
-            {instruction.operation&&instruction.operation!==instruction.explanation&&<code className="dev-tutor-asm-operation">{instruction.operation}</code>}
-            <div className="dev-tutor-asm-result" data-observed={Boolean(latest)}><strong>{latest?`실제 실행 · ${latest[0]}`:'실제 실행'}</strong><p title={latest?.[1].summary??details?.valueNotice}><TutorText text={latest?.[1].summary??details?.valueNotice??'구체적인 실행값 기록이 제공되지 않았습니다.'}/></p></div>
+            {latest&&<div className="dev-tutor-asm-result" data-observed><strong>실제 실행 · {latest[0]}</strong><p><TutorText text={latest[1].summary}/></p></div>}
           </div>
           <footer><TutorDetailPages title="자세히 보기" context={row.text} pages={pages}/>
             {!hasC&&<><TutorCycleEvidence bundle={simulation.tutor} historyIndex={historyIndex} compact/><TutorPerformanceSummary bundle={simulation.tutor} historyIndex={historyIndex}/></>}

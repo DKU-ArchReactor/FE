@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import {tutorReadingText} from '../utils/tutorReadable';
 
 export type ReadingSection = { title: string; blocks: { label?: string; text: string; href?:string }[] };
 
@@ -31,7 +32,7 @@ export default function TutorReader({ sections, documentKey }: { sections: Readi
         let page: ReadingSection = { title: section.title, blocks: [] };
         let used=0;
         for (const block of section.blocks) {
-          let text=block.text.trim();
+          let text=tutorReadingText(block.text);
           if (!text) continue;
           while (text) {
             const fullHeight=size(text,block.label);
