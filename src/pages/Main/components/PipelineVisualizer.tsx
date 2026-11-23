@@ -3,6 +3,11 @@ import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import SingleCycleDatapath from './SingleCycleDatapath';
 import type { InstructionLessonContext } from './InstructionLesson';
 import { numericPc } from '../utils/instructionFlow';
+import {
+  computePipelineWireState,
+  isBranch,
+} from '../utils/pipelineWireState';
+import './PipelineVisualizer.css';
 
 // SVG 경로(M, L, H, V)를 안전하게 파싱하여 진행률(0~1)에 따른 좌표를 산출하는 보간 헬퍼
 function parseSvgPathPoints(pathStr: string): { x: number; y: number }[] {
@@ -190,126 +195,61 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     );
   }
 
-  const buffers = currentData?.buffers;
-  const cycle_events = currentData?.cycle_events;
-  const clock = currentData?.clock;
-  const isStall = Boolean(!isSingle && cycle_events?.stall?.has_stall);
-  const isForward = Boolean(!isSingle && cycle_events?.forwarding?.has_forwarded);
-  const isBranchFlush = Boolean(!isSingle && cycle_events?.control_hazard?.has_flush);
-
-  // Single-cycle 모드: 1클럭에 1개 명령어 전체가 IF~WB 전 단계를 한 번에 통과
-  // Pipeline 모드: 각 스테이지 버퍼에 개별 명령어가 순차적으로 위치
-  const singleCycleInst = isSingle
-    ? (buffers?.IF?.assembly || currentData?.stage_activity?.IF?.assembly || currentData?.if_stage?.assembly || '—')
-    : null;
-
-  // 5단계별 명령어
-  const ifInst = isSingle ? (singleCycleInst || '—') : (buffers?.IF?.assembly || '—');
-  const idInst = isSingle ? (singleCycleInst || '—') : (buffers?.ID?.assembly || '—');
-  const exInst = isSingle ? (singleCycleInst || '—') : (buffers?.EX?.assembly || '—');
-  const memInst = isSingle ? (singleCycleInst || '—') : (buffers?.MEM?.assembly || '—');
-  const wbInst = isSingle ? (singleCycleInst || '—') : (buffers?.WB?.assembly || '—');
-
-  // 활성 여부
-  const isIfActive = ifInst !== '—' && ifInst !== 'bubble' && ifInst !== 'empty';
-  const isIdActive = idInst !== '—' && idInst !== 'bubble' && idInst !== 'empty';
-  const isExActive = exInst !== '—' && exInst !== 'bubble' && exInst !== 'empty';
-  const isMemActive = memInst !== '—' && memInst !== 'bubble' && memInst !== 'empty';
-  const isWbActive = wbInst !== '—' && wbInst !== 'bubble' && wbInst !== 'empty';
-
-  // 명령어 파싱 및 세부 동작 분류
-  const parseOp = (assembly: string | null | undefined): string => {
-    if (!assembly) return "";
-    const trimmed = assembly.trim().toLowerCase();
-    if (trimmed === "bubble" || trimmed === "empty" || trimmed === "flush" || trimmed === "stall") return "";
-    const match = trimmed.match(/^([a-z0-9_.]+)/);
-    return match ? match[1] : "";
-  };
-
-  const isRType = (op: string) =>
-    /^(add|sub|and|or|xor|sll|srl|sra|slt|sltu|mul|mulh|mulhsu|mulhu|div|divu|rem|remu)$/.test(op);
-  const isITypeAlu = (op: string) =>
-    /^(addi|andi|ori|xori|slti|sltiu|slli|srli|srai|li|mv|not|neg|seqz|snez)$/.test(op);
-  const isLoad = (op: string) =>
-    /^(lw|lh|lb|lhu|lbu)$/.test(op);
-  const isStore = (op: string) =>
-    /^(sw|sh|sb)$/.test(op);
-  const isBranch = (op: string) =>
-    /^(beq|bne|blt|bge|bltu|bgeu|beqz|bnez|bltz|bgez|blez|bgtz)$/.test(op);
-  const isJump = (op: string) =>
-    /^(jal|jalr|j|jr|ret|call|tail)$/.test(op);
-  const isLui = (op: string) => op === "lui";
-  const isAuipc = (op: string) => op === "auipc";
-
-  const usesRs1 = (op: string) =>
-    isRType(op) || isITypeAlu(op) || isLoad(op) || isStore(op) || isBranch(op) || op === "jalr" || op === "jr" || op === "ret" ||
-    (!isRType(op) && !isITypeAlu(op) && !isLoad(op) && !isStore(op) && !isBranch(op) && !isJump(op) && !isLui(op) && !isAuipc(op) && Boolean(op));
-  const usesRs2 = (op: string) =>
-    isRType(op) || isStore(op) || isBranch(op);
-  const usesImm = (op: string) =>
-    isITypeAlu(op) || isLoad(op) || isStore(op) || isBranch(op) || isLui(op) || isAuipc(op) || isJump(op) ||
-    (!isRType(op) && Boolean(op));
-  const usesPc = (op: string) =>
-    isBranch(op) || isJump(op) || isAuipc(op);
-  const writesReg = (op: string) =>
-    isRType(op) || isITypeAlu(op) || isLoad(op) || isLui(op) || isAuipc(op) || op === "jal" || op === "jalr" || op === "call" ||
-    (!isStore(op) && !isBranch(op) && Boolean(op));
-
-  const ifOp = parseOp(ifInst);
-  const idOp = parseOp(idInst);
-  const exOp = parseOp(exInst);
-  const memOp = parseOp(memInst);
-  const wbOp = parseOp(wbInst);
-
-  // 컴파일 이전(currentData === null)에는 전체 도식 개형을 보여주기 위해 모든 선을 표시하고,
-  // 컴파일 이후(시뮬레이션 재생 중)에는 실제로 신호가 흐르는 활성 선만 보여주고 비활성 선은 투명화합니다.
-  const isInitialEmpty = !currentData;
-  const inactiveStroke = isInitialEmpty ? "#94A3B8" : "transparent";
-  const inactiveMarker = isInitialEmpty ? "url(#m-arr-def)" : undefined;
-
-  // [IF 단계 와이어 활성 조건]
-  const ifPcMuxToPcActive = isIfActive;
-  const ifPcToImemActive = isIfActive;
-  const ifPcToPlus4Active = isIfActive;
-  const ifPcToIfIdActive = isIfActive && usesPc(ifOp);
-  const ifPlus4LoopbackActive = isIfActive && !isBranchFlush;
-  const branchLoopbackActive = isBranchFlush || Boolean(cycle_events?.control_hazard?.taken);
-  const ifImemToIfIdActive = isIfActive;
-
-  // [ID 단계 와이어 활성 조건]
-  const idTrunkActive = isIdActive;
-  const idControlUnitActive = isIdActive;
-  const idToRegsActive = isIdActive && (usesRs1(idOp) || usesRs2(idOp));
-  const idToImmGenActive = isIdActive && usesImm(idOp);
-  const idRd1ToIdExActive = isIdActive && usesRs1(idOp);
-  const idRd2ToIdExActive = isIdActive && usesRs2(idOp);
-  const idImmToIdExActive = isIdActive && usesImm(idOp);
-  const idPcToIdExActive = isIdActive && usesPc(idOp);
-
-  // [EX 단계 와이어 활성 조건]
-  const exRd1ToAluActive = isExActive && usesRs1(exOp);
-  const exRd2TrunkActive = isExActive && usesRs2(exOp);
-  const exRd2ToAluSrcActive = isExActive && (isRType(exOp) || isBranch(exOp));
-  const exRd2ToWriteDataActive = isExActive && isStore(exOp);
-  const exImmTrunkActive = isExActive && usesImm(exOp);
-  const exImmToAluSrcActive = isExActive && (isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
-  const exAluSrcToAluActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isBranch(exOp) || isLui(exOp) || exOp === "jalr");
-  const exBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exImmToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exPcToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exAluToExMemActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
-
-  // [MEM 단계 와이어 활성 조건]
-  const memAluTrunkActive = isMemActive && (isLoad(memOp) || isStore(memOp) || isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
-  const memAluToDmemAddrActive = isMemActive && (isLoad(memOp) || isStore(memOp));
-  const memAluBypassActive = isMemActive && (isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
-  const memWriteDataActive = isMemActive && isStore(memOp);
-  const memDmemReadDataActive = isMemActive && isLoad(memOp);
-
-  // [WB 단계 와이어 활성 조건]
-  const wbAluBypassActive = isWbActive && (isRType(wbOp) || isITypeAlu(wbOp) || isLui(wbOp) || isAuipc(wbOp) || wbOp === "jalr");
-  const wbDmemReadDataActive = isWbActive && isLoad(wbOp);
-  const wbReverseFeedbackActive = isWbActive && writesReg(wbOp);
+  const {
+    cycle_events,
+    clock,
+    isStall,
+    isForward,
+    isBranchFlush,
+    ifInst,
+    idInst,
+    exInst,
+    memInst,
+    wbInst,
+    isIfActive,
+    isIdActive,
+    isExActive,
+    isMemActive,
+    isWbActive,
+    exOp,
+    isInitialEmpty,
+    inactiveStroke,
+    inactiveMarker,
+    ifPcMuxToPcActive,
+    ifPcToImemActive,
+    ifPcToPlus4Active,
+    ifPcToIfIdActive,
+    ifPlus4LoopbackActive,
+    branchLoopbackActive,
+    ifImemToIfIdActive,
+    idTrunkActive,
+    idControlUnitActive,
+    idToRegsActive,
+    idToImmGenActive,
+    idRd1ToIdExActive,
+    idRd2ToIdExActive,
+    idImmToIdExActive,
+    idPcToIdExActive,
+    exRd1ToAluActive,
+    exRd2TrunkActive,
+    exRd2ToAluSrcActive,
+    exRd2ToWriteDataActive,
+    exImmTrunkActive,
+    exImmToAluSrcActive,
+    exAluSrcToAluActive,
+    exBranchAddActive,
+    exImmToBranchAddActive,
+    exPcToBranchAddActive,
+    exAluToExMemActive,
+    memAluTrunkActive,
+    memAluToDmemAddrActive,
+    memAluBypassActive,
+    memWriteDataActive,
+    memDmemReadDataActive,
+    wbAluBypassActive,
+    wbDmemReadDataActive,
+    wbReverseFeedbackActive,
+  } = computePipelineWireState(currentData, isSingle);
 
   const wireStyle = (active: boolean): React.CSSProperties => ({
     opacity: (isInitialEmpty || active) ? 1 : 0,
@@ -318,6 +258,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   });
 
   // 10진수 PC 주소값 계산
+  const buffers = currentData?.buffers;
   const ifPcStr = buffers?.IF?.pc || currentData?.global_result?.current_pc;
   const ifPcNum = numericPc(ifPcStr);
   const ifPcDec = Number.isFinite(ifPcNum) ? String(ifPcNum) : (ifPcStr || "0");
@@ -2421,4 +2362,4 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   );
 };
 
-export default PipelineVisualizer;
+export default React.memo(PipelineVisualizer);

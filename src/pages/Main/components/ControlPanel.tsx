@@ -39,7 +39,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isReady = true,
   isCompiling = false,
   mode = "pipeline",
-  simulationData: _simulationData = null,
   editorTarget = "c",
   onChangeEditorTarget,
   onChangeSimulationMode,

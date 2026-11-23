@@ -26,36 +26,28 @@ export function useSimulationPlayback({
   const totalCycles = historyList.length;
   const isSimulationReady = historyList.length > 0;
 
-  const [currentCycle, setCurrentCycle] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(3000);
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
+  const [targetCycles, setTargetCycles] = useState<Record<"c" | "asm", number>>({ c: 0, asm: 0 });
+  const [prevTarget, setPrevTarget] = useState<"c" | "asm">(editorTarget);
+  const currentCycle = targetCycles[editorTarget];
+  const setCurrentCycle: React.Dispatch<React.SetStateAction<number>> = (action) => {
+    setTargetCycles((prev) => {
+      const nextVal = typeof action === "function" ? action(prev[editorTarget]) : action;
+      return { ...prev, [editorTarget]: nextVal };
+    });
+  };
 
-  // C 모드와 ASM 모드 간 전환 시 각 모드의 사이클 및 재생 상태를 복원하기 위한 캐시
-  const targetCycleCache = useRef<Record<"c" | "asm", { cycle: number; isPlaying: boolean; playSpeed: number }>>({
-    c: { cycle: 0, isPlaying: false, playSpeed: 3000 },
-    asm: { cycle: 0, isPlaying: false, playSpeed: 3000 },
-  });
-  const prevTargetRef = useRef<"c" | "asm">(editorTarget);
-
-  // 모드(editorTarget)가 바뀔 때 이전 모드의 사이클을 저장하고 새 모드의 사이클로 복원
-  useEffect(() => {
-    const prevTarget = prevTargetRef.current;
-    if (prevTarget !== editorTarget) {
-      targetCycleCache.current[prevTarget] = {
-        cycle: currentCycle,
-        isPlaying: false,
-        playSpeed,
-      };
-
-      const restored = targetCycleCache.current[editorTarget];
-      const validCycle = historyList.length > 0 ? Math.min(restored.cycle, historyList.length) : 0;
-      setCurrentCycle(validCycle);
-      setIsPlaying(false);
-      prevTargetRef.current = editorTarget;
+  if (prevTarget !== editorTarget) {
+    setPrevTarget(editorTarget);
+    setIsPlaying(false);
+    const validCycle = historyList.length > 0 ? Math.min(targetCycles[editorTarget], historyList.length) : 0;
+    if (validCycle !== targetCycles[editorTarget]) {
+      setTargetCycles((prev) => ({ ...prev, [editorTarget]: validCycle }));
     }
-  }, [editorTarget, historyList.length, currentCycle, playSpeed]);
+  }
 
   const [playbackFeedback, setPlaybackFeedback] = useState<{
     type: "play" | "pause" | "reset" | "trash" | "check";

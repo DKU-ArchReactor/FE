@@ -1,4 +1,4 @@
-import { getAuthSession, notifyAuthChanged, useAuthSession } from '@/api/authSession';
+import { clearAuthTokens, getAuthSession, useAuthSession } from '@/api/authSession';
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getMe } from "@/api/auth";
@@ -22,17 +22,13 @@ const Header = () => {
       if (active && getAuthSession().epoch === auth.epoch) setProfile({ epoch: auth.epoch, user: data });
     }).catch(() => {
       if (!active || getAuthSession().epoch !== auth.epoch) return;
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("token_type");
-      notifyAuthChanged();
+      clearAuthTokens();
     });
     return () => { active = false; };
   }, [location.pathname, auth.authenticated, auth.epoch]);
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    notifyAuthChanged();
-    localStorage.removeItem("token_type");
+    clearAuthTokens();
     setProfile(null);
     navigate("/login");
   };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Props = {
   language: 'c' | 'asm';
@@ -11,7 +11,7 @@ export default function AssistantCompileHint({ language, onOpen, onDismiss }: Pr
   const fadeTimerRef = useRef<number | null>(null);
   const dismissTimerRef = useRef<number | null>(null);
 
-  const clearAllTimers = () => {
+  const clearAllTimers = useCallback(() => {
     if (fadeTimerRef.current !== null) {
       window.clearTimeout(fadeTimerRef.current);
       fadeTimerRef.current = null;
@@ -20,9 +20,9 @@ export default function AssistantCompileHint({ language, onOpen, onDismiss }: Pr
       window.clearTimeout(dismissTimerRef.current);
       dismissTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const startTimers = () => {
+  const startTimers = useCallback(() => {
     clearAllTimers();
     // 5초간 표시 후 부드럽게 페이드아웃 (500ms)
     fadeTimerRef.current = window.setTimeout(() => {
@@ -31,7 +31,7 @@ export default function AssistantCompileHint({ language, onOpen, onDismiss }: Pr
         onDismiss();
       }, 500);
     }, 5000);
-  };
+  }, [clearAllTimers, onDismiss]);
 
   useEffect(() => {
     // 마운트 후 자연스러운 페이드인 트랜지션 (500ms)
@@ -44,7 +44,7 @@ export default function AssistantCompileHint({ language, onOpen, onDismiss }: Pr
       cancelAnimationFrame(animFrame);
       clearAllTimers();
     };
-  }, [onDismiss]);
+  }, [clearAllTimers, startTimers]);
 
   const handleMouseEnter = () => {
     clearAllTimers();

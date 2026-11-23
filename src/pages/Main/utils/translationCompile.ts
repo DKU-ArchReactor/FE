@@ -82,39 +82,12 @@ type CompileOptions = {
   onCompiled?: (result: BuildCompileResponse) => void;
 };
 
-export async function compileTranslation(
-  source: string,
-  preferredMode: "single" | "pipeline" = "single",
+async function runDualModeSimulations(
+  result: BuildCompileResponse,
   options: CompileOptions
-): Promise<TranslationCompileResult> {
-  const result = await compileCode({
-    ...(options.fileId ? { file_id: options.fileId } : { content: source, lang: "c" }),
-    compile_profile: "rv32im",
-    compiler_opt: "-O0 -g",
-  }, options.signal);
-  options.signal.throwIfAborted();
-  options.onCompiled?.(result);
-  if (result.status !== "success") {
-    throw new Error(result.log || "컴파일에 실패했습니다.");
-  }
-
-  // 1. Single과 Pipeline 모드를 백그라운드 병렬(Promise.all)로 동시 실행하여 즉시 캐싱
+): Promise<{ singleResult: SimulationResult | null; pipelineResult: SimulationResult | null }> {
   let singleResult: SimulationResult | null = null;
   let pipelineResult: SimulationResult | null = null;
-  let assembly = result.analysis?.instructions.map(item => item.assembly).join("\n") ?? "";
-
-  // 어셈블리 텍스트 가져오기 (선택적 / 폴백 지원)
-  if (result.assembly_url) {
-    try {
-      const response = await fetch(result.assembly_url, { signal: options.signal });
-      if (response.ok) {
-        assembly = await response.text();
-      }
-    } catch {
-      // S3 다운로드 실패 시에도 시뮬레이션 로그에서 어셈블리를 자동 추출하므로 차단하지 않음
-    }
-  }
-
   const targetToken = result.build_id
     ? { build_id: result.build_id }
     : result.simulation_token
@@ -134,10 +107,41 @@ export async function compileTranslation(
       console.warn("시뮬레이션 동시 실행 실패:", simError);
     }
   }
+  return { singleResult, pipelineResult };
+}
 
+export async function compileTranslation(
+  source: string,
+  preferredMode: "single" | "pipeline" = "single",
+  options: CompileOptions
+): Promise<TranslationCompileResult> {
+  const result = await compileCode({
+    ...(options.fileId ? { file_id: options.fileId } : { content: source, lang: "c" }),
+    compile_profile: "rv32im",
+    compiler_opt: "-O0 -g",
+  }, options.signal);
+  options.signal.throwIfAborted();
+  options.onCompiled?.(result);
+  if (result.status !== "success") {
+    throw new Error(result.log || "컴파일에 실패했습니다.");
+  }
+
+  let assembly = result.analysis?.instructions.map(item => item.assembly).join("\n") ?? "";
+
+  if (result.assembly_url) {
+    try {
+      const response = await fetch(result.assembly_url, { signal: options.signal });
+      if (response.ok) {
+        assembly = await response.text();
+      }
+    } catch {
+      // S3 다운로드 실패 시에도 시뮬레이션 로그에서 어셈블리를 자동 추출하므로 차단하지 않음
+    }
+  }
+
+  const { singleResult, pipelineResult } = await runDualModeSimulations(result, options);
   const activeResult = preferredMode === "single" ? singleResult : pipelineResult;
 
-  // S3 assembly_url이 없으면(단일 패스 컴파일), 상단 code_mapping에서 어셈블리 텍스트를 자동 생성
   if (!assembly && activeResult) {
     const rows = extractAssemblyFromSimulation(activeResult);
     if (rows.length > 0) {
@@ -172,28 +176,7 @@ export async function compileAssemblyDirectly(
     throw new Error(result.log || "어셈블리 빌드에 실패했습니다.");
   }
 
-  let singleResult: SimulationResult | null = null;
-  let pipelineResult: SimulationResult | null = null;
-  const targetToken = result.build_id
-    ? { build_id: result.build_id }
-    : result.simulation_token
-    ? { simulation_token: result.simulation_token }
-    : null;
-
-  options.signal.throwIfAborted();
-  if (targetToken) {
-    try {
-      const [pRes, sRes] = await Promise.allSettled([
-        runSimulation({ ...targetToken, mode: "pipeline", max_cycles: 2000, capture_assistant_context: options.capture }, options.signal),
-        runSimulation({ ...targetToken, mode: "single", max_cycles: 2000, capture_assistant_context: options.capture }, options.signal),
-      ]);
-      if (pRes.status === "fulfilled") pipelineResult = pRes.value;
-      if (sRes.status === "fulfilled") singleResult = sRes.value;
-    } catch (simError) {
-      console.warn("어셈블리 시뮬레이션 동시 실행 실패:", simError);
-    }
-  }
-
+  const { singleResult, pipelineResult } = await runDualModeSimulations(result, options);
   const activeResult = preferredMode === "single" ? singleResult : pipelineResult;
 
   return {

@@ -20,7 +20,7 @@ interface ResizingPair {
 }
 
 export function useResizableLayout(
-  sections: SectionConfig[],
+  _sections: SectionConfig[],
   setSections: React.Dispatch<React.SetStateAction<SectionConfig[]>>
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,7 +110,7 @@ export function useResizableLayout(
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [resizingRowSlot, resizingPair, sections, setSections]);
+  }, [resizingRowSlot, resizingPair, setSections]);
 
   const handleSlotResizeStart = (
     secIdx: number,
@@ -155,31 +155,37 @@ export function useResizableLayout(
   };
 
   const handlePairReset = (secIdx: number, slotIdx: number) => {
-    setSections((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      const targetSlot = next[secIdx]?.slots[slotIdx];
-      if (targetSlot) {
-        targetSlot.pairRatio = 50;
-      }
-      return next;
-    });
+    setSections((prev) =>
+      prev.map((sec, sIdx) => {
+        if (sIdx !== secIdx) return sec;
+        return {
+          ...sec,
+          slots: sec.slots.map((sl, slIdx) =>
+            slIdx === slotIdx && sl.type === 'pair' ? { ...sl, pairRatio: 50 } : sl
+          ),
+        };
+      })
+    );
   };
 
   const handleSlotReset = (secIdx: number, slotIdx: number) => {
     const defaults = getDefaultSections();
-    setSections((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      const sec = next[secIdx];
-      const defaultSec = defaults[secIdx];
-      if (!sec || !defaultSec) return next;
-
-      const slots = sec.slots;
-      if (slots && slots[slotIdx] && slots[slotIdx + 1]) {
-        slots[slotIdx].flexRatio = defaultSec.slots[slotIdx]?.flexRatio ?? 1;
-        slots[slotIdx + 1].flexRatio = defaultSec.slots[slotIdx + 1]?.flexRatio ?? 1;
-      }
-      return next;
-    });
+    setSections((prev) =>
+      prev.map((sec, sIdx) => {
+        if (sIdx !== secIdx) return sec;
+        const defaultSec = defaults[secIdx];
+        if (!defaultSec) return sec;
+        return {
+          ...sec,
+          slots: sec.slots.map((sl, slIdx) => {
+            if (slIdx === slotIdx || slIdx === slotIdx + 1) {
+              return { ...sl, flexRatio: defaultSec.slots[slIdx]?.flexRatio ?? 1 };
+            }
+            return sl;
+          }),
+        };
+      })
+    );
   };
 
   return {

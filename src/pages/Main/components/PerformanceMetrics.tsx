@@ -116,4 +116,4 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
   );
 };
 
-export default PerformanceMetrics;
+export default React.memo(PerformanceMetrics);
