@@ -196,6 +196,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   }
 
   const {
+    buffers,
     cycle_events,
     clock,
     isStall,
@@ -258,7 +259,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   });
 
   // 10진수 PC 주소값 계산
-  const buffers = currentData?.buffers;
   const ifPcStr = buffers?.IF?.pc || currentData?.global_result?.current_pc;
   const ifPcNum = numericPc(ifPcStr);
   const ifPcDec = Number.isFinite(ifPcNum) ? String(ifPcNum) : (ifPcStr || "0");
