@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
-import {buildInstructionFlow, instructionPc, instructionFlowDuration, singleFlowDuration} from '../utils/instructionFlow';
+import { buildInstructionFlow, instructionPc, instructionFlowDuration, singleFlowDuration } from '../utils/instructionFlow';
 
-import {instructionAt} from '../utils/tutorAnalysis';
+import { instructionAt } from '../utils/tutorAnalysis';
 
 interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;
@@ -55,7 +55,7 @@ export function useSimulationPlayback({
   } | null>(null);
 
   const timerRef = useRef<number | null>(null);
-  const singleClock = useRef<{frame: CycleHistoryItem | null; duration: number; remaining: number; started: number | null} | null>(null);
+  const singleClock = useRef<{ frame: CycleHistoryItem | null; duration: number; remaining: number; started: number | null } | null>(null);
 
   const triggerPlaybackFeedback = (type: "play" | "pause" | "reset" | "trash" | "check") => {
     setPlaybackFeedback({ type, id: Date.now() });
@@ -159,8 +159,8 @@ export function useSimulationPlayback({
     currentCycle === 0
       ? null
       : currentCycle === 1
-      ? initialResetData
-      : (historyList[Math.min(currentCycle - 2, historyList.length - 1)] ?? null);
+        ? initialResetData
+        : (historyList[Math.min(currentCycle - 2, historyList.length - 1)] ?? null);
 
   // Single 모드 또는 Pipeline 모드에서 현재 활성 실행 중인 어셈블리 행 계산
   const currentActiveRow = (() => {
@@ -269,12 +269,12 @@ export function useSimulationPlayback({
   // left a completed diagram apparently frozen after Pause -> Play.
   useEffect(() => {
     const advance = () => setCurrentCycle(previous => {
-      if (previous >= totalCycles) {setIsPlaying(false);return previous;}
+      if (previous >= totalCycles) { setIsPlaying(false); return previous; }
       return previous + 1;
     });
     if (isSingleEngine) {
       if (!singleClock.current || singleClock.current.frame !== singleFrame)
-        singleClock.current = {frame: singleFrame, duration: singlePlaybackDelay, remaining: singlePlaybackDelay, started: null};
+        singleClock.current = { frame: singleFrame, duration: singlePlaybackDelay, remaining: singlePlaybackDelay, started: null };
       const clock = singleClock.current;
       if (clock.duration !== singlePlaybackDelay) {
         clock.remaining = clock.remaining * singlePlaybackDelay / clock.duration;
@@ -283,7 +283,7 @@ export function useSimulationPlayback({
       if (!isPlaying) return;
       onClearSelection();
       clock.started = performance.now();
-      timerRef.current = window.setTimeout(() => {clock.remaining = 0;clock.started = null;if(singlePlaybackFrame >= totalCycles)setFinishedSingleFrame(singleFrame);advance();}, clock.remaining);
+      timerRef.current = window.setTimeout(() => { clock.remaining = 0; clock.started = null; if (singlePlaybackFrame >= totalCycles) setFinishedSingleFrame(singleFrame); advance(); }, clock.remaining);
       return () => {
         if (timerRef.current !== null) clearTimeout(timerRef.current);
         if (clock.started !== null) {
@@ -296,7 +296,7 @@ export function useSimulationPlayback({
     if (!isPlaying) return;
     onClearSelection();
     timerRef.current = window.setInterval(advance, playSpeed);
-    return () => {if (timerRef.current !== null) clearInterval(timerRef.current);};
+    return () => { if (timerRef.current !== null) clearInterval(timerRef.current); };
   }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection, singlePlaybackDelay, singlePlaybackFrame, singleFrame]);
 
   const pauseForFlow = () => {

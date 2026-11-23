@@ -22,8 +22,8 @@ import type { MappedAssemblyRow } from "../utils/translationCompile";
 const EMPTY_REGISTERS: Record<string, string> = {};
 
 interface PanelRendererProps {
-  tutorSelection?:{kind:'c'|'asm';revision:number};
-  onTutorSelect?:(kind:'c'|'asm')=>void;
+  tutorSelection?: { kind: 'c' | 'asm'; revision: number };
+  onTutorSelect?: (kind: 'c' | 'asm') => void;
   onSourceSelection?: (selection: EditorSelection | null) => void;
   panelKey: PanelKey;
   simulationData: SimulationResult | null;
@@ -180,7 +180,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           error={translationError}
           selectedLine={translationSelectedLine}
           executionLine={activeExecutionCLine}
-          onSelectLine={(...args)=>{if(args[0]!=null)onTutorSelect?.('c');onSelectTranslationLine(...args);}}
+          onSelectLine={(...args) => { if (args[0] != null) onTutorSelect?.('c'); onSelectTranslationLine(...args); }}
           savedFiles={savedFiles}
           isLoggedIn={isLoggedIn}
           currentFileId={fileId}
@@ -203,7 +203,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           selectedLine={translationSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           executionLine={activeExecutionCLine}
-          onSelectLine={(...args)=>{if(args[0]!=null||args[1]!=null)onTutorSelect?.('asm');onSelectTranslationLine(...args);}}
+          onSelectLine={(...args) => { if (args[0] != null || args[1] != null) onTutorSelect?.('asm'); onSelectTranslationLine(...args); }}
           stageBuffers={currentData?.buffers}
           prevStageBuffers={prevData?.buffers}
           cycleEvents={currentData?.cycle_events}

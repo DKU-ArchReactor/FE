@@ -1147,7 +1147,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 height="36"
                 rx="18"
                 fill="#F1F5F9"
-                stroke="#CBD5E1"
+                stroke="#94A3B8"
                 strokeWidth="1.5"
                 className="transition-colors duration-150"
               />
@@ -1231,7 +1231,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               <rect
                 x="-40"
                 y="104"
-                width="210"
+                width="240"
                 height="76"
                 rx="10"
                 fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
@@ -1239,15 +1239,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.5"
               />
               <path
-                d="M -40,114 a 10,10 0 0 1 10,-10 h 190 a 10,10 0 0 1 10,10 v 20 h -210 z"
+                d="M -40,114 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
                 fill={isIfActive ? "#EF4444" : "#94A3B8"}
               />
               <text
-                x="65"
-                y="119"
+                x="80"
+                y="121"
                 dominantBaseline="central"
                 fill="#FFFFFF"
-                fontSize="16"
+                fontSize="19"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -1256,15 +1256,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </text>
               <line
                 x1="-40"
-                y1="134"
-                x2="170"
-                y2="134"
+                y1="137"
+                x2="200"
+                y2="137"
                 stroke={isIfActive ? "#EF4444" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
-                x="65"
-                y="157"
+                x="80"
+                y="159"
                 dominantBaseline="central"
                 fill={isIfActive ? "#991B1B" : "#94A3B8"}
                 fontSize="19"
@@ -1281,7 +1281,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               <rect
                 x="-40"
                 y="388"
-                width="210"
+                width="240"
                 height="76"
                 rx="10"
                 fill={isIdActive ? "#FFF7ED" : "#F8FAFC"}
@@ -1289,15 +1289,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.5"
               />
               <path
-                d="M -40,398 a 10,10 0 0 1 10,-10 h 190 a 10,10 0 0 1 10,10 v 20 h -210 z"
+                d="M -40,398 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
                 fill={isIdActive ? "#EA580C" : "#94A3B8"}
               />
               <text
-                x="65"
-                y="403"
+                x="80"
+                y="405"
                 dominantBaseline="central"
                 fill="#FFFFFF"
-                fontSize="16"
+                fontSize="19"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -1306,15 +1306,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </text>
               <line
                 x1="-40"
-                y1="418"
-                x2="170"
-                y2="418"
+                y1="421"
+                x2="200"
+                y2="421"
                 stroke={isIdActive ? "#EA580C" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
-                x="65"
-                y="441"
+                x="80"
+                y="443"
                 dominantBaseline="central"
                 fill={isIdActive ? "#C2410C" : "#94A3B8"}
                 fontSize="19"
@@ -1331,7 +1331,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               <rect
                 x="-40"
                 y="700"
-                width="210"
+                width="240"
                 height="76"
                 rx="10"
                 fill={isExActive ? "#F0FDF4" : "#F8FAFC"}
@@ -1339,15 +1339,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.5"
               />
               <path
-                d="M -40,710 a 10,10 0 0 1 10,-10 h 190 a 10,10 0 0 1 10,10 v 20 h -210 z"
+                d="M -40,710 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
                 fill={isExActive ? "#16A34A" : "#94A3B8"}
               />
               <text
-                x="65"
-                y="715"
+                x="80"
+                y="717"
                 dominantBaseline="central"
                 fill="#FFFFFF"
-                fontSize="16"
+                fontSize="19"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -1356,15 +1356,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </text>
               <line
                 x1="-40"
-                y1="730"
-                x2="170"
-                y2="730"
+                y1="733"
+                x2="200"
+                y2="733"
                 stroke={isExActive ? "#16A34A" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
-                x="65"
-                y="753"
+                x="80"
+                y="755"
                 dominantBaseline="central"
                 fill={isExActive ? "#15803D" : "#94A3B8"}
                 fontSize="19"
@@ -1381,7 +1381,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               <rect
                 x="-40"
                 y="1008"
-                width="210"
+                width="240"
                 height="76"
                 rx="10"
                 fill={isMemActive ? "#F0F9FF" : "#F8FAFC"}
@@ -1389,15 +1389,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.5"
               />
               <path
-                d="M -40,1018 a 10,10 0 0 1 10,-10 h 190 a 10,10 0 0 1 10,10 v 20 h -210 z"
+                d="M -40,1018 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
                 fill={isMemActive ? "#0284C7" : "#94A3B8"}
               />
               <text
-                x="65"
-                y="1023"
+                x="80"
+                y="1025"
                 dominantBaseline="central"
                 fill="#FFFFFF"
-                fontSize="16"
+                fontSize="19"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -1406,15 +1406,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </text>
               <line
                 x1="-40"
-                y1="1038"
-                x2="170"
-                y2="1038"
+                y1="1041"
+                x2="200"
+                y2="1041"
                 stroke={isMemActive ? "#0284C7" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
-                x="65"
-                y="1061"
+                x="80"
+                y="1063"
                 dominantBaseline="central"
                 fill={isMemActive ? "#0369A1" : "#94A3B8"}
                 fontSize="19"
@@ -1431,7 +1431,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               <rect
                 x="-40"
                 y="1229"
-                width="210"
+                width="240"
                 height="76"
                 rx="10"
                 fill={isWbActive ? "#F5F3FF" : "#F8FAFC"}
@@ -1439,15 +1439,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.5"
               />
               <path
-                d="M -40,1239 a 10,10 0 0 1 10,-10 h 190 a 10,10 0 0 1 10,10 v 20 h -210 z"
+                d="M -40,1239 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
                 fill={isWbActive ? "#8B5CF6" : "#94A3B8"}
               />
               <text
-                x="65"
-                y="1244"
+                x="80"
+                y="1246"
                 dominantBaseline="central"
                 fill="#FFFFFF"
-                fontSize="16"
+                fontSize="19"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -1456,15 +1456,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </text>
               <line
                 x1="-40"
-                y1="1259"
-                x2="170"
-                y2="1259"
+                y1="1262"
+                x2="200"
+                y2="1262"
                 stroke={isWbActive ? "#8B5CF6" : "#94A3B8"}
                 strokeWidth="1.5"
               />
               <text
-                x="65"
-                y="1282"
+                x="80"
+                y="1284"
                 dominantBaseline="central"
                 fill={isWbActive ? "#6D28D9" : "#94A3B8"}
                 fontSize="19"
