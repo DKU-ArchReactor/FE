@@ -359,10 +359,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       {/* 3. 속도 조절 (모바일 숨김) */}
       <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] dark:border-[#3E3E42] pl-2 text-[10px]">
         {[
-          { label: "0.5x", speed: 2000 },
-          { label: "1.0x", speed: 1000 },
-          { label: "1.5x", speed: 667 },
-          { label: "2.0x", speed: 500 },
+          { label: "0.5x", speed: 6000 },
+          { label: "1.0x", speed: 3000 },
+          { label: "1.5x", speed: 2000 },
+          { label: "2.0x", speed: 1500 },
+          { label: "3.0x", speed: 1000 },
         ].map(({ label, speed }) => {
           const isSelected = Math.abs(playSpeed - speed) < 50;
           return (

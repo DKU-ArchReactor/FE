@@ -739,10 +739,11 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
 
             <div className="flex items-center gap-0.5 shrink-0 text-[9.5px]">
               {[
-                { label: "0.5x", speed: 2000 },
-                { label: "1.0x", speed: 1000 },
-                { label: "1.5x", speed: 667 },
-                { label: "2.0x", speed: 500 },
+                { label: "0.5x", speed: 6000 },
+                { label: "1.0x", speed: 3000 },
+                { label: "1.5x", speed: 2000 },
+                { label: "2.0x", speed: 1500 },
+                { label: "3.0x", speed: 1000 },
               ].map(({ label, speed }) => {
                 const isSelected = Math.abs(playback.playSpeed - speed) < 50;
                 return (

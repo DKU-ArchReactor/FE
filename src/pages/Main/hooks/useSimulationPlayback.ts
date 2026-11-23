@@ -28,14 +28,14 @@ export function useSimulationPlayback({
 
   const [currentCycle, setCurrentCycle] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [playSpeed, setPlaySpeed] = useState<number>(1000);
+  const [playSpeed, setPlaySpeed] = useState<number>(3000);
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
 
   // C 모드와 ASM 모드 간 전환 시 각 모드의 사이클 및 재생 상태를 복원하기 위한 캐시
   const targetCycleCache = useRef<Record<"c" | "asm", { cycle: number; isPlaying: boolean; playSpeed: number }>>({
-    c: { cycle: 0, isPlaying: false, playSpeed: 1000 },
-    asm: { cycle: 0, isPlaying: false, playSpeed: 1000 },
+    c: { cycle: 0, isPlaying: false, playSpeed: 3000 },
+    asm: { cycle: 0, isPlaying: false, playSpeed: 3000 },
   });
   const prevTargetRef = useRef<"c" | "asm">(editorTarget);
 
@@ -261,7 +261,7 @@ export function useSimulationPlayback({
     setFinishedSingleFrame(null);
     setIsPlaying(false);
     setCurrentCycle(0);
-    setPlaySpeed(1000);
+    setPlaySpeed(3000);
   };
 
   const singlePlaybackDelay = useMemo(() => {

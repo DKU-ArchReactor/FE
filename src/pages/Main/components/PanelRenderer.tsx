@@ -5,6 +5,7 @@ import type { PanelKey } from "../types";
 // 컴포넌트 임포트
 import TutorArea from "./TutorArea";
 import PipelineVisualizer from "./PipelineVisualizer";
+import SingleCycleDatapath from "./SingleCycleDatapath";
 import RegisterVisualizer from "./RegisterVisualizer";
 import MemorySegmentVisualizer from "./MemorySegmentVisualizer";
 import MultiCycleDiagram from "./MultiCycleDiagram";
@@ -16,7 +17,7 @@ import TranslationMapping from "./TranslationMapping";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
-import {singleFlowDuration} from '../utils/instructionFlow';
+
 
 const EMPTY_REGISTERS: Record<string, string> = {};
 
@@ -214,17 +215,49 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
       );
 
     case "pipeline":
+      if (simulationMode === "single") {
+        return (
+          <SingleCycleDatapath
+            lessonContext={{
+              isPlaying,
+              playbackRevision,
+              playbackFinished: singlePlaybackFinished,
+              flowDurationMs: playSpeed,
+              onPausePlayback,
+              source: editorTarget === "c" ? translationSource : undefined,
+              rows: mappedAssemblyRows,
+              selectedAsmIndex: translationSelectedAsmIndex,
+              selectedCLine: editorTarget === "c" ? translationSelectedLine : undefined,
+              onSelectAsm: (line: number | null, index: number) => onSelectTranslationLine(line, index, false),
+              onJumpToCycle,
+            }}
+            currentData={currentData}
+            prevData={prevData}
+            simulationData={simulationData}
+            loadingMessage={loadingMessage}
+          />
+        );
+      }
       return (
         <PipelineVisualizer
-          lessonContext={{isPlaying, playbackRevision, playbackFinished: singlePlaybackFinished, flowDurationMs: singleFlowDuration(playSpeed), onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
-            rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
-            selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
-            onSelectAsm: (line: number | null, index: number) => onSelectTranslationLine(line, index, false), onJumpToCycle}}
+          lessonContext={{
+            isPlaying,
+            playbackRevision,
+            playbackFinished: singlePlaybackFinished,
+            flowDurationMs: playSpeed,
+            onPausePlayback,
+            source: editorTarget === "c" ? translationSource : undefined,
+            rows: mappedAssemblyRows,
+            selectedAsmIndex: translationSelectedAsmIndex,
+            selectedCLine: editorTarget === "c" ? translationSelectedLine : undefined,
+            onSelectAsm: (line: number | null, index: number) => onSelectTranslationLine(line, index, false),
+            onJumpToCycle,
+          }}
           currentData={currentData}
           prevData={prevData}
           simulationData={simulationData}
           loadingMessage={loadingMessage}
-          mode={simulationMode}
+          mode="pipeline"
         />
       );
 
