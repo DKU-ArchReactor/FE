@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { signup } from "@/api/auth";
-import type { SignupRequest, ValidationErrorResponse } from "@/type/auth";
+import type { SignupRequest } from "@/type/auth";
+import { parseApiError } from "@/utils/errorParser";
 
 const SignUpPage = () => {
   const navigate = useNavigate();
@@ -29,18 +29,9 @@ const SignUpPage = () => {
       await signup(formData);
       navigate("/login", { replace: true });
     } catch (error) {
-      if (axios.isAxiosError<ValidationErrorResponse>(error)) {
-        const detail = error.response?.data?.detail;
-        if (Array.isArray(detail) && detail.length > 0) {
-          setErrorMsg(detail.map((d) => d.msg).join(", "));
-        } else if (typeof detail === "string") {
-          setErrorMsg(detail);
-        } else {
-          setErrorMsg("회원가입에 실패했습니다. 입력 정보를 다시 확인해 주세요.");
-        }
-      } else {
-        setErrorMsg("서버와 통신 중 오류가 발생했습니다.");
-      }
+      setErrorMsg(
+        parseApiError(error, "회원가입에 실패했습니다. 입력 정보를 다시 확인해 주세요.")
+      );
     } finally {
       setIsLoading(false);
     }

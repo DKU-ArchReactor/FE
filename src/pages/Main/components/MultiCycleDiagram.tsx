@@ -1,26 +1,13 @@
-import React, { useMemo, useRef, useEffect } from 'react';
-import type { SimulationResult } from '@/type/simulation';
+import React, { useMemo } from 'react';
+import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 import {
   STAGE_STYLES,
   buildMultiCycleTraceRows,
   type TraceRow,
 } from '../utils/multiCycleTrace';
 import type { MappedAssemblyRow } from '../utils/translationCompile';
-
-// 명령어(Opcode)와 피연산자(Operands) 분리 및 정렬 헬퍼 (TranslationMapping 에디터와 동일)
-function splitInstruction(text: string): { opcode: string; operands: string } {
-  const trimmed = text.trim();
-  const firstSpace = trimmed.search(/\s/);
-  if (firstSpace === -1) {
-    return { opcode: trimmed, operands: "" };
-  }
-  const rawOperands = trimmed.slice(firstSpace).trim();
-  const formattedOperands = rawOperands.replace(/,([^\s])/g, ", $1");
-  return {
-    opcode: trimmed.slice(0, firstSpace).trim(),
-    operands: formattedOperands,
-  };
-}
+import { splitInstruction } from '@/utils/instructionFormat';
+import { useSyncedScroll } from '../hooks/useSyncedScroll';
 
 interface MultiCycleDiagramProps {
   simulationData: SimulationResult | null;
@@ -34,6 +21,7 @@ interface MultiCycleDiagramProps {
 const COL_WIDTH = 40;
 const ROW_HEIGHT = 28;
 const LEFT_COL_WIDTH = 300;
+const EMPTY_HISTORY: CycleHistoryItem[] = [];
 
 export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   simulationData,
@@ -43,34 +31,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   mode,
   loadingMessage,
 }) => {
-  const leftScrollRef = useRef<HTMLDivElement>(null);
-  const rightScrollRef = useRef<HTMLDivElement>(null);
-  const isSyncingLeft = useRef(false);
-  const isSyncingRight = useRef(false);
-
-  const handleLeftScroll = () => {
-    if (isSyncingLeft.current) {
-      isSyncingLeft.current = false;
-      return;
-    }
-    if (rightScrollRef.current && leftScrollRef.current) {
-      isSyncingRight.current = true;
-      rightScrollRef.current.scrollTop = leftScrollRef.current.scrollTop;
-    }
-  };
-
-  const handleRightScroll = () => {
-    if (isSyncingRight.current) {
-      isSyncingRight.current = false;
-      return;
-    }
-    if (leftScrollRef.current && rightScrollRef.current) {
-      isSyncingLeft.current = true;
-      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
-    }
-  };
-
-  const history = simulationData?.history ?? [];
+  const history = simulationData?.history ?? EMPTY_HISTORY;
   const totalCycles = history.length;
 
   // 파이프라인/싱글사이클 히스토리를 추적하여 다이어그램 행 생성 (컴파일 전이라도 현재 선택된 mode 우선 반영)
@@ -112,74 +73,16 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       activeHeader: 'bg-purple-600 text-white',
     };
 
-  // 가로 스크롤바 유무에 따라 좌측 명령어 목록 하단 패딩 동기화 (우측 가로 스크롤바로 인한 라인 어긋남 완벽 방지)
-  const [hScrollbarHeight, setHScrollbarHeight] = React.useState<number>(0);
-
-  useEffect(() => {
-    const el = rightScrollRef.current;
-    if (!el) return;
-
-    const updateScrollbarHeight = () => {
-      // clientHeight와 scrollWidth/clientWidth 비교로 가로 스크롤바 높이 계산
-      const hasHorizontalScroll = el.scrollWidth > el.clientWidth;
-      const scrollHeightDiff = el.offsetHeight - el.clientHeight;
-      setHScrollbarHeight(hasHorizontalScroll && scrollHeightDiff > 0 ? scrollHeightDiff : 0);
-    };
-
-    updateScrollbarHeight();
-    const ro = new ResizeObserver(updateScrollbarHeight);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [history.length, traceRows.length]);
-
   // Single-Cycle 및 Pipeline 모드 공통: Cycle 0은 초기 대기 상태(activeCycleCol = -1)이며, Cycle 1~N이 각 C0~CN-1 열에 1:1 매핑
   const activeCycleCol = currentCycle > 0 ? currentCycle - 1 : -1;
 
-  // 현재 사이클이 바뀔 때 해당 사이클 열(C0~CN)과 현재 실행 중인 명령어 행이 화면에 오도록 자동 스크롤
-  useEffect(() => {
-    const rightContainer = rightScrollRef.current;
-    if (!rightContainer || !traceRows.length) return;
-
-    if (activeCycleCol < 0) {
-      rightContainer.scrollTo({
-        left: 0,
-        top: 0,
-        behavior: 'smooth',
-      });
-      return;
-    }
-
-    // 수평 스크롤 (우측 35% 지점에 현재 사이클 열 배치 -> 다음 진행될 사이클들 시야 확보)
-    const targetLeft = Math.max(
-      0,
-      activeCycleCol * COL_WIDTH - rightContainer.clientWidth * 0.35 + COL_WIDTH / 2
-    );
-
-    // 수직 스크롤 (상단 35% 지점에 현재 실행 중인 명령어 행 배치 -> 다음 실행될 명령어들 시야 확보)
-    const activeRowIndices: number[] = [];
-    traceRows.forEach((row, idx) => {
-      if (row.cells[activeCycleCol]) {
-        activeRowIndices.push(idx);
-      }
-    });
-
-    const midRowIdx =
-      activeRowIndices.length > 0
-        ? activeRowIndices[Math.floor(activeRowIndices.length / 2)]
-        : activeCycleCol;
-
-    const targetTop = Math.max(
-      0,
-      midRowIdx * ROW_HEIGHT - (rightContainer.clientHeight - 30) * 0.35 + ROW_HEIGHT / 2
-    );
-
-    // rightContainer를 부드럽게 스크롤하면 handleRightScroll이 좌측 컨테이너의 scrollTop을 프레임 단위로 완벽 동기화
-    rightContainer.scrollTo({
-      left: targetLeft,
-      top: targetTop,
-      behavior: 'smooth',
-    });
-  }, [activeCycleCol, traceRows]);
+  const {
+    leftScrollRef,
+    rightScrollRef,
+    hScrollbarHeight,
+    handleLeftScroll,
+    handleRightScroll,
+  } = useSyncedScroll(history.length, traceRows, activeCycleCol, COL_WIDTH, ROW_HEIGHT);
 
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none transition-colors duration-150">
@@ -649,4 +552,4 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   );
 };
 
-export default MultiCycleDiagram;
+export default React.memo(MultiCycleDiagram);

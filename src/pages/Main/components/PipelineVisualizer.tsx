@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import SingleCycleDatapath from './SingleCycleDatapath';
 import type { InstructionLessonContext } from './InstructionLesson';
+import {
+  computePipelineWireState,
+  isBranch,
+} from '../utils/pipelineWireState';
+import './PipelineVisualizer.css';
 
 interface PipelineVisualizerProps {
   lessonContext?: InstructionLessonContext;
@@ -49,126 +54,61 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     );
   }
 
-  const buffers = currentData?.buffers;
-  const cycle_events = currentData?.cycle_events;
-  const clock = currentData?.clock;
-  const isStall = Boolean(!isSingle && cycle_events?.stall?.has_stall);
-  const isForward = Boolean(!isSingle && cycle_events?.forwarding?.has_forwarded);
-  const isBranchFlush = Boolean(!isSingle && cycle_events?.control_hazard?.has_flush);
-
-  // Single-cycle 모드: 1클럭에 1개 명령어 전체가 IF~WB 전 단계를 한 번에 통과
-  // Pipeline 모드: 각 스테이지 버퍼에 개별 명령어가 순차적으로 위치
-  const singleCycleInst = isSingle
-    ? (buffers?.IF?.assembly || currentData?.stage_activity?.IF?.assembly || currentData?.if_stage?.assembly || '—')
-    : null;
-
-  // 5단계별 명령어
-  const ifInst = isSingle ? (singleCycleInst || '—') : (buffers?.IF?.assembly || '—');
-  const idInst = isSingle ? (singleCycleInst || '—') : (buffers?.ID?.assembly || '—');
-  const exInst = isSingle ? (singleCycleInst || '—') : (buffers?.EX?.assembly || '—');
-  const memInst = isSingle ? (singleCycleInst || '—') : (buffers?.MEM?.assembly || '—');
-  const wbInst = isSingle ? (singleCycleInst || '—') : (buffers?.WB?.assembly || '—');
-
-  // 활성 여부
-  const isIfActive = ifInst !== '—' && ifInst !== 'bubble' && ifInst !== 'empty';
-  const isIdActive = idInst !== '—' && idInst !== 'bubble' && idInst !== 'empty';
-  const isExActive = exInst !== '—' && exInst !== 'bubble' && exInst !== 'empty';
-  const isMemActive = memInst !== '—' && memInst !== 'bubble' && memInst !== 'empty';
-  const isWbActive = wbInst !== '—' && wbInst !== 'bubble' && wbInst !== 'empty';
-
-  // 명령어 파싱 및 세부 동작 분류
-  const parseOp = (assembly: string | null | undefined): string => {
-    if (!assembly) return "";
-    const trimmed = assembly.trim().toLowerCase();
-    if (trimmed === "bubble" || trimmed === "empty" || trimmed === "flush" || trimmed === "stall") return "";
-    const match = trimmed.match(/^([a-z0-9_.]+)/);
-    return match ? match[1] : "";
-  };
-
-  const isRType = (op: string) =>
-    /^(add|sub|and|or|xor|sll|srl|sra|slt|sltu|mul|mulh|mulhsu|mulhu|div|divu|rem|remu)$/.test(op);
-  const isITypeAlu = (op: string) =>
-    /^(addi|andi|ori|xori|slti|sltiu|slli|srli|srai|li|mv|not|neg|seqz|snez)$/.test(op);
-  const isLoad = (op: string) =>
-    /^(lw|lh|lb|lhu|lbu)$/.test(op);
-  const isStore = (op: string) =>
-    /^(sw|sh|sb)$/.test(op);
-  const isBranch = (op: string) =>
-    /^(beq|bne|blt|bge|bltu|bgeu|beqz|bnez|bltz|bgez|blez|bgtz)$/.test(op);
-  const isJump = (op: string) =>
-    /^(jal|jalr|j|jr|ret|call|tail)$/.test(op);
-  const isLui = (op: string) => op === "lui";
-  const isAuipc = (op: string) => op === "auipc";
-
-  const usesRs1 = (op: string) =>
-    isRType(op) || isITypeAlu(op) || isLoad(op) || isStore(op) || isBranch(op) || op === "jalr" || op === "jr" || op === "ret" ||
-    (!isRType(op) && !isITypeAlu(op) && !isLoad(op) && !isStore(op) && !isBranch(op) && !isJump(op) && !isLui(op) && !isAuipc(op) && Boolean(op));
-  const usesRs2 = (op: string) =>
-    isRType(op) || isStore(op) || isBranch(op);
-  const usesImm = (op: string) =>
-    isITypeAlu(op) || isLoad(op) || isStore(op) || isBranch(op) || isLui(op) || isAuipc(op) || isJump(op) ||
-    (!isRType(op) && Boolean(op));
-  const usesPc = (op: string) =>
-    isBranch(op) || isJump(op) || isAuipc(op);
-  const writesReg = (op: string) =>
-    isRType(op) || isITypeAlu(op) || isLoad(op) || isLui(op) || isAuipc(op) || op === "jal" || op === "jalr" || op === "call" ||
-    (!isStore(op) && !isBranch(op) && Boolean(op));
-
-  const ifOp = parseOp(ifInst);
-  const idOp = parseOp(idInst);
-  const exOp = parseOp(exInst);
-  const memOp = parseOp(memInst);
-  const wbOp = parseOp(wbInst);
-
-  // 컴파일 이전(currentData === null)에는 전체 도식 개형을 보여주기 위해 모든 선을 표시하고,
-  // 컴파일 이후(시뮬레이션 재생 중)에는 실제로 신호가 흐르는 활성 선만 보여주고 비활성 선은 투명화합니다.
-  const isInitialEmpty = !currentData;
-  const inactiveStroke = isInitialEmpty ? "#94A3B8" : "transparent";
-  const inactiveMarker = isInitialEmpty ? "url(#m-arr-def)" : undefined;
-
-  // [IF 단계 와이어 활성 조건]
-  const ifPcMuxToPcActive = isIfActive;
-  const ifPcToImemActive = isIfActive;
-  const ifPcToPlus4Active = isIfActive;
-  const ifPcToIfIdActive = isIfActive && usesPc(ifOp);
-  const ifPlus4LoopbackActive = isIfActive && !isBranchFlush;
-  const branchLoopbackActive = isBranchFlush || Boolean(cycle_events?.control_hazard?.taken);
-  const ifImemToIfIdActive = isIfActive;
-
-  // [ID 단계 와이어 활성 조건]
-  const idTrunkActive = isIdActive;
-  const idControlUnitActive = isIdActive;
-  const idToRegsActive = isIdActive && (usesRs1(idOp) || usesRs2(idOp));
-  const idToImmGenActive = isIdActive && usesImm(idOp);
-  const idRd1ToIdExActive = isIdActive && usesRs1(idOp);
-  const idRd2ToIdExActive = isIdActive && usesRs2(idOp);
-  const idImmToIdExActive = isIdActive && usesImm(idOp);
-  const idPcToIdExActive = isIdActive && usesPc(idOp);
-
-  // [EX 단계 와이어 활성 조건]
-  const exRd1ToAluActive = isExActive && usesRs1(exOp);
-  const exRd2TrunkActive = isExActive && usesRs2(exOp);
-  const exRd2ToAluSrcActive = isExActive && (isRType(exOp) || isBranch(exOp));
-  const exRd2ToWriteDataActive = isExActive && isStore(exOp);
-  const exImmTrunkActive = isExActive && usesImm(exOp);
-  const exImmToAluSrcActive = isExActive && (isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
-  const exAluSrcToAluActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isBranch(exOp) || isLui(exOp) || exOp === "jalr");
-  const exBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exImmToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exPcToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exAluToExMemActive = isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
-
-  // [MEM 단계 와이어 활성 조건]
-  const memAluTrunkActive = isMemActive && (isLoad(memOp) || isStore(memOp) || isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
-  const memAluToDmemAddrActive = isMemActive && (isLoad(memOp) || isStore(memOp));
-  const memAluBypassActive = isMemActive && (isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
-  const memWriteDataActive = isMemActive && isStore(memOp);
-  const memDmemReadDataActive = isMemActive && isLoad(memOp);
-
-  // [WB 단계 와이어 활성 조건]
-  const wbAluBypassActive = isWbActive && (isRType(wbOp) || isITypeAlu(wbOp) || isLui(wbOp) || isAuipc(wbOp) || wbOp === "jalr");
-  const wbDmemReadDataActive = isWbActive && isLoad(wbOp);
-  const wbReverseFeedbackActive = isWbActive && writesReg(wbOp);
+  const {
+    cycle_events,
+    clock,
+    isStall,
+    isForward,
+    isBranchFlush,
+    ifInst,
+    idInst,
+    exInst,
+    memInst,
+    wbInst,
+    isIfActive,
+    isIdActive,
+    isExActive,
+    isMemActive,
+    isWbActive,
+    exOp,
+    isInitialEmpty,
+    inactiveStroke,
+    inactiveMarker,
+    ifPcMuxToPcActive,
+    ifPcToImemActive,
+    ifPcToPlus4Active,
+    ifPcToIfIdActive,
+    ifPlus4LoopbackActive,
+    branchLoopbackActive,
+    ifImemToIfIdActive,
+    idTrunkActive,
+    idControlUnitActive,
+    idToRegsActive,
+    idToImmGenActive,
+    idRd1ToIdExActive,
+    idRd2ToIdExActive,
+    idImmToIdExActive,
+    idPcToIdExActive,
+    exRd1ToAluActive,
+    exRd2TrunkActive,
+    exRd2ToAluSrcActive,
+    exRd2ToWriteDataActive,
+    exImmTrunkActive,
+    exImmToAluSrcActive,
+    exAluSrcToAluActive,
+    exBranchAddActive,
+    exImmToBranchAddActive,
+    exPcToBranchAddActive,
+    exAluToExMemActive,
+    memAluTrunkActive,
+    memAluToDmemAddrActive,
+    memAluBypassActive,
+    memWriteDataActive,
+    memDmemReadDataActive,
+    wbAluBypassActive,
+    wbDmemReadDataActive,
+    wbReverseFeedbackActive,
+  } = computePipelineWireState(currentData, isSingle);
 
   const wireStyle = (active: boolean): React.CSSProperties => ({
     opacity: (isInitialEmpty || active) ? 1 : 0,
@@ -189,147 +129,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
-      {/* 동적 CSS 애니메이션 및 정밀 스트리밍 스타일: 2.0초 주기로 Step 0 -> 1 -> 2 -> 3 순차 전파 */}
-      <style>{`
-        /* 1) 실선 펄스 애니메이션 (dash 없음, 굵기와 투명도만 펄스 전파) */
-        @keyframes solidPulseStep0 {
-          0%       { opacity: 0.35; stroke-width: 2.8; }
-          12%, 28% { opacity: 1.0;  stroke-width: 4.0; }
-          45%      { opacity: 0.85; stroke-width: 2.8; }
-          85%      { opacity: 0.8;  stroke-width: 2.8; }
-          100%     { opacity: 0.35; stroke-width: 2.8; }
-        }
-        @keyframes solidPulseStep1 {
-          0%, 18%  { opacity: 0.25; stroke-width: 2.8; }
-          30%, 48% { opacity: 1.0;  stroke-width: 4.0; }
-          65%      { opacity: 0.85; stroke-width: 2.8; }
-          85%      { opacity: 0.8;  stroke-width: 2.8; }
-          100%     { opacity: 0.25; stroke-width: 2.8; }
-        }
-        @keyframes solidPulseStep2 {
-          0%, 40%  { opacity: 0.25; stroke-width: 2.8; }
-          52%, 72% { opacity: 1.0;  stroke-width: 4.0; }
-          82%      { opacity: 0.85; stroke-width: 2.8; }
-          90%      { opacity: 0.8;  stroke-width: 2.8; }
-          100%     { opacity: 0.25; stroke-width: 2.8; }
-        }
-        @keyframes solidPulseStep3 {
-          0%, 65%  { opacity: 0.25; stroke-width: 2.8; }
-          75%, 94% { opacity: 1.0;  stroke-width: 4.0; }
-          98%      { opacity: 0.85; stroke-width: 2.8; }
-          100%     { opacity: 0.35; stroke-width: 2.8; }
-        }
-
-        .wire-solid-step-0 {
-          animation: solidPulseStep0 2.0s linear infinite;
-        }
-        .wire-solid-step-1 {
-          animation: solidPulseStep1 2.0s linear infinite;
-        }
-        .wire-solid-step-2 {
-          animation: solidPulseStep2 2.0s linear infinite;
-        }
-        .wire-solid-step-3 {
-          animation: solidPulseStep3 2.0s linear infinite;
-        }
-
-        /* 2) 점선 제어선 애니메이션 (strokeDasharray 6 3 유지, dashoffset 행진 및 펄스) */
-        @keyframes dashedPulseStep0 {
-          0%       { stroke-dashoffset: 36; opacity: 0.35; stroke-width: 2.8; }
-          12%, 28% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
-          45%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          85%      { stroke-dashoffset: -36; opacity: 0.8; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -54; opacity: 0.35; stroke-width: 2.8; }
-        }
-        @keyframes dashedPulseStep1 {
-          0%, 18%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
-          30%, 48% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
-          65%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          85%      { stroke-dashoffset: -36; opacity: 0.8; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -54; opacity: 0.25; stroke-width: 2.8; }
-        }
-        @keyframes dashedPulseStep2 {
-          0%, 40%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
-          52%, 72% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
-          82%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          90%      { stroke-dashoffset: -27; opacity: 0.8; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -36; opacity: 0.25; stroke-width: 2.8; }
-        }
-        @keyframes dashedPulseStep3 {
-          0%, 65%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
-          75%, 94% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
-          98%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
-          100%     { stroke-dashoffset: -18; opacity: 0.35; stroke-width: 2.8; }
-        }
-
-        .wire-dashed-step-0 {
-          stroke-dasharray: 6 3;
-          animation: dashedPulseStep0 2.0s linear infinite;
-        }
-        .wire-dashed-step-1 {
-          stroke-dasharray: 6 3;
-          animation: dashedPulseStep1 2.0s linear infinite;
-        }
-        .wire-dashed-step-2 {
-          stroke-dasharray: 6 3;
-          animation: dashedPulseStep2 2.0s linear infinite;
-        }
-        .wire-dashed-step-3 {
-          stroke-dasharray: 6 3;
-          animation: dashedPulseStep3 2.0s linear infinite;
-        }
-
-        @keyframes dotPulse0 {
-          0%, 100% { r: 3.5; opacity: 0.5; }
-          15%      { r: 5.5; opacity: 1.0; }
-          35%      { r: 3.5; opacity: 0.85; }
-        }
-        @keyframes dotPulse1 {
-          0%, 15%, 100% { r: 3.5; opacity: 0.5; }
-          35%           { r: 5.5; opacity: 1.0; }
-          55%           { r: 3.5; opacity: 0.85; }
-        }
-        @keyframes dotPulse2 {
-          0%, 38%, 100% { r: 3.5; opacity: 0.5; }
-          58%           { r: 5.5; opacity: 1.0; }
-          78%           { r: 3.5; opacity: 0.85; }
-        }
-        @keyframes dotPulse3 {
-          0%, 62%, 100% { r: 3.5; opacity: 0.5; }
-          82%           { r: 5.5; opacity: 1.0; }
-          98%           { r: 3.5; opacity: 0.85; }
-        }
-        .dot-step-0 { animation: dotPulse0 2.0s ease-in-out infinite; }
-        .dot-step-1 { animation: dotPulse1 2.0s ease-in-out infinite; }
-        .dot-step-2 { animation: dotPulse2 2.0s ease-in-out infinite; }
-        .dot-step-3 { animation: dotPulse3 2.0s ease-in-out infinite; }
-
-        @keyframes boxPulse0 {
-          0%, 100% { stroke-width: 2px; }
-          15%      { stroke-width: 3.2px; }
-          35%      { stroke-width: 2px; }
-        }
-        @keyframes boxPulse1 {
-          0%, 15%, 100% { stroke-width: 2px; }
-          35%           { stroke-width: 3.2px; }
-          55%           { stroke-width: 2px; }
-        }
-        @keyframes boxPulse2 {
-          0%, 38%, 100% { stroke-width: 2px; }
-          58%           { stroke-width: 3.2px; }
-          78%           { stroke-width: 2px; }
-        }
-        @keyframes boxPulse3 {
-          0%, 62%, 100% { stroke-width: 2px; }
-          82%           { stroke-width: 3.2px; }
-          98%           { stroke-width: 2px; }
-        }
-        .box-step-0 { animation: boxPulse0 2.0s ease-in-out infinite; }
-        .box-step-1 { animation: boxPulse1 2.0s ease-in-out infinite; }
-        .box-step-2 { animation: boxPulse2 2.0s ease-in-out infinite; }
-        .box-step-3 { animation: boxPulse3 2.0s ease-in-out infinite; }
-      `}</style>
-
       {/* 1. 상단 헤더 & 컨트롤러 */}
       <div className={`h-8 shrink-0 flex items-center justify-between px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 ${isSingle ? "border-l-amber-500" : "border-l-blue-500"}`}>
         <div className="flex items-center gap-1.5 min-w-0">
@@ -1895,4 +1694,4 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   );
 };
 
-export default PipelineVisualizer;
+export default React.memo(PipelineVisualizer);

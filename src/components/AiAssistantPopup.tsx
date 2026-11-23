@@ -1,23 +1,14 @@
-import type { ExecutionContext, ExecutionReference } from '@/type/assistant';
-import { captureEditorSource, selectedEditorSource, type EditorSelection } from '@/pages/Main/utils/assistantSource';
+import React from "react";
+import type { EditorSelection } from '@/pages/Main/utils/assistantSource';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
-import { contextAvailability, availableMemory, freezeExecutionContext } from '@/pages/Main/utils/assistantContext';
-import { getAssistantStatus, isServiceNotice, streamChat, type AssistantStatus, type ChatMessage } from "@/api/assistant";
-import React, { lazy, Suspense, useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
-
-const AssistantMarkdown = lazy(() => import('./AssistantMarkdown').then(module => ({ default: module.AssistantMarkdown })));
-
-interface Message {
-  id: string;
-  sender: "ai" | "user";
-  text: string;
-  time: string;
-  complete?: boolean;
-  notice?: string;
-  context?: ExecutionReference;
-  requestedContext?: ExecutionContext;
-  sourceInfo?: { language: 'c' | 'asm'; characters: number; label: string };
-}
+import {
+  useFloatingWindow,
+  getSiteHeaderBottom,
+  MIN_POPUP_WIDTH,
+  MIN_POPUP_HEIGHT,
+} from "./AiAssistant/useFloatingWindow";
+import { useAssistantChat } from "./AiAssistant/useAssistantChat";
+import { AssistantMessageList } from "./AiAssistant/AssistantMessageList";
 
 interface Props {
   sourceSelection?: EditorSelection | null;
@@ -47,496 +38,80 @@ const QUESTION_EXAMPLES = [
   { label: '🔍 코드·실행 비교', question: '작성 중인 코드와 첨부 실행이 같은 코드인지 확인 가능한지 먼저 말하고, 확인되는 범위에서 실행 상태를 설명해줘. 코드나 실행 정보가 부족하면 필요한 자료를 요청하고, 코드가 비슷하다는 이유만으로 같은 실행이라고 단정하지 마.' },
 ];
 
-const DEFAULT_POPUP_WIDTH = 480;
-const DEFAULT_POPUP_HEIGHT = 570;
-const MIN_POPUP_WIDTH = 480;
-const MIN_POPUP_HEIGHT = 570;
-
-// 사이트 글로벌 헤더의 하단 경계(px) 계산
-export const getSiteHeaderBottom = () => {
-  if (typeof document === "undefined") return 48;
-  const siteHeader = document.querySelector("header.sticky") || document.querySelector("header");
-  if (siteHeader) {
-    const rect = siteHeader.getBoundingClientRect();
-    return Math.max(48, Math.round(rect.bottom));
-  }
-  return 48;
-};
-
-type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
-
-const getResizeCursor = (dir: ResizeDirection): string => {
-  switch (dir) {
-    case 'n':
-    case 's':
-      return 'ns-resize';
-    case 'e':
-    case 'w':
-      return 'ew-resize';
-    case 'ne':
-    case 'sw':
-      return 'nesw-resize';
-    case 'nw':
-    case 'se':
-      return 'nwse-resize';
-  }
-};
-
-export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, inline = false, authenticated, simulation, currentData, mode, beforeExecution, editorLanguage = 'c', editorContent = '', sourceSelection }) => {
+export const AiAssistantPopup: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  anchorRef,
+  inline = false,
+  authenticated,
+  simulation,
+  currentData,
+  mode,
+  beforeExecution,
+  editorLanguage = 'c',
+  editorContent = '',
+  sourceSelection,
+}) => {
   const isSingle = mode === "single";
-  // 1. 위치, 크기 및 조작(이동/리사이즈/애니메이션) 상태 관리
-  const [size, setSize] = useState<{ width: number; height: number }>({
-    width: DEFAULT_POPUP_WIDTH,
-    height: DEFAULT_POPUP_HEIGHT,
+
+  const {
+    size,
+    position,
+    isDragging,
+    resizingDirection,
+    isSmoothTransition,
+    hasAnimated,
+    setHasAnimated,
+    getAnchorPosition,
+    triggerSmoothChange,
+    startDrag,
+    startResize,
+    handleHeaderDoubleClick,
+  } = useFloatingWindow(isOpen, inline, anchorRef);
+
+  const {
+    inputMessage,
+    setInputMessage,
+    attachSource,
+    setAttachSource,
+    settingsOpen,
+    setSettingsOpen,
+    sourceContent,
+    sourceLabel,
+    messages,
+    responsePhase,
+    isThinking,
+    requestRef,
+    status,
+    statusError,
+    setStatusRevision,
+    localError,
+    setLocalError,
+    scope,
+     setAttachment,
+    attach,
+    addresses,
+    unavailable,
+    memory,
+    sourceUnsupported,
+    canSend,
+    handleSendMessage,
+  } = useAssistantChat({
+    isOpen,
+    authenticated,
+    simulation,
+    currentData,
+    mode,
+    beforeExecution,
+    editorLanguage,
+    editorContent,
+    sourceSelection,
   });
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [resizingDirection, setResizingDirection] = useState<ResizeDirection | null>(null);
-  const [isSmoothTransition, setIsSmoothTransition] = useState(false);
-  // 첫 오픈 시에만 드롭 애니메이션을 실행하고, 드래그&드롭 등 이후 조작 시에는 재실행 방지
-  const [hasAnimated, setHasAnimated] = useState(false);
-
-  const transitionTimerRef = useRef<number | null>(null);
-
-  const triggerSmoothChange = (nextSize: { width: number; height: number }, nextPos: { x: number; y: number }) => {
-    if (transitionTimerRef.current !== null) {
-      window.clearTimeout(transitionTimerRef.current);
-    }
-    setIsSmoothTransition(true);
-    setSize(nextSize);
-    setPosition(nextPos);
-    transitionTimerRef.current = window.setTimeout(() => {
-      setIsSmoothTransition(false);
-      transitionTimerRef.current = null;
-    }, 320);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (transitionTimerRef.current !== null) {
-        window.clearTimeout(transitionTimerRef.current);
-      }
-    };
-  }, []);
-
-  const sizeRef = useRef(size);
-  useEffect(() => {
-    sizeRef.current = size;
-  }, [size]);
-
-  const dragStartRef = useRef<{ mouseX: number; mouseY: number; posX: number; posY: number }>({
-    mouseX: 0,
-    mouseY: 0,
-    posX: 0,
-    posY: 0,
-  });
-
-  const resizeStartRef = useRef<{
-    mouseX: number;
-    mouseY: number;
-    posX: number;
-    posY: number;
-    width: number;
-    height: number;
-  }>({
-    mouseX: 0,
-    mouseY: 0,
-    posX: 0,
-    posY: 0,
-    width: DEFAULT_POPUP_WIDTH,
-    height: DEFAULT_POPUP_HEIGHT,
-  });
-
-  // 2. 대화 메시지 상태
-  const [inputMessage, setInputMessage] = useState("");
-  const [attachSource, setAttachSource] = useState(true);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const selectedSource = selectedEditorSource(sourceSelection, editorLanguage, editorContent);
-  const sourceContent = selectedSource?.content ?? editorContent;
-  const sourceLabel = selectedSource
-    ? `${editorLanguage.toUpperCase()} 코드 ${selectedSource.startLine}–${selectedSource.endLine}줄`
-    : `${editorLanguage.toUpperCase()} 원문 전체`;
-  useEffect(() => {
-    if (selectedEditorSource(sourceSelection, editorLanguage, editorContent)) setAttachSource(true);
-  }, [sourceSelection, editorLanguage, editorContent]);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      sender: "ai",
-      text: "코드와 실행 과정에서 궁금한 점을 물어보세요.",
-      time: "방금 전",
-    },
-  ]);
-  const [responsePhase, setResponsePhase] = useState<"waiting" | "receiving" | null>(null);
-  const isThinking = responsePhase !== null;
-  const requestRef = useRef<AbortController | null>(null);
-  const [status, setStatus] = useState<AssistantStatus | null>(null);
-  const [statusError, setStatusError] = useState('');
-  const [statusRevision, setStatusRevision] = useState(0);
-  const [localError, setLocalError] = useState('');
-  const [now, setNow] = useState(Date.now);
-  const descriptor = simulation?.assistant_context;
-  const scope = descriptor?.available ? `${mode}:${descriptor.execution_id}` : '';
-  useLayoutEffect(() => {
-    setAttachment({ scope: '', enabled: false, addresses: [] });
-    setLocalError('');
-  }, [scope]);
-  const [attachment, setAttachment] = useState({ scope: '', enabled: false, addresses: [] as number[] });
-  const attach = attachment.scope === scope && attachment.enabled;
-  const addresses = attachment.scope === scope ? attachment.addresses : [];
-  const unavailable = contextAvailability(simulation, currentData, mode, beforeExecution, now);
-  const memory = availableMemory(currentData);
-  const sourceUnsupported = attachSource && Boolean(sourceContent.trim()) && status?.enabled === true && status.editor_source_supported !== true;
-  const canSend = authenticated && status?.enabled === true && !isThinking;
-  useEffect(() => {
-    if (!isOpen) return;
-    const controller = new AbortController();
-    setStatus(null);
-    setStatusError('');
-    getAssistantStatus(controller.signal).then(value => { if (!controller.signal.aborted) setStatus(value); }).catch(error => {
-      if (!controller.signal.aborted) setStatusError(error instanceof Error ? error.message : '연결 상태 확인에 실패했습니다.');
-    });
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => { controller.abort(); window.clearInterval(timer); };
-  }, [isOpen, statusRevision]);
-
-  useEffect(() => {
-    if (!isOpen) requestRef.current?.abort();
-  }, [isOpen]);
-  useEffect(() => () => requestRef.current?.abort(), []);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // 버튼 바로 아래 기본 위치 계산 (사이트 헤더 제외, 버튼 오른쪽 정렬 & 바로 아래 8px)
-  const getAnchorPosition = useCallback((popupWidth = sizeRef.current.width, popupHeight = sizeRef.current.height) => {
-    if (typeof window === "undefined") return { x: 100, y: 64 };
-    const minY = getSiteHeaderBottom() + 8;
-    if (anchorRef?.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      const x = Math.max(12, Math.min(window.innerWidth - popupWidth - 12, rect.right - popupWidth));
-      const y = Math.max(minY, Math.min(window.innerHeight - popupHeight - 12, rect.bottom + 8));
-      return { x, y };
-    }
-    const margin = 16;
-    const x = Math.max(12, window.innerWidth - popupWidth - margin);
-    const y = Math.max(minY, 64);
-    return { x, y };
-  }, [anchorRef]);
-
-  // 창이 닫힐 때는 애니메이션 상태 초기화, 열릴 때는 버튼 바로 아래 위치로 초기화
-  useEffect(() => {
-    if (!isOpen) {
-      setHasAnimated(false);
-    } else {
-      setPosition(getAnchorPosition());
-    }
-  }, [isOpen, getAnchorPosition]);
-
-  // 애니메이션 종료 fallback 타이머 (280ms CSS 애니메이션 완료 후 안전하게 hasAnimated=true 확정)
-  useEffect(() => {
-    if (isOpen && !hasAnimated) {
-      const timer = setTimeout(() => {
-        setHasAnimated(true);
-      }, 350);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, hasAnimated]);
-
-  // 브라우저 리사이즈 시 화면 내 유지 (사이트 헤더 제외 영역)
-  useEffect(() => {
-    const handleResize = () => {
-      const curW = sizeRef.current.width;
-      const curH = sizeRef.current.height;
-      const minY = getSiteHeaderBottom() + 8;
-      const maxAllowedW = Math.max(MIN_POPUP_WIDTH, window.innerWidth - 24);
-      const maxAllowedH = Math.max(MIN_POPUP_HEIGHT, window.innerHeight - minY - 12);
-      const clampedW = Math.min(curW, maxAllowedW);
-      const clampedH = Math.min(curH, maxAllowedH);
-
-      if (clampedW !== curW || clampedH !== curH) {
-        setSize({ width: clampedW, height: clampedH });
-      }
-
-      setPosition((prev) => {
-        if (!prev) return prev;
-        const maxX = Math.max(12, window.innerWidth - clampedW - 12);
-        const maxY = Math.max(minY, window.innerHeight - clampedH - 12);
-        return {
-          x: Math.max(12, Math.min(maxX, prev.x)),
-          y: Math.max(minY, Math.min(maxY, prev.y)),
-        };
-      });
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // 드래그 시작 핸들러
-  const startDrag = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button")) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (transitionTimerRef.current !== null) {
-      window.clearTimeout(transitionTimerRef.current);
-      transitionTimerRef.current = null;
-    }
-    setIsSmoothTransition(false);
-    setHasAnimated(true);
-
-    const curPos = position || getAnchorPosition();
-    dragStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
-      posX: curPos.x,
-      posY: curPos.y,
-    };
-    setIsDragging(true);
-  };
-
-  // 리사이즈 시작 핸들러
-  const startResize = (e: React.MouseEvent, dir: ResizeDirection) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (transitionTimerRef.current !== null) {
-      window.clearTimeout(transitionTimerRef.current);
-      transitionTimerRef.current = null;
-    }
-    setIsSmoothTransition(false);
-    setHasAnimated(true);
-
-    const curPos = position || getAnchorPosition();
-    resizeStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
-      posX: curPos.x,
-      posY: curPos.y,
-      width: sizeRef.current.width,
-      height: sizeRef.current.height,
-    };
-    setResizingDirection(dir);
-  };
-
-  // 전역 마우스 이동 & 마우스 업 이벤트 리스너 (위치 이동)
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - dragStartRef.current.mouseX;
-      const deltaY = e.clientY - dragStartRef.current.mouseY;
-
-      const curW = sizeRef.current.width;
-      const curH = sizeRef.current.height;
-      const minY = getSiteHeaderBottom() + 8;
-      const maxX = Math.max(12, window.innerWidth - curW - 12);
-      const maxY = Math.max(minY, window.innerHeight - curH - 12);
-
-      const rawX = dragStartRef.current.posX + deltaX;
-      const rawY = dragStartRef.current.posY + deltaY;
-
-      setPosition({
-        x: Math.max(12, Math.min(maxX, rawX)),
-        y: Math.max(minY, Math.min(maxY, rawY)),
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      document.body.style.userSelect = "";
-    };
-
-    document.body.style.userSelect = "none";
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.userSelect = "";
-    };
-  }, [isDragging]);
-
-  // 전역 마우스 이동 & 마우스 업 이벤트 리스너 (테두리 리사이즈)
-  useEffect(() => {
-    if (!resizingDirection) return;
-
-    const dir = resizingDirection;
-    const handleMouseMove = (e: MouseEvent) => {
-      const { mouseX, mouseY, posX, posY, width, height } = resizeStartRef.current;
-      const deltaX = e.clientX - mouseX;
-      const deltaY = e.clientY - mouseY;
-
-      let newX = posX;
-      let newY = posY;
-      let newWidth = width;
-      let newHeight = height;
-
-      const minW = MIN_POPUP_WIDTH;
-      const minH = MIN_POPUP_HEIGHT;
-      const minY = getSiteHeaderBottom() + 8;
-      const viewportW = window.innerWidth;
-      const viewportH = window.innerHeight;
-
-      // 가로 리사이즈
-      if (dir.includes('e')) {
-        const maxAllowedWidth = Math.max(minW, viewportW - posX - 12);
-        newWidth = Math.max(minW, Math.min(maxAllowedWidth, width + deltaX));
-      } else if (dir.includes('w')) {
-        const rightEdge = posX + width;
-        const rawX = posX + deltaX;
-        newX = Math.max(12, Math.min(rightEdge - minW, rawX));
-        newWidth = rightEdge - newX;
-      }
-
-      // 세로 리사이즈 (사이트 헤더 제외 minY)
-      if (dir.includes('s')) {
-        const maxAllowedHeight = Math.max(minH, viewportH - posY - 12);
-        newHeight = Math.max(minH, Math.min(maxAllowedHeight, height + deltaY));
-      } else if (dir.includes('n')) {
-        const bottomEdge = posY + height;
-        const rawY = posY + deltaY;
-        newY = Math.max(minY, Math.min(bottomEdge - minH, rawY));
-        newHeight = bottomEdge - newY;
-      }
-
-      setSize({ width: newWidth, height: newHeight });
-      setPosition({ x: newX, y: newY });
-    };
-
-    const handleMouseUp = () => {
-      setResizingDirection(null);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = getResizeCursor(dir);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-  }, [resizingDirection]);
-
-  // 헤더 더블클릭 핸들러: 최대 크기 ↔ 최소 크기 스르륵 전환
-  const handleHeaderDoubleClick = (e: React.MouseEvent) => {
-    if (inline) return;
-    if ((e.target as HTMLElement).closest("button")) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsDragging(false);
-    document.body.style.userSelect = "";
-    setHasAnimated(true);
-
-    const siteHeaderBottom = getSiteHeaderBottom();
-    const topY = siteHeaderBottom + 8;
-    const maxW = Math.max(MIN_POPUP_WIDTH, window.innerWidth - 24);
-    const maxH = Math.max(MIN_POPUP_HEIGHT, window.innerHeight - topY - 12);
-
-    const isCurrentMax = (
-      sizeRef.current.width >= maxW - 20 &&
-      sizeRef.current.height >= maxH - 20
-    );
-
-    if (isCurrentMax) {
-      // 최대 크기일 때는 최소 크기(320x380)로 스르륵 전환
-      const nextSize = { width: MIN_POPUP_WIDTH, height: MIN_POPUP_HEIGHT };
-      const nextPos = getAnchorPosition(MIN_POPUP_WIDTH, MIN_POPUP_HEIGHT);
-      triggerSmoothChange(nextSize, nextPos);
-    } else {
-      // 그 외 상태일 때는 최대 크기로 스르륵 확장
-      const nextSize = { width: maxW, height: maxH };
-      const nextPos = { x: 12, y: topY };
-      triggerSmoothChange(nextSize, nextPos);
-    }
-  };
-
-  // 대화 스크롤 하단 이동
-  useEffect(() => {
-    if (isOpen && messages.length > 1) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isThinking, isOpen]);
-
-  // 메시지 전송
-  const handleSendMessage = async (textToSend?: string) => {
-    const text = (textToSend ?? inputMessage).trim();
-    if (!text || requestRef.current || !canSend) return;
-    setLocalError('');
-    // The attachment bar already explains unavailable source support.
-    if (sourceUnsupported) return;
-    let context: ExecutionContext | undefined;
-    let editorSource;
-    try {
-      editorSource = captureEditorSource(attachSource, editorLanguage, sourceContent, status?.editor_source_supported === true);
-      if (attach) context = freezeExecutionContext(simulation, currentData, mode, beforeExecution, addresses);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : '실행 정보를 확인해 주세요.');
-      return;
-    }
-    if (text.length > 8000) return;
-    const controller = new AbortController();
-    requestRef.current = controller;
-    const userMsg: Message = {
-      id: `user-${Date.now()}`, sender: 'user', text, time: '방금 전', complete: false, requestedContext: context,
-      sourceInfo: editorSource ? { language: editorSource.language, characters: [...editorSource.content].length, label: sourceLabel } : undefined,
-    };
-    const replyId = `ai-${Date.now()}`;
-    setMessages(prev => [...prev, userMsg, {
-      id: replyId, sender: 'ai', text: '', time: '방금 전', requestedContext: context,
-    }]);
-    setInputMessage('');
-    setResponsePhase("waiting");
-    const updateReply = (change: (message: Message) => Message) => {
-      setMessages(prev => prev.map(message => message.id === replyId ? change(message) : message));
-    };
-    let responseText = '';
-    try {
-      const history: ChatMessage[] = [...messages.filter(m => m.id !== 'welcome' && m.complete), userMsg]
-        .map(m => ({ role: m.sender === 'ai' ? 'assistant' : 'user', content: m.text }));
-      await streamChat(history, controller.signal, event => {
-        if (controller.signal.aborted) return;
-        if (event.type === 'delta' && event.text) {
-          setResponsePhase('receiving');
-          responseText += event.text;
-          updateReply(m => ({ ...m, text: m.text + event.text }));
-        }
-        if (event.type === 'done') {
-          const serviceNotice = isServiceNotice(responseText);
-          const complete = event.stop_reason === 'end_turn' && !serviceNotice;
-          setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, complete } : m));
-          updateReply(m => ({
-          ...m, complete, context: complete ? event.context : undefined, requestedContext: undefined,
-          notice: event.stop_reason === 'max_tokens' ? '답변 길이 한도에 도달했습니다. 이어서 질문해 주세요.'
-            : event.stop_reason !== 'end_turn' ? '모델이 답변 생성을 종료했습니다.'
-            : serviceNotice ? '질문을 구체적으로 바꿔 다시 입력할 수 있습니다.' : undefined,
-          }));
-        }
-      }, context, editorSource);
-    } catch (error) {
-      const notice = controller.signal.aborted ? '답변 생성을 중단했습니다.'
-        : error instanceof Error ? error.message : 'AI 요청에 실패했습니다.';
-      updateReply(m => ({ ...m, complete: false, notice, requestedContext: undefined }));
-    } finally {
-      if (requestRef.current === controller) {
-        requestRef.current = null;
-        setResponsePhase(null);
-      }
-    }
-  };
 
   if (!isOpen) return null;
 
   const curPos = position || getAnchorPosition();
 
-  // ========================================================
-  // 이동 가능한 AI 어시스턴트 창 팝업
-  // ========================================================
   return (
     <div
       style={
@@ -577,7 +152,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
       {/* 테두리 리사이즈 핸들 (플로팅 모드 전용) */}
       {!inline && (
         <>
-          {/* 상하좌우 4개 엣지 핸들 */}
           <div
             onMouseDown={(e) => startResize(e, 'n')}
             className="absolute -top-1 left-3 right-3 h-2.5 cursor-ns-resize z-30"
@@ -598,8 +172,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             className="absolute -right-1 top-3 bottom-3 w-2.5 cursor-ew-resize z-30"
             title="우측 크기 조절"
           />
-
-          {/* 4개 코너 핸들 */}
           <div
             onMouseDown={(e) => startResize(e, 'nw')}
             className="absolute -top-1 -left-1 w-3.5 h-3.5 cursor-nwse-resize z-40"
@@ -620,8 +192,6 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             className="absolute -bottom-1 -right-1 w-3.5 h-3.5 cursor-nwse-resize z-40"
             title="대각선 크기 조절"
           />
-
-          {/* 우측 하단 리사이즈 시각적 그립 표시 */}
           <div
             className="absolute bottom-1 right-1 w-3 h-3 z-20 flex items-end justify-end pointer-events-none"
             aria-hidden="true"
@@ -670,10 +240,8 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
             </div>
           </div>
 
-          {/* 우측 컨트롤 버튼 (플로팅 모드 전용: 확대 / 축소 / 닫기 순서) */}
           {!inline && (
             <div className="flex items-center gap-1 shrink-0">
-              {/* 1. 최대화 (확대) 버튼 */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -695,12 +263,10 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
               >
                 <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                  {/* 4방향 바깥 확장 코너 프레임 */}
                   <path d="M1.5 4.5V1.5H4.5M10.5 4.5V1.5H7.5M1.5 7.5v3H4.5M10.5 7.5v3H7.5" />
                 </svg>
               </button>
 
-              {/* 2. 최소화 (축소) 버튼 */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -718,12 +284,10 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
                 } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
               >
                 <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                  {/* 4방향 안쪽 축소 코너 프레임 */}
                   <path d="M4.5 1.5V4.5H1.5M7.5 1.5V4.5h3M4.5 10.5V7.5H1.5M7.5 10.5V7.5h3" />
                 </svg>
               </button>
 
-              {/* 3. 닫기 버튼 */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -741,158 +305,212 @@ export const AiAssistantPopup: React.FC<Props> = ({ isOpen, onClose, anchorRef, 
           )}
         </header>
 
-      {/* 대화 본문 */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
-        {/* 추천 질문 칩 바 */}
-        <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
-          {QUESTION_EXAMPLES.map(example => (
-            <button key={example.label} type="button" disabled={!canSend}
-              onClick={() => setInputMessage(example.question + BRIEF_ANSWER_REQUEST)} title={example.question}
-              className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
-                isSingle
-                  ? 'hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]'
-                  : 'hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]'
-              } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs disabled:opacity-50`}>
-              {example.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 메시지 리스트 */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-3 select-text text-xs leading-relaxed">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex flex-col gap-1 ${msg.sender === "user" ? "items-end" : "items-start"}`}
-            >
-              <div className="flex items-center gap-1.5 text-[10px] text-[#57606A] dark:text-[#858585] px-1">
-                <span>{msg.sender === "user" ? "나" : "ArchReactor AI"}</span>
-                <span>·</span>
-                <span>{msg.time}</span>
-              </div>
-              <div
-                className={`rounded-2xl px-3.5 py-2.5 min-w-0 max-w-[85%] break-words shadow-2xs ${
-                  msg.sender === "user"
-                    ? isSingle
-                      ? "bg-[#005FB8] dark:bg-[#007ACC] text-white rounded-tr-none font-medium whitespace-pre-wrap"
-                      : "bg-[#7C3AED] dark:bg-[#8B5CF6] text-white rounded-tr-none font-medium whitespace-pre-wrap"
-                    : "bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] text-[#1F2328] dark:text-[#CCCCCC] rounded-tl-none font-normal"
-                }`}
+        {/* 대화 본문 */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
+          {/* 추천 질문 칩 바 */}
+          <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
+            {QUESTION_EXAMPLES.map((example) => (
+              <button
+                key={example.label}
+                type="button"
+                disabled={!canSend}
+                onClick={() => setInputMessage(example.question + BRIEF_ANSWER_REQUEST)}
+                title={example.question}
+                className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
+                  isSingle
+                    ? 'hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]'
+                    : 'hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]'
+                } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs disabled:opacity-50`}
               >
-                {msg.sender === 'ai'
-                  ? <Suspense fallback={<span className="whitespace-pre-wrap">{msg.text}</span>}><AssistantMarkdown text={msg.text} /></Suspense>
-                  : msg.text}
-                {msg.sender === 'user' && <p className="mt-1 text-[10px]" data-testid="question-context">
-                  {msg.requestedContext
-                    ? `실행 첨부 · ${msg.requestedContext.mode} · clock ${msg.requestedContext.cycle}`
-                    : '실행 정보 미첨부'}
-                </p>}
-                {msg.sender === 'user' && <p className="mt-1 text-[10px]" data-testid="question-source">
-                  {msg.sourceInfo ? `${msg.sourceInfo.label} 첨부 · ${msg.sourceInfo.characters.toLocaleString()}자` : '원문 미첨부'}
-                </p>}
-                {msg.sender === 'ai' && (msg.context || (isThinking && msg.requestedContext)) && <p data-testid="execution-badge" className="mt-2 text-[10px]" title={(msg.context || msg.requestedContext)!.execution_id}>
-                  {msg.context ? '참고한 실행' : '요청한 실행'} {(msg.context || msg.requestedContext)!.execution_id.slice(0, 8)} · {(msg.context || msg.requestedContext)!.mode} · clock {(msg.context || msg.requestedContext)!.cycle} 기준 (0부터 시작)
-                </p>}
-                {msg.sender === 'user' && Boolean(msg.requestedContext?.memory_addresses.length) && <p className="mt-1 text-[10px]">선택 메모리: {msg.requestedContext!.memory_addresses.map(a => `0x${a.toString(16)}`).join(', ')}</p>}
-                {msg.notice && msg.sender === 'ai' && <button type="button" disabled={!canSend} className="block mt-1 underline" onClick={() => { const index = messages.findIndex(m => m.id === msg.id); setInputMessage(messages[index - 1]?.text || ''); }}>질문 다시 입력</button>}
-                {msg.notice && <p role="status" className="mt-1 text-[#57606A] dark:text-[#AAAAAA]">{msg.notice}</p>}
-              </div>
-            </div>
-          ))}
+                {example.label}
+              </button>
+            ))}
+          </div>
 
-          {/* AI 응답 대기 로딩 */}
-          {isThinking && (
-            <div role="status" aria-live="polite" data-testid="assistant-progress" className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] max-w-[140px]">
-              <div className={`w-4 h-4 border-2 ${
-                isSingle ? "border-[#005FB8] dark:border-[#007ACC]" : "border-[#7C3AED] dark:border-[#8B5CF6]"
-              } border-t-transparent rounded-full animate-spin`} />
-              <span className="text-[11px] text-[#57606A] dark:text-[#858585] font-medium animate-pulse">
-                {responsePhase === 'waiting' ? '답변 준비 중…' : '답변 받는 중…'}
-              </span>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          {/* 메시지 리스트 (memoized: 1초 주기 now 갱신 시 리렌더링 방지) */}
+          <AssistantMessageList
+            messages={messages}
+            isSingle={isSingle}
+            isThinking={isThinking}
+            responsePhase={responsePhase}
+            canSend={canSend}
+            isOpen={isOpen}
+            onRetryQuestion={setInputMessage}
+          />
 
-        {/* 하단 입력 폼 */}
-        <footer className="shrink-0 p-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-t border-[#E5E5E5] dark:border-[#3E3E42]">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="flex items-center gap-2"
-          >
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="C 코드나 파이프라인에 대해 질문하세요..."
-              disabled={!canSend}
-              maxLength={8000}
-              className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-xs text-[#1F2328] dark:text-[#CCCCCC] placeholder:text-[#8C959F] dark:placeholder:text-[#6E7681] focus:outline-none ${
-                isSingle
-                  ? "focus:border-[#005FB8] dark:focus:border-[#007ACC] focus:ring-1 focus:ring-[#005FB8] dark:focus:ring-[#007ACC]"
-                  : "focus:border-[#7C3AED] dark:focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#7C3AED] dark:focus:ring-[#8B5CF6]"
-              } transition-colors`}
-            />
-            <button
-              type={isThinking ? "button" : "submit"}
-              aria-label={isThinking ? "중단" : "전송"}
-              onClick={isThinking ? () => requestRef.current?.abort() : undefined}
-              disabled={!isThinking && (!inputMessage.trim() || !canSend || sourceUnsupported)}
-              className={`px-3 py-1.5 rounded-lg border ${
-                isThinking
-                  ? "bg-white text-[#1F2328] border-[#D0D7DE] hover:bg-[#F3F4F6]"
-                  : isSingle
-                    ? "border-transparent bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white"
-                    : "border-transparent bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED] text-white"
-              } text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
+          {/* 하단 입력 폼 */}
+          <footer className="shrink-0 p-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-t border-[#E5E5E5] dark:border-[#3E3E42]">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSendMessage();
+              }}
+              className="flex items-center gap-2"
             >
-              {isThinking ? <>
-                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-xs bg-current" />
-                <span>중단</span>
-              </> : <><span>전송</span><span aria-hidden="true" className="text-[10px]">➤</span></>}
-            </button>
-          </form>
-        <div data-testid="attachment-bar" className="shrink-0 pt-2 mt-2 text-[11px] border-t border-[#E5E5E5] dark:border-[#333333] space-y-1.5 max-h-48 overflow-y-auto">
-          <div className="flex items-center flex-wrap gap-1.5">
-            {attachSource && sourceContent.trim() ? <button type="button" disabled={isThinking} aria-label="코드 첨부 해제" onClick={() => setAttachSource(false)} className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200">{sourceLabel} <span aria-hidden="true">×</span></button> : <span className="text-gray-500">코드 미첨부</span>}
-            {attach && currentData ? <button type="button" disabled={isThinking} aria-label="실행 첨부 해제" onClick={() => setAttachment({ scope, enabled: false, addresses: [] })} className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200">실행 · clock {currentData.clock} <span aria-hidden="true">×</span></button> : !unavailable && <button type="button" disabled={!authenticated || isThinking} onClick={() => setAttachment({ scope, enabled: true, addresses: [] })} className="rounded-full border border-dashed border-gray-400 px-2 py-1">+ 실행 · clock {currentData?.clock}</button>}
-            <button type="button" aria-expanded={settingsOpen} aria-controls="assistant-attachment-settings" onClick={() => setSettingsOpen(value => !value)} className="ml-auto text-[#57606A] dark:text-gray-300 hover:underline">첨부 설정 {settingsOpen ? '▴' : '▾'}</button>
-          </div>
-          <p className="text-[#57606A] dark:text-gray-400">선택된 코드를 어시스턴트가 참고합니다.</p>
-          {(!authenticated || statusError || !status?.enabled) && <p role="status">{!authenticated ? '로그인 후 이용할 수 있습니다.' : statusError || (!status ? 'AI 연결 확인 중…' : 'AI 연결 준비 중')}</p>}
-          {sourceUnsupported && <p role="status">원문 첨부 지원 대기 중입니다.</p>}
-          {(statusError || status?.enabled === false || (sourceUnsupported)) && <button type="button" onClick={() => setStatusRevision(v => v + 1)} className="underline">연결 다시 확인</button>}
-          {attach && unavailable && <p role="alert">{unavailable}</p>}
-          <div id="assistant-attachment-settings" hidden={!settingsOpen} className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
-          <label className="flex gap-2 items-center">
-            <input type="checkbox" checked={attachSource} disabled={isThinking}
-              onChange={e => { setAttachSource(e.target.checked); setLocalError(''); }} />
-            작성 중인 원문 자동 첨부
-          </label>
-          <p>{attachSource
-            ? `${sourceLabel} · ${[...sourceContent].length.toLocaleString()}자 / 최대 12,000자`
-            : '원문 미첨부'}</p>
-          {attach && !unavailable && <details>
-            <summary>메모리 선택 ({addresses.length}/16) · 기본 미전송</summary>
-            <select multiple aria-label="첨부할 메모리 주소" size={3} disabled={isThinking} value={addresses.map(String)} className="w-full bg-white dark:bg-[#252526]"
-              onChange={e => {
-                const next = Array.from(e.currentTarget.selectedOptions, option => Number(option.value));
-                if (next.length > 16) { setLocalError('메모리는 최대 16개 선택할 수 있습니다.'); return; }
-                setLocalError(''); setAttachment({ scope, enabled: true, addresses: next });
-              }}>
-              {memory.map(address => <option key={address} value={address}>0x{address.toString(16).padStart(8, '0')}</option>)}
-            </select>
-            <button type="button" disabled={isThinking} className="underline" onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}>메모리 선택 해제</button>
-            {addresses.some(address => !memory.includes(address)) && <p>선택한 주소가 현재 사이클에 없습니다. 선택을 해제해 주세요.</p>}
-          </details>}
-          </div>
-          {localError && <p role="alert">{localError}</p>}
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder="C 코드나 파이프라인에 대해 질문하세요..."
+                disabled={!canSend}
+                maxLength={8000}
+                className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-xs text-[#1F2328] dark:text-[#CCCCCC] placeholder:text-[#8C959F] dark:placeholder:text-[#6E7681] focus:outline-none ${
+                  isSingle
+                    ? "focus:border-[#005FB8] dark:focus:border-[#007ACC] focus:ring-1 focus:ring-[#005FB8] dark:focus:ring-[#007ACC]"
+                    : "focus:border-[#7C3AED] dark:focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#7C3AED] dark:focus:ring-[#8B5CF6]"
+                } transition-colors`}
+              />
+              <button
+                type={isThinking ? "button" : "submit"}
+                aria-label={isThinking ? "중단" : "전송"}
+                onClick={isThinking ? () => requestRef.current?.abort() : undefined}
+                disabled={!isThinking && (!inputMessage.trim() || !canSend || sourceUnsupported)}
+                className={`px-3 py-1.5 rounded-lg border ${
+                  isThinking
+                    ? "bg-white text-[#1F2328] border-[#D0D7DE] hover:bg-[#F3F4F6]"
+                    : isSingle
+                      ? "border-transparent bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white"
+                      : "border-transparent bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED] text-white"
+                } text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
+              >
+                {isThinking ? (
+                  <>
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-xs bg-current" />
+                    <span>중단</span>
+                  </>
+                ) : (
+                  <>
+                    <span>전송</span>
+                    <span aria-hidden="true" className="text-[10px]">➤</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div data-testid="attachment-bar" className="shrink-0 pt-2 mt-2 text-[11px] border-t border-[#E5E5E5] dark:border-[#333333] space-y-1.5 max-h-48 overflow-y-auto">
+              <div className="flex items-center flex-wrap gap-1.5">
+                {attachSource && sourceContent.trim() ? (
+                  <button
+                    type="button"
+                    disabled={isThinking}
+                    aria-label="코드 첨부 해제"
+                    onClick={() => setAttachSource(false)}
+                    className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200"
+                  >
+                    {sourceLabel} <span aria-hidden="true">×</span>
+                  </button>
+                ) : (
+                  <span className="text-gray-500">코드 미첨부</span>
+                )}
+                {attach && currentData ? (
+                  <button
+                    type="button"
+                    disabled={isThinking}
+                    aria-label="실행 첨부 해제"
+                    onClick={() => setAttachment({ scope, enabled: false, addresses: [] })}
+                    className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200"
+                  >
+                    실행 · clock {currentData.clock} <span aria-hidden="true">×</span>
+                  </button>
+                ) : (
+                  !unavailable && (
+                    <button
+                      type="button"
+                      disabled={!authenticated || isThinking}
+                      onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}
+                      className="rounded-full border border-dashed border-gray-400 px-2 py-1"
+                    >
+                      + 실행 · clock {currentData?.clock}
+                    </button>
+                  )
+                )}
+                <button
+                  type="button"
+                  aria-expanded={settingsOpen}
+                  aria-controls="assistant-attachment-settings"
+                  onClick={() => setSettingsOpen((value) => !value)}
+                  className="ml-auto text-[#57606A] dark:text-gray-300 hover:underline"
+                >
+                  첨부 설정 {settingsOpen ? '▴' : '▾'}
+                </button>
+              </div>
+              <p className="text-[#57606A] dark:text-gray-400">선택된 코드를 어시스턴트가 참고합니다.</p>
+              {(!authenticated || statusError || !status?.enabled) && (
+                <p role="status">
+                  {!authenticated
+                    ? '로그인 후 이용할 수 있습니다.'
+                    : statusError || (!status ? 'AI 연결 확인 중…' : 'AI 연결 준비 중')}
+                </p>
+              )}
+              {sourceUnsupported && <p role="status">원문 첨부 지원 대기 중입니다.</p>}
+              {(statusError || status?.enabled === false || sourceUnsupported) && (
+                <button type="button" onClick={() => setStatusRevision((v) => v + 1)} className="underline">
+                  연결 다시 확인
+                </button>
+              )}
+              {attach && unavailable && <p role="alert">{unavailable}</p>}
+              <div id="assistant-attachment-settings" hidden={!settingsOpen} className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                <label className="flex gap-2 items-center">
+                  <input
+                    type="checkbox"
+                    checked={attachSource}
+                    disabled={isThinking}
+                    onChange={(e) => {
+                      setAttachSource(e.target.checked);
+                      setLocalError('');
+                    }}
+                  />
+                  작성 중인 원문 자동 첨부
+                </label>
+                <p>
+                  {attachSource
+                    ? `${sourceLabel} · ${[...sourceContent].length.toLocaleString()}자 / 최대 12,000자`
+                    : '원문 미첨부'}
+                </p>
+                {attach && !unavailable && (
+                  <details>
+                    <summary>메모리 선택 ({addresses.length}/16) · 기본 미전송</summary>
+                    <select
+                      multiple
+                      aria-label="첨부할 메모리 주소"
+                      size={3}
+                      disabled={isThinking}
+                      value={addresses.map(String)}
+                      className="w-full bg-white dark:bg-[#252526]"
+                      onChange={(e) => {
+                        const next = Array.from(e.currentTarget.selectedOptions, (option) => Number(option.value));
+                        if (next.length > 16) {
+                          setLocalError('메모리는 최대 16개 선택할 수 있습니다.');
+                          return;
+                        }
+                        setLocalError('');
+                        setAttachment({ scope, enabled: true, addresses: next });
+                      }}
+                    >
+                      {memory.map((address) => (
+                        <option key={address} value={address}>
+                          0x{address.toString(16).padStart(8, '0')}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isThinking}
+                      className="underline"
+                      onClick={() => setAttachment({ scope, enabled: true, addresses: [] })}
+                    >
+                      메모리 선택 해제
+                    </button>
+                    {addresses.some((address) => !memory.includes(address)) && (
+                      <p>선택한 주소가 현재 사이클에 없습니다. 선택을 해제해 주세요.</p>
+                    )}
+                  </details>
+                )}
+              </div>
+              {localError && <p role="alert">{localError}</p>}
+            </div>
+          </footer>
         </div>
-        </footer>
-      </div>
       </div>
     </div>
   );

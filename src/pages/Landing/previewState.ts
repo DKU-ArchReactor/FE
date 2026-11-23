@@ -1,3 +1,5 @@
+export const stages = ["IF", "ID", "EX", "MEM", "WB"];
+
 export function getPreviewState(mode: "single" | "pipeline", clock: number) {
   const maxClock = mode === "single" ? 4 : 8;
   const completed = mode === "single" ? clock : Math.max(0, clock - 4);

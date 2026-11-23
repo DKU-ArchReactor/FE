@@ -7,6 +7,7 @@ export default function TutorPerformanceSummary({bundle,historyIndex}:{bundle?:T
   const snapshots=useMemo(()=>new Map((analysis?.snapshots??[]).map(snapshot=>[snapshot.history_index,snapshot])),[analysis]);
   const snapshot=historyIndex==null?undefined:snapshots.get(historyIndex);
   if(!analysis||!snapshot||historyIndex==null)return null;
+  const pages=()=>{
   const groups=new Map<string,{pc:string|null;assembly:string|null;stalls:number;flushes:number;forwards:number;detail:string;priority:number}>();
   const priority={stall:3,flush:2,forwarding:1};
   for(const record of analysis.records){
@@ -36,5 +37,7 @@ export default function TutorPerformanceSummary({bundle,historyIndex}:{bundle?:T
     ]})),
     {title:'집계 기준',blocks:analysis.notes.map(text=>({text}))},
   ];
+  return pages;
+  };
   return <TutorDetailPages title="CPI와 해저드 분석" context={`Step ${historyIndex+1} · 실행 분석`} pages={pages}/>;
 }

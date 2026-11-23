@@ -27,7 +27,7 @@ export function TutorDetailHost({children,inline=false,onOpen,label='튜터 자�
   </DetailContext.Provider>;
 }
 
-export default function TutorDetailPages({title,context,pages}:{title:string;context:string;pages:TutorDetailPage[]}) {
+export default function TutorDetailPages({title,context,pages}:{title:string;context:string;pages:TutorDetailPage[]|(()=>TutorDetailPage[])}) {
   const open=useContext(DetailContext);
-  return <button type="button" className="dev-tutor-detail-link" onClick={()=>open?.({context,pages})}>{title}<span aria-hidden="true">›</span></button>;
+  return <button type="button" className="dev-tutor-detail-link" onClick={()=>open?.({context,pages:typeof pages==='function'?pages():pages})}>{title}<span aria-hidden="true">›</span></button>;
 }
