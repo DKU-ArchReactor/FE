@@ -267,6 +267,29 @@ test.describe("시뮬레이션 엔진(Single/Pipeline), 재생 컨트롤, 3대 �
           contentType: "application/json",
           body: JSON.stringify({
             execution_status: "CYCLE_LIMIT",
+            tutor: {
+              schema_version: "1.0",
+              asm_instructions: [
+                {
+                  pc: "0x00010000",
+                  text: "addi a0, zero, 1",
+                  raw_instruction: "0x00100513",
+                  source_line: 1,
+                  mapping_status: "mapped",
+                  explanation: {
+                    kind: "asm",
+                    category: "alu",
+                    title: "즉치 덧셈",
+                    summary: "zero와 1을 더해 a0에 저장합니다.",
+                    detail: "ALU가 즉치값 덧셈을 수행합니다.",
+                    opcode: "addi",
+                    operands: "a0, zero, 1",
+                    reads: ["x0"],
+                    writes: ["x10"],
+                  },
+                },
+              ],
+            },
             result: {
               simulator: { mode: "single", pipeline_model: "single-cycle" },
               program: { entry_point: "0x00010000" },
@@ -282,6 +305,7 @@ test.describe("시뮬레이션 엔진(Single/Pipeline), 재생 컨트롤, 3대 �
                       status: "normal",
                     },
                   },
+                  cycle_events: {},
                   global_result: {
                     registers: { x0: "0x00000000", x10: "0x00000001" },
                     memory_snapshot: {},
@@ -335,9 +359,10 @@ test.describe("시뮬레이션 엔진(Single/Pipeline), 재생 컨트롤, 3대 �
       name: "싱글 사이클 데이터패스",
     });
     await expect(singleDatapath).toBeVisible();
-    // 데이터 흐름 애니메이션 완료 시 표시되는 CYCLE_LIMIT 상태 텍스트 확인
+    // 데이터 흐름 재생 시작(또는 다시 보기) 후 완료 시 표시되는 CYCLE_LIMIT 상태 텍스트 확인
+    await singleDatapath.getByRole("button", { name: "흐름 다시 보기" }).click();
     await expect(
       singleDatapath.locator('[data-execution-status="CYCLE_LIMIT"]')
-    ).toContainText("최대 클록 수 도달 · 실행 중단", { timeout: 20_000 });
+    ).toContainText("최대 클록 수 도달 · 실행 중단", { timeout: 30_000 });
   });
 });

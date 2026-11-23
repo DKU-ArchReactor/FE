@@ -3,7 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 const baseURL =
   process.env.PLAYWRIGHT_BASE_URL ||
   process.env.BASE_URL ||
-  "http://archreactor-dev.s3-website-us-east-1.amazonaws.com/";
+  "http://localhost:5173";
+
+const isLocalServer =
+  baseURL.includes("localhost") || baseURL.includes("127.0.0.1");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -15,6 +18,14 @@ export default defineConfig({
     timeout: 15_000,
   },
   reporter: [["list"]],
+  webServer: isLocalServer
+    ? {
+        command: "npm run dev",
+        url: baseURL,
+        reuseExistingServer: true,
+        timeout: 60_000,
+      }
+    : undefined,
   use: {
     baseURL,
     trace: "retain-on-failure",
