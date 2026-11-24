@@ -158,14 +158,14 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
       },
       ...(lineExplanation
         ? [
-            {
-              title: 'C와 어셈블리 연결',
-              blocks: [
-                { label: '어셈블리 동작 요약', text: lineExplanation.summary },
-                { label: '상세 매핑 원리', text: lineExplanation.detail },
-              ],
-            },
-          ]
+          {
+            title: 'C와 어셈블리 연결',
+            blocks: [
+              { label: '어셈블리 동작 요약', text: lineExplanation.summary },
+              { label: '상세 매핑 원리', text: lineExplanation.detail },
+            ],
+          },
+        ]
         : []),
     ];
   }, [cAnalysis, cText, lineExplanation]);
@@ -182,34 +182,34 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
       },
       ...(observations.length
         ? [
-            {
-              title: '실제 실행 관찰',
-              blocks: observations.map(([stage, val]) => ({
-                label: `Step ${val.step} · ${stage}`,
-                text: val.summary,
-              })),
-            },
-          ]
+          {
+            title: '실제 실행 관찰',
+            blocks: observations.map(([stage, val]) => ({
+              label: `Step ${val.step} · ${stage}`,
+              text: val.summary,
+            })),
+          },
+        ]
         : []),
       ...(details?.pages ?? []),
       ...(instruction.hardwareDetail
         ? [
-            {
-              title: '하드웨어 원리와 주의사항',
-              blocks: [{ text: instruction.hardwareDetail }],
-            },
-          ]
+          {
+            title: '하드웨어 원리와 주의사항',
+            blocks: [{ text: instruction.hardwareDetail }],
+          },
+        ]
         : []),
       ...(currentRow.sourceLine == null
         ? [
-            {
-              title: '소스 위치와 실행 문맥',
-              blocks: [
-                { text: analyzeCrtInstruction(currentRow.text, currentRow.pc).summary },
-                { text: analyzeCrtInstruction(currentRow.text, currentRow.pc).detail },
-              ],
-            },
-          ]
+          {
+            title: '소스 위치와 실행 문맥',
+            blocks: [
+              { text: analyzeCrtInstruction(currentRow.text, currentRow.pc).summary },
+              { text: analyzeCrtInstruction(currentRow.text, currentRow.pc).detail },
+            ],
+          },
+        ]
         : []),
     ];
   }, [currentRow, instruction, observations, details, currentRow?.sourceLine, currentRow?.text, currentRow?.pc]);

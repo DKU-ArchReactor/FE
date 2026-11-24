@@ -283,6 +283,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           isPlaying={isPlaying}
           playSpeed={playSpeed}
           currentCycle={currentCycle}
+          playbackRevision={playbackRevision}
         />
       );
 

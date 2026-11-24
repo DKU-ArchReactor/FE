@@ -311,6 +311,7 @@ export function useSimulationPlayback({
       return false;
     });
     onClearSelection();
+    setPlaybackRevision((v) => v + 1);
     setCurrentCycle((prev) => Math.max(0, prev - 1));
   };
 
@@ -323,6 +324,7 @@ export function useSimulationPlayback({
       return false;
     });
     onClearSelection();
+    setPlaybackRevision((v) => v + 1);
     const maxLimit = totalCycles;
     setCurrentCycle((prev) => Math.min(maxLimit, prev + 1));
   };
@@ -337,10 +339,14 @@ export function useSimulationPlayback({
     if (currentPos >= maxPos && (!isSingleEngine || (!isPlaying && singleClock.current?.remaining === 0))) {
       setCurrentCycle(0);
       setIsPlaying(true);
+      setPlaybackRevision((v) => v + 1);
       triggerPlaybackFeedback("play");
     } else {
       setIsPlaying((prev) => {
         const nextState = !prev;
+        if (nextState) {
+          setPlaybackRevision((v) => v + 1);
+        }
         triggerPlaybackFeedback(nextState ? "play" : "pause");
         return nextState;
       });
@@ -352,6 +358,7 @@ export function useSimulationPlayback({
     setIsPlaying(false);
     onClearSelection();
     setCurrentCycle(0);
+    setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("reset");
   };
 
@@ -360,6 +367,7 @@ export function useSimulationPlayback({
     onClearSelection();
     setCurrentCycle(0);
     setIsPlaying(true);
+    setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("play");
   };
 

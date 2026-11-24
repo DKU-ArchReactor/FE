@@ -540,6 +540,7 @@ interface PipelineVisualizerProps {
   playSpeed?: number;
   isPlaying?: boolean;
   currentCycle?: number;
+  playbackRevision?: number;
 }
 
 const MASTER_WIDTH = 1240;
@@ -553,14 +554,18 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   mode = "pipeline",
   lessonContext,
   playSpeed,
+  isPlaying,
+  playbackRevision,
 }) => {
   // [모든 훅은 React Rules of Hooks에 따라 조건문이나 조기 반환보다 먼저 최상단에서 무조건 실행]
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [animProgress, setAnimProgress] = useState<number>(0);
   const [isSubstepLooping, setIsSubstepLooping] = useState<boolean>(true);
+  const [animResetId, setAnimResetId] = useState<number>(0);
   const flowDuration = lessonContext?.flowDurationMs ?? playSpeed ?? 3000;
   const progressRef = React.useRef<number>(0);
   const prevDataRef = React.useRef(currentData);
+  const prevIsPlayingRef = React.useRef(isPlaying ?? false);
 
   // 뷰포트 교차 감지: 회로도가 화면 밖(다른 탭/뷰포트)으로 슬라이드되면 RAF 애니메이션을 일시 정지하여 CPU 낭비 방지
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -580,20 +585,37 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // 사이클 데이터(currentData)가 변경되면 진행률을 0으로 리셋
+  // 1. 사이클 데이터(currentData)가 변경되면 진행률을 0으로 리셋하고 새 루프 시작
   useEffect(() => {
     if (prevDataRef.current !== currentData) {
       prevDataRef.current = currentData;
       progressRef.current = 0;
       setAnimProgress(0);
+      setAnimResetId((prev) => prev + 1);
     }
   }, [currentData]);
+
+  // 2. 시뮬레이션 바(상단 ControlPanel)에서 Play 버튼을 누르면:
+  // 사이클 바를 즉시 중지(0으로 리셋)한 후 처음부터(0.0) 동기화하여 재생
+  useEffect(() => {
+    if (isPlaying) {
+      progressRef.current = 0;
+      setAnimProgress(0);
+      setIsSubstepLooping(true);
+      setAnimResetId((prev) => prev + 1);
+    } else if (prevIsPlayingRef.current && !isPlaying) {
+      // 시뮬레이션 바 일시정지 시: 사이클 바도 현재 위치에서 일시정지
+      setIsSubstepLooping(false);
+    }
+    prevIsPlayingRef.current = isPlaying ?? false;
+  }, [isPlaying, playbackRevision]);
 
   // 처음으로 돌아가기 (정지 및 0으로 리셋)
   const handleResetToStart = () => {
     setIsSubstepLooping(false);
     progressRef.current = 0;
     setAnimProgress(0);
+    setAnimResetId((prev) => prev + 1);
   };
 
   useEffect(() => {
@@ -622,7 +644,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isSubstepLooping, isIntersecting, flowDuration, currentData]);
+  }, [isSubstepLooping, isIntersecting, flowDuration, currentData, animResetId]);
 
   const isSingle = mode === "single";
 
