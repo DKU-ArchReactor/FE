@@ -1,0 +1,310 @@
+/* ======================================================== */
+/* ArchReactor Single-Cycle Tutor (2D Card Navigation)       */
+/* Responsive Percentage-based Layout                        */
+/* ======================================================== */
+
+.tutor-single-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 8px 14px;
+  position: relative;
+  user-select: none;
+  background: var(--ar-panel-bg);
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* 수직 이동 (위/아래) 버튼 슬롯 - 컴팩트하게 구성하여 세로 공간 확보 */
+.tutor-single-slot-vertical {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  min-height: 34px;
+  width: 100%;
+  z-index: 5;
+  flex-shrink: 0;
+}
+
+/* 수직 네비게이션 버튼 (C로 올라가기 / ASM으로 내려가기) */
+.tutor-single-btn-vertical {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--ar-border);
+  background: var(--ar-header-bg);
+  color: var(--ar-text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tutor-single-btn-vertical:not(:disabled):hover {
+  border-color: var(--ar-accent);
+  color: var(--ar-accent);
+  background: var(--ar-panel-bg);
+  box-shadow: 0 2px 8px -2px rgba(0, 95, 184, 0.25);
+}
+
+.tutor-single-btn-vertical.up:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+
+.tutor-single-btn-vertical.down:not(:disabled):hover {
+  transform: translateY(2px);
+}
+
+.tutor-single-btn-vertical:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.tutor-single-btn-vertical svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.tutor-single-btn-vertical.up:hover svg {
+  transform: translateY(-1px);
+}
+
+.tutor-single-btn-vertical.down:hover svg {
+  transform: translateY(1px);
+}
+
+/* 중간 영역: 좌측 화살표 + 중앙 카드 + 우측 화살표 (컴포넌트 자체 크기 기반 동적 계산) */
+.tutor-single-stage {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  max-width: 100%;
+  min-height: 0;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* 수평 네비게이션 버튼 (이전 ASM / 다음 ASM) - 카드 높이와 관계없이 수직 중앙 정렬 */
+.tutor-single-btn-horizontal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--ar-border);
+  background: var(--ar-header-bg);
+  color: var(--ar-text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.tutor-single-btn-horizontal:not(:disabled):hover {
+  border-color: var(--ar-accent);
+  color: var(--ar-accent);
+  background: var(--ar-panel-bg);
+  transform: scale(1.08);
+  box-shadow: 0 3px 10px -2px rgba(0, 95, 184, 0.25);
+}
+
+.tutor-single-btn-horizontal:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.tutor-single-btn-horizontal svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 중앙 메인 카드 */
+.tutor-single-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ar-panel-bg);
+  border: 1px solid var(--ar-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+html.dark .tutor-single-card {
+  box-shadow: 0 4px 18px -4px rgba(0, 0, 0, 0.35);
+}
+
+.tutor-single-card:hover {
+  border-color: color-mix(in srgb, var(--ar-accent) 40%, var(--ar-border));
+}
+
+/* 카드 상단 헤더 */
+.tutor-single-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  background: var(--ar-header-bg);
+  border-bottom: 1px solid var(--ar-border);
+  flex-shrink: 0;
+}
+
+.tutor-single-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  background: color-mix(in srgb, var(--ar-accent) 12%, transparent);
+  color: var(--ar-accent);
+  border: 1px solid color-mix(in srgb, var(--ar-accent) 25%, transparent);
+}
+
+.tutor-single-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--ar-panel-bg);
+  border: 1px solid var(--ar-border);
+  color: var(--ar-text-muted);
+}
+
+.tutor-single-counter {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ar-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 카드 본문 - 공간에 맞춰 넉넉하게 확장 */
+.tutor-single-card-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+/* 코드 스니펫 박스 */
+.tutor-single-code-box {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--ar-header-bg);
+  border: 1px solid var(--ar-border);
+  border-left: 3px solid var(--ar-accent);
+  flex-shrink: 0;
+}
+
+.tutor-single-code-box code {
+  display: block;
+  font-family: var(--font-mono, monospace);
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--ar-text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 자연어 설명 영역 */
+.tutor-single-meaning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.tutor-single-meaning-arrow {
+  color: var(--ar-accent);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.35;
+  flex-shrink: 0;
+}
+
+.tutor-single-meaning-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ar-text-primary);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+/* 실제 실행 결과 관찰 블록 */
+.tutor-single-observed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #10B981 8%, var(--ar-header-bg));
+  border: 1px solid color-mix(in srgb, #10B981 30%, var(--ar-border));
+  border-left: 3px solid #10B981;
+  flex-shrink: 0;
+}
+
+.tutor-single-observed-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: #059669;
+}
+
+html.dark .tutor-single-observed-title {
+  color: #34D399;
+}
+
+.tutor-single-observed-content {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ar-text-primary);
+  margin: 0;
+}
+
+/* 하단 부가 링크 및 안내 */
+.tutor-single-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px;
+  background: var(--ar-header-bg);
+  border-top: 1px solid var(--ar-border);
+  flex-shrink: 0;
+}
+
+.tutor-single-mapping-hint {
+  font-size: 11px;
+  color: var(--ar-text-muted);
+}
