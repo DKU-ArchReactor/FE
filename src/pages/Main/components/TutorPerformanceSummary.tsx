@@ -21,6 +21,7 @@ export default function TutorPerformanceSummary({bundle,historyIndex}:{bundle?:T
   const hotspots=[...groups.values()].sort((a,b)=>b.stalls-a.stalls||b.flushes-a.flushes||b.forwards-a.forwards).slice(0,3);
   const pages:TutorDetailPage[]=[
     {title:'CPI와 해저드 분석',blocks:[
+      {label:'이 숫자는 무엇을 뜻하나요?',text:'CPI는 명령어 하나를 완료하는 데 평균 몇 클록이 들었는지를 뜻합니다. 해저드는 명령어들이 겹쳐 실행될 때 필요한 값이나 실행 순서 때문에 생기는 제약입니다.'},
       {text:`선택한 시점까지 ${snapshot.cycles}클록을 실행했습니다. ${snapshot.completed!=null?'완료 명령어는 '+snapshot.completed+'개입니다.':'완료 명령어 수는 제공되지 않았습니다.'}${snapshot.cpi!=null?' CPI는 '+snapshot.cycles+' ÷ '+snapshot.completed+' = '+snapshot.cpi.toFixed(2)+'클록/명령어입니다.':''}`},
       {label:'대기·전달·취소',text:`스톨 관찰 ${snapshot.stall_cycles}클록\n플러시 관찰 ${snapshot.flush_cycles}클록\n포워딩 관찰 ${snapshot.forwarding_cycles}클록\n같은 클록에서 겹침 ${snapshot.overlap_cycles}클록\n중복 제외 관찰 ${snapshot.hazard_cycles}클록`},
       {label:'명령어 완료가 없는 클록',text:`완료 없음 ${snapshot.idle_cycles}클록\n스톨·플러시와 함께 관찰 ${snapshot.hazard_idle_cycles}클록\n해당 표시 없이 관찰 ${snapshot.other_idle_cycles}클록`},
