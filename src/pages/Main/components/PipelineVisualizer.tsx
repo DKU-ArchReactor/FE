@@ -559,12 +559,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   isPlaying,
   playbackRevision,
   currentCycle,
-  onPausePlayback,
+  onPausePlayback: _onPausePlayback,
 }) => {
   // [모든 훅은 React Rules of Hooks에 따라 조건문이나 조기 반환보다 먼저 최상단에서 무조건 실행]
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [animProgress, setAnimProgress] = useState<number>(0);
-  const [substepMode, setSubstepMode] = useState<"once" | "loop">("once");
   const [isSubstepPlaying, setIsSubstepPlaying] = useState<boolean>(true);
   const flowDuration = lessonContext?.flowDurationMs ?? playSpeed ?? 3000;
   const progressRef = React.useRef<number>(0);
@@ -599,10 +598,10 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       progressRef.current = 0;
       pausedProgressRef.current = 0;
       setAnimProgress(0);
-      setIsSubstepPlaying(true);
+      setIsSubstepPlaying(!!isPlaying);
       timelineSync.setProgress(currentCycle ?? 0, 0);
     }
-  }, [currentData, currentCycle]);
+  }, [currentData, currentCycle, isPlaying]);
 
   // 2. 재생 속도(flowDuration) 변경 시 현재 상대 진행률 유지
   useEffect(() => {
@@ -612,75 +611,30 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     }
   }, [flowDuration]);
 
-  // 3. 외부 시뮬레이션 바(상단 ControlPanel)에서 Play 버튼을 누르면:
-  // 항상 1회 재생("once") 모드로 동기화하여 0.0부터 시작
+  // 3. 외부 시뮬레이션 바(상단 ControlPanel)에서 Play / Pause 누를 때:
+  // 제자리 일시정지 및 제자리 재개 동작 수행
   useEffect(() => {
     if (isPlaying) {
-      startTimeRef.current = performance.now();
-      progressRef.current = 0;
-      pausedProgressRef.current = 0;
-      setAnimProgress(0);
-      setIsSubstepPlaying(true);
-      setSubstepMode("once");
-      timelineSync.setProgress(currentCycle ?? 0, 0);
-    }
-  }, [isPlaying, playbackRevision, currentCycle]);
-
-  // 사이클 바 재생 / 일시정지 (Play ▶ / Pause ❚❚) 토글
-  const handleTogglePlayPause = () => {
-    if (!currentCycle || currentCycle <= 0) return;
-    setIsSubstepPlaying((prev) => {
-      const next = !prev;
-      if (!next) {
-        pausedProgressRef.current = progressRef.current;
-        if (isPlaying) {
-          onPausePlayback?.();
-        }
+      if (pausedProgressRef.current > 0 && pausedProgressRef.current < 1) {
+        // 일시정지되었던 위치에서 그대로 이어서 재생
+        startTimeRef.current = performance.now() - pausedProgressRef.current * flowDuration;
+        progressRef.current = pausedProgressRef.current;
+        setAnimProgress(pausedProgressRef.current);
       } else {
-        if (progressRef.current >= 1) {
-          startTimeRef.current = performance.now();
-          progressRef.current = 0;
-          pausedProgressRef.current = 0;
-        } else {
-          startTimeRef.current = performance.now() - pausedProgressRef.current * flowDuration;
-        }
+        // 사이클 처음부터 재생
+        startTimeRef.current = performance.now();
+        progressRef.current = 0;
+        pausedProgressRef.current = 0;
+        setAnimProgress(0);
+        timelineSync.setProgress(currentCycle ?? 0, 0);
       }
-      return next;
-    });
-  };
-
-  // 처음으로 돌아가기 (정지 및 0으로 리셋)
-  const handleResetToStart = () => {
-    if (!currentCycle || currentCycle <= 0) return;
-    setIsSubstepPlaying(false);
-    startTimeRef.current = performance.now();
-    progressRef.current = 0;
-    pausedProgressRef.current = 0;
-    setAnimProgress(0);
-    timelineSync.setProgress(currentCycle, 0);
-    if (isPlaying) {
-      onPausePlayback?.();
+      setIsSubstepPlaying(true);
+    } else {
+      // 일시정지: 현재 진행률을 정확히 보존하고 정지
+      pausedProgressRef.current = progressRef.current;
+      setIsSubstepPlaying(false);
     }
-  };
-
-  // 1회 재생 (1-Shot) vs 무한 반복 (Loop) 모드 토글
-  const handleToggleMode = () => {
-    if (!currentCycle || currentCycle <= 0) return;
-    setSubstepMode((prev) => {
-      const next = prev === "once" ? "loop" : "once";
-      if (next === "loop") {
-        setIsSubstepPlaying(true);
-        if (progressRef.current >= 1) {
-          startTimeRef.current = performance.now();
-          progressRef.current = 0;
-          pausedProgressRef.current = 0;
-        } else {
-          startTimeRef.current = performance.now() - progressRef.current * flowDuration;
-        }
-      }
-      return next;
-    });
-  };
+  }, [isPlaying, playbackRevision]);
 
   useEffect(() => {
     if (!isSubstepPlaying || !isIntersecting) {
@@ -699,39 +653,20 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
       const cycle = currentCycle ?? 0;
       const elapsed = Math.max(0, now - startTimeRef.current);
+      const rawProg = elapsed / flowDuration;
+      const prog = Math.min(1, rawProg);
+      progressRef.current = prog;
+      setAnimProgress(prog);
+      timelineSync.setProgress(cycle, prog);
 
-      if (substepMode === "once" && !isPlaying) {
-        // 1회 재생 모드 (외부 재생 중이 아닐 때): 1회 완주 후 1.0에서 정지
-        const rawProg = elapsed / flowDuration;
-        const prog = Math.min(1, rawProg);
-        progressRef.current = prog;
-        setAnimProgress(prog);
-        timelineSync.setProgress(cycle, prog);
-
-        if (prog >= 1) {
-          pausedProgressRef.current = 1;
-          setIsSubstepPlaying(false);
-        }
-      } else if (isPlaying) {
-        // 외부 글로벌 Play 진행 중: 1회 흐르고 다음 사이클 advance를 기다림
-        const rawProg = elapsed / flowDuration;
-        const prog = Math.min(1, rawProg);
-        progressRef.current = prog;
-        setAnimProgress(prog);
-        timelineSync.setProgress(cycle, prog);
-      } else {
-        // 무한 반복 관전 모드: 해당 사이클 내에서 계속 순환
-        const wrapped = elapsed % flowDuration;
-        const prog = wrapped / flowDuration;
-        progressRef.current = prog;
-        setAnimProgress(prog);
-        timelineSync.setProgress(cycle, prog);
+      if (prog >= 1) {
+        pausedProgressRef.current = 1;
       }
     };
 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isSubstepPlaying, isIntersecting, flowDuration, substepMode, isPlaying, currentCycle]);
+  }, [isSubstepPlaying, isIntersecting, flowDuration, currentCycle]);
 
   const isSingle = mode === "single";
 
@@ -1453,97 +1388,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             {/* [1열: 좌측 열] 스테이지 + 명령어 컴팩트 2층 카드 5개 (규격 슬림화: x=-40, w=210, h=76) */}
             {/* ============================================================ */}
 
-            {/* [이미지 최상단] 1개 사이클 내부 스테이지 시뮬레이션 제어 바 (재생/일시정지 + 정지/리셋 + 1회/무한 토글) */}
-            <g
-              transform="translate(0, 0)"
-              className={!currentCycle || currentCycle <= 0 ? "opacity-35 pointer-events-none" : ""}
-            >
-              {/* 1. 재생 / 일시정지 (▶ / ❚❚) 알약 버튼 */}
-              <g
-                className="select-none cursor-pointer transition-opacity hover:opacity-95"
-                onClick={handleTogglePlayPause}
-              >
-                <rect
-                  x="-36"
-                  y="-48"
-                  width="62"
-                  height="32"
-                  rx="16"
-                  fill={isSubstepPlaying ? "url(#stage-rainbow-grad)" : "#F1F5F9"}
-                  stroke={isSubstepPlaying ? "#7C3AED" : "#94A3B8"}
-                  strokeWidth="1.5"
-                />
-                {isSubstepPlaying ? (
-                  <g fill="#FFFFFF">
-                    <rect x="-24" y="-39" width="3.5" height="14" rx="1.5" />
-                    <rect x="-16" y="-39" width="3.5" height="14" rx="1.5" />
-                    <text x="-4" y="-28" fontSize="10" fontWeight="bold" fill="#FFFFFF" fontFamily="sans-serif">정지</text>
-                  </g>
-                ) : (
-                  <g>
-                    <polygon points="-24,-39 -24,-25 -12,-32" fill="url(#stage-rainbow-grad)" />
-                    <text x="-4" y="-28" fontSize="10" fontWeight="bold" fill="#334155" fontFamily="sans-serif">재생</text>
-                  </g>
-                )}
-                <title>{isSubstepPlaying ? "사이클 내부 시뮬레이션 일시정지 (❚❚)" : "사이클 내부 시뮬레이션 재생 (▶)"}</title>
-              </g>
-
-              {/* 2. 중지 및 리셋 (⏹) 원형 버튼 */}
-              <g
-                className="group select-none cursor-pointer transition-opacity"
-                onClick={handleResetToStart}
-              >
-                <circle
-                  cx="44"
-                  cy="-32"
-                  r="16"
-                  fill="#F1F5F9"
-                  stroke="#94A3B8"
-                  strokeWidth="1.5"
-                />
-                <rect
-                  x="38"
-                  y="-38"
-                  width="12"
-                  height="12"
-                  rx="2.5"
-                  fill="#94A3B8"
-                  className="group-hover:fill-[#64748B]"
-                />
-                <title>처음으로 정지 및 리셋 (⏹)</title>
-              </g>
-
-              {/* 3. 1회 재생 (1-Shot) vs 무한 반복 (Loop) 모드 토글 스위치 */}
-              <g
-                className="select-none cursor-pointer transition-opacity hover:opacity-95"
-                onClick={handleToggleMode}
-              >
-                <rect
-                  x="68"
-                  y="-48"
-                  width="100"
-                  height="32"
-                  rx="16"
-                  fill="#F1F5F9"
-                  stroke={substepMode === "loop" ? "#8B5CF6" : "#10B981"}
-                  strokeWidth="1.5"
-                />
-                {substepMode === "once" ? (
-                  <g>
-                    <rect x="70" y="-46" width="46" height="28" rx="14" fill="#10B981" />
-                    <text x="93" y="-28" fontSize="10" fontWeight="bold" fill="#FFFFFF" textAnchor="middle" fontFamily="sans-serif">1회</text>
-                    <text x="140" y="-28" fontSize="10" fontWeight="bold" fill="#94A3B8" textAnchor="middle" fontFamily="sans-serif">무한</text>
-                  </g>
-                ) : (
-                  <g>
-                    <rect x="116" y="-46" width="50" height="28" rx="14" fill="#8B5CF6" />
-                    <text x="93" y="-28" fontSize="10" fontWeight="bold" fill="#94A3B8" textAnchor="middle" fontFamily="sans-serif">1회</text>
-                    <text x="141" y="-28" fontSize="10" fontWeight="bold" fill="#FFFFFF" textAnchor="middle" fontFamily="sans-serif">무한 🔁</text>
-                  </g>
-                )}
-                <title>{substepMode === "once" ? "현재 모드: 1회 재생 (클릭 시 무한 반복 모드로 전환)" : "현재 모드: 무한 반복 (클릭 시 1회 재생 모드로 전환)"}</title>
-              </g>
-            </g>
 
             {/* [좌측 5개 스테이지 카드] 해저드 배지 (STALL / FLUSH / BUBBLE) 통합 렌더링 */}
             {renderStageCard("IF", 104, "IF · Instruction Fetch", ifInst, "#EF4444", "#FEF2F2", "#991B1B", isIfActive)}

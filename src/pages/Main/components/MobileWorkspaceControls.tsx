@@ -14,7 +14,9 @@ interface MobileWorkspaceControlsProps {
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
   onReset: () => void;
-  onResetAndPlay: () => void;
+  onResetAndPlay?: () => void;
+  onPlayCurrentCycle?: () => void;
+  isCyclePlaying?: boolean;
   onStepBack: () => void;
   onTogglePlay: () => void;
   onStepForward: () => void;
@@ -39,6 +41,8 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
     onChangeSpeed,
     onReset,
     onResetAndPlay,
+    onPlayCurrentCycle,
+    isCyclePlaying = false,
     onStepBack,
     onTogglePlay,
     onStepForward,
@@ -128,13 +132,21 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
 
             <button
               type="button"
-              onClick={onResetAndPlay}
-              disabled={!isSimulationReady || totalCycles <= 1}
-              title="처음부터 다시시작 (Restart / Reset & Play)"
-              className="p-1.5 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#3A3A3A] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+              onClick={onPlayCurrentCycle ?? onResetAndPlay}
+              disabled={!isSimulationReady || totalCycles <= 0}
+              title={
+                isCyclePlaying
+                  ? "현재 사이클 1회 재생 중"
+                  : "현재 사이클 1회 재생 (1-Cycle Play)"
+              }
+              className={`p-1.5 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
+                isCyclePlaying
+                  ? "text-[#10B981] dark:text-[#34D399] bg-[#ECFDF5] dark:bg-[#064E3B]/40 font-bold"
+                  : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#3A3A3A]"
+              }`}
             >
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
               </svg>
             </button>
 

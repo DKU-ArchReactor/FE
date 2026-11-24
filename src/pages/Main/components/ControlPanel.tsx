@@ -12,6 +12,8 @@ interface ControlPanelProps {
   onTogglePlay: () => void;
   onReset: () => void;
   onResetAndPlay?: () => void;
+  onPlayCurrentCycle?: () => void;
+  isCyclePlaying?: boolean;
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
@@ -35,6 +37,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onTogglePlay,
   onReset,
   onResetAndPlay,
+  onPlayCurrentCycle,
+  isCyclePlaying = false,
   onJumpToCycle,
   onChangeSpeed,
   isReady = true,
@@ -63,12 +67,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const fillBarRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
 
+  // 현재 연속 진행 위치(0 ~ maxCycle)를 유지하는 ref (PAUSE 시 제자리 정지, PLAY 시 제자리 재개)
+  const continuousPosRef = useRef<number>(currentCycle > 0 ? currentCycle - 1 : 0);
+  const prevCycleRef = useRef<number>(currentCycle);
+
   // timelineSync를 통한 내부/외부 시뮬레이션 타임라인 실시간 동기화
   useEffect(() => {
     const unsubscribe = timelineSync.subscribe((prog, cycle) => {
       if (maxCycle <= 0) return;
       const base = cycle <= 0 ? 0 : Math.max(0, cycle - 1);
       const continuousPos = base + prog;
+      continuousPosRef.current = continuousPos;
       const pct = Math.min(100, Math.max(0, (continuousPos / maxCycle) * 100));
       if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
       if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
@@ -76,47 +85,48 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     return unsubscribe;
   }, [maxCycle]);
 
-  // currentCycle 또는 maxCycle 변경 시 즉시 위치 동기화 (수동 조작 / 일시정지)
+  // 사용자가 수동으로 스텝 이동/점프/리셋했을 때만 위치 동기화 (재생/일시정지 토글 시에는 제자리 유지하여 스냅 점프 방지)
   useEffect(() => {
-    if (!isPlaying) {
-      const pct = maxCycle > 0 ? Math.min(100, Math.max(0, (currentCycle / maxCycle) * 100)) : 0;
-      if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
-      if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
+    if (prevCycleRef.current !== currentCycle) {
+      prevCycleRef.current = currentCycle;
+      if (!isPlaying) {
+        const base = currentCycle <= 0 ? 0 : Math.max(0, currentCycle - 1);
+        continuousPosRef.current = base;
+        const pct = maxCycle > 0 ? Math.min(100, Math.max(0, (base / maxCycle) * 100)) : 0;
+        if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
+        if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
+      }
     }
   }, [currentCycle, maxCycle, isPlaying]);
 
-  // 재생 중일 때 매 프레임(60fps/120fps) GPU 합성으로 부드럽게 연속 이동
+  // Single-Cycle 모드 전용 연속 이동 (Pipeline 모드는 PipelineVisualizer의 60fps timelineSync가 직접 주도)
   useEffect(() => {
-    if (!isPlaying || maxCycle <= 0) return;
+    if (!isPlaying || !isSingle || maxCycle <= 0) return;
 
     let animId: number;
     let lastTime = performance.now();
-    // 1-based Cycle k는 [k - 1, k] 구간을 실행하므로 애니메이션은 k - 1에서 시작하여 k로 전진합니다.
-    let currentPos = Math.max(0, currentCycle - 1);
 
     const tick = (now: number) => {
       const delta = now - lastTime;
       lastTime = now;
 
-      // playSpeed(ms) 동안 1사이클 전진 (k - 1 -> k)
-      currentPos += delta / playSpeed;
-      if (currentPos > maxCycle) currentPos = maxCycle;
+      continuousPosRef.current += delta / playSpeed;
+      if (continuousPosRef.current > maxCycle) continuousPosRef.current = maxCycle;
 
-      const pct = (currentPos / maxCycle) * 100;
+      const pct = (continuousPosRef.current / maxCycle) * 100;
       if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
       if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
 
-      if (currentPos < maxCycle) {
+      if (continuousPosRef.current < maxCycle) {
         animId = requestAnimationFrame(tick);
       }
     };
 
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, [isPlaying, playSpeed, maxCycle, currentCycle]);
+  }, [isPlaying, isSingle, playSpeed, maxCycle]);
 
-  const baseCycle = isPlaying ? Math.max(0, currentCycle - 1) : currentCycle;
-  const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (baseCycle / maxCycle) * 100)) : 0;
+  const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (continuousPosRef.current / maxCycle) * 100)) : 0;
 
   return (
     <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3 md:px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
@@ -305,16 +315,24 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </svg>
         </button>
 
-        {/* 2) 처음부터 다시시작 버튼 (회전 리로드 아이콘) */}
+        {/* 2) 현재 사이클 1회 재생 버튼 (1-Cycle Play) */}
         <button
           type="button"
-          onClick={onResetAndPlay}
-          disabled={!isReady || totalCycles <= 1}
-          title="처음부터 다시시작 (Restart / Reset & Play)"
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          onClick={onPlayCurrentCycle ?? onResetAndPlay}
+          disabled={!isReady || totalCycles <= 0}
+          title={
+            isCyclePlaying
+              ? "현재 사이클 1회 재생 중 (클릭 시 다시 1회 반복)"
+              : "현재 사이클 1회 재생 (Play Current Cycle)"
+          }
+          className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
+            isCyclePlaying
+              ? "text-[#10B981] dark:text-[#34D399] bg-[#ECFDF5] dark:bg-[#064E3B]/40 font-bold"
+              : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545]"
+          }`}
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
           </svg>
         </button>
 

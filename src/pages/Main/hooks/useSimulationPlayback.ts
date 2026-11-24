@@ -26,6 +26,7 @@ export function useSimulationPlayback({
   const isSimulationReady = historyList.length > 0;
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playMode, setPlayMode] = useState<"continuous" | "singleCycle">("continuous");
   const [isStandby, setIsStandby] = useState<boolean>(true);
   const [playSpeed, setPlaySpeed] = useState<number>(3000);
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
@@ -59,7 +60,7 @@ export function useSimulationPlayback({
   } | null>(null);
 
   const timerRef = useRef<number | null>(null);
-  const singleClock = useRef<{
+  const playbackClock = useRef<{
     cycle: number;
     frame: CycleHistoryItem | null;
     duration: number;
@@ -280,67 +281,87 @@ export function useSimulationPlayback({
 
   const singlePlaybackDelay = playSpeed;
   const singlePlaybackFrame = isSingleEngine ? currentCycle : 0;
-
   const singleFrame = isSingleEngine ? currentData : null;
-  // Resume the remaining part of this instruction; restarting a full interval here
-  // left a completed diagram apparently frozen after Pause -> Play.
+
+  // 공통 시뮬레이션 타이머: SingleEngine 및 Pipeline 모드 모두 정지된 잔여 시간(remaining)을 추적하여
+  // PAUSE 시 제자리 정지, PLAY 시 제자리 재개 동작을 보장합니다.
   useEffect(() => {
     const advance = () => setCurrentCycle(previous => {
       if (previous >= totalCycles) { setIsPlaying(false); return previous; }
       return previous + 1;
     });
-    if (isSingleEngine) {
-      if (!singleClock.current || singleClock.current.cycle !== currentCycle || singleClock.current.frame !== singleFrame) {
-        singleClock.current = {
-          cycle: currentCycle,
-          frame: singleFrame,
-          duration: singlePlaybackDelay,
-          remaining: singlePlaybackDelay,
-          started: null,
-        };
-      }
-      const clock = singleClock.current;
-      if (clock.duration !== singlePlaybackDelay) {
-        clock.remaining = clock.remaining * singlePlaybackDelay / clock.duration;
-        clock.duration = singlePlaybackDelay;
-      }
-      if (!isPlaying) return;
-      if (singlePlaybackFrame >= totalCycles) {
-        setFinishedSingleFrame(singleFrame);
-        setIsPlaying(false);
-        return;
-      }
-      clock.started = performance.now();
-      timerRef.current = window.setTimeout(() => {
-        clock.remaining = 0;
-        clock.started = null;
-        if (singlePlaybackFrame >= totalCycles) setFinishedSingleFrame(singleFrame);
-        advance();
-      }, clock.remaining);
-      return () => {
-        if (timerRef.current !== null) clearTimeout(timerRef.current);
-        if (clock.started !== null) {
-          clock.remaining = Math.max(0, clock.remaining - (performance.now() - clock.started));
-          clock.started = null;
-        }
+
+    if (!isSimulationReady) return;
+
+    if (!playbackClock.current || playbackClock.current.cycle !== currentCycle || playbackClock.current.frame !== currentData) {
+      playbackClock.current = {
+        cycle: currentCycle,
+        frame: currentData,
+        duration: playSpeed,
+        remaining: playSpeed,
+        started: null,
       };
     }
-    singleClock.current = null;
+
+    const clock = playbackClock.current;
+    if (clock.duration !== playSpeed) {
+      clock.remaining = (clock.remaining * playSpeed) / clock.duration;
+      clock.duration = playSpeed;
+    }
+
     if (!isPlaying) return;
-    timerRef.current = window.setInterval(advance, playSpeed);
-    return () => { if (timerRef.current !== null) clearInterval(timerRef.current); };
-  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, singlePlaybackDelay, singlePlaybackFrame, singleFrame, currentCycle]);
+
+    if (currentCycle >= totalCycles && clock.remaining <= 0) {
+      if (isSingleEngine) setFinishedSingleFrame(currentData);
+      setIsPlaying(false);
+      return;
+    }
+
+    clock.started = performance.now();
+    timerRef.current = window.setTimeout(() => {
+      clock.remaining = 0;
+      clock.started = null;
+      if (isSingleEngine && currentCycle >= totalCycles) {
+        setFinishedSingleFrame(currentData);
+      }
+
+      if (playMode === "singleCycle") {
+        // 1회 재생 완료 시 해당 사이클 완료 상태로 일시정지
+        setIsPlaying(false);
+        setPlayMode("continuous");
+        timelineSync.setProgress(currentCycle, 1);
+      } else {
+        // 연속 재생 시 다음 사이클로 전진
+        if (currentCycle >= totalCycles) {
+          setIsPlaying(false);
+        } else {
+          advance();
+        }
+      }
+    }, clock.remaining);
+
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (clock.started !== null) {
+        clock.remaining = Math.max(0, clock.remaining - (performance.now() - clock.started));
+        clock.started = null;
+      }
+    };
+  }, [isPlaying, playSpeed, totalCycles, isSimulationReady, isSingleEngine, currentCycle, playMode, currentData]);
 
   const pauseForFlow = () => {
-    // Manual flow controls detach from CPU playback. The next global Play starts
-    // this instruction afresh, while the diagram's own Pause/Resume keeps its cursor.
-    singleClock.current = null;
+    playbackClock.current = null;
     setFinishedSingleFrame(null);
     setIsPlaying(false);
   };
 
   const handleStepBack = () => {
     setFinishedSingleFrame(null);
+    playbackClock.current = null;
+    setPlayMode("continuous");
     setIsPlaying((prev) => {
       if (prev) {
         triggerPlaybackFeedback("pause");
@@ -360,6 +381,8 @@ export function useSimulationPlayback({
 
   const handleStepForward = () => {
     setFinishedSingleFrame(null);
+    playbackClock.current = null;
+    setPlayMode("continuous");
     setIsPlaying((prev) => {
       if (prev) {
         triggerPlaybackFeedback("pause");
@@ -373,14 +396,61 @@ export function useSimulationPlayback({
     setCurrentCycle((prev) => Math.min(maxLimit, prev + 1));
   };
 
+  // 1회 재생 버튼 핸들러: 현재 사이클(k-1 -> k]을 1회만 재생하고 k에서 멈춤
+  const handlePlayCurrentCycle = () => {
+    if (!isSimulationReady || totalCycles <= 0) return;
+    onClearSelection();
+    setFinishedSingleFrame(null);
+
+    // Standby 상태이거나 Cycle 0이면 Cycle 1로 세팅 후 재생
+    if (isStandby || currentCycle === 0) {
+      setCurrentCycle(1);
+      setIsStandby(false);
+      setPlayMode("singleCycle");
+      if (playbackClock.current) {
+        playbackClock.current.remaining = playSpeed;
+      }
+      setIsPlaying(true);
+      setPlaybackRevision((v) => v + 1);
+      triggerPlaybackFeedback("play");
+      return;
+    }
+
+    // 이미 1회 재생 중인 상태에서 다시 1회 버튼을 누르면: 처음부터 다시 1회 반복 재생
+    if (isPlaying && playMode === "singleCycle") {
+      timelineSync.setProgress(currentCycle, 0);
+      if (playbackClock.current) {
+        playbackClock.current.remaining = playSpeed;
+        playbackClock.current.started = performance.now();
+      }
+      setPlaybackRevision((v) => v + 1);
+      triggerPlaybackFeedback("play");
+      return;
+    }
+
+    // 일시정지 중이거나 대기 중인 상태에서 1회 재생 시작
+    setPlayMode("singleCycle");
+    // 해당 사이클이 이미 끝까지 도달(remaining <= 0)한 상태라면 처음(0)부터 다시 재생
+    if (playbackClock.current && playbackClock.current.remaining <= 0) {
+      playbackClock.current.remaining = playSpeed;
+      timelineSync.setProgress(currentCycle, 0);
+    }
+    setIsStandby(false);
+    setIsPlaying(true);
+    setPlaybackRevision((v) => v + 1);
+    triggerPlaybackFeedback("play");
+  };
+
+  // 일반 PLAY / PAUSE 토글 버튼 핸들러 (연속 재생 모드)
   const handleTogglePlay = () => {
     const currentPos = currentCycle;
     const maxPos = totalCycles;
 
     onClearSelection();
     setFinishedSingleFrame(null);
+    setPlayMode("continuous");
 
-    if (currentPos >= maxPos && (!isSingleEngine || (!isPlaying && singleClock.current?.remaining === 0))) {
+    if (currentPos >= maxPos && (!isPlaying && playbackClock.current?.remaining === 0)) {
       setCurrentCycle(1);
       setIsStandby(false);
       setIsPlaying(true);
@@ -394,6 +464,9 @@ export function useSimulationPlayback({
         if (currentPos === 0) {
           setCurrentCycle(1);
         }
+        if (playbackClock.current && playbackClock.current.remaining <= 0) {
+          playbackClock.current.remaining = playSpeed;
+        }
         setPlaybackRevision((v) => v + 1);
       }
       triggerPlaybackFeedback(nextState ? "play" : "pause");
@@ -403,9 +476,16 @@ export function useSimulationPlayback({
   const handleReset = () => {
     setFinishedSingleFrame(null);
     setIsPlaying(false);
+    setPlayMode("continuous");
     setIsStandby(true);
     onClearSelection();
     setCurrentCycle(0);
+    if (playbackClock.current) {
+      playbackClock.current.cycle = 0;
+      playbackClock.current.frame = null;
+      playbackClock.current.remaining = playSpeed;
+      playbackClock.current.started = null;
+    }
     timelineSync.setProgress(0, 0);
     setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("reset");
@@ -414,15 +494,22 @@ export function useSimulationPlayback({
   const handleResetAndPlay = () => {
     setFinishedSingleFrame(null);
     onClearSelection();
+    setPlayMode("continuous");
     setCurrentCycle(1);
     setIsStandby(false);
+    if (playbackClock.current) {
+      playbackClock.current.cycle = 1;
+      playbackClock.current.remaining = playSpeed;
+      playbackClock.current.started = null;
+    }
     setIsPlaying(true);
     setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("play");
   };
 
   const handleJumpToCycle = (val: number) => {
-    singleClock.current = null;
+    playbackClock.current = null;
+    setPlayMode("continuous");
     setPlaybackRevision(value => value + 1);
     setFinishedSingleFrame(null);
     setIsPlaying((prev) => {
@@ -455,6 +542,8 @@ export function useSimulationPlayback({
     activeCycleIndex,
     currentData,
     singlePlaybackDelay,
+    singlePlaybackFrame,
+    singleFrame,
     playbackRevision,
     singlePlaybackFinished: isSingleEngine && currentCycle > 0 && finishedSingleFrame === currentData,
     pauseForFlow,
@@ -462,6 +551,9 @@ export function useSimulationPlayback({
     currentActiveRow,
     activeExecutionCLine,
     effectiveSelectedLine,
+    playMode,
+    isCyclePlaying: isPlaying && playMode === "singleCycle",
+    handlePlayCurrentCycle,
     handleSimulationComplete,
     handleStepBack,
     handleStepForward,
