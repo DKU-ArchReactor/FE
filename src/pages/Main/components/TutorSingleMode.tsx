@@ -344,7 +344,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                     /* ---------------- C [컴파일 원리] 탭 ---------------- */
                     <div className="space-y-3">
                       {cAnalysis?.detail && (
-                        <div className="p-3 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 border-l-[var(--ar-accent)]">
+                        <div className={`p-3 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 ${isUserSelected ? 'border-l-[var(--ar-accent)]' : 'border-l-emerald-500'}`}>
                           <strong className="block text-xs font-semibold text-[var(--ar-text-primary)] mb-1">
                             C 코드 컴파일 해석
                           </strong>
@@ -565,7 +565,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                             <div className="text-xs text-[var(--ar-text-muted)] flex items-center justify-between pb-1 border-b border-[var(--ar-border)]">
                               <span>시뮬레이터에서 실행되며 발생한 하드웨어 상태 변화입니다.</span>
                               {latest && (
-                                <span className="font-mono font-semibold text-[var(--ar-accent)]">
+                                <span className={`font-mono font-semibold ${isUserSelected ? 'text-[var(--ar-accent)]' : 'text-emerald-600'}`}>
                                   최종 관찰: Step {latest[1].step}
                                 </span>
                               )}
@@ -573,7 +573,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                             {observations.map(([stage, val]) => (
                               <div
                                 key={stage}
-                                className="p-2.5 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 border-l-emerald-500"
+                                className={`p-2.5 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 ${isUserSelected ? 'border-l-[var(--ar-accent)]' : 'border-l-emerald-500'}`}
                               >
                                 <div className="flex items-center justify-between text-xs font-semibold text-[var(--ar-text-primary)] mb-1">
                                   <span>Step {val.step} · {stage}</span>
@@ -592,7 +592,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                         ) : (
                           <div className="space-y-3">
                             {instruction?.hardwareDetail && (
-                              <div className="p-3 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 border-l-[var(--ar-accent)]">
+                              <div className={`p-3 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 ${isUserSelected ? 'border-l-[var(--ar-accent)]' : 'border-l-emerald-500'}`}>
                                 <strong className="block text-xs font-semibold text-[var(--ar-text-primary)] mb-1">
                                   하드웨어 동작 원리
                                 </strong>
@@ -611,7 +611,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                                     key={sIdx}
                                     className="p-2 rounded border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] text-xs"
                                   >
-                                    <span className="font-bold text-[var(--ar-accent)] mr-1.5">
+                                    <span className={`font-bold mr-1.5 ${isUserSelected ? 'text-[var(--ar-accent)]' : 'text-emerald-600'}`}>
                                       {step.title}:
                                     </span>
                                     <span className="text-[var(--ar-text-primary)]"><TutorText text={step.text} /></span>
@@ -630,7 +630,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                                       key={rIdx}
                                       className="p-2 rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] text-xs"
                                     >
-                                      <span className="font-mono font-bold text-[var(--ar-accent)] mr-1.5">
+                                      <span className={`font-mono font-bold mr-1.5 ${isUserSelected ? 'text-[var(--ar-accent)]' : 'text-emerald-600'}`}>
                                         {(['첫 번째', '두 번째', '세 번째'][rIdx] ?? `${rIdx + 1}번째`) + ' 항목 · ' + tutorDecimalText(role.operand)}
                                       </span>
                                       <span className="text-[var(--ar-text-muted)]"><TutorText text={role.role} /></span>
