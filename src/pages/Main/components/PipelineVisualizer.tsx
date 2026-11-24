@@ -1110,10 +1110,264 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
   const boxStepClass = (_active: boolean, _step?: number) => undefined;
 
+  const cycleEvents = currentData?.cycle_events;
+
   // 줌 조절
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)));
   const handleZoomOut = () => setZoomLevel((prev) => Math.max(0.5, +(prev - 0.15).toFixed(2)));
   const handleZoomReset = () => setZoomLevel(1.0);
+
+  // 5개 스테이지 카드 해저드 배지 렌더링 헬퍼 (방안 1: 본문 공간 활용)
+  const renderStageCard = (
+    stage: "IF" | "ID" | "EX" | "MEM" | "WB",
+    cardY: number,
+    fullName: string,
+    inst: string,
+    activeColor: string,
+    activeBg: string,
+    activeDarkText: string,
+    isActive: boolean
+  ) => {
+    const isFlushed = Boolean(
+      cycleEvents?.control_hazard?.flushed_stages?.includes(stage) ||
+      buffers?.[stage]?.status === "flush" ||
+      buffers?.[stage]?.status === "flushed" ||
+      buffers?.[stage]?.assembly?.toLowerCase() === "flush"
+    );
+    const isStalled = Boolean(
+      (cycleEvents?.stall?.has_stall && cycleEvents?.stall?.stage === stage) ||
+      buffers?.[stage]?.status === "stall"
+    );
+    const isStallBubble = Boolean(
+      !isStalled &&
+      cycleEvents?.stall?.has_stall &&
+      (inst === "bubble" || inst === "—") &&
+      (stage === "EX" || buffers?.[stage]?.status === "bubble")
+    );
+    const isRegularBubble = Boolean(
+      !isFlushed && !isStallBubble && inst === "bubble"
+    );
+    const isEmpty = Boolean(inst === "—" || inst === "empty" || isInitialEmpty);
+
+    // 카드 테두리 및 배경 계산
+    let cardFill = "#F8FAFC";
+    let cardStroke = "#94A3B8";
+    let headerFill = "#94A3B8";
+    let dividerStroke = "#94A3B8";
+
+    if (isFlushed) {
+      cardFill = "#FEF2F2";
+      cardStroke = "#EF4444";
+      headerFill = "#EF4444";
+      dividerStroke = "#FCA5A5";
+    } else if (isStalled) {
+      cardFill = "#FFFBEB";
+      cardStroke = "#F59E0B";
+      headerFill = activeColor;
+      dividerStroke = "#FCD34D";
+    } else if (isStallBubble) {
+      cardFill = "#FFFBEB";
+      cardStroke = "#F59E0B";
+      headerFill = "#94A3B8";
+      dividerStroke = "#FCD34D";
+    } else if (isActive) {
+      cardFill = activeBg;
+      cardStroke = activeColor;
+      headerFill = activeColor;
+      dividerStroke = activeColor;
+    }
+
+    return (
+      <g key={stage}>
+        {/* 1. 외곽 카드 바디 */}
+        <rect
+          x="-40"
+          y={cardY}
+          width="240"
+          height="76"
+          rx="10"
+          fill={cardFill}
+          stroke={cardStroke}
+          strokeWidth="2.5"
+          strokeDasharray={isStallBubble ? "5 3" : undefined}
+        />
+        {/* 2. 상단 헤더 배너 */}
+        <path
+          d={`M -40,${cardY + 10} a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z`}
+          fill={headerFill}
+        />
+        <text
+          x="80"
+          y={cardY + 17}
+          dominantBaseline="central"
+          fill="#FFFFFF"
+          fontSize="18.5"
+          fontWeight="bold"
+          fontFamily="sans-serif"
+          textAnchor="middle"
+        >
+          {fullName}
+        </text>
+        <line
+          x1="-40"
+          y1={cardY + 33}
+          x2="200"
+          y2={cardY + 33}
+          stroke={dividerStroke}
+          strokeWidth="1.5"
+        />
+
+        {/* 3. 하단 본문 영역 (해저드 배지 또는 명령어 표시) */}
+        {isFlushed ? (
+          /* 플러시(분기 예측 실패로 취소) */
+          <g transform={`translate(80, ${cardY + 54.5})`}>
+            <rect
+              x="-62"
+              y="-13"
+              width="124"
+              height="26"
+              rx="13"
+              fill="#FEE2E2"
+              stroke="#EF4444"
+              strokeWidth="1.5"
+            />
+            <text
+              x="0"
+              y="0.5"
+              dominantBaseline="central"
+              textAnchor="middle"
+              fill="#DC2626"
+              fontSize="13.5"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+            >
+              ✕ FLUSH (취소)
+            </text>
+          </g>
+        ) : isStalled && inst !== "bubble" && inst !== "—" ? (
+          /* 스톨로 1클록 대기 중인 명령어 */
+          <g>
+            <text
+              x="80"
+              y={cardY + 46.5}
+              dominantBaseline="central"
+              fill={activeDarkText}
+              fontSize="15"
+              fontFamily="'D2Coding', Consolas, monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {inst}
+            </text>
+            <g transform={`translate(80, ${cardY + 63.5})`}>
+              <rect
+                x="-46"
+                y="-8.5"
+                width="92"
+                height="17"
+                rx="8.5"
+                fill="#FEF3C7"
+                stroke="#F59E0B"
+                strokeWidth="1.2"
+              />
+              <text
+                x="0"
+                y="0.5"
+                dominantBaseline="central"
+                textAnchor="middle"
+                fill="#D97706"
+                fontSize="10.5"
+                fontWeight="bold"
+                fontFamily="sans-serif"
+              >
+                ❚❚ STALL (대기)
+              </text>
+            </g>
+          </g>
+        ) : isStallBubble ? (
+          /* 스톨로 인해 하류에 주입된 NOP 버블 */
+          <g transform={`translate(80, ${cardY + 54.5})`}>
+            <rect
+              x="-64"
+              y="-13"
+              width="128"
+              height="26"
+              rx="13"
+              fill="#FEF3C7"
+              stroke="#F59E0B"
+              strokeWidth="1.5"
+            />
+            <text
+              x="0"
+              y="0.5"
+              dominantBaseline="central"
+              textAnchor="middle"
+              fill="#B45309"
+              fontSize="12.5"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+            >
+              ❚❚ STALL BUBBLE
+            </text>
+          </g>
+        ) : isRegularBubble ? (
+          /* 일반 파이프라인 버블 */
+          <g transform={`translate(80, ${cardY + 54.5})`}>
+            <rect
+              x="-50"
+              y="-12"
+              width="100"
+              height="24"
+              rx="12"
+              fill="#F1F5F9"
+              stroke="#CBD5E1"
+              strokeWidth="1.2"
+            />
+            <text
+              x="0"
+              y="0.5"
+              dominantBaseline="central"
+              textAnchor="middle"
+              fill="#64748B"
+              fontSize="12.5"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+            >
+              ○ BUBBLE
+            </text>
+          </g>
+        ) : isEmpty ? (
+          /* 실행 전 초기 비어있음 */
+          <text
+            x="80"
+            y={cardY + 55}
+            dominantBaseline="central"
+            fill="#94A3B8"
+            fontSize="19"
+            fontFamily="'D2Coding', Consolas, monospace"
+            fontWeight="bold"
+            textAnchor="middle"
+          >
+            —
+          </text>
+        ) : (
+          /* 일반 활성 명령어 */
+          <text
+            x="80"
+            y={cardY + 55}
+            dominantBaseline="central"
+            fill={activeDarkText}
+            fontSize="18.5"
+            fontFamily="'D2Coding', Consolas, monospace"
+            fontWeight="bold"
+            textAnchor="middle"
+          >
+            {inst}
+          </text>
+        )}
+      </g>
+    );
+  };
 
   return (
     <div ref={containerRef} className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] flex flex-col justify-between overflow-hidden relative select-none min-h-0 transition-colors duration-150">
@@ -1345,255 +1599,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               <title>처음으로 돌아가기 (정지 및 리셋)</title>
             </g>
 
-            {/* 1. IF: Instruction Fetch (Row center: 142.5 -> card y=104, h=76) */}
-            <g>
-              <rect
-                x="-40"
-                y="104"
-                width="240"
-                height="76"
-                rx="10"
-                fill={isIfActive ? "#FEF2F2" : "#F8FAFC"}
-                stroke={isIfActive ? "#EF4444" : "#94A3B8"}
-                strokeWidth="2.5"
-              />
-              <path
-                d="M -40,114 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
-                fill={isIfActive ? "#EF4444" : "#94A3B8"}
-              />
-              <text
-                x="80"
-                y="121"
-                dominantBaseline="central"
-                fill="#FFFFFF"
-                fontSize="19"
-                fontWeight="bold"
-                fontFamily="sans-serif"
-                textAnchor="middle"
-              >
-                IF · Instruction Fetch
-              </text>
-              <line
-                x1="-40"
-                y1="137"
-                x2="200"
-                y2="137"
-                stroke={isIfActive ? "#EF4444" : "#94A3B8"}
-                strokeWidth="1.5"
-              />
-              <text
-                x="80"
-                y="159"
-                dominantBaseline="central"
-                fill={isIfActive ? "#991B1B" : "#94A3B8"}
-                fontSize="19"
-                fontFamily="'D2Coding', Consolas, monospace"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                {ifInst}
-              </text>
-            </g>
-
-            {/* 2. ID: Instruction Decode (Row center: 425.5 -> card y=388, h=76) */}
-            <g>
-              <rect
-                x="-40"
-                y="388"
-                width="240"
-                height="76"
-                rx="10"
-                fill={isIdActive ? "#FFF7ED" : "#F8FAFC"}
-                stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-                strokeWidth="2.5"
-              />
-              <path
-                d="M -40,398 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
-                fill={isIdActive ? "#EA580C" : "#94A3B8"}
-              />
-              <text
-                x="80"
-                y="405"
-                dominantBaseline="central"
-                fill="#FFFFFF"
-                fontSize="19"
-                fontWeight="bold"
-                fontFamily="sans-serif"
-                textAnchor="middle"
-              >
-                ID · Instruction Decode
-              </text>
-              <line
-                x1="-40"
-                y1="421"
-                x2="200"
-                y2="421"
-                stroke={isIdActive ? "#EA580C" : "#94A3B8"}
-                strokeWidth="1.5"
-              />
-              <text
-                x="80"
-                y="443"
-                dominantBaseline="central"
-                fill={isIdActive ? "#C2410C" : "#94A3B8"}
-                fontSize="19"
-                fontFamily="'D2Coding', Consolas, monospace"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                {idInst}
-              </text>
-            </g>
-
-            {/* 3. EX: Execute (Row center: 738 -> card y=700, h=76) */}
-            <g>
-              <rect
-                x="-40"
-                y="700"
-                width="240"
-                height="76"
-                rx="10"
-                fill={isExActive ? "#F0FDF4" : "#F8FAFC"}
-                stroke={isExActive ? "#16A34A" : "#94A3B8"}
-                strokeWidth="2.5"
-              />
-              <path
-                d="M -40,710 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
-                fill={isExActive ? "#16A34A" : "#94A3B8"}
-              />
-              <text
-                x="80"
-                y="717"
-                dominantBaseline="central"
-                fill="#FFFFFF"
-                fontSize="19"
-                fontWeight="bold"
-                fontFamily="sans-serif"
-                textAnchor="middle"
-              >
-                EX · Execute
-              </text>
-              <line
-                x1="-40"
-                y1="733"
-                x2="200"
-                y2="733"
-                stroke={isExActive ? "#16A34A" : "#94A3B8"}
-                strokeWidth="1.5"
-              />
-              <text
-                x="80"
-                y="755"
-                dominantBaseline="central"
-                fill={isExActive ? "#15803D" : "#94A3B8"}
-                fontSize="19"
-                fontFamily="'D2Coding', Consolas, monospace"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                {exInst}
-              </text>
-            </g>
-
-            {/* 4. MEM: Memory Access (Row center: 1046 -> card y=1008, h=76) */}
-            <g>
-              <rect
-                x="-40"
-                y="1008"
-                width="240"
-                height="76"
-                rx="10"
-                fill={isMemActive ? "#F0F9FF" : "#F8FAFC"}
-                stroke={isMemActive ? "#0284C7" : "#94A3B8"}
-                strokeWidth="2.5"
-              />
-              <path
-                d="M -40,1018 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
-                fill={isMemActive ? "#0284C7" : "#94A3B8"}
-              />
-              <text
-                x="80"
-                y="1025"
-                dominantBaseline="central"
-                fill="#FFFFFF"
-                fontSize="19"
-                fontWeight="bold"
-                fontFamily="sans-serif"
-                textAnchor="middle"
-              >
-                MEM · Memory Access
-              </text>
-              <line
-                x1="-40"
-                y1="1041"
-                x2="200"
-                y2="1041"
-                stroke={isMemActive ? "#0284C7" : "#94A3B8"}
-                strokeWidth="1.5"
-              />
-              <text
-                x="80"
-                y="1063"
-                dominantBaseline="central"
-                fill={isMemActive ? "#0369A1" : "#94A3B8"}
-                fontSize="19"
-                fontFamily="'D2Coding', Consolas, monospace"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                {memInst}
-              </text>
-            </g>
-
-            {/* 5. WB: Write Back (Row center: 1267 -> card y=1229, h=76) */}
-            <g>
-              <rect
-                x="-40"
-                y="1229"
-                width="240"
-                height="76"
-                rx="10"
-                fill={isWbActive ? "#F5F3FF" : "#F8FAFC"}
-                stroke={isWbActive ? "#8B5CF6" : "#94A3B8"}
-                strokeWidth="2.5"
-              />
-              <path
-                d="M -40,1239 a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z"
-                fill={isWbActive ? "#8B5CF6" : "#94A3B8"}
-              />
-              <text
-                x="80"
-                y="1246"
-                dominantBaseline="central"
-                fill="#FFFFFF"
-                fontSize="19"
-                fontWeight="bold"
-                fontFamily="sans-serif"
-                textAnchor="middle"
-              >
-                WB · Write Back
-              </text>
-              <line
-                x1="-40"
-                y1="1262"
-                x2="200"
-                y2="1262"
-                stroke={isWbActive ? "#8B5CF6" : "#94A3B8"}
-                strokeWidth="1.5"
-              />
-              <text
-                x="80"
-                y="1284"
-                dominantBaseline="central"
-                fill={isWbActive ? "#6D28D9" : "#94A3B8"}
-                fontSize="19"
-                fontFamily="'D2Coding', Consolas, monospace"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                {wbInst}
-              </text>
-            </g>
+            {/* [좌측 5개 스테이지 카드] 해저드 배지 (STALL / FLUSH / BUBBLE) 통합 렌더링 */}
+            {renderStageCard("IF", 104, "IF · Instruction Fetch", ifInst, "#EF4444", "#FEF2F2", "#991B1B", isIfActive)}
+            {renderStageCard("ID", 388, "ID · Instruction Decode", idInst, "#EA580C", "#FFF7ED", "#C2410C", isIdActive)}
+            {renderStageCard("EX", 700, "EX · Execute", exInst, "#16A34A", "#F0FDF4", "#15803D", isExActive)}
+            {renderStageCard("MEM", 1008, "MEM · Memory Access", memInst, "#0284C7", "#F0F9FF", "#0369A1", isMemActive)}
+            {renderStageCard("WB", 1229, "WB · Write Back", wbInst, "#8B5CF6", "#F5F3FF", "#6D28D9", isWbActive)}
 
             {/* ============================================================ */}
             {/* [2열: 우측 열] 순수 데이터패스 본체 (좌측 60px 당김: translate(170, 0)) */}

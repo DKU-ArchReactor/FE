@@ -1,6 +1,6 @@
 /* ======================================================== */
 /* ArchReactor Single-Cycle Tutor (2D Card Navigation)       */
-/* View-Optimized Layout (C fills top, ASM fills bottom)     */
+/* Header-Integrated Folder Tabs Layout (도식 1번)           */
 /* ======================================================== */
 
 .tutor-single-container {
@@ -18,7 +18,7 @@
   outline: none;
 }
 
-/* 상단 버튼 슬롯 (ASM 뷰에서만 노출, C 뷰에서는 DOM에서 완전히 제거) */
+/* 상단 버튼 슬롯 (ASM 뷰에서만 노출) */
 .tutor-single-slot-top {
   display: flex;
   align-items: center;
@@ -31,7 +31,7 @@
   flex-shrink: 0;
 }
 
-/* 하단 버튼 슬롯 (C 뷰에서만 노출, ASM 뷰에서는 DOM에서 완전히 제거) */
+/* 하단 버튼 슬롯 (C 뷰에서만 노출) */
 .tutor-single-slot-bottom {
   display: flex;
   align-items: center;
@@ -141,7 +141,9 @@
   height: 16px;
 }
 
-/* 중앙 메인 카드 - 상/하/좌/우 공간을 최대로 활용 */
+/* ======================================================== */
+/* 중앙 메인 카드 본체 (Card Body)                          */
+/* ======================================================== */
 .tutor-single-card {
   display: flex;
   flex-direction: column;
@@ -163,30 +165,100 @@ html.dark .tutor-single-card {
   box-shadow: 0 4px 18px -4px rgba(0, 0, 0, 0.35);
 }
 
-.tutor-single-card:hover {
-  border-color: color-mix(in srgb, var(--ar-accent) 40%, var(--ar-border));
-}
-
-/* 카드 상단 헤더 */
+/* ======================================================== */
+/* 카드 상단 헤더: [태그] + [서류철 탭] + [진행도] (1단 결합)   */
+/* ======================================================== */
 .tutor-single-card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 16px;
+  padding: 6px 16px 0 16px;
   background: var(--ar-header-bg);
   border-bottom: 1px solid var(--ar-border);
+  position: relative;
   flex-shrink: 0;
+  min-height: 40px;
+}
+
+.tutor-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 7px;
+  flex-shrink: 0;
+}
+
+.tutor-header-right {
+  display: flex;
+  align-items: center;
+  padding-bottom: 7px;
+  flex-shrink: 0;
+}
+
+/* 서류철 탭 바 (Header Tabs Bar) */
+.tutor-header-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  margin-bottom: -1px;
+  z-index: 2;
+  position: relative;
+  overflow-x: auto;
+}
+
+/* 개별 서류철 탭 (Individual Folder Tab) */
+.tutor-folder-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--ar-border);
+  border-bottom: 1px solid var(--ar-border);
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+  background: var(--ar-header-bg);
+  color: var(--ar-text-muted);
+  cursor: pointer;
+  transition: all 0.14s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.tutor-folder-tab:hover:not(.active) {
+  background: color-mix(in srgb, var(--ar-header-bg) 60%, var(--ar-panel-bg));
+  color: var(--ar-text-primary);
+}
+
+/* 활성화된 서류철 탭 (Active Folder Tab) - 본문과 바닥선 없이 일체화 */
+.tutor-folder-tab.active {
+  background: var(--ar-panel-bg);
+  color: var(--ar-accent);
+  font-weight: 700;
+  border-top: 2px solid var(--ar-accent);
+  border-bottom: 1px solid var(--ar-panel-bg);
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.tutor-folder-tab-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ar-accent) 15%, transparent);
+  color: var(--ar-accent);
 }
 
 .tutor-single-tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
-  border-radius: 6px;
+  padding: 2.5px 9px;
+  border-radius: 5px;
   font-family: var(--font-mono, monospace);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 750;
   letter-spacing: -0.01em;
   background: color-mix(in srgb, var(--ar-accent) 12%, transparent);
@@ -197,7 +269,7 @@ html.dark .tutor-single-card {
 .tutor-single-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -207,13 +279,15 @@ html.dark .tutor-single-card {
 }
 
 .tutor-single-counter {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--ar-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-/* 카드 본문 */
+/* ======================================================== */
+/* 카드 본문 (Card Body)                                     */
+/* ======================================================== */
 .tutor-single-card-body {
   padding: 12px 16px;
   display: flex;
@@ -308,7 +382,7 @@ html.dark .tutor-single-observed-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 16px;
+  padding: 6px 16px;
   background: var(--ar-header-bg);
   border-top: 1px solid var(--ar-border);
   flex-shrink: 0;

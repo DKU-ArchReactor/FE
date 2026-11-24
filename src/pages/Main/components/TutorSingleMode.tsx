@@ -4,12 +4,10 @@ import type { MappedAssemblyRow } from '../utils/translationCompile';
 import {
   analyzeAsmInstruction,
   analyzeCLine,
-  analyzeCrtInstruction,
   instructionAt,
 } from '../utils/tutorAnalysis';
 import { instructionCycleForPc } from '../utils/instructionFlow';
 import { tutorInstructionDetails } from '../utils/tutorInstructionDetails';
-import TutorDetailPages, { TutorDetailHost, type TutorDetailPage } from './TutorDetailPages';
 import { TutorText } from './TutorEvidence';
 import './TutorSingleMode.css';
 
@@ -30,6 +28,9 @@ export interface TutorSingleModeProps {
   onJumpToCycle?: (cycle: number) => void;
   onPausePlayback?: () => void;
 }
+
+type AsmTabId = 'desc' | 'exec' | 'logic';
+type CTabId = 'desc' | 'logic';
 
 export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   rows,
@@ -54,6 +55,10 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   });
 
   const view = screen.key === selectionKey ? screen.kind : requestedView;
+
+  // 서류철 탭 상태 관리
+  const [asmTab, setAsmTab] = useState<AsmTabId>('desc');
+  const [cTab, setCTab] = useState<CTabId>('desc');
 
   // 현재 C 라인에 매핑된 ASM 명령어 그룹 (C가 없거나 CRT인 경우 전체 또는 CRT 그룹)
   const group = useMemo(() => {
@@ -91,6 +96,41 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   const details = item ? tutorInstructionDetails(item, simulation.tutor, historyIndex) : null;
   const observations = details ? [...details.observations].sort((a, b) => a[1].history_index - b[1].history_index) : [];
   const latest = observations.at(-1);
+
+  // ASM 활성화 탭 계산 (데이터가 유효한 탭만 동적으로 노출)
+  const availableAsmTabs = useMemo<{ id: AsmTabId; label: string; badge?: string }[]>(() => {
+    const tabs: { id: AsmTabId; label: string; badge?: string }[] = [
+      { id: 'desc', label: '설명' },
+    ];
+    if (observations.length > 0 || latest) {
+      tabs.push({
+        id: 'exec',
+        label: '실제 실행',
+        badge: latest ? `Step ${latest[1].step}` : undefined,
+      });
+    }
+    if (
+      instruction?.hardwareDetail ||
+      (item?.teaching?.walkthrough && item.teaching.walkthrough.length > 0) ||
+      (item?.teaching?.operand_roles && item.teaching.operand_roles.length > 0)
+    ) {
+      tabs.push({ id: 'logic', label: '동작 원리' });
+    }
+    return tabs;
+  }, [observations, latest, instruction, item]);
+
+  // C 활성화 탭 계산
+  const availableCTabs = useMemo<{ id: CTabId; label: string }[]>(() => {
+    const tabs: { id: CTabId; label: string }[] = [{ id: 'desc', label: '코드 설명' }];
+    if (lineExplanation?.detail || cAnalysis?.detail) {
+      tabs.push({ id: 'logic', label: '컴파일 원리' });
+    }
+    return tabs;
+  }, [lineExplanation, cAnalysis]);
+
+  // 현재 유효한 탭 ID 결정 (유효하지 않은 탭이면 'desc'로 자동 안전 복귀)
+  const activeAsmTabId = availableAsmTabs.some((t) => t.id === asmTab) ? asmTab : 'desc';
+  const activeCTabId = availableCTabs.some((t) => t.id === cTab) ? cTab : 'desc';
 
   type AsmRow = (typeof group)[number];
 
@@ -144,213 +184,213 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
     onSelectLine?.(line, currentRow?.index ?? null);
   }, [hasC, line, isPlaying, onPausePlayback, selectionKey, onSelectLine, currentRow]);
 
-  // 상세 페이지 구성 (TutorDetailPages)
-  const cDetailPages: TutorDetailPage[] = useMemo(() => {
-    if (!cAnalysis) return [];
-    return [
-      {
-        title: cAnalysis.type,
-        blocks: [
-          { label: '선택한 C 코드', text: cText },
-          { label: '이 코드의 의미', text: cAnalysis.summary },
-          { label: '컴파일 결과 해석', text: cAnalysis.detail },
-        ],
-      },
-      ...(lineExplanation
-        ? [
-          {
-            title: 'C와 어셈블리 연결',
-            blocks: [
-              { label: '어셈블리 동작 요약', text: lineExplanation.summary },
-              { label: '상세 매핑 원리', text: lineExplanation.detail },
-            ],
-          },
-        ]
-        : []),
-    ];
-  }, [cAnalysis, cText, lineExplanation]);
-
-  const asmDetailPages: TutorDetailPage[] = useMemo(() => {
-    if (!currentRow || !instruction) return [];
-    return [
-      {
-        title: '명령어 해설',
-        blocks: [
-          { label: '명령어 의미', text: instruction.explanation },
-          { label: '연산 분류', text: instruction.action },
-        ],
-      },
-      ...(observations.length
-        ? [
-          {
-            title: '실제 실행 관찰',
-            blocks: observations.map(([stage, val]) => ({
-              label: `Step ${val.step} · ${stage}`,
-              text: val.summary,
-            })),
-          },
-        ]
-        : []),
-      ...(details?.pages ?? []),
-      ...(instruction.hardwareDetail
-        ? [
-          {
-            title: '하드웨어 원리와 주의사항',
-            blocks: [{ text: instruction.hardwareDetail }],
-          },
-        ]
-        : []),
-      ...(currentRow.sourceLine == null
-        ? [
-          {
-            title: '소스 위치와 실행 문맥',
-            blocks: [
-              { text: analyzeCrtInstruction(currentRow.text, currentRow.pc).summary },
-              { text: analyzeCrtInstruction(currentRow.text, currentRow.pc).detail },
-            ],
-          },
-        ]
-        : []),
-    ];
-  }, [currentRow, instruction, observations, details, currentRow?.sourceLine, currentRow?.text, currentRow?.pc]);
-
   return (
-    <TutorDetailHost
-      inline
-      label={view === 'c' ? 'C 라인 해설 자세히 보기' : '어셈블리 명령어 해설 자세히 보기'}
-      onOpen={() => {
-        if (currentRow) onSelect(currentRow.index);
-      }}
-    >
-      <div className="tutor-single-container" data-view={view} aria-label="싱글사이클 튜터 네비게이션">
-        {/* ========================================================= */}
-        {/* 상단 슬롯: [^] C로 올라가는 버튼 (ASM 뷰에서만 렌더링 - C 뷰는 윗쪽을 완전히 채움) */}
-        {/* ========================================================= */}
-        {view === 'asm' && (
-          <div className="tutor-single-slot-top">
-            <button
-              type="button"
-              className="tutor-single-btn-vertical up"
-              disabled={!hasC || line == null}
-              title={
-                !hasC || line == null
-                  ? 'C 코드 매핑 없음 (런타임 또는 직접 작성한 어셈블리)'
-                  : `C: L${line} 설명으로 올라가기`
-              }
-              onClick={handleRollUpToC}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
-              <span>{hasC && line != null ? `C: L${line} 설명으로 올라가기` : 'C 코드 매핑 없음'}</span>
-            </button>
-          </div>
+    <div className="tutor-single-container" data-view={view} aria-label="싱글사이클 튜터 네비게이션">
+      {/* ========================================================= */}
+      {/* 상단 슬롯: [^] C로 올라가는 버튼 (ASM 뷰에서만 노출 - C 뷰는 윗쪽을 완전히 채움) */}
+      {/* ========================================================= */}
+      {view === 'asm' && (
+        <div className="tutor-single-slot-top">
+          <button
+            type="button"
+            className="tutor-single-btn-vertical up"
+            disabled={!hasC || line == null}
+            title={
+              !hasC || line == null
+                ? 'C 코드 매핑 없음 (런타임 또는 직접 작성한 어셈블리)'
+                : `C: L${line} 설명으로 올라가기`
+            }
+            onClick={handleRollUpToC}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="18 15 12 9 6 15" />
+            </svg>
+            <span>{hasC && line != null ? `C: L${line} 설명으로 올라가기` : 'C 코드 매핑 없음'}</span>
+          </button>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 중간 스테이지: [<] 버튼 + 중앙 카드(도식 1번 헤더 일체형) + [>] 버튼 */}
+      {/* ========================================================= */}
+      <div className="tutor-single-stage">
+        {/* 좌측 이전 버튼 (ASM 뷰에서만 활성화) */}
+        {view === 'asm' ? (
+          <button
+            type="button"
+            className="tutor-single-btn-horizontal"
+            disabled={!prevRow}
+            title={prevRow ? `이전 ASM: L${prevRow.index + 1}로 이동` : '첫 번째 명령어입니다'}
+            aria-label="이전 ASM 명령어"
+            onClick={() => prevRow && handleNavigateAsm(prevRow)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-[36px] shrink-0" aria-hidden="true" />
         )}
 
         {/* ========================================================= */}
-        {/* 중간 스테이지: [<] 버튼 + 중앙 카드 + [>] 버튼 */}
+        {/* 중앙 카드 본체 (1번 구조: 헤더 한 줄에 태그 + 서류철 탭 + 진행도 결합) */}
         {/* ========================================================= */}
-        <div className="tutor-single-stage">
-          {/* 좌측 이전 버튼 (ASM 뷰에서만 활성화) */}
-          {view === 'asm' ? (
-            <button
-              type="button"
-              className="tutor-single-btn-horizontal"
-              disabled={!prevRow}
-              title={prevRow ? `이전 ASM: L${prevRow.index + 1}로 이동` : '첫 번째 명령어입니다'}
-              aria-label="이전 ASM 명령어"
-              onClick={() => prevRow && handleNavigateAsm(prevRow)}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-          ) : (
-            <div className="w-[36px] shrink-0" aria-hidden="true" />
-          )}
+        <div className="tutor-single-card">
+          {view === 'c' ? (
+            /* ==================== C 코드 카드 ==================== */
+            <>
+              {/* 1번 스타일: 헤더 안에 태그, 서류철 탭, 카운터가 한 줄로 배치 */}
+              <div className="tutor-single-card-header">
+                <div className="tutor-header-left">
+                  <span className="tutor-single-tag">
+                    {line != null ? `C : L${line}` : 'C 코드'}
+                  </span>
+                  {cAnalysis && (
+                    <span className="tutor-single-badge">{cAnalysis.type}</span>
+                  )}
+                </div>
 
-          {/* 중앙 메인 카드 */}
-          <div className="tutor-single-card">
-            {view === 'c' ? (
-              /* ---------------- C 코드 카드 ---------------- */
-              <>
-                <div className="tutor-single-card-header">
-                  <div className="flex items-center gap-2">
-                    <span className="tutor-single-tag">
-                      {line != null ? `C : L${line}` : 'C 코드'}
-                    </span>
-                    {cAnalysis && (
-                      <span className="tutor-single-badge">{cAnalysis.type}</span>
-                    )}
-                  </div>
+                {/* 헤더 중앙 서류철 탭 */}
+                <div className="tutor-header-tabs" role="tablist">
+                  {availableCTabs.map((tab) => {
+                    const isActive = activeCTabId === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        className={`tutor-folder-tab ${isActive ? 'active' : ''}`}
+                        onClick={() => setCTab(tab.id as CTabId)}
+                      >
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="tutor-header-right">
                   <span className="tutor-single-counter">
                     {group.length > 0 ? `연결된 ASM ${group.length}개` : '매핑된 ASM 없음'}
                   </span>
                 </div>
+              </div>
 
-                <div className="tutor-single-card-body">
-                  <div className="tutor-single-code-box">
-                    <code>{cText.trim() || (line != null ? '// 빈 라인 또는 주석' : 'C 위치 정보 없음')}</code>
-                  </div>
-
-                  <div className="tutor-single-meaning">
-                    <span className="tutor-single-meaning-arrow" aria-hidden="true">→</span>
-                    <p className="tutor-single-meaning-text">
-                      <TutorText
-                        text={
-                          cAnalysis?.summary ??
-                          (line != null
-                            ? '선택한 C 라인의 문법 해설을 분석 중입니다.'
-                            : '시작 코드·어셈블리 직접 작성 등으로 연결된 C 라인이 없습니다.')
-                        }
-                      />
-                    </p>
-                  </div>
-
-                  {lineExplanation && (
-                    <div className="text-xs text-[var(--ar-text-muted)] bg-[var(--ar-header-bg)] p-2.5 rounded-md border border-[var(--ar-border)]">
-                      <strong className="block font-semibold text-[var(--ar-text-primary)] mb-1">
-                        컴파일된 어셈블리 동작 요약
-                      </strong>
-                      <p>{lineExplanation.summary}</p>
+              <div className="tutor-single-card-body">
+                {activeCTabId === 'desc' ? (
+                  /* ---------------- C [코드 설명] 탭 ---------------- */
+                  <>
+                    <div className="tutor-single-code-box">
+                      <code>{cText.trim() || (line != null ? '// 빈 라인 또는 주석' : 'C 위치 정보 없음')}</code>
                     </div>
-                  )}
-                </div>
 
-                <div className="tutor-single-card-footer">
-                  {cDetailPages.length > 0 ? (
-                    <TutorDetailPages
-                      title="C 설명 자세히 보기"
-                      context={`C: L${line} · ${cText.trim()}`}
-                      pages={cDetailPages}
-                    />
-                  ) : (
-                    <span />
-                  )}
-                  <span className="tutor-single-mapping-hint">
-                    아래 버튼을 눌러 어셈블리 명령어를 확인하세요
-                  </span>
-                </div>
-              </>
-            ) : (
-              /* ---------------- ASM 어셈블리 카드 ---------------- */
-              <>
-                <div className="tutor-single-card-header">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="tutor-single-tag">
-                      {currentRow ? `ASM : L${currentRow.index + 1}` : 'ASM'}
-                    </span>
-                    {instruction && (
-                      <span className="tutor-single-badge">{instruction.action}</span>
+                    <div className="tutor-single-meaning">
+                      <span className="tutor-single-meaning-arrow" aria-hidden="true">→</span>
+                      <p className="tutor-single-meaning-text">
+                        <TutorText
+                          text={
+                            cAnalysis?.summary ??
+                            (line != null
+                              ? '선택한 C 라인의 문법 해설을 분석 중입니다.'
+                              : '시작 코드·어셈블리 직접 작성 등으로 연결된 C 라인이 없습니다.')
+                          }
+                        />
+                      </p>
+                    </div>
+
+                    {lineExplanation && (
+                      <div className="text-xs text-[var(--ar-text-muted)] bg-[var(--ar-header-bg)] p-2.5 rounded-md border border-[var(--ar-border)]">
+                        <strong className="block font-semibold text-[var(--ar-text-primary)] mb-1">
+                          컴파일된 어셈블리 동작 요약
+                        </strong>
+                        <p>{lineExplanation.summary}</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* ---------------- C [컴파일 원리] 탭 ---------------- */
+                  <div className="space-y-3">
+                    {cAnalysis?.detail && (
+                      <div className="p-3 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 border-l-[var(--ar-accent)]">
+                        <strong className="block text-xs font-semibold text-[var(--ar-text-primary)] mb-1">
+                          C 코드 컴파일 해석
+                        </strong>
+                        <p className="text-[13px] leading-relaxed text-[var(--ar-text-primary)]">
+                          <TutorText text={cAnalysis.detail} />
+                        </p>
+                      </div>
+                    )}
+
+                    {lineExplanation?.detail && (
+                      <div className="p-3 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)]">
+                        <strong className="block text-xs font-semibold text-[var(--ar-text-primary)] mb-1">
+                          어셈블리 매핑 원리
+                        </strong>
+                        <p className="text-[13px] leading-relaxed text-[var(--ar-text-muted)]">
+                          <TutorText text={lineExplanation.detail} />
+                        </p>
+                      </div>
                     )}
                   </div>
+                )}
+              </div>
+
+              <div className="tutor-single-card-footer">
+                <span className="text-xs text-[var(--ar-text-muted)] font-medium">
+                  {activeCTabId === 'desc' ? 'C 소스 코드 해설' : '컴파일러 번역 분석'}
+                </span>
+                <span className="tutor-single-mapping-hint">
+                  하단 버튼을 누르면 어셈블리 단계로 내려갑니다
+                </span>
+              </div>
+            </>
+          ) : (
+            /* ==================== ASM 어셈블리 카드 ==================== */
+            <>
+              {/* 1번 스타일: 헤더 안에 태그, 서류철 탭, 카운터가 한 줄로 배치 */}
+              <div className="tutor-single-card-header">
+                <div className="tutor-header-left">
+                  <span className="tutor-single-tag">
+                    {currentRow ? `ASM : L${currentRow.index + 1}` : 'ASM'}
+                  </span>
+                  {instruction && (
+                    <span className="tutor-single-badge">{instruction.action}</span>
+                  )}
+                </div>
+
+                {/* 헤더 중앙 서류철 탭 */}
+                <div className="tutor-header-tabs" role="tablist">
+                  {availableAsmTabs.map((tab) => {
+                    const isActive = activeAsmTabId === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        className={`tutor-folder-tab ${isActive ? 'active' : ''}`}
+                        onClick={() => setAsmTab(tab.id as AsmTabId)}
+                      >
+                        <span>{tab.label}</span>
+                        {tab.badge && (
+                          <span className="tutor-folder-tab-badge">{tab.badge}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="tutor-header-right">
                   <span className="tutor-single-counter">
                     {group.length ? `${position + 1} / ${group.length}` : '0 / 0'}
                   </span>
                 </div>
+              </div>
 
-                <div className="tutor-single-card-body">
-                  {currentRow && instruction ? (
+              <div className="tutor-single-card-body">
+                {currentRow && instruction ? (
+                  activeAsmTabId === 'desc' ? (
+                    /* ---------------- ASM [설명] 탭 ---------------- */
                     <>
                       <div className="tutor-single-code-box">
                         <code>{currentRow.text}</code>
@@ -366,7 +406,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                       {latest && (
                         <div className="tutor-single-observed">
                           <div className="tutor-single-observed-title">
-                            <span>실제 실행 관찰</span>
+                            <span>실제 실행 요약</span>
                             <span>Step {latest[1].step} · {latest[0]}</span>
                           </div>
                           <p className="tutor-single-observed-content">
@@ -375,81 +415,164 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                         </div>
                       )}
                     </>
-                  ) : (
-                    <p className="text-sm text-[var(--ar-text-muted)] p-4 text-center">
-                      이 C 줄에 연결된 어셈블리 명령어가 없습니다.
-                    </p>
-                  )}
-                </div>
+                  ) : activeAsmTabId === 'exec' ? (
+                    /* ---------------- ASM [실제 실행] 탭 ---------------- */
+                    <div className="space-y-2.5">
+                      <div className="text-xs text-[var(--ar-text-muted)] flex items-center justify-between pb-1 border-b border-[var(--ar-border)]">
+                        <span>시뮬레이터에서 실행되며 발생한 하드웨어 상태 변화입니다.</span>
+                        {latest && (
+                          <span className="font-mono font-semibold text-[var(--ar-accent)]">
+                            최종 관찰: Step {latest[1].step}
+                          </span>
+                        )}
+                      </div>
 
-                <div className="tutor-single-card-footer">
-                  {asmDetailPages.length > 0 ? (
-                    <TutorDetailPages
-                      title="명령어 자세히 보기"
-                      context={currentRow ? `ASM: L${currentRow.index + 1} · ${currentRow.text}` : 'ASM 해설'}
-                      pages={asmDetailPages}
-                    />
+                      {observations.map(([stage, val]) => (
+                        <div
+                          key={stage}
+                          className="p-2.5 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 border-l-emerald-500"
+                        >
+                          <div className="flex items-center justify-between text-xs font-semibold text-[var(--ar-text-primary)] mb-1">
+                            <span>Step {val.step} · {stage}</span>
+                            {val.cycle != null && (
+                              <span className="font-mono text-[11px] text-[var(--ar-text-muted)]">
+                                CORE Clock {val.cycle}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[13px] leading-relaxed text-[var(--ar-text-primary)]">
+                            <TutorText text={val.summary} />
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <span />
-                  )}
-                  {hasC && line != null && (
-                    <span className="tutor-single-mapping-hint">
-                      C: L{line}에 매핑된 명령어
-                    </span>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+                    /* ---------------- ASM [동작 원리] 탭 ---------------- */
+                    <div className="space-y-3">
+                      {instruction.hardwareDetail && (
+                        <div className="p-3 rounded-lg border border-[var(--ar-border)] bg-[var(--ar-header-bg)] border-l-3 border-l-[var(--ar-accent)]">
+                          <strong className="block text-xs font-semibold text-[var(--ar-text-primary)] mb-1">
+                            하드웨어 동작 원리
+                          </strong>
+                          <p className="text-[13px] leading-relaxed text-[var(--ar-text-primary)]">
+                            <TutorText text={instruction.hardwareDetail} />
+                          </p>
+                        </div>
+                      )}
 
-          {/* 우측 다음 버튼 (ASM 뷰에서만 활성화) */}
-          {view === 'asm' ? (
-            <button
-              type="button"
-              className="tutor-single-btn-horizontal"
-              disabled={!nextRow}
-              title={nextRow ? `다음 ASM: L${nextRow.index + 1}로 이동` : '마지막 명령어입니다'}
-              aria-label="다음 ASM 명령어"
-              onClick={() => nextRow && handleNavigateAsm(nextRow)}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          ) : (
-            <div className="w-[36px] shrink-0" aria-hidden="true" />
+                      {item?.teaching?.walkthrough && item.teaching.walkthrough.length > 0 && (
+                        <div className="space-y-1.5">
+                          <strong className="block text-xs font-semibold text-[var(--ar-text-muted)]">
+                            단계별 처리 순서
+                          </strong>
+                          {item.teaching.walkthrough.map((step, idx) => (
+                            <div
+                              key={idx}
+                              className="p-2 rounded border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] text-xs"
+                            >
+                              <span className="font-bold text-[var(--ar-accent)] mr-1.5">
+                                {step.title}:
+                              </span>
+                              <span className="text-[var(--ar-text-primary)]">{step.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {item?.teaching?.operand_roles && item.teaching.operand_roles.length > 0 && (
+                        <div className="space-y-1.5">
+                          <strong className="block text-xs font-semibold text-[var(--ar-text-muted)]">
+                            피연산자 역할
+                          </strong>
+                          <div className="grid grid-cols-2 gap-2">
+                            {item.teaching.operand_roles.map((role, idx) => (
+                              <div
+                                key={idx}
+                                className="p-2 rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] text-xs"
+                              >
+                                <span className="font-mono font-bold text-[var(--ar-accent)] mr-1.5">
+                                  {role.operand}
+                                </span>
+                                <span className="text-[var(--ar-text-muted)]">{role.role}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <p className="text-sm text-[var(--ar-text-muted)] p-4 text-center">
+                    이 C 줄에 연결된 어셈블리 명령어가 없습니다.
+                  </p>
+                )}
+              </div>
+
+              <div className="tutor-single-card-footer">
+                <span className="text-xs text-[var(--ar-text-muted)] font-medium">
+                  {activeAsmTabId === 'desc'
+                    ? '명령어 기본 해설'
+                    : activeAsmTabId === 'exec'
+                    ? '레지스터/메모리 변화 추적'
+                    : 'CPU 하드웨어 동작'}
+                </span>
+                {hasC && line != null && (
+                  <span className="tutor-single-mapping-hint">
+                    C: L{line}에 매핑된 명령어
+                  </span>
+                )}
+              </div>
+            </>
           )}
         </div>
 
-        {/* ========================================================= */}
-        {/* 하단 슬롯: [v] ASM으로 내려가는 버튼 (C 뷰에서만 렌더링 - ASM 뷰는 아랫쪽을 완전히 채움) */}
-        {/* ========================================================= */}
-        {view === 'c' && (
-          <div className="tutor-single-slot-bottom">
-            <button
-              type="button"
-              className="tutor-single-btn-vertical down"
-              disabled={!firstAsmRow}
-              title={
-                firstAsmRow
-                  ? `ASM: L${firstAsmRow.index + 1} 설명으로 내려가기 (${group.length}개 명령어)`
-                  : '연결된 ASM 명령어가 없습니다'
-              }
-              onClick={handleDrillDownToAsm}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-              <span>
-                {firstAsmRow
-                  ? `ASM: L${firstAsmRow.index + 1} 설명으로 내려가기 (${group.length}개)`
-                  : '연결된 ASM 없음'}
-              </span>
-            </button>
-          </div>
+        {/* 우측 다음 버튼 (ASM 뷰에서만 활성화) */}
+        {view === 'asm' ? (
+          <button
+            type="button"
+            className="tutor-single-btn-horizontal"
+            disabled={!nextRow}
+            title={nextRow ? `다음 ASM: L${nextRow.index + 1}로 이동` : '마지막 명령어입니다'}
+            aria-label="다음 ASM 명령어"
+            onClick={() => nextRow && handleNavigateAsm(nextRow)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-[36px] shrink-0" aria-hidden="true" />
         )}
       </div>
-    </TutorDetailHost>
+
+      {/* ========================================================= */}
+      {/* 하단 슬롯: [v] ASM으로 내려가는 버튼 (C 뷰에서만 렌더링 - ASM 뷰는 아랫쪽을 완전히 채움) */}
+      {/* ========================================================= */}
+      {view === 'c' && (
+        <div className="tutor-single-slot-bottom">
+          <button
+            type="button"
+            className="tutor-single-btn-vertical down"
+            disabled={!firstAsmRow}
+            title={
+              firstAsmRow
+                ? `ASM: L${firstAsmRow.index + 1} 설명으로 내려가기 (${group.length}개 명령어)`
+                : '연결된 ASM 명령어가 없습니다'
+            }
+            onClick={handleDrillDownToAsm}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+            <span>
+              {firstAsmRow
+                ? `ASM: L${firstAsmRow.index + 1} 설명으로 내려가기 (${group.length}개)`
+                : '연결된 ASM 없음'}
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
