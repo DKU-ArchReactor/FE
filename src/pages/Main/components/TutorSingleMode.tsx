@@ -6,7 +6,6 @@ import {
   analyzeCLine,
   instructionAt,
 } from '../utils/tutorAnalysis';
-import { instructionCycleForPc } from '../utils/instructionFlow';
 import { tutorInstructionDetails } from '../utils/tutorInstructionDetails';
 import { TutorText } from './TutorEvidence';
 import './TutorSingleMode.css';
@@ -25,7 +24,6 @@ export interface TutorSingleModeProps {
   isPlaying?: boolean;
   onSelect: (index: number) => void;
   onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
-  onJumpToCycle?: (cycle: number) => void;
   onPausePlayback?: () => void;
 }
 
@@ -45,7 +43,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   isPlaying = false,
   onSelect,
   onSelectLine,
-  onJumpToCycle,
   onPausePlayback,
 }) => {
   // 사용자의 명시적 C ↔ ASM 전환 상태 관리 (selectionKey가 바뀌면 상위 요청 뷰로 초기화)
@@ -134,7 +131,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
 
   type AsmRow = (typeof group)[number];
 
-  // ASM 명령어 간 수평 이동 핸들러
+  // ASM 명령어 간 수평 이동 핸들러 (현재 C 라인 범위 안에서만 이동)
   const handleNavigateAsm = useCallback(
     (target: AsmRow | null | undefined) => {
       if (!target) return;
@@ -144,23 +141,12 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
         onPausePlayback?.();
       }
 
-      // 2) 튜터 내부 및 외부 에디터 선택 상태 동기화
+      // 2) 튜터 내부 및 외부 에디터 선택 상태 동기화 (현재 C 라인 범위 엄격 유지)
+      const currentCLine = hasC && line != null ? line : target.sourceLine;
       onSelect(target.index);
-      onSelectLine?.(target.sourceLine, target.index);
-
-      // 3) 정지 상태에서 해당 명령어의 실행 사이클이 존재하면 시뮬레이터 상태도 동기화
-      if (!isPlaying && target.pc && simulation.history) {
-        const cycle = instructionCycleForPc(
-          simulation.history,
-          target.pc,
-          historyIndex != null && historyIndex >= 0 ? historyIndex + 1 : 1
-        );
-        if (cycle !== undefined) {
-          onJumpToCycle?.(cycle);
-        }
-      }
+      onSelectLine?.(currentCLine, target.index);
     },
-    [isPlaying, onPausePlayback, onSelect, onSelectLine, simulation.history, historyIndex, onJumpToCycle]
+    [isPlaying, onPausePlayback, onSelect, onSelectLine, hasC, line]
   );
 
   // C -> ASM 드릴다운 핸들러
@@ -334,15 +320,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                   </div>
                 )}
               </div>
-
-              <div className="tutor-single-card-footer">
-                <span className="text-xs text-[var(--ar-text-muted)] font-medium">
-                  {activeCTabId === 'desc' ? 'C 소스 코드 해설' : '컴파일러 번역 분석'}
-                </span>
-                <span className="tutor-single-mapping-hint">
-                  하단 버튼을 누르면 어셈블리 단계로 내려갑니다
-                </span>
-              </div>
             </>
           ) : (
             /* ==================== ASM 어셈블리 카드 ==================== */
@@ -505,21 +482,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                   <p className="text-sm text-[var(--ar-text-muted)] p-4 text-center">
                     이 C 줄에 연결된 어셈블리 명령어가 없습니다.
                   </p>
-                )}
-              </div>
-
-              <div className="tutor-single-card-footer">
-                <span className="text-xs text-[var(--ar-text-muted)] font-medium">
-                  {activeAsmTabId === 'desc'
-                    ? '명령어 기본 해설'
-                    : activeAsmTabId === 'exec'
-                    ? '레지스터/메모리 변화 추적'
-                    : 'CPU 하드웨어 동작'}
-                </span>
-                {hasC && line != null && (
-                  <span className="tutor-single-mapping-hint">
-                    C: L{line}에 매핑된 명령어
-                  </span>
                 )}
               </div>
             </>

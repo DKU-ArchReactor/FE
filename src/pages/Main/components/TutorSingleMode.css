@@ -289,7 +289,7 @@ html.dark .tutor-single-card {
 /* 카드 본문 (Card Body)                                     */
 /* ======================================================== */
 .tutor-single-card-body {
-  padding: 12px 16px;
+  padding: 14px 18px 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -377,18 +377,4 @@ html.dark .tutor-single-observed-title {
   margin: 0;
 }
 
-/* 하단 푸터 */
-.tutor-single-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 16px;
-  background: var(--ar-header-bg);
-  border-top: 1px solid var(--ar-border);
-  flex-shrink: 0;
-}
 
-.tutor-single-mapping-hint {
-  font-size: 11px;
-  color: var(--ar-text-muted);
-}

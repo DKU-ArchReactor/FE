@@ -255,7 +255,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           mode={simulationMode}
           onClose={onCloseTutor}
           onSelectLine={onSelectTranslationLine}
-          onJumpToCycle={onJumpToCycle}
           onPausePlayback={onPausePlayback}
         />
       );

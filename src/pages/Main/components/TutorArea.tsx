@@ -38,7 +38,6 @@ export interface TutorAreaProps {
   mode?: "single" | "pipeline";
   onClose?: () => void;
   onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
-  onJumpToCycle?: (cycle: number) => void;
   onPausePlayback?: () => void;
 }
 
@@ -80,7 +79,6 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   mode = "pipeline",
   onClose,
   onSelectLine,
-  onJumpToCycle,
   onPausePlayback,
 }) => {
   const isCompiled = Boolean(simulationData);
@@ -121,7 +119,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const followsExecution = stageIndex==null && !isUserSelected && manualAsmIndex == null;
   const selectedAsmIndex = stageIndex ?? (followsExecution ? currentActiveAsmIndex : manualAsmIndex);
   const selectedTranslationLine = (followsExecution || stageIndex!=null || selectionKind==='asm' && activeTarget==='asm') && selectedAsmIndex != null
-    ? effectiveRows[selectedAsmIndex]?.sourceLine ?? null : providedTranslationLine;
+    ? effectiveRows[selectedAsmIndex]?.sourceLine ?? providedTranslationLine : providedTranslationLine;
 
   const selectedRow = useMemo(() => {
     if (selectedAsmIndex !== null && selectedAsmIndex !== undefined && selectedAsmIndex >= 0) {
@@ -131,7 +129,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   }, [selectedAsmIndex, effectiveRows]);
 
   const isCrtSelected = Boolean(
-    selectedRow && (selectedRow.sourceLine === null || selectedRow.isRuntime)
+    selectedRow && (selectedRow.isRuntime || (selectedRow.sourceLine === null && providedTranslationLine == null))
   );
   const splitView = isCompiled && (activeTarget !== 'asm' || selectedRow != null);
 
@@ -287,13 +285,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             isPlaying={isPlaying}
             onSelect={index => {
               setStageSelection({ rows: effectiveRows, scope: selectionScope, index });
-              const row = effectiveRows[index];
-              if (row) {
-                onSelectLine?.(row.sourceLine, index);
-              }
             }}
             onSelectLine={onSelectLine}
-            onJumpToCycle={onJumpToCycle}
             onPausePlayback={onPausePlayback}
           />
         ) : splitView && simulationData ? (

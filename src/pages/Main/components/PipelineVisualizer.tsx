@@ -1117,7 +1117,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const handleZoomOut = () => setZoomLevel((prev) => Math.max(0.5, +(prev - 0.15).toFixed(2)));
   const handleZoomReset = () => setZoomLevel(1.0);
 
-  // 5개 스테이지 카드 해저드 배지 렌더링 헬퍼 (방안 1: 본문 공간 활용)
+  // 5개 스테이지 카드 렌더링 헬퍼 (스타일 B: 2열 우측 테두리에 플로팅 태그 오버레이)
   const renderStageCard = (
     stage: "IF" | "ID" | "EX" | "MEM" | "WB",
     cardY: number,
@@ -1144,9 +1144,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       (inst === "bubble" || inst === "—") &&
       (stage === "EX" || buffers?.[stage]?.status === "bubble")
     );
-    const isRegularBubble = Boolean(
-      !isFlushed && !isStallBubble && inst === "bubble"
-    );
+    const isBubble = inst === "bubble";
     const isEmpty = Boolean(inst === "—" || inst === "empty" || isInitialEmpty);
 
     // 카드 테두리 및 배경 계산
@@ -1177,6 +1175,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       dividerStroke = activeColor;
     }
 
+    const hasFloatingTag = isFlushed || isStalled || isStallBubble;
+
     return (
       <g key={stage}>
         {/* 1. 외곽 카드 바디 */}
@@ -1191,7 +1191,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           strokeWidth="2.5"
           strokeDasharray={isStallBubble ? "5 3" : undefined}
         />
-        {/* 2. 상단 헤더 배너 */}
+        {/* 2. 상단 헤더 배너 (1열) */}
         <path
           d={`M -40,${cardY + 10} a 10,10 0 0 1 10,-10 h 220 a 10,10 0 0 1 10,10 v 23 h -240 z`}
           fill={headerFill}
@@ -1217,16 +1217,32 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           strokeWidth="1.5"
         />
 
-        {/* 3. 하단 본문 영역 (해저드 배지 또는 명령어 표시) */}
-        {isFlushed ? (
-          /* 플러시(분기 예측 실패로 취소) */
-          <g transform={`translate(80, ${cardY + 54.5})`}>
+        {/* 3. 하단 본문 영역 (2열: 명령어 또는 bubble) */}
+        <text
+          x={hasFloatingTag ? "72" : "80"}
+          y={cardY + 55}
+          dominantBaseline="central"
+          fill={isFlushed ? "#B91C1C" : (isStalled || isActive) ? activeDarkText : "#94A3B8"}
+          fontSize={isEmpty ? "19" : isBubble ? "17.5" : "18"}
+          fontFamily="'D2Coding', Consolas, monospace"
+          fontWeight="bold"
+          textAnchor="middle"
+        >
+          {inst}
+        </text>
+
+        {/* 4. 2열 오른쪽 테두리에 걸친 플로팅 태그 (Style B: Border Overlap Tag) */}
+        {isFlushed && (
+          <g
+            transform={`translate(196, ${cardY + 54.5})`}
+            style={{ filter: "drop-shadow(0 1.5px 3px rgba(220, 38, 38, 0.25))" }}
+          >
             <rect
-              x="-62"
-              y="-13"
-              width="124"
-              height="26"
-              rx="13"
+              x="-33"
+              y="-11"
+              width="66"
+              height="22"
+              rx="11"
               fill="#FEE2E2"
               stroke="#EF4444"
               strokeWidth="1.5"
@@ -1237,62 +1253,26 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               dominantBaseline="central"
               textAnchor="middle"
               fill="#DC2626"
-              fontSize="13.5"
-              fontWeight="bold"
+              fontSize="11"
+              fontWeight="800"
               fontFamily="sans-serif"
             >
-              ✕ FLUSH (취소)
+              ✕ FLUSH
             </text>
           </g>
-        ) : isStalled && inst !== "bubble" && inst !== "—" ? (
-          /* 스톨로 1클록 대기 중인 명령어 */
-          <g>
-            <text
-              x="80"
-              y={cardY + 46.5}
-              dominantBaseline="central"
-              fill={activeDarkText}
-              fontSize="15"
-              fontFamily="'D2Coding', Consolas, monospace"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {inst}
-            </text>
-            <g transform={`translate(80, ${cardY + 63.5})`}>
-              <rect
-                x="-46"
-                y="-8.5"
-                width="92"
-                height="17"
-                rx="8.5"
-                fill="#FEF3C7"
-                stroke="#F59E0B"
-                strokeWidth="1.2"
-              />
-              <text
-                x="0"
-                y="0.5"
-                dominantBaseline="central"
-                textAnchor="middle"
-                fill="#D97706"
-                fontSize="10.5"
-                fontWeight="bold"
-                fontFamily="sans-serif"
-              >
-                ❚❚ STALL (대기)
-              </text>
-            </g>
-          </g>
-        ) : isStallBubble ? (
-          /* 스톨로 인해 하류에 주입된 NOP 버블 */
-          <g transform={`translate(80, ${cardY + 54.5})`}>
+        )}
+
+        {(isStalled || isStallBubble) && !isFlushed && (
+          <g
+            transform={`translate(196, ${cardY + 54.5})`}
+            style={{ filter: "drop-shadow(0 1.5px 3px rgba(217, 119, 6, 0.25))" }}
+          >
             <rect
-              x="-64"
-              y="-13"
-              width="128"
-              height="26"
-              rx="13"
+              x="-33"
+              y="-11"
+              width="66"
+              height="22"
+              rx="11"
               fill="#FEF3C7"
               stroke="#F59E0B"
               strokeWidth="1.5"
@@ -1302,68 +1282,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y="0.5"
               dominantBaseline="central"
               textAnchor="middle"
-              fill="#B45309"
-              fontSize="12.5"
-              fontWeight="bold"
+              fill="#D97706"
+              fontSize="11"
+              fontWeight="800"
               fontFamily="sans-serif"
             >
-              ❚❚ STALL BUBBLE
+              ❚❚ STALL
             </text>
           </g>
-        ) : isRegularBubble ? (
-          /* 일반 파이프라인 버블 */
-          <g transform={`translate(80, ${cardY + 54.5})`}>
-            <rect
-              x="-50"
-              y="-12"
-              width="100"
-              height="24"
-              rx="12"
-              fill="#F1F5F9"
-              stroke="#CBD5E1"
-              strokeWidth="1.2"
-            />
-            <text
-              x="0"
-              y="0.5"
-              dominantBaseline="central"
-              textAnchor="middle"
-              fill="#64748B"
-              fontSize="12.5"
-              fontWeight="bold"
-              fontFamily="sans-serif"
-            >
-              ○ BUBBLE
-            </text>
-          </g>
-        ) : isEmpty ? (
-          /* 실행 전 초기 비어있음 */
-          <text
-            x="80"
-            y={cardY + 55}
-            dominantBaseline="central"
-            fill="#94A3B8"
-            fontSize="19"
-            fontFamily="'D2Coding', Consolas, monospace"
-            fontWeight="bold"
-            textAnchor="middle"
-          >
-            —
-          </text>
-        ) : (
-          /* 일반 활성 명령어 */
-          <text
-            x="80"
-            y={cardY + 55}
-            dominantBaseline="central"
-            fill={activeDarkText}
-            fontSize="18.5"
-            fontFamily="'D2Coding', Consolas, monospace"
-            fontWeight="bold"
-            textAnchor="middle"
-          >
-            {inst}
-          </text>
         )}
       </g>
     );
