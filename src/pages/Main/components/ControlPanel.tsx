@@ -77,13 +77,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
     let animId: number;
     let lastTime = performance.now();
-    let currentPos = currentCycle;
+    // 1-based Cycle k는 [k - 1, k] 구간을 실행하므로 애니메이션은 k - 1에서 시작하여 k로 전진합니다.
+    let currentPos = Math.max(0, currentCycle - 1);
 
     const tick = (now: number) => {
       const delta = now - lastTime;
       lastTime = now;
 
-      // playSpeed(ms) 동안 1사이클 전진
+      // playSpeed(ms) 동안 1사이클 전진 (k - 1 -> k)
       currentPos += delta / playSpeed;
       if (currentPos > maxCycle) currentPos = maxCycle;
 
@@ -100,7 +101,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [isPlaying, playSpeed, maxCycle, currentCycle]);
 
-  const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (currentCycle / maxCycle) * 100)) : 0;
+  const baseCycle = isPlaying ? Math.max(0, currentCycle - 1) : currentCycle;
+  const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (baseCycle / maxCycle) * 100)) : 0;
 
   return (
     <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3 md:px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
