@@ -1,6 +1,8 @@
 import type {CycleHistoryItem} from '@/type/simulation';
 import type {MappedAssemblyRow} from '../utils/translationCompile';
 import './TutorPipelineFlow.css';
+import {tutorDecimalText} from '../utils/tutorReadable';
+
 
 const stages=[['IF','인출'],['ID','해독'],['EX','연산'],['MEM','메모리'],['WB','기록']] as const;
 export default function TutorPipelineFlow({cycle,rows,onSelect,selectedIndex,onFollow,onStage,selectedStage}:{cycle:CycleHistoryItem|null;rows:MappedAssemblyRow[];onSelect:(index:number)=>void;selectedIndex?:number|null;onFollow:()=>void;onStage?:(stage:string,index:number)=>void;selectedStage?:string|null}){
@@ -13,7 +15,7 @@ export default function TutorPipelineFlow({cycle,rows,onSelect,selectedIndex,onF
       const cancelled=value?.flush_info?.is_flushed||/flush/i.test(value?.status??'');
       const index=value?.pc?rows.findIndex(row=>row.pc&&Number(row.pc)===Number(value.pc)):-1;
       return <button key={stage} data-stage={stage} aria-pressed={selectedStage?selectedStage===stage:index>=0&&index===selectedIndex} onClick={()=>onStage?onStage(stage,index):index>=0&&onSelect(index)} title={`${stage} · ${label} · ${value?.assembly??'비어 있음'}`}>
-        <span>{stage}<small>{label}</small></span><code>{empty?'비어 있음':cancelled?'취소됨':bubble?'버블':value?.assembly}</code>
+        <span>{stage}<small>{label}</small></span><code>{empty?'비어 있음':cancelled?'취소됨':bubble?'버블':tutorDecimalText(value?.assembly??'')}</code>
       </button>;
     })}</div>
   </div>;

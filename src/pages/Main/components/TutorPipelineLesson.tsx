@@ -5,7 +5,7 @@ import {analyzeAsmInstruction,analyzeCLine,fetchTutor,instructionAt} from '../ut
 import {TutorText} from './TutorEvidence';
 import './TutorCycleCards.css';
 import {buildMultiCycleTraceRows} from '../utils/multiCycleTrace';
-import {explainForwarding,explainStall,explainBubble} from '../utils/tutorReadable';
+import {explainForwarding,explainStall,explainBubble,tutorDecimalText,tutorReadingText} from '../utils/tutorReadable';
 
 const stages=['IF','ID','EX','MEM','WB'] as const;
 const names={IF:'명령어 인출',ID:'명령어 해독',EX:'연산·조건 판단',MEM:'메모리 접근',WB:'완료·필요 시 레지스터 기록'};
@@ -65,12 +65,12 @@ export default function TutorPipelineLesson({cycle,simulation,rows,source,histor
     {card?<article key={`${historyIndex}-${card.stage}`} className="tutor-cycle-card" data-stage={card.stage}>
       <div className="tutor-cycle-card-title"><span data-kind={card.badge}>{card.badge==='STL'?<svg aria-label="STL" width="44" height="27" viewBox="0 0 100 68"><path d="M8 16 C5 16 4 19 4 22 L4 46 C4 49 5 52 8 52 L58 52 L58 60 C58 64 63 65 66 62 L96 36 C98 34 98 34 96 32 L66 6 C63 3 58 4 58 8 L58 16 Z" fill="#fde68a" stroke="#f59e0b" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/><text x="45" y="35" dominantBaseline="middle" textAnchor="middle" fill="#b45309" fontSize="23" fontWeight="800">STL</text></svg>:card.badge==='BBL'?<svg aria-label="BBL" width="44" height="29" viewBox="0 0 100 68"><path d="M18 48 C5 48 5 32 14 26 C8 15 20 6 30 14 C36 3 50 2 58 10 C66 2 80 5 84 16 C96 16 98 30 91 38 C98 48 88 60 76 56 C70 66 56 66 48 58 C40 66 26 66 22 56 C14 58 10 52 18 48 Z" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="3.2" strokeLinejoin="round"/><text x="51" y="36" dominantBaseline="middle" textAnchor="middle" fill="#0284c7" fontSize="23" fontWeight="800">BBL</text></svg>:card.badge}</span><h3>{card.status}</h3><small>{card.stage} · {names[card.stage]}</small></div>
       <div className="tutor-cycle-card-body" data-has-c={Boolean(card.c)}>
-        <section className="tutor-cycle-code"><strong>{card.row?`ASM: L${rows.indexOf(card.row)+1}`:'ASM'}{card.bubble?' · 원래 명령어의 의미':''}</strong><code>{card.asm??'실행 명령어 정보 없음'}</code>{card.meaning&&<p><TutorText text={card.meaning}/></p>}</section>
-        {card.c&&<section className="tutor-cycle-code tutor-cycle-c"><strong>C: L{card.line}</strong><code>{card.c}</code><p>{analyzeCLine(card.c,card.line!).summary}</p></section>}
-        {!card.cause&&<section className="tutor-cycle-observation"><strong>{card.observation?'이 사이클의 실제 동작':'이 단계에서 하는 일'}</strong><p>{card.observation?.summary??(card.cause?'아래 발생 원인과 해결 방법을 확인하세요.':({IF:'PC가 가리키는 주소에서 명령어를 가져옵니다.',ID:'명령어를 해독하고 필요한 레지스터 입력을 확인합니다.',EX:'연산·주소 계산·조건 판단을 수행합니다.',MEM:/^(lb|lbu|lh|lhu|lw)\b/i.test(card.asm??'')?'계산한 주소의 메모리 값을 읽습니다.':/^(sb|sh|sw)\b/i.test(card.asm??'')?'계산한 주소에 레지스터 값을 저장합니다.':'이 명령어는 데이터 메모리를 읽거나 쓰지 않고 다음 단계로 진행합니다.',WB:/^(sb|sh|sw|beq|bne|blt|bge|bltu|bgeu)\b/i.test(card.asm??'')?'이 명령어는 일반 레지스터에 결과를 기록하지 않습니다.':'기록 대상이 있는 명령어는 결과를 레지스터에 반영합니다.'})[card.stage])}</p></section>}
+        <section className="tutor-cycle-code"><strong>{card.row?`ASM: L${rows.indexOf(card.row)+1}`:'ASM'}{card.bubble?' · 원래 명령어의 의미':''}</strong><code>{tutorDecimalText(card.asm??'실행 명령어 정보 없음')}</code>{card.meaning&&<p><TutorText text={card.meaning}/></p>}</section>
+        {card.c&&<section className="tutor-cycle-code tutor-cycle-c"><strong>C: L{card.line}</strong><code>{tutorDecimalText(card.c)}</code><p>{tutorReadingText(analyzeCLine(card.c,card.line!).summary)}</p></section>}
+        {!card.cause&&<section className="tutor-cycle-observation"><strong>{card.observation?'이 사이클의 실제 동작':'이 단계에서 하는 일'}</strong><p>{tutorReadingText(card.observation?.summary??(card.cause?'아래 발생 원인과 해결 방법을 확인하세요.':({IF:'PC가 가리키는 주소에서 명령어를 가져옵니다.',ID:'명령어를 해독하고 필요한 레지스터 입력을 확인합니다.',EX:'연산·주소 계산·조건 판단을 수행합니다.',MEM:/^(lb|lbu|lh|lhu|lw)\b/i.test(card.asm??'')?'계산한 주소의 메모리 값을 읽습니다.':/^(sb|sh|sw)\b/i.test(card.asm??'')?'계산한 주소에 레지스터 값을 저장합니다.':'이 명령어는 데이터 메모리를 읽거나 쓰지 않고 다음 단계로 진행합니다.',WB:/^(sb|sh|sw|beq|bne|blt|bge|bltu|bgeu)\b/i.test(card.asm??'')?'이 명령어는 일반 레지스터에 결과를 기록하지 않습니다.':'기록 대상이 있는 명령어는 결과를 레지스터에 반영합니다.'})[card.stage]))}</p></section>}
         {(card.cause||card.action)&&<div className="tutor-cycle-response">
-          {card.cause&&<section className="tutor-cycle-cause"><strong>발생 원인</strong><p>{card.cause}</p></section>}
-          {card.action&&<section className="tutor-cycle-action"><strong>해결 방법</strong><p>{card.action}</p></section>}
+          {card.cause&&<section className="tutor-cycle-cause"><strong>발생 원인</strong><p>{tutorReadingText(card.cause)}</p></section>}
+          {card.action&&<section className="tutor-cycle-action"><strong>해결 방법</strong><p>{tutorReadingText(card.action)}</p></section>}
         </div>}
       </div>
     </article>:<div className="tutor-cycle-empty">이 사이클에는 실행 중인 명령어나 보고된 대기·취소 상황이 없습니다.</div>}

@@ -1,4 +1,6 @@
 import React from "react";
+import {tutorDecimalText,tutorReadingText} from '../utils/tutorReadable';
+
 import type { CycleHistoryItem, SimulationResult } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
 import {
@@ -15,7 +17,7 @@ export const TutorCrtCard: React.FC<{
   totalRowsCount: number;
   simulationData: SimulationResult | null;
   historyIndex?: number;
-}> = ({ selectedRow, selectedAsmIndex, totalRowsCount, simulationData, historyIndex }) => {
+}> = ({ selectedRow, selectedAsmIndex, simulationData, historyIndex }) => {
   const crtInfo = analyzeCrtInstruction(selectedRow.text, selectedRow.pc);
   return (
     <div className="flex flex-col gap-3">
@@ -33,21 +35,18 @@ export const TutorCrtCard: React.FC<{
           </div>
           {selectedRow.pc && (
             <span className="text-[10px] font-mono text-slate-500 dark:text-[#858585] bg-white dark:bg-[#1E1E1E] px-2 py-0.5 rounded border border-slate-200 dark:border-[#333333] whitespace-nowrap shrink-0">
-              PC: {selectedRow.pc}
+              PC: {tutorDecimalText(selectedRow.pc)}
             </span>
           )}
         </div>
 
         <div className="font-mono text-xs px-3 py-2 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-slate-900 dark:text-[#D4D4D4] font-semibold flex items-center justify-between shadow-2xs">
-          <span>{selectedRow.text}</span>
+          <span>{tutorDecimalText(selectedRow.text)}</span>
           <span className="text-[10px] text-slate-400 dark:text-[#858585] font-normal">
             ASM L{(selectedAsmIndex ?? 0) + 1}
           </span>
         </div>
 
-        <p className="text-[11px] text-[var(--ar-text-muted)]">
-          전체 ASM {totalRowsCount}개 중 소스 위치가 확인되지 않은 선택 명령어 1개를 설명합니다.
-        </p>
         <p className="text-[13px] leading-6 text-[var(--ar-text-primary)]">
           <TutorText
             text={
@@ -73,18 +72,18 @@ export const TutorCrtCard: React.FC<{
               <div>
                 <strong className="text-slate-900 dark:text-white font-bold">{crtInfo.role}</strong>
                 <p className="text-[11px] text-slate-600 dark:text-[#858585] mt-0.5 leading-relaxed">
-                  {crtInfo.summary}
+                  {tutorReadingText(crtInfo.summary)}
                 </p>
               </div>
             </div>
 
             <div className="p-2.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-[13px] text-[var(--ar-text-muted)] leading-7">
-              <p>{crtInfo.detail}</p>
+              <p>{tutorReadingText(crtInfo.detail)}</p>
             </div>
 
             <div className="p-2 rounded bg-slate-100/70 dark:bg-[#1E1E1E]/80 border border-slate-200/80 dark:border-[#333333] text-[10px] text-slate-500 dark:text-[#858585] flex items-start gap-1.5">
               <span className="font-bold text-slate-700 dark:text-[#CCCCCC] shrink-0">하드웨어 동작:</span>
-              <span>{crtInfo.instructionDetail.hardwareDetail}</span>
+              <span>{tutorReadingText(crtInfo.instructionDetail.hardwareDetail)}</span>
             </div>
           </div>
         </details>
@@ -118,7 +117,6 @@ export const TutorSelectedLineSection: React.FC<{
   cLineAnalysis,
   lineExplanation,
   explainedAsmRows,
-  effectiveRowsCount,
   selectedAsmIndex,
   currentActiveAsmIndex,
   isUserSelected,
@@ -164,7 +162,7 @@ export const TutorSelectedLineSection: React.FC<{
               </span>
             </div>
             <div className="font-mono text-[13px] leading-6 px-3 py-2 rounded-md bg-[var(--ar-header-bg)] border border-[var(--ar-border)] text-[var(--ar-text-primary)] whitespace-pre-wrap break-all">
-              {trimmed || <span className="text-slate-400 dark:text-[#858585] italic">빈 줄</span>}
+              {tutorDecimalText(trimmed) || <span className="text-slate-400 dark:text-[#858585] italic">빈 줄</span>}
             </div>
             <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">{descText}</p>
           </div>
@@ -179,7 +177,7 @@ export const TutorSelectedLineSection: React.FC<{
                 C: L{selectedTranslationLine}
               </span>
               <div className="text-sm leading-6 font-semibold text-[var(--ar-text-primary)] flex items-center gap-2">
-                <span>{cLineAnalysis.summary}</span>
+                <span>{tutorReadingText(cLineAnalysis.summary)}</span>
               </div>
             </div>
             <span className={`text-[10px] px-2 py-0.5 rounded font-medium shrink-0 ${cLineAnalysis.badgeColor}`}>
@@ -188,17 +186,17 @@ export const TutorSelectedLineSection: React.FC<{
           </div>
 
           <div className="font-mono text-[13px] leading-6 px-3 py-2 rounded-md bg-[var(--ar-header-bg)] border border-[var(--ar-border)] text-[var(--ar-text-primary)] whitespace-pre-wrap break-all">
-            {selectedCLineText?.trim() || <span className="text-slate-400 dark:text-[#858585] italic">빈 줄</span>}
+            {tutorDecimalText(selectedCLineText?.trim()??'') || <span className="text-slate-400 dark:text-[#858585] italic">빈 줄</span>}
           </div>
 
-          <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">{cLineAnalysis.detail}</p>
+          <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">{tutorReadingText(cLineAnalysis.detail)}</p>
         </div>
       )}
 
       {activeTarget !== "asm" && lineExplanation && (
         <div className="border-l-2 border-[var(--ar-border)] pl-3 text-[13px] leading-7 space-y-1">
-          <p className="font-semibold text-[var(--ar-text-primary)]">{lineExplanation.summary}</p>
-          <p className="text-[var(--ar-text-muted)]">{lineExplanation.detail}</p>
+          <p className="font-semibold text-[var(--ar-text-primary)]">{tutorReadingText(lineExplanation.summary)}</p>
+          <p className="text-[var(--ar-text-muted)]">{tutorReadingText(lineExplanation.detail)}</p>
         </div>
       )}
 
@@ -218,15 +216,6 @@ export const TutorSelectedLineSection: React.FC<{
           <div className="text-[10px] text-slate-400 dark:text-[#858585] font-mono">RV32IM / 컴파일 결과 기준</div>
         </div>
 
-        <p className="text-[11px] text-[var(--ar-text-muted)]">
-          전체 ASM {effectiveRowsCount}개 중{" "}
-          {activeTarget === "asm"
-            ? `선택한 명령어 ${explainedAsmRows.length}개를 설명합니다.`
-            : `C ${selectedTranslationLine}줄에 연결된 ${explainedAsmRows.length}개를 모두 설명합니다.`}
-          {selectedAsmIndex != null &&
-            explainedAsmRows.some((row) => row.asmIndex === selectedAsmIndex + 1) &&
-            ` 선택한 명령어는 이 그룹의 ${explainedAsmRows.findIndex((row) => row.asmIndex === selectedAsmIndex + 1) + 1}번째입니다.`}
-        </p>
 
         {explainedAsmRows.length === 0 ? (
           <div className="p-3 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-center text-xs text-slate-400 dark:text-[#858585]">
@@ -251,7 +240,7 @@ export const TutorSelectedLineSection: React.FC<{
                 <article
                   key={`${asmRow.asmIndex}-${idx}`}
                   data-asm-index={rowZeroIndex}
-                  aria-label={`ASM L${asmRow.asmIndex} ${asmRow.text}`}
+                  aria-label={`ASM L${asmRow.asmIndex} ${tutorDecimalText(asmRow.text)}`}
                   className={`rounded-lg bg-[var(--ar-panel-bg)] overflow-clip transition-colors flex flex-col gap-2 border border-l-4 shadow-sm ${
                     isRowSelectedFocus
                       ? "border-[var(--ar-accent)]"
@@ -274,7 +263,7 @@ export const TutorSelectedLineSection: React.FC<{
                         ASM L{asmRow.asmIndex}
                       </span>
                       <h4 className="font-mono text-sm leading-6 font-medium text-[var(--ar-text-primary)] break-all">
-                        {asmRow.text}
+                        {tutorDecimalText(asmRow.text)}
                       </h4>
                       <span className="text-[11px] text-[var(--ar-text-muted)]">{instDetail.action}</span>
                       {isRowSelectedFocus && (
@@ -294,11 +283,6 @@ export const TutorSelectedLineSection: React.FC<{
                     <p className="text-[13px] text-[var(--ar-text-primary)] leading-6">
                       <TutorText text={instDetail.explanation} />
                     </p>
-                    {instDetail.operation && instDetail.operation !== instDetail.explanation && (
-                      <p className="rounded-md border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-2 font-mono text-xs leading-6 break-all text-[var(--ar-text-primary)]">
-                        {instDetail.operation}
-                      </p>
-                    )}
                     <TutorInstructionEvidence
                       item={instructionAt(simulationData?.tutor, asmRow.pc)}
                       bundle={simulationData?.tutor}
@@ -398,7 +382,7 @@ export const TutorCycleOverviewSection: React.FC<{
                       [Step 0] 시뮬레이션 준비 완료
                     </span>
                     <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585]">
-                      Entry: {ifBuf?.pc || "0x00010000"}
+                      Entry: {tutorDecimalText(ifBuf?.pc || "0x00010000")}
                     </span>
                   </div>
                   <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">
@@ -418,7 +402,7 @@ export const TutorCycleOverviewSection: React.FC<{
                 <div className="flex items-center justify-between flex-wrap gap-1.5 text-[11px]">
                   <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                     <span className="font-bold text-indigo-700 dark:text-[#79C0FF] font-sans">
-                      [IF 인출 단계] {ifInst}
+                      [IF 인출 단계] {tutorDecimalText(ifInst)}
                     </span>
                     {isCrtCycle && (
                       <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] whitespace-nowrap shrink-0">
@@ -428,12 +412,12 @@ export const TutorCycleOverviewSection: React.FC<{
                   </div>
                   {ifBuf?.pc && (
                     <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585] whitespace-nowrap shrink-0">
-                      PC: {ifBuf.pc}
+                      PC: {tutorDecimalText(ifBuf.pc)}
                     </span>
                   )}
                 </div>
                 <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">
-                  {crtAnalysis ? `${crtAnalysis.role}: ${crtAnalysis.summary}` : ifAnalysis.explanation}
+                  {tutorDecimalText(crtAnalysis ? `${crtAnalysis.role}: ${crtAnalysis.summary}` : ifAnalysis.explanation)}
                 </p>
               </div>
             );

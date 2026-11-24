@@ -1,7 +1,32 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import {tutorReadingText} from '../utils/tutorReadable';
+import {tutorReadingText,tutorDecimalText} from '../utils/tutorReadable';
+import {tutorSectionPages} from '../utils/tutorReadingSections';
 
 export type ReadingSection = { title: string; blocks: { label?: string; text: string; href?:string;kind?:'question'|'answer' }[] };
+
+export function TutorScrollReader({sections,documentKey=''}:{sections:ReadingSection[];documentKey?:string}){
+  const pages=tutorSectionPages(sections);
+  const [selection,setSelection]=useState({key:documentKey,index:0});
+  const index=selection.key===documentKey?Math.min(selection.index,Math.max(0,pages.length-1)):0;
+  const page=pages[index];
+  const move=(delta:number)=>setSelection({key:documentKey,index:Math.max(0,Math.min(pages.length-1,index+delta))});
+  return <section className="tutor-reader" aria-label="튜터 읽기" tabIndex={0} onKeyDown={event=>{
+    if(event.target!==event.currentTarget)return;
+    if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1);}
+  }}>
+    <header><h3>{page?.title}</h3><span aria-live="polite">{pages.length>1?`${index+1} / ${pages.length}`:''}</span></header>
+    <div key={`${documentKey}-${index}`} className="tutor-reader-viewport" data-section-scroll="true" tabIndex={0}>
+      {page?.blocks.map((block,i)=><div className="tutor-reading-block" data-kind={block.kind} key={i}>
+        {block.label&&<strong>{block.label}</strong>}
+        <p>{block.href?.startsWith('https://')?<a href={block.href} target="_blank" rel="noopener noreferrer">{block.text}</a>:block.text}</p>
+      </div>)}
+    </div>
+    {pages.length>1&&<nav aria-label="설명 페이지 이동" className="tutor-reader-arrows">
+      <button aria-label="이전 설명" disabled={index===0} onClick={()=>move(-1)}>‹</button>
+      <button aria-label="다음 설명" disabled={index===pages.length-1} onClick={()=>move(1)}>›</button>
+    </nav>}
+  </section>;
+}
 
 /** Pages contain complete reading units; arrows never scroll the viewport. */
 export default function TutorReader({ sections, documentKey }: { sections: ReadingSection[]; documentKey: string }) {
@@ -30,15 +55,17 @@ export default function TutorReader({ sections, documentKey }: { sections: Readi
       };
       const result: ReadingSection[] = [];
       for (const section of sections) {
-        let page: ReadingSection = { title: section.title, blocks: [] };
+        const title=tutorDecimalText(section.title);
+        let page: ReadingSection = { title, blocks: [] };
         let used=0;
         for (let blockIndex=0;blockIndex<section.blocks.length;blockIndex++) {
-          const block=section.blocks[blockIndex];
+          const original=section.blocks[blockIndex];
+          const block={...original,label:original.label?tutorDecimalText(original.label):undefined};
           const answer=section.blocks[blockIndex+1];
           if(block.kind==='question'&&answer?.kind==='answer'){
-            const pair=[block,answer].map(value=>({...value,text:tutorReadingText(value.text)}));
+            const pair=[block,answer].map(value=>({...value,label:value.label?tutorDecimalText(value.label):undefined,text:tutorReadingText(value.text)}));
             const pairHeight=pair.reduce((total,value)=>total+size(value.text,value.label,value.kind),0);
-            if(page.blocks.length&&used+pairHeight>height){result.push(page);page={title:section.title,blocks:[]};used=0;}
+            if(page.blocks.length&&used+pairHeight>height){result.push(page);page={title,blocks:[]};used=0;}
             page.blocks.push(...pair);used+=pairHeight;blockIndex++;
             continue;
           }
@@ -47,7 +74,7 @@ export default function TutorReader({ sections, documentKey }: { sections: Readi
           while (text) {
             const fullHeight=size(text,block.label,block.kind);
             if (used+fullHeight<=height) {page.blocks.push({...block,text});used+=fullHeight;break;}
-            if (page.blocks.length) { result.push(page);page={title:section.title,blocks:[]};used=0;continue; }
+            if (page.blocks.length) { result.push(page);page={title,blocks:[]};used=0;continue; }
             // A temporarily collapsed panel cannot fit even one labelled line.
             // Keep the paragraph intact until ResizeObserver sees its final height.
             if(size(text.slice(0,1),block.label,block.kind)>height){page.blocks.push({...block,text});break;}
@@ -58,7 +85,7 @@ export default function TutorReader({ sections, documentKey }: { sections: Readi
             const boundary=Math.max(prefix.lastIndexOf('. ')+1,prefix.lastIndexOf(' '));
             const end=boundary>low*.7 ? boundary : low;
             page.blocks.push({...block,text:text.slice(0,end)});result.push(page);
-            page={title:section.title,blocks:[]};used=0;text=text.slice(end).trimStart();
+            page={title,blocks:[]};used=0;text=text.slice(end).trimStart();
           }
         }
         if(page.blocks.length)result.push(page);

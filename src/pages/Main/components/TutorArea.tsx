@@ -206,7 +206,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   }
 
   return (
-    <TutorDetailHost><section
+    <TutorDetailHost scrollable={isSingleMode}><section
       className="ar-tutor @container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="튜터 해설 패널"
     >
