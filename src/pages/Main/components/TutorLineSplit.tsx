@@ -31,21 +31,21 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
   const observations=details?[...details.observations].sort((a,b)=>a[1].history_index-b[1].history_index):[];
   const latest=observations.at(-1);
   const pages:TutorDetailPage[]=row&&instruction?[
-    {title:'명령어 해설',blocks:[{label:'이 명령어의 의미',text:instruction.explanation},...(instruction.operation?[{label:'동작 식',text:instruction.operation}]:[])]},
-    ...(observations.length?[{title:'실제 실행',blocks:observations.map(([stage,value])=>({label:`Step ${value.step} · ${stage}`,text:value.summary}))}]:[{title:'실제 실행',blocks:[{text:details?.valueNotice??'실행값 기록이 제공되지 않았습니다.'}]}]),
+    {title:'명령어 해설',blocks:[{label:'이 명령어의 의미',text:instruction.explanation}]},
+    ...(observations.length?[{title:'실제 실행',blocks:observations.map(([stage,value])=>({label:`Step ${value.step} · ${stage}`,text:value.summary}))}]:[]),
     ...(details?.pages??[]),
     ...(instruction.hardwareDetail?[{title:'명령어 원리와 주의사항',blocks:[{text:instruction.hardwareDetail}]}]:[]),
     ...(row.sourceLine==null?[{title:'소스 위치와 실행 문맥',blocks:[{text:analyzeCrtInstruction(row.text,row.pc).summary},{text:analyzeCrtInstruction(row.text,row.pc).detail}]}]:[]),
   ]:[];
   return <div className="dev-tutor-line-split" data-has-c={hasC} data-single-screen={singleScreen}>
     {hasC&&(!singleScreen||view==='c')&&<TutorDetailHost key={`c-${line}`} inline label="C 줄 자세히 보기" onOpen={()=>{if(row)onSelect(row.index);}}><aside className="dev-tutor-c-panel" aria-label="선택한 C 줄 설명">
-      <header><strong>{line!=null?`C L${line}`:'C 위치 미확인'}</strong></header>
+      <header><strong>{line!=null?`C: L${line}`:'C 위치 미확인'}</strong></header>
       <div className="dev-tutor-c-reading"><div className="dev-tutor-c-explanation"><code title={cText}>{cText.trim()||'선택 명령어의 C 위치 정보가 없습니다.'}</code>
         <p><TutorText text={cAnalysis?.summary??'시작 코드·어셈블리 직접 작성·디버그 정보 누락 등으로 C 줄이 확인되지 않을 수 있습니다.'}/></p>
         </div>{lineExplanation&&<small className="dev-tutor-c-mapping"><span>연결된 ASM의 동작</span>{lineExplanation.summary}</small>}
       </div>
       <footer>
-        {cAnalysis&&<TutorDetailPages title="C 설명 자세히" context={`C ${line} · ${cText}`} pages={[
+        {cAnalysis&&<TutorDetailPages title="C 설명 자세히" context={`C: L${line} · ${cText.trim()}`} pages={[
           {title:cAnalysis.type,blocks:[{label:'선택한 코드',text:cText},{label:'이 코드의 의미',text:cAnalysis.summary},{label:'컴파일 결과를 읽는 방법',text:cAnalysis.detail}]},
           ...(lineExplanation?[{title:'C와 어셈블리 연결',blocks:[{text:lineExplanation.summary},{text:lineExplanation.detail}]}]:[]),
         ]}/>}
@@ -66,12 +66,11 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
         {row&&instruction?<>
           <div className="dev-tutor-asm-reading">
             <code className="dev-tutor-asm-code">{row.text}</code>
-            <div className="dev-tutor-asm-meta"><span>ASM L{row.index+1}</span><span>{instruction.action}</span></div>
+            <div className="dev-tutor-asm-meta"><span>ASM: L{row.index+1}</span><span>{instruction.action}</span></div>
             <p className="dev-tutor-asm-meaning" title={instruction.explanation}><TutorText text={instruction.explanation}/></p>
-            {instruction.operation&&instruction.operation!==instruction.explanation&&<code className="dev-tutor-asm-operation">{instruction.operation}</code>}
-            <div className="dev-tutor-asm-result" data-observed={Boolean(latest)}><strong>{latest?`실제 실행 · ${latest[0]}`:'실제 실행'}</strong><p title={latest?.[1].summary??details?.valueNotice}><TutorText text={latest?.[1].summary??details?.valueNotice??'구체적인 실행값 기록이 제공되지 않았습니다.'}/></p></div>
+            {latest&&<div className="dev-tutor-asm-result" data-observed><strong>실제 실행 · {latest[0]}</strong><p><TutorText text={latest[1].summary}/></p></div>}
           </div>
-          <footer><TutorDetailPages title="자세히 보기" context={row.text} pages={pages}/>
+          <footer><TutorDetailPages title="자세히 보기" context={`ASM: L${row.index+1} · ${row.text}`} pages={pages}/>
             {!hasC&&<><TutorCycleEvidence bundle={simulation.tutor} historyIndex={historyIndex} compact/><TutorPerformanceSummary bundle={simulation.tutor} historyIndex={historyIndex}/></>}
           </footer>
         </>:<p className="dev-tutor-no-asm">이 C 줄에 연결된 어셈블리 명령어가 없습니다.</p>}

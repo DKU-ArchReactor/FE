@@ -7,16 +7,11 @@ import ts from 'typescript';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 
-function component(file, name) {
-  const source = readFileSync(new URL(`../src/pages/Main/components/${file}`, import.meta.url), 'utf8');
-  const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX}});
-  const exports = {};
-  vm.runInNewContext(compiled.outputText, {exports, require: createRequire(import.meta.url)});
-  return exports[name];
-}
-const Summary = component('TutorPerformanceSummary.tsx', 'default');
-const Details = component('TutorPerformanceSummary.tsx', 'TutorPerformanceDetails');
-const Hazards = component('HazardDiagnostics.tsx', 'HazardDiagnostics');
+import {loadTutor} from './load-tutor-component.mjs';
+const Summary=loadTutor('TutorPerformanceSummary.tsx',{details:false}).default;
+const Expanded=loadTutor('TutorPerformanceSummary.tsx').default;
+const Details=({analysis,historyIndex})=>createElement(Expanded,{bundle:{performance_analysis:analysis},historyIndex});
+const Hazards=loadTutor('HazardDiagnostics.tsx').HazardDiagnostics;
 const snapshot = {history_index: 0, cycles: 2, completed: 1, cpi: 2, stall_cycles: 1, flush_cycles: 1, forwarding_cycles: 0,
   overlap_cycles: 1, hazard_cycles: 1, idle_cycles: 1, hazard_idle_cycles: 1, other_idle_cycles: 0, unknown_completion_cycles: 0, extra_cycles: 1};
 const record = {history_index: 0, cycle: 0, kind: 'stall', instruction: {pc: '0x10000', assembly: 'add a0,a1,a2', source_line: 4}, detail: 'known load dependency'};

@@ -5,7 +5,7 @@ import { analyzeCLine, fetchTutor } from '../utils/tutorAnalysis';
 import { TutorCycleEvidence } from './TutorEvidence';
 import './TutorTypography.css';
 import { tutorExecutionFocus } from '../utils/tutorFocus';
-import { TutorDetailHost } from './TutorDetailPages';
+import {TutorDetailHost} from './TutorDetailPages';
 import TutorPipelineLesson from './TutorPipelineLesson';
 import TutorLineSplit from './TutorLineSplit';
 import TutorPerformanceSummary from './TutorPerformanceSummary';
@@ -172,7 +172,6 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const asmExplanationError = useTutorExplanations(asmExplanationItems, retryVersion);
   const cExplanationError = useTutorExplanations(cExplanationItems, retryVersion);
   const explanationError = asmExplanationError || cExplanationError;
-  const explanationMissing = Boolean(simulationData && !simulationData.tutor);
 
   const cLineAnalysis = isCompiled && selectedTranslationLine && selectedCLineText !== null
     ? analyzeCLine(selectedCLineText, selectedTranslationLine) : null;
@@ -238,46 +237,21 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         </div>
       </header>
       {/* 튜터 메인 본문 영역 */}
-      <div ref={tutorBodyRef} className={`min-h-0 flex-1 overflow-y-auto p-4 space-y-4 select-text [scrollbar-gutter:stable] ${splitView ? 'dev-tutor-line-body' : ''}`}>
-        {explanationError && (
-          <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)]">
-            <span>해설을 불러오지 못했습니다.</span>
-            <button className="rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-1 font-medium focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]" onClick={() => setRetryVersion(x => x + 1)}>다시 시도</button>
-          </div>
-        )}
-        {explanationMissing && (
-          <p className="text-xs text-[var(--ar-text-muted)]">
-            상세 실행 해설이 제공되지 않았습니다. 현재는 기본 명령어 설명을 표시합니다.
-          </p>
-        )}
+      <div ref={tutorBodyRef} className={`min-h-0 flex-1 overflow-y-auto p-4 space-y-4 select-text [scrollbar-gutter:stable] ${splitView?'dev-tutor-line-body':''}`}>
+        {explanationError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)]">
+          <span>해설을 불러오지 못했습니다.</span>
+          <button className="rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-1 font-medium focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]" onClick={() => setRetryVersion(x => x + 1)}>다시 시도</button>
+        </div>}
+        {simulationData && !simulationData.tutor && <p role="status" className="rounded-md border border-[var(--ar-border)] bg-[var(--ar-header-bg)] p-3 text-xs leading-6 text-[var(--ar-text-muted)]">
+          상세 실행 해설이 제공되지 않았습니다. 현재는 기본 명령어 설명을 표시합니다.
+        </p>}
         {/* ========================================================= */}
-        {!isSingleMode && simulationData ? (
-          <TutorPipelineLesson
-            cycle={currentCycleData}
-            simulation={simulationData}
-            rows={effectiveRows}
-            source={cLines}
-            historyIndex={historyIndex}
-            selectedIndex={selectedAsmIndex}
-            sourceLine={selectedTranslationLine}
-            selectionKind={selectionKind}
-            selectionRevision={selectionRevision}
-          />
-        ) : splitView && simulationData ? (
-          <TutorLineSplit
-            rows={effectiveRows}
-            source={cLines}
-            line={isCrtSelected ? null : selectedTranslationLine}
-            selectedIndex={selectedAsmIndex}
-            singleScreen={isSingleMode}
-            requestedView={singleIntent.kind}
-            selectionKey={singleIntent.version}
-            simulation={simulationData}
-            historyIndex={historyIndex}
-            hasC={activeTarget !== 'asm'}
-            onSelect={index => setStageSelection({ rows: effectiveRows, scope: selectionScope, index })}
-          />
-        ) : !isCompiled ? (
+        {/* 컴파일/어셈블 전: 대기 화면 표시 (유효성 검증 완료 전 튜터 비활성화) */}
+        {/* ========================================================= */}
+        {!isSingleMode && simulationData ? <TutorPipelineLesson cycle={currentCycleData} simulation={simulationData} rows={effectiveRows} source={cLines} historyIndex={historyIndex} selectedIndex={selectedAsmIndex} sourceLine={selectedTranslationLine} selectionKind={selectionKind} selectionRevision={selectionRevision}/>:splitView && simulationData ? <TutorLineSplit rows={effectiveRows} source={cLines} line={isCrtSelected?null:selectedTranslationLine} selectedIndex={selectedAsmIndex}
+          singleScreen={isSingleMode} requestedView={singleIntent.kind} selectionKey={singleIntent.version}
+          simulation={simulationData} historyIndex={historyIndex} hasC={activeTarget!=='asm'}
+          onSelect={index=>setStageSelection({rows:effectiveRows,scope:selectionScope,index})}/>: !isCompiled ? (
           <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42] my-auto">
             <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
               💡
@@ -334,45 +308,18 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   );
 };
 
-const MemoizedTutorArea = React.memo(TutorArea);
-
-export default function FollowingTutor(props: TutorAreaProps) {
-  const [frozen, setFrozen] = useState<TutorAreaProps | null>(null);
-  const [resume, setResume] = useState<{ revision: number | undefined; epoch: number } | null>(null);
-  const enabled = frozen === null;
-  const live =
-    resume && resume.revision === props.selectionRevision
-      ? {
-          ...props,
-          isUserSelected: false,
-          selectedAsmIndex: null,
-          selectedTranslationLine: null,
-          selectionKind: 'asm' as const,
-        }
-      : props;
-  const shown = enabled
-    ? live
-    : {
-        ...frozen,
-        selectionKind: props.selectionKind,
-        selectionRevision: props.selectionRevision,
-        selectedAsmIndex: props.selectedAsmIndex,
-        selectedTranslationLine: props.selectedTranslationLine,
-        isUserSelected: props.isUserSelected,
-        isPlaying: false,
-      };
-  return (
-    <MemoizedTutorArea
-      {...shown}
-      key={resume?.epoch ?? 0}
-      followEnabled={enabled}
-      onToggleFollow={() => {
-        if (enabled) setFrozen(live);
-        else {
-          setFrozen(null);
-          setResume({ revision: props.selectionRevision, epoch: (resume?.epoch ?? 0) + 1 });
-        }
-      }}
-    />
-  );
+function FollowingTutor(props:TutorAreaProps){
+  const [frozen,setFrozen]=useState<TutorAreaProps|null>(null);
+  const [resume,setResume]=useState<{revision:number|undefined;epoch:number}|null>(null);
+  const enabled=frozen===null;
+  const live=resume&&resume.revision===props.selectionRevision
+    ? {...props,isUserSelected:false,selectedAsmIndex:null,selectedTranslationLine:null,selectionKind:'asm' as const}
+    : props;
+  const shown=enabled?live:{...frozen,selectionKind:props.selectionKind,selectionRevision:props.selectionRevision,selectedAsmIndex:props.selectedAsmIndex,selectedTranslationLine:props.selectedTranslationLine,isUserSelected:props.isUserSelected,isPlaying:false};
+  return <TutorArea {...shown} key={resume?.epoch??0} followEnabled={enabled} onToggleFollow={()=>{
+    if(enabled)setFrozen(live);
+    else{setFrozen(null);setResume({revision:props.selectionRevision,epoch:(resume?.epoch??0)+1});}
+  }}/>;
 }
+
+export default React.memo(FollowingTutor);

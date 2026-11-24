@@ -1,9 +1,10 @@
 import TutorDetailPages from './TutorDetailPages';
 import {tutorInstructionDetails} from '../utils/tutorInstructionDetails';
 import type { TutorBundle, TutorInstruction } from '../utils/tutorAnalysis';
+import {tutorReadingText} from '../utils/tutorReadable';
 
 export function TutorText({text}: {text: string}) {
-  const tokens = text.split(/(\b(?:0x[\da-f]+|x(?:[12]?\d|3[01])|a[0-7]|s(?:\d|1[01])|t[0-6]|sp|fp|ra|gp|tp|zero|PC|MEM(?:8|16|32))\b)/gi);
+  const tokens = tutorReadingText(text).split(/(\b(?:0x[\da-f]+|x(?:[12]?\d|3[01])|a[0-7]|s(?:\d|1[01])|t[0-6]|sp|fp|ra|gp|tp|zero|PC|MEM(?:8|16|32))\b)/gi);
   return <>{tokens.map((token, index) => index % 2 === 1
     ? <code key={index} className="rounded bg-[var(--ar-header-bg)] px-1 py-0.5 font-mono text-[0.95em] text-[var(--ar-text-primary)] break-all">{token}</code>
     : token)}</>;
