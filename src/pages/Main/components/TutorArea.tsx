@@ -5,7 +5,7 @@ import { analyzeCLine, fetchTutor } from '../utils/tutorAnalysis';
 import { TutorCycleEvidence } from './TutorEvidence';
 import './TutorTypography.css';
 import { tutorExecutionFocus } from '../utils/tutorFocus';
-import {TutorDetailHost} from './TutorDetailPages';
+import { TutorDetailHost } from './TutorDetailPages';
 import TutorPipelineLesson from './TutorPipelineLesson';
 import TutorLineSplit from './TutorLineSplit';
 import TutorSingleMode from './TutorSingleMode';
@@ -19,8 +19,8 @@ import {
 export interface TutorAreaProps {
   followEnabled?: boolean;
   onToggleFollow?: () => void;
-  selectionKind?:'c'|'asm';
-  selectionRevision?:number;
+  selectionKind?: 'c' | 'asm';
+  selectionRevision?: number;
   isPlaying?: boolean;
   simulationData: SimulationResult | null;
   currentCycleData: CycleHistoryItem | null;
@@ -60,11 +60,11 @@ function useTutorExplanations(items: Parameters<typeof fetchTutor>[0], retryVers
 }
 
 const TutorArea: React.FC<TutorAreaProps> = ({
-  followEnabled=true,
+  followEnabled = true,
   onToggleFollow,
   isPlaying = false,
-  selectionKind='asm',
-  selectionRevision=0,
+  selectionKind = 'asm',
+  selectionRevision = 0,
   simulationData,
   currentCycleData,
   loadingMessage,
@@ -108,17 +108,17 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     ? tutorExecutionFocus(currentCycleData, effectiveRows, simulationData?.simulator.mode === 'single') : null;
   const currentActiveAsmIndex = executionFocus?.index ?? providedActiveAsmIndex;
   const selectionScope = `${isUserSelected}:${manualAsmIndex}:${providedTranslationLine}:${activeTarget}`;
-  const [stageSelection,setStageSelection]=useState<{rows:MappedAssemblyRow[];scope:string;index:number}|null>(null);
-  const [wasPlaying,setWasPlaying]=useState(isPlaying);
-  const [singleIntent,setSingleIntent]=useState({run:simulationData,revision:selectionRevision,kind:'asm' as 'c'|'asm',version:0});
-  if(singleIntent.run!==simulationData)setSingleIntent({run:simulationData,revision:selectionRevision,kind:'asm',version:singleIntent.version+1});
-  else if(singleIntent.revision!==selectionRevision)setSingleIntent({...singleIntent,revision:selectionRevision,kind:selectionKind,version:singleIntent.version+1});
-  else if(!wasPlaying&&isPlaying)setSingleIntent({...singleIntent,kind:'asm',version:singleIntent.version+1});
-  if(wasPlaying!==isPlaying){setWasPlaying(isPlaying);if(isPlaying)setStageSelection(null);}
-  const stageIndex=stageSelection?.rows===effectiveRows&&stageSelection.scope===selectionScope?stageSelection.index:null;
-  const followsExecution = stageIndex==null && !isUserSelected && manualAsmIndex == null;
+  const [stageSelection, setStageSelection] = useState<{ rows: MappedAssemblyRow[]; scope: string; index: number } | null>(null);
+  const [wasPlaying, setWasPlaying] = useState(isPlaying);
+  const [singleIntent, setSingleIntent] = useState({ run: simulationData, revision: selectionRevision, kind: 'asm' as 'c' | 'asm', version: 0 });
+  if (singleIntent.run !== simulationData) setSingleIntent({ run: simulationData, revision: selectionRevision, kind: 'asm', version: singleIntent.version + 1 });
+  else if (singleIntent.revision !== selectionRevision) setSingleIntent({ ...singleIntent, revision: selectionRevision, kind: selectionKind, version: singleIntent.version + 1 });
+  else if (!wasPlaying && isPlaying) setSingleIntent({ ...singleIntent, kind: 'asm', version: singleIntent.version + 1 });
+  if (wasPlaying !== isPlaying) { setWasPlaying(isPlaying); if (isPlaying) setStageSelection(null); }
+  const stageIndex = stageSelection?.rows === effectiveRows && stageSelection.scope === selectionScope ? stageSelection.index : null;
+  const followsExecution = stageIndex == null && !isUserSelected && manualAsmIndex == null;
   const selectedAsmIndex = stageIndex ?? (followsExecution ? currentActiveAsmIndex : manualAsmIndex);
-  const selectedTranslationLine = (followsExecution || stageIndex!=null || selectionKind==='asm' && activeTarget==='asm') && selectedAsmIndex != null
+  const selectedTranslationLine = (followsExecution || stageIndex != null || selectionKind === 'asm' && activeTarget === 'asm') && selectedAsmIndex != null
     ? effectiveRows[selectedAsmIndex]?.sourceLine ?? providedTranslationLine : providedTranslationLine;
 
   const selectedRow = useMemo(() => {
@@ -141,7 +141,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   }, [effectiveRows, selectedTranslationLine]);
 
   const explainedAsmRows = activeTarget === 'asm'
-    ? selectedRow ? [{...selectedRow, asmIndex: (selectedAsmIndex ?? 0) + 1}] : []
+    ? selectedRow ? [{ ...selectedRow, asmIndex: (selectedAsmIndex ?? 0) + 1 }] : []
     : mappedAsmForSelectedLine;
 
   const asmLines = useMemo(() => {
@@ -163,15 +163,15 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const asmExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
     if (!isCompiled) return [];
     return effectiveRows.flatMap(row => [
-      {kind: 'asm' as const, text: row.text},
-      ...(row.sourceLine === null || row.isRuntime ? [{kind: 'crt' as const, text: row.text, pc: row.pc}] : []),
+      { kind: 'asm' as const, text: row.text },
+      ...(row.sourceLine === null || row.isRuntime ? [{ kind: 'crt' as const, text: row.text, pc: row.pc }] : []),
     ]);
   }, [effectiveRows, isCompiled]);
 
   const cExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
     if (!isCompiled) return [];
     return selectedCLineText !== null && selectedTranslationLine
-      ? [{kind: 'c', text: selectedCLineText, line: selectedTranslationLine}] : [];
+      ? [{ kind: 'c', text: selectedCLineText, line: selectedTranslationLine }] : [];
   }, [selectedCLineText, selectedTranslationLine, isCompiled]);
 
   const asmExplanationError = useTutorExplanations(asmExplanationItems, retryVersion);
@@ -187,17 +187,17 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const tutorBodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const body = tutorBodyRef.current;
-    if (!body || (!followsExecution && !isUserSelected && activeTarget !== 'asm' && stageIndex==null)) return;
+    if (!body || (!followsExecution && !isUserSelected && activeTarget !== 'asm' && stageIndex == null)) return;
     if (selectedAsmIndex == null) {
-      body.scrollTo({top: 0});
+      body.scrollTo({ top: 0 });
       return;
     }
     const selectedCard = body.querySelector<HTMLElement>(`[data-asm-index="${selectedAsmIndex}"]`);
     if (selectedCard) {
       const offset = selectedCard.getBoundingClientRect().top - body.getBoundingClientRect().top;
-      body.scrollTo({top: Math.max(0, body.scrollTop + offset - 12)});
+      body.scrollTo({ top: Math.max(0, body.scrollTop + offset - 12) });
     } else if (followsExecution) {
-      body.scrollTo({top: 0});
+      body.scrollTo({ top: 0 });
     }
   }, [selectedAsmIndex, selectedTranslationLine, isUserSelected, activeTarget, loadingMessage, followsExecution, stageIndex]);
 
@@ -228,8 +228,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button type="button" role="switch" aria-checked={followEnabled} aria-label="실행 따라가기" onClick={onToggleFollow} className="tutor-follow-switch">
-            <span className="tutor-follow-track"><span/></span>
-            <span>실행 따라가기</span><span className="tutor-follow-status">{followEnabled?'ON':'OFF'}</span>
+            <span className="tutor-follow-track"><span /></span>
+            <span>실행 따라가기</span><span className="tutor-follow-status">{followEnabled ? 'ON' : 'OFF'}</span>
           </button>
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
             {followsExecution && executionFocus ? `${executionFocus.stage} · 실행 따라가기` : activeTarget === "asm" ? "ASM INSTRUCTION" : "INSTRUCTION"}
@@ -360,18 +360,18 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   );
 };
 
-function FollowingTutor(props:TutorAreaProps){
-  const [frozen,setFrozen]=useState<TutorAreaProps|null>(null);
-  const [resume,setResume]=useState<{revision:number|undefined;epoch:number}|null>(null);
-  const enabled=frozen===null;
-  const live=resume&&resume.revision===props.selectionRevision
-    ? {...props,isUserSelected:false,selectedAsmIndex:null,selectedTranslationLine:null,selectionKind:'asm' as const}
+function FollowingTutor(props: TutorAreaProps) {
+  const [frozen, setFrozen] = useState<TutorAreaProps | null>(null);
+  const [resume, setResume] = useState<{ revision: number | undefined; epoch: number } | null>(null);
+  const enabled = frozen === null;
+  const live = resume && resume.revision === props.selectionRevision
+    ? { ...props, isUserSelected: false, selectedAsmIndex: null, selectedTranslationLine: null, selectionKind: 'asm' as const }
     : props;
-  const shown=enabled?live:{...frozen,selectionKind:props.selectionKind,selectionRevision:props.selectionRevision,selectedAsmIndex:props.selectedAsmIndex,selectedTranslationLine:props.selectedTranslationLine,isUserSelected:props.isUserSelected,isPlaying:false};
-  return <TutorArea {...shown} key={resume?.epoch??0} followEnabled={enabled} onToggleFollow={()=>{
-    if(enabled)setFrozen(live);
-    else{setFrozen(null);setResume({revision:props.selectionRevision,epoch:(resume?.epoch??0)+1});}
-  }}/>;
+  const shown = enabled ? live : { ...frozen, selectionKind: props.selectionKind, selectionRevision: props.selectionRevision, selectedAsmIndex: props.selectedAsmIndex, selectedTranslationLine: props.selectedTranslationLine, isUserSelected: props.isUserSelected, isPlaying: false };
+  return <TutorArea {...shown} key={resume?.epoch ?? 0} followEnabled={enabled} onToggleFollow={() => {
+    if (enabled) setFrozen(live);
+    else { setFrozen(null); setResume({ revision: props.selectionRevision, epoch: (resume?.epoch ?? 0) + 1 }); }
+  }} />;
 }
 
 export default React.memo(FollowingTutor);

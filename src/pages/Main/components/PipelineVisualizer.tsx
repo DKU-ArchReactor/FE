@@ -1147,33 +1147,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     const isBubble = inst === "bubble";
     const isEmpty = Boolean(inst === "—" || inst === "empty" || isInitialEmpty);
 
-    // 카드 테두리 및 배경 계산
-    let cardFill = "#F8FAFC";
-    let cardStroke = "#94A3B8";
-    let headerFill = "#94A3B8";
-    let dividerStroke = "#94A3B8";
-
-    if (isFlushed) {
-      cardFill = "#FEF2F2";
-      cardStroke = "#EF4444";
-      headerFill = "#EF4444";
-      dividerStroke = "#FCA5A5";
-    } else if (isStalled) {
-      cardFill = "#FFFBEB";
-      cardStroke = "#F59E0B";
-      headerFill = activeColor;
-      dividerStroke = "#FCD34D";
-    } else if (isStallBubble) {
-      cardFill = "#FFFBEB";
-      cardStroke = "#F59E0B";
-      headerFill = "#94A3B8";
-      dividerStroke = "#FCD34D";
-    } else if (isActive) {
-      cardFill = activeBg;
-      cardStroke = activeColor;
-      headerFill = activeColor;
-      dividerStroke = activeColor;
-    }
+    // 카드 테두리 및 배경: 활성 명령어일 때만 고유 색상 적용, 버블/플러시/유휴 상태일 때는 모두 차분한 기본 회색 유지
+    const cardFill = isActive ? activeBg : "#F8FAFC";
+    const cardStroke = isActive ? activeColor : "#94A3B8";
+    const headerFill = isActive ? activeColor : "#94A3B8";
+    const dividerStroke = isActive ? activeColor : "#94A3B8";
 
     const hasFloatingTag = isFlushed || isStalled || isStallBubble;
 
@@ -1189,7 +1167,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           fill={cardFill}
           stroke={cardStroke}
           strokeWidth="2.5"
-          strokeDasharray={isStallBubble ? "5 3" : undefined}
         />
         {/* 2. 상단 헤더 배너 (1열) */}
         <path
@@ -1222,7 +1199,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           x={hasFloatingTag ? "72" : "80"}
           y={cardY + 55}
           dominantBaseline="central"
-          fill={isFlushed ? "#B91C1C" : (isStalled || isActive) ? activeDarkText : "#94A3B8"}
+          fill={isActive ? activeDarkText : "#94A3B8"}
           fontSize={isEmpty ? "19" : isBubble ? "17.5" : "18"}
           fontFamily="'D2Coding', Consolas, monospace"
           fontWeight="bold"
@@ -1238,11 +1215,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             style={{ filter: "drop-shadow(0 1.5px 3px rgba(220, 38, 38, 0.25))" }}
           >
             <rect
-              x="-33"
-              y="-11"
-              width="66"
-              height="22"
-              rx="11"
+              x="-28"
+              y="-10.5"
+              width="56"
+              height="21"
+              rx="10.5"
               fill="#FEE2E2"
               stroke="#EF4444"
               strokeWidth="1.5"
@@ -1257,7 +1234,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               fontWeight="800"
               fontFamily="sans-serif"
             >
-              ✕ FLUSH
+              FLUSH
             </text>
           </g>
         )}
@@ -1268,11 +1245,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             style={{ filter: "drop-shadow(0 1.5px 3px rgba(217, 119, 6, 0.25))" }}
           >
             <rect
-              x="-33"
-              y="-11"
-              width="66"
-              height="22"
-              rx="11"
+              x="-28"
+              y="-10.5"
+              width="56"
+              height="21"
+              rx="10.5"
               fill="#FEF3C7"
               stroke="#F59E0B"
               strokeWidth="1.5"
@@ -1287,7 +1264,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               fontWeight="800"
               fontFamily="sans-serif"
             >
-              ❚❚ STALL
+              STALL
             </text>
           </g>
         )}
