@@ -352,7 +352,8 @@
   box-shadow: 0 4px 20px -2px rgba(16, 185, 129, 0.45), 0 0 0 1.5px rgba(16, 185, 129, 0.6);
 }
 
-/* 실행 모드 비활성 피킹 카드 내부 태그 & 코드 박스도 초록 톤으로 통일 */
+/* 실행 모드 활성 카드 및 비활성 피킹 카드 내부 태그, 화살표, 코드 박스, 탭 초록 톤 통일 */
+.tutor-single-card[data-mode="executing"] .tutor-single-tag,
 .tutor-single-card[data-mode="executing-peek"] .tutor-single-tag {
   background: color-mix(in srgb, #10B981 14%, transparent);
   color: #047857;
@@ -360,8 +361,33 @@
   border-color: color-mix(in srgb, #10B981 35%, transparent);
 }
 
+.tutor-single-card[data-mode="executing"] .tutor-single-code-box,
 .tutor-single-card[data-mode="executing-peek"] .tutor-single-code-box {
   border-left-color: #10B981;
+}
+
+.tutor-single-card[data-mode="executing"] .tutor-single-meaning-arrow,
+.tutor-single-card[data-mode="executing-peek"] .tutor-single-meaning-arrow {
+  color: #10B981;
+}
+
+.tutor-single-card[data-mode="executing"] .tutor-single-badge,
+.tutor-single-card[data-mode="executing-peek"] .tutor-single-badge {
+  background: color-mix(in srgb, #10B981 8%, var(--ar-panel-bg));
+  border-color: color-mix(in srgb, #10B981 25%, var(--ar-border));
+  color: #047857;
+}
+
+.tutor-single-card[data-mode="executing"] .tutor-folder-tab.active {
+  color: #047857;
+  border-top-color: #10B981;
+}
+
+/* 선택 모드 활성 카드 내부 동작 분류 뱃지: 블루 톤 통일 */
+.tutor-single-card[data-mode="selected"] .tutor-single-badge {
+  background: color-mix(in srgb, #3B82F6 8%, var(--ar-panel-bg));
+  border-color: color-mix(in srgb, #3B82F6 25%, var(--ar-border));
+  color: #2563EB;
 }
 
 /* 실행/선택 상태 뱃지 (● 실행 중 / ● 선택됨) */
@@ -630,6 +656,17 @@
   font-size: 11px;
   font-weight: 700;
   color: #059669;
+}
+
+/* 선택 모드 시 '실제 실행 요약' 블록도 파란색 톤으로 통일 */
+.tutor-single-card[data-mode="selected"] .tutor-single-observed {
+  background: color-mix(in srgb, #3B82F6 8%, var(--ar-header-bg));
+  border-color: color-mix(in srgb, #3B82F6 30%, var(--ar-border));
+  border-left-color: #3B82F6;
+}
+
+.tutor-single-card[data-mode="selected"] .tutor-single-observed-title {
+  color: #2563EB;
 }
 
 .tutor-single-observed-content {
