@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
 import type { MappedAssemblyRow } from '../utils/translationCompile';
 import {
@@ -47,70 +47,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   onJumpToCycle,
   onPausePlayback,
 }) => {
-  // 컴포넌트 자체 크기(너비, 높이) 실시간 측정
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({
-    width: 0,
-    height: 0,
-  });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const updateSize = (w: number, h: number) => {
-      if (w > 0 && h > 0) {
-        setContainerSize((prev) => {
-          if (prev.width === Math.round(w) && prev.height === Math.round(h)) return prev;
-          return { width: Math.round(w), height: Math.round(h) };
-        });
-      }
-    };
-
-    const rect = el.getBoundingClientRect();
-    updateSize(rect.width, rect.height);
-
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry?.contentRect) {
-        updateSize(entry.contentRect.width, entry.contentRect.height);
-      }
-    });
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // 컴포넌트 크기 기준 최적 비율 계산
-  const cardLayout = useMemo(() => {
-    const { width, height } = containerSize;
-    if (width <= 0 || height <= 0) return null;
-
-    // 좌우 버튼(38px * 2) + 양측 간격(12px * 2) = 100px
-    const horizontalButtonSpace = 100;
-    // 상하 버튼(34px * 2) + 상하 여백 = 84px
-    const verticalButtonSpace = 84;
-
-    const maxCardW = Math.max(260, width - horizontalButtonSpace);
-    const maxCardH = Math.max(160, height - verticalButtonSpace);
-
-    // 컴포넌트 자체 크기 비율: 기본 가로 84%, 세로 80%
-    let cardW = Math.min(maxCardW, Math.round(width * 0.84));
-    let cardH = Math.min(maxCardH, Math.round(height * 0.80));
-
-    // 종횡비(Aspect Ratio) 가드: 카드가 너무 납작해지거나(가로 > 세로 * 2.8) 너무 길쭉해지지 않도록 방지
-    if (cardW / cardH > 2.8) {
-      cardW = Math.min(cardW, Math.round(cardH * 2.8));
-    } else if (cardW / cardH < 1.05 && maxCardH > cardW) {
-      cardH = Math.min(cardH, Math.round(cardW * 1.15));
-    }
-
-    return {
-      cardWidth: cardW,
-      cardHeight: cardH,
-      stageWidth: cardW + horizontalButtonSpace,
-    };
-  }, [containerSize]);
-
   // 사용자의 명시적 C ↔ ASM 전환 상태 관리 (selectionKey가 바뀌면 상위 요청 뷰로 초기화)
   const [screen, setScreen] = useState<{ key: number; kind: 'c' | 'asm' }>({
     key: selectionKey,
@@ -286,12 +222,12 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
         if (currentRow) onSelect(currentRow.index);
       }}
     >
-      <div ref={containerRef} className="tutor-single-container" aria-label="싱글사이클 튜터 네비게이션">
+      <div className="tutor-single-container" data-view={view} aria-label="싱글사이클 튜터 네비게이션">
         {/* ========================================================= */}
-        {/* 상단 슬롯: [^] C로 올라가는 버튼 (ASM 뷰에서만 노출) */}
+        {/* 상단 슬롯: [^] C로 올라가는 버튼 (ASM 뷰에서만 렌더링 - C 뷰는 윗쪽을 완전히 채움) */}
         {/* ========================================================= */}
-        <div className="tutor-single-slot-vertical">
-          {view === 'asm' && (
+        {view === 'asm' && (
+          <div className="tutor-single-slot-top">
             <button
               type="button"
               className="tutor-single-btn-vertical up"
@@ -308,20 +244,13 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
               </svg>
               <span>{hasC && line != null ? `C: L${line} 설명으로 올라가기` : 'C 코드 매핑 없음'}</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* ========================================================= */}
         {/* 중간 스테이지: [<] 버튼 + 중앙 카드 + [>] 버튼 */}
         {/* ========================================================= */}
-        <div
-          className="tutor-single-stage"
-          style={
-            cardLayout
-              ? { width: `${cardLayout.stageWidth}px`, height: `${cardLayout.cardHeight}px` }
-              : undefined
-          }
-        >
+        <div className="tutor-single-stage">
           {/* 좌측 이전 버튼 (ASM 뷰에서만 활성화) */}
           {view === 'asm' ? (
             <button
@@ -337,18 +266,11 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
               </svg>
             </button>
           ) : (
-            <div className="w-[38px] shrink-0" aria-hidden="true" />
+            <div className="w-[36px] shrink-0" aria-hidden="true" />
           )}
 
           {/* 중앙 메인 카드 */}
-          <div
-            className="tutor-single-card"
-            style={
-              cardLayout
-                ? { width: `${cardLayout.cardWidth}px`, height: `${cardLayout.cardHeight}px` }
-                : undefined
-            }
-          >
+          <div className="tutor-single-card">
             {view === 'c' ? (
               /* ---------------- C 코드 카드 ---------------- */
               <>
@@ -495,15 +417,15 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
               </svg>
             </button>
           ) : (
-            <div className="w-[38px] shrink-0" aria-hidden="true" />
+            <div className="w-[36px] shrink-0" aria-hidden="true" />
           )}
         </div>
 
         {/* ========================================================= */}
-        {/* 하단 슬롯: [v] ASM으로 내려가는 버튼 (C 뷰에서만 노출) */}
+        {/* 하단 슬롯: [v] ASM으로 내려가는 버튼 (C 뷰에서만 렌더링 - ASM 뷰는 아랫쪽을 완전히 채움) */}
         {/* ========================================================= */}
-        <div className="tutor-single-slot-vertical">
-          {view === 'c' && (
+        {view === 'c' && (
+          <div className="tutor-single-slot-bottom">
             <button
               type="button"
               className="tutor-single-btn-vertical down"
@@ -524,8 +446,8 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                   : '연결된 ASM 없음'}
               </span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </TutorDetailHost>
   );

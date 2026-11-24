@@ -561,10 +561,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [animProgress, setAnimProgress] = useState<number>(0);
   const [isSubstepLooping, setIsSubstepLooping] = useState<boolean>(true);
-  const [animResetId, setAnimResetId] = useState<number>(0);
   const flowDuration = lessonContext?.flowDurationMs ?? playSpeed ?? 3000;
   const progressRef = React.useRef<number>(0);
+  const startTimeRef = React.useRef<number>(performance.now());
+  const pausedProgressRef = React.useRef<number>(0);
   const prevDataRef = React.useRef(currentData);
+  const prevFlowDurationRef = React.useRef(flowDuration);
 
   // 뷰포트 교차 감지: 회로도가 화면 밖(다른 탭/뷰포트)으로 슬라이드되면 RAF 애니메이션을 일시 정지하여 CPU 낭비 방지
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -584,34 +586,58 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // 1. 사이클 데이터(currentData)가 변경되면 진행률을 0으로 리셋하고 새 루프 시작
+  // 1. 사이클 데이터(currentData)가 변경되면 진행률을 즉시 0으로 리셋하고 새 루프 시작
   useEffect(() => {
     if (prevDataRef.current !== currentData) {
       prevDataRef.current = currentData;
+      startTimeRef.current = performance.now();
       progressRef.current = 0;
+      pausedProgressRef.current = 0;
       setAnimProgress(0);
-      setAnimResetId((prev) => prev + 1);
     }
   }, [currentData]);
 
-  // 2. 시뮬레이션 바(상단 ControlPanel)에서 Play 버튼을 누르면:
+  // 2. 재생 속도(flowDuration) 변경 시 현재 상대 진행률 유지
+  useEffect(() => {
+    if (prevFlowDurationRef.current !== flowDuration) {
+      startTimeRef.current = performance.now() - progressRef.current * flowDuration;
+      prevFlowDurationRef.current = flowDuration;
+    }
+  }, [flowDuration]);
+
+  // 3. 시뮬레이션 바(상단 ControlPanel)에서 Play 버튼을 누르면:
   // 사이클 바가 중간 어디를 돌고 있었든 즉시 처음(0.0)부터 동기화하여 재생
   // (시뮬레이션 바가 일시정지되더라도 사이클 바를 강제로 멈추지 않고 현재 사이클 서브스텝을 계속 관찰할 수 있도록 유지)
   useEffect(() => {
     if (isPlaying) {
+      startTimeRef.current = performance.now();
       progressRef.current = 0;
+      pausedProgressRef.current = 0;
       setAnimProgress(0);
       setIsSubstepLooping(true);
-      setAnimResetId((prev) => prev + 1);
     }
   }, [isPlaying, playbackRevision]);
+
+  // 사이클 바 알약 토글 (Play ▶ / Pause ❚❚)
+  const handleToggleSubstepLooping = () => {
+    setIsSubstepLooping((prev) => {
+      const next = !prev;
+      if (!next) {
+        pausedProgressRef.current = progressRef.current;
+      } else {
+        startTimeRef.current = performance.now() - pausedProgressRef.current * flowDuration;
+      }
+      return next;
+    });
+  };
 
   // 처음으로 돌아가기 (정지 및 0으로 리셋)
   const handleResetToStart = () => {
     setIsSubstepLooping(false);
+    startTimeRef.current = performance.now();
     progressRef.current = 0;
+    pausedProgressRef.current = 0;
     setAnimProgress(0);
-    setAnimResetId((prev) => prev + 1);
   };
 
   useEffect(() => {
@@ -620,9 +646,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     }
 
     let frameId: number;
-    // 일시 정지 후 다시 재생할 때 이전에 멈췄던 위치(progressRef.current)부터 자연스럽게 이어지도록 시작 시점 오프셋 적용
-    const currentProg = Math.max(0, Math.min(1, progressRef.current));
-    const start = performance.now() - currentProg * flowDuration;
     let lastTick = 0;
     const minFrameInterval = 16; // 60 FPS 상한 제한 (120Hz/240Hz ProMotion 디스플레이의 무리한 고주파수 재연산 차단)
 
@@ -632,7 +655,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       if (now - lastTick < minFrameInterval) return;
       lastTick = now;
 
-      const elapsed = (now - start) % flowDuration;
+      const elapsed = Math.max(0, (now - startTimeRef.current) % flowDuration);
       const prog = elapsed / flowDuration;
       progressRef.current = prog;
       setAnimProgress(prog);
@@ -640,7 +663,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isSubstepLooping, isIntersecting, flowDuration, currentData, animResetId]);
+  }, [isSubstepLooping, isIntersecting, flowDuration]);
 
   const isSingle = mode === "single";
 
@@ -1208,7 +1231,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             {/* [이미지 최상단] 1개 사이클 내부 스테이지 시뮬레이션 제어 알약 토글 버튼 (Play ▶ / Pause ❚❚) */}
             <g
               className="select-none cursor-pointer transition-opacity hover:opacity-95"
-              onClick={() => setIsSubstepLooping((prev) => !prev)}
+              onClick={handleToggleSubstepLooping}
             >
               {/* 1. 알약 외곽 트랙 (이전 크기 110x36 복원, 카드 중앙 x=65 기준 x=10) */}
               <rect

@@ -342,14 +342,12 @@ export function useSimulationPlayback({
       setPlaybackRevision((v) => v + 1);
       triggerPlaybackFeedback("play");
     } else {
-      setIsPlaying((prev) => {
-        const nextState = !prev;
-        if (nextState) {
-          setPlaybackRevision((v) => v + 1);
-        }
-        triggerPlaybackFeedback(nextState ? "play" : "pause");
-        return nextState;
-      });
+      const nextState = !isPlaying;
+      setIsPlaying(nextState);
+      if (nextState) {
+        setPlaybackRevision((v) => v + 1);
+      }
+      triggerPlaybackFeedback(nextState ? "play" : "pause");
     }
   };
 

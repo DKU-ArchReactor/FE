@@ -1,17 +1,16 @@
 /* ======================================================== */
 /* ArchReactor Single-Cycle Tutor (2D Card Navigation)       */
-/* Responsive Percentage-based Layout                        */
+/* View-Optimized Layout (C fills top, ASM fills bottom)     */
 /* ======================================================== */
 
 .tutor-single-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 8px 14px;
+  padding: 6px 10px;
   position: relative;
   user-select: none;
   background: var(--ar-panel-bg);
@@ -19,13 +18,27 @@
   outline: none;
 }
 
-/* 수직 이동 (위/아래) 버튼 슬롯 - 컴팩트하게 구성하여 세로 공간 확보 */
-.tutor-single-slot-vertical {
+/* 상단 버튼 슬롯 (ASM 뷰에서만 노출, C 뷰에서는 DOM에서 완전히 제거) */
+.tutor-single-slot-top {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 34px;
-  min-height: 34px;
+  height: 32px;
+  min-height: 32px;
+  margin-bottom: 6px;
+  width: 100%;
+  z-index: 5;
+  flex-shrink: 0;
+}
+
+/* 하단 버튼 슬롯 (C 뷰에서만 노출, ASM 뷰에서는 DOM에서 완전히 제거) */
+.tutor-single-slot-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-height: 32px;
+  margin-top: 6px;
   width: 100%;
   z-index: 5;
   flex-shrink: 0;
@@ -37,7 +50,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 5px 14px;
+  padding: 4px 14px;
   border-radius: 9999px;
   border: 1px solid var(--ar-border);
   background: var(--ar-header-bg);
@@ -57,11 +70,11 @@
 }
 
 .tutor-single-btn-vertical.up:not(:disabled):hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .tutor-single-btn-vertical.down:not(:disabled):hover {
-  transform: translateY(2px);
+  transform: translateY(1px);
 }
 
 .tutor-single-btn-vertical:disabled {
@@ -71,40 +84,34 @@
 }
 
 .tutor-single-btn-vertical svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   flex-shrink: 0;
-  transition: transform 0.18s ease;
 }
 
-.tutor-single-btn-vertical.up:hover svg {
-  transform: translateY(-1px);
-}
-
-.tutor-single-btn-vertical.down:hover svg {
-  transform: translateY(1px);
-}
-
-/* 중간 영역: 좌측 화살표 + 중앙 카드 + 우측 화살표 (컴포넌트 자체 크기 기반 동적 계산) */
+/* 중간 영역: 좌측 화살표 + 중앙 카드 + 우측 화살표 */
 .tutor-single-stage {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  gap: 12px;
-  max-width: 100%;
+  gap: 8px;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  flex: 1;
   min-height: 0;
   position: relative;
   box-sizing: border-box;
 }
 
-/* 수평 네비게이션 버튼 (이전 ASM / 다음 ASM) - 카드 높이와 관계없이 수직 중앙 정렬 */
+/* 수평 네비게이션 버튼 (이전 ASM / 다음 ASM) */
 .tutor-single-btn-horizontal {
   display: flex;
   align-items: center;
   justify-content: center;
   align-self: center;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 1px solid var(--ar-border);
   background: var(--ar-header-bg);
@@ -119,31 +126,34 @@
   border-color: var(--ar-accent);
   color: var(--ar-accent);
   background: var(--ar-panel-bg);
-  transform: scale(1.08);
+  transform: scale(1.06);
   box-shadow: 0 3px 10px -2px rgba(0, 95, 184, 0.25);
 }
 
 .tutor-single-btn-horizontal:disabled {
-  opacity: 0.2;
+  opacity: 0.18;
   cursor: not-allowed;
   pointer-events: none;
 }
 
 .tutor-single-btn-horizontal svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
-/* 중앙 메인 카드 */
+/* 중앙 메인 카드 - 상/하/좌/우 공간을 최대로 활용 */
 .tutor-single-card {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   background: var(--ar-panel-bg);
   border: 1px solid var(--ar-border);
   border-radius: 12px;
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 3px 14px -3px rgba(0, 0, 0, 0.07);
   overflow: hidden;
   box-sizing: border-box;
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
@@ -163,7 +173,7 @@ html.dark .tutor-single-card {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 18px;
+  padding: 8px 16px;
   background: var(--ar-header-bg);
   border-bottom: 1px solid var(--ar-border);
   flex-shrink: 0;
@@ -203,12 +213,12 @@ html.dark .tutor-single-card {
   font-variant-numeric: tabular-nums;
 }
 
-/* 카드 본문 - 공간에 맞춰 넉넉하게 확장 */
+/* 카드 본문 */
 .tutor-single-card-body {
-  padding: 14px 18px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   overflow-y: auto;
   min-height: 0;
   flex: 1;
@@ -216,8 +226,8 @@ html.dark .tutor-single-card {
 
 /* 코드 스니펫 박스 */
 .tutor-single-code-box {
-  padding: 10px 14px;
-  border-radius: 8px;
+  padding: 9px 13px;
+  border-radius: 7px;
   background: var(--ar-header-bg);
   border: 1px solid var(--ar-border);
   border-left: 3px solid var(--ar-accent);
@@ -239,7 +249,7 @@ html.dark .tutor-single-card {
 .tutor-single-meaning {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
   padding: 2px 0;
 }
 
@@ -253,7 +263,7 @@ html.dark .tutor-single-card {
 
 .tutor-single-meaning-text {
   font-size: 13.5px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--ar-text-primary);
   word-break: keep-all;
   overflow-wrap: anywhere;
@@ -264,9 +274,9 @@ html.dark .tutor-single-card {
 .tutor-single-observed {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  gap: 3px;
+  padding: 7px 11px;
+  border-radius: 7px;
   background: color-mix(in srgb, #10B981 8%, var(--ar-header-bg));
   border: 1px solid color-mix(in srgb, #10B981 30%, var(--ar-border));
   border-left: 3px solid #10B981;
@@ -288,17 +298,17 @@ html.dark .tutor-single-observed-title {
 
 .tutor-single-observed-content {
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--ar-text-primary);
   margin: 0;
 }
 
-/* 하단 부가 링크 및 안내 */
+/* 하단 푸터 */
 .tutor-single-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 18px;
+  padding: 7px 16px;
   background: var(--ar-header-bg);
   border-top: 1px solid var(--ar-border);
   flex-shrink: 0;
