@@ -88,8 +88,8 @@
 .dev-tutor-c-explanation{border-left:3px solid var(--ar-accent)}
 .dev-tutor-c-explanation>code,.dev-tutor-asm-code{color:var(--ar-accent)}
 .dev-tutor-c-mapping>span{color:var(--ar-accent)}
-.dev-tutor-asm-result[data-observed=true]>strong{color:light-dark(#16756c,#72cec0)}
-.dev-tutor-asm-result[data-observed=true]{border-top-color:light-dark(#b6d4cf,#365c56)}
+.dev-tutor-asm-result[data-observed=true]>strong{color:#16756c}
+.dev-tutor-asm-result[data-observed=true]{border-top-color:#b6d4cf}
 .dev-tutor-inline-switch,.dev-tutor-detail-link,.dev-tutor-c-navigation button,.dev-tutor-asm-arrows button{transition:background-color .16s ease,border-color .16s ease,color .16s ease}
 .dev-tutor-detail-link:hover,.dev-tutor-inline-switch:hover,.dev-tutor-c-navigation button:not(:disabled):hover{color:var(--ar-accent);background:var(--ar-header-bg);border-color:var(--ar-accent)}
 .dev-tutor-host-inline>.dev-tutor-detail-window .tutor-reader h3{color:var(--ar-text-primary)}

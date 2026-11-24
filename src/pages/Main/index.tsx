@@ -18,7 +18,6 @@ import { useSimulationSession } from "./hooks/useSimulationSession";
 import { useFileManager } from "./hooks/useFileManager";
 import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
 import { getLearningExample } from "@/data/learningExamples";
-import { instructionCycleForPc } from "./utils/instructionFlow";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
   "addi t0, zero, 5",
@@ -88,8 +87,6 @@ const MainPage: React.FC = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
-  const [translationSelectedAsmIndex, setTranslationSelectedAsmIndex] = useState<number | null>(null);
   const [isMobileTutorModalOpen, setIsMobileTutorModalOpen] = useState(false);
   const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
 
@@ -113,8 +110,25 @@ const MainPage: React.FC = () => {
     setTranslationAssembly: fileMgr.setTranslationAssembly,
   });
 
+  // 싱글 모드와 파이프라인 모드별 독립된 라인 선택 상태 캐시
+  type ModeSelection = { line: number | null; asmIndex: number | null };
+  const [modeSelections, setModeSelections] = useState<
+    Record<"single" | "pipeline", ModeSelection>
+  >({
+    single: { line: null, asmIndex: null },
+    pipeline: { line: null, asmIndex: null },
+  });
+
+  const currentSelection = modeSelections[simSession.simulationEngineMode];
+  const translationSelectedLine = currentSelection.line;
+  const translationSelectedAsmIndex = currentSelection.asmIndex;
+
   const showAssistantHint = assistantHint?.workspace === workspaceKey && !isAiPopupOpen && !fileMgr.translationBusy;
   const onCompilationComplete = () => {
+    setModeSelections({
+      single: { line: null, asmIndex: null },
+      pipeline: { line: null, asmIndex: null },
+    });
     if (assistantHintTimerRef.current !== null) {
       window.clearTimeout(assistantHintTimerRef.current);
       assistantHintTimerRef.current = null;
@@ -129,10 +143,12 @@ const MainPage: React.FC = () => {
   };
 
   const handleClearSelection = useCallback(() => {
-    setTranslationSelectedLine(null);
-    setTranslationSelectedAsmIndex(null);
+    setModeSelections((prev) => ({
+      ...prev,
+      [simSession.simulationEngineMode]: { line: null, asmIndex: null },
+    }));
     setIsMobileTutorModalOpen(false);
-  }, []);
+  }, [simSession.simulationEngineMode]);
 
   // 5. 시뮬레이션 재생 및 스텝 컨트롤 훅
   const playback = useSimulationPlayback({
@@ -147,9 +163,11 @@ const MainPage: React.FC = () => {
   const onResetSimulation = () => {
     clearAssistantHint();
     simSession.clearSimulationCache();
-    playback.setCurrentCycle(0);
-    playback.setIsPlaying(false);
-    playback.triggerPlaybackFeedback("reset");
+    setModeSelections({
+      single: { line: null, asmIndex: null },
+      pipeline: { line: null, asmIndex: null },
+    });
+    playback.handleResetAll();
   };
 
   useEffect(() => {
@@ -191,20 +209,16 @@ const MainPage: React.FC = () => {
     asmIndex: number | null = null,
     openTutorModal: boolean = asmIndex !== null
   ) => {
-    if (line !== null || (simSession.isSingleEngine && asmIndex !== null)) {
+    if (line !== null || asmIndex !== null) {
       playback.setIsPlaying((prev) => {
         if (prev) playback.triggerPlaybackFeedback("pause");
         return false;
       });
     }
-    if (simSession.isSingleEngine && asmIndex !== null) {
-      const pc = simSession.mappedAssemblyRows[asmIndex]?.pc;
-      const history = simSession.simulationData?.history;
-      const cycle = pc && history ? instructionCycleForPc(history, pc, playback.currentCycle) : undefined;
-      if (cycle !== undefined) playback.handleJumpToCycle(cycle);
-    }
-    setTranslationSelectedLine(line);
-    setTranslationSelectedAsmIndex(asmIndex);
+    setModeSelections((prev) => ({
+      ...prev,
+      [simSession.simulationEngineMode]: { line, asmIndex },
+    }));
     if ((line !== null || asmIndex !== null) && openTutorModal && simSession.simulationData) {
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setIsMobileTutorModalOpen(true);
@@ -264,6 +278,8 @@ const MainPage: React.FC = () => {
       singlePlaybackFinished={playback.singlePlaybackFinished}
       playbackRevision={playback.playbackRevision}
       isPlaying={playback.isPlaying}
+      playMode={playback.playMode}
+      isStandby={playback.isStandby}
       loadingMessage={simSession.loadingMessage}
       simulationMode={simSession.simulationEngineMode}
       isSingleEngine={simSession.isSingleEngine}
@@ -344,15 +360,15 @@ const MainPage: React.FC = () => {
         playback.setCurrentCycle(0);
         playback.setIsPlaying(false);
       }}
+      onStepBack={playback.handleStepBack}
+      onStepForward={playback.handleStepForward}
       onJumpToCycle={playback.handleJumpToCycle}
       savedFiles={fileMgr.savedFiles}
       isLoggedIn={fileMgr.isLoggedIn}
     />
   );
 
-  const maxCycle = simSession.isSingleEngine
-    ? playback.totalCycles
-    : Math.max(0, playback.totalCycles - 1);
+  const maxCycle = playback.totalCycles;
 
 const handleMobileCodeSelect = () => {
   setIsMobileCodeView(true);
@@ -394,6 +410,8 @@ const handleMobileViewportSelect = (index: number) => {
             onTogglePlay={playback.handleTogglePlay}
             onReset={playback.handleReset}
             onResetAndPlay={playback.handleResetAndPlay}
+            onPlayCurrentCycle={playback.handlePlayCurrentCycle}
+            isCyclePlaying={playback.isCyclePlaying}
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={playback.isSimulationReady}
@@ -407,8 +425,10 @@ const handleMobileViewportSelect = (index: number) => {
               setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {
-                setTranslationSelectedLine(null);
-                setTranslationSelectedAsmIndex(null);
+                setModeSelections({
+                  single: { line: null, asmIndex: null },
+                  pipeline: { line: null, asmIndex: null },
+                });
               }
             }}
             onChangeSimulationMode={(m) =>
@@ -531,7 +551,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
                   className={`w-[3px] rounded-full transition-all duration-200 ${
                     resizingLeftCodeCol
                       ? "h-24 bg-[var(--ar-accent)] shadow-sm"
-                      : "h-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[var(--ar-accent)]"
+                      : "h-10 bg-[#D0D7DE] group-hover:h-20 group-hover:bg-[var(--ar-accent)]"
                   }`}
                 />
               </div>
@@ -567,7 +587,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
               className={`h-[3px] rounded-full transition-all duration-200 ${
                 resizingLeftVertical
                   ? "w-28 bg-[var(--ar-accent)] shadow-sm"
-                  : "w-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-24 group-hover:bg-[var(--ar-accent)]"
+                  : "w-12 bg-[#D0D7DE] group-hover:w-24 group-hover:bg-[var(--ar-accent)]"
               }`}
             />
           </div>
@@ -604,7 +624,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
             className={`w-[4px] rounded-full transition-all duration-200 ${
               resizingLeftPane
                 ? "h-36 bg-[var(--ar-accent)] shadow-md ring-2 ring-[var(--ar-accent)]/30"
-                : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[var(--ar-accent)]"
+                : "h-16 bg-[#D0D7DE] group-hover:h-28 group-hover:bg-[var(--ar-accent)]"
             }`}
           />
         </div>
@@ -619,8 +639,8 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
                 title="이전 뷰포트(왼쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   simSession.isSingleEngine
-                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
-                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
+                    ? "text-[#8C959F] hover:text-[#005FB8] hover:bg-[#005FB8]/10"
+                    : "text-[#8C959F] hover:text-purple-600 hover:bg-purple-500/10"
                 }`}
               >
                 <svg
@@ -686,8 +706,8 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
                 title="다음 뷰포트(오른쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   simSession.isSingleEngine
-                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
-                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
+                    ? "text-[#8C959F] hover:text-[#005FB8] hover:bg-[#005FB8]/10"
+                    : "text-[#8C959F] hover:text-purple-600 hover:bg-purple-500/10"
                 }`}
               >
                 <svg
@@ -721,6 +741,8 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
         onChangeSpeed={playback.setPlaySpeed}
         onReset={playback.handleReset}
         onResetAndPlay={playback.handleResetAndPlay}
+        onPlayCurrentCycle={playback.handlePlayCurrentCycle}
+        isCyclePlaying={playback.isCyclePlaying}
         onStepBack={playback.handleStepBack}
         onTogglePlay={playback.handleTogglePlay}
         onStepForward={playback.handleStepForward}

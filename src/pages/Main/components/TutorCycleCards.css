@@ -32,9 +32,9 @@
 .tutor-cycle-card-body p code{display:inline;font-size:inherit;line-height:inherit;white-space:normal}
 .tutor-cycle-card-body p{margin:4px 0 0;font-size:13px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere;color:var(--ar-text-primary)}
 .tutor-cycle-observation{grid-column:1/-1;border-top:1px solid var(--ar-border);padding-top:10px}
-.tutor-cycle-observation strong{color:light-dark(#16756c,#72cec0)}
+.tutor-cycle-observation strong{color:#16756c}
 .tutor-cycle-cause,.tutor-cycle-action{padding:9px 12px;border-radius:5px;background:var(--ar-header-bg)}
-.tutor-cycle-cause strong{color:light-dark(#a25d14,#e7b16e)}
+.tutor-cycle-cause strong{color:#a25d14}
 .tutor-cycle-cards>nav{display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding:6px 16px;border-top:1px solid var(--ar-border);background:var(--ar-header-bg)}
 .tutor-cycle-cards>nav>button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;gap:7px;min-width:78px;width:auto;height:32px;padding:5px 10px;border:1px solid var(--ar-border);border-radius:4px;color:var(--ar-accent);background:var(--ar-panel-bg);font-size:12px;font-weight:650;line-height:1.4;white-space:nowrap;word-break:keep-all;cursor:pointer}
 .tutor-cycle-cards>nav>button:disabled{opacity:.3;cursor:default}

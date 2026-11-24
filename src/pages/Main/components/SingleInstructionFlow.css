@@ -24,26 +24,6 @@
 .ar-single-flow-diagram .font-mono {
   font-family: "D2Coding", Consolas, monospace;
 }
-.dark .ar-single-flow {
-  --ar-flow-border: #4b5563;
-  --ar-flow-region-border: #a1afc1;
-  --ar-flow-region-heading-bg: #2b3441;
-  --ar-flow-device-border: #7c899b;
-  --ar-flow-idle-text: #94a3b8;
-  --ar-flow-wire: #64748b;
-  --ar-flow-address: #e6ae64;
-  --ar-flow-data: #79c0ff;
-  --ar-flow-control: #c6a0f6;
-  --ar-flow-address-token: #965600;
-  --ar-flow-data-token: #1f6feb;
-  --ar-flow-control-token: #7540ae;
-  --ar-flow-address-text: var(--ar-flow-address);
-  --ar-flow-data-text: var(--ar-flow-data);
-  --ar-flow-control-text: var(--ar-flow-control);
-  --ar-flow-device-bg: #22272f;
-  --ar-flow-result-bg: #252d38;
-  --ar-flow-region-bg: var(--ar-panel-bg);
-}
 @media (prefers-reduced-motion: reduce) {
   .flow-device-active {
     stroke-width: 2.6;

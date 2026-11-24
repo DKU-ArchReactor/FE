@@ -40,66 +40,66 @@ export const STAGE_STYLES: Record<
 > = {
   // 무지개 스펙트럼 (Red -> Orange -> Green -> Blue -> Purple)
   IF: {
-    bg: "bg-[#FCA5A5] dark:bg-[#7F1D1D]", // 평소: 부드러운 파스텔 코랄 레드
-    activeBg: "bg-[#EF4444] dark:bg-[#DC2626]", // 포커스: 짙고 선명한 레드
-    hoverBg: "hover:bg-[#EF4444] dark:hover:bg-[#DC2626]", // 호버 시 진해짐
+    bg: "bg-[#FCA5A5]", // 평소: 부드러운 파스텔 코랄 레드
+    activeBg: "bg-[#EF4444]", // 포커스: 짙고 선명한 레드
+    hoverBg: "hover:bg-[#EF4444]", // 호버 시 진해짐
     text: "text-white",
     border: "border-0",
   },
   ID: {
-    bg: "bg-[#FDBA74] dark:bg-[#7C2D12]", // 평소: 파스텔 오렌지
-    activeBg: "bg-[#F97316] dark:bg-[#EA580C]", // 포커스: 짙은 딥 오렌지
-    hoverBg: "hover:bg-[#F97316] dark:hover:bg-[#EA580C]",
+    bg: "bg-[#FDBA74]", // 평소: 파스텔 오렌지
+    activeBg: "bg-[#F97316]", // 포커스: 짙은 딥 오렌지
+    hoverBg: "hover:bg-[#F97316]",
     text: "text-white",
     border: "border-0",
   },
   EX: {
-    bg: "bg-[#A3E635] dark:bg-[#365314]", // 평소: 파스텔 연두 (Lime 400)
-    activeBg: "bg-[#22C55E] dark:bg-[#15803D]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
-    hoverBg: "hover:bg-[#22C55E] dark:hover:bg-[#15803D]",
+    bg: "bg-[#A3E635]", // 평소: 파스텔 연두 (Lime 400)
+    activeBg: "bg-[#22C55E]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
+    hoverBg: "hover:bg-[#22C55E]",
     text: "text-white font-bold",
     border: "border-0",
   },
   MEM: {
-    bg: "bg-[#93C5FD] dark:bg-[#1E3A8A]", // 평소: 파스텔 스카이블루
-    activeBg: "bg-[#0EA5E9] dark:bg-[#0284C7]", // 포커스: 짙은 블루
-    hoverBg: "hover:bg-[#0EA5E9] dark:hover:bg-[#0284C7]",
+    bg: "bg-[#93C5FD]", // 평소: 파스텔 스카이블루
+    activeBg: "bg-[#0EA5E9]", // 포커스: 짙은 블루
+    hoverBg: "hover:bg-[#0EA5E9]",
     text: "text-white",
     border: "border-0",
   },
   WB: {
-    bg: "bg-[#C4B5FD] dark:bg-[#4C1D95]", // 평소: 파스텔 바이올렛
-    activeBg: "bg-[#8B5CF6] dark:bg-[#7C3AED]", // 포커스: 짙은 바이올렛 퍼플
-    hoverBg: "hover:bg-[#8B5CF6] dark:hover:bg-[#7C3AED]",
+    bg: "bg-[#C4B5FD]", // 평소: 파스텔 바이올렛
+    activeBg: "bg-[#8B5CF6]", // 포커스: 짙은 바이올렛 퍼플
+    hoverBg: "hover:bg-[#8B5CF6]",
     text: "text-white",
     border: "border-0",
   },
   DONE: {
-    bg: "bg-[#A3E635] dark:bg-[#365314]", // 평소: 파스텔 연두 (Lime 400)
-    activeBg: "bg-[#22C55E] dark:bg-[#15803D]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
-    hoverBg: "hover:bg-[#22C55E] dark:hover:bg-[#15803D]",
+    bg: "bg-[#A3E635]", // 평소: 파스텔 연두 (Lime 400)
+    activeBg: "bg-[#22C55E]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
+    hoverBg: "hover:bg-[#22C55E]",
     text: "text-white font-bold",
     border: "border-0",
   },
   // 장애 / 스톨 / 버블
   STALL_IF: {
-    bg: "bg-[#FDE68A] dark:bg-[#78350F]", // Amber 200 / Amber 900
-    activeBg: "bg-[#F59E0B] dark:bg-[#B45309]", // Amber 500 / Amber 700
-    hoverBg: "hover:bg-[#F59E0B] dark:hover:bg-[#B45309]",
-    text: "text-amber-900 dark:text-amber-100",
+    bg: "bg-[#FDE68A]", // Amber 200 / Amber 900
+    activeBg: "bg-[#F59E0B]", // Amber 500 / Amber 700
+    hoverBg: "hover:bg-[#F59E0B]",
+    text: "text-amber-900",
     border: "border-0",
   },
   STALL_ID: {
-    bg: "bg-[#FDE68A] dark:bg-[#78350F]",
-    activeBg: "bg-[#F59E0B] dark:bg-[#B45309]",
-    hoverBg: "hover:bg-[#F59E0B] dark:hover:bg-[#B45309]",
-    text: "text-amber-900 dark:text-amber-100",
+    bg: "bg-[#FDE68A]",
+    activeBg: "bg-[#F59E0B]",
+    hoverBg: "hover:bg-[#F59E0B]",
+    text: "text-amber-900",
     border: "border-0",
   },
   BUBBLE: {
-    bg: "bg-[#BAE6FD] dark:bg-[#164E63]",
-    activeBg: "bg-[#38BDF8] dark:bg-[#0284C7]",
-    hoverBg: "hover:bg-[#38BDF8] dark:hover:bg-[#0284C7]",
+    bg: "bg-[#BAE6FD]",
+    activeBg: "bg-[#38BDF8]",
+    hoverBg: "hover:bg-[#38BDF8]",
     text: "text-white",
     border: "border-0",
   },

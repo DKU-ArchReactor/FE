@@ -135,3 +135,14 @@
 .box-step-1 { animation: boxPulse1 2.0s ease-in-out infinite; }
 .box-step-2 { animation: boxPulse2 2.0s ease-in-out infinite; }
 .box-step-3 { animation: boxPulse3 2.0s ease-in-out infinite; }
+
+/* 4) 점선 제어선 실시간 흐름 애니메이션 스타일 (CSSOM 재연산 방지를 위해 외부 파일로 분리) */
+@keyframes dashedFlow {
+  from { stroke-dashoffset: 36; }
+  to   { stroke-dashoffset: 0; }
+}
+.wire-dashed-flowing {
+  stroke-dasharray: 6 3;
+  animation: dashedFlow 1.2s linear infinite;
+}
+

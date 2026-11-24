@@ -131,22 +131,22 @@ export const AiAssistantPopup: React.FC<Props> = ({
       }}
       className={
         inline
-          ? "w-full h-full flex-1 min-h-0 flex flex-col rounded-lg overflow-hidden select-none border border-[var(--ar-border)] shadow-sm bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]"
+          ? "w-full h-full flex-1 min-h-0 flex flex-col rounded-lg overflow-hidden select-none border border-[var(--ar-border)] shadow-sm bg-white text-[#1F2328]"
           : `hidden md:flex fixed z-50 flex-col rounded-xl select-none border-2 ${
               isSingle
-                ? "border-[#005FB8]/40 dark:border-[#007ACC]/50 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(0,122,204,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
-                : "border-[#7C3AED]/40 dark:border-[#A855F7]/50 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_-12px_rgba(168,85,247,0.35),0_4px_16px_-2px_rgba(0,0,0,0.5)]"
+                ? "border-[#005FB8]/40 shadow-[0_20px_50px_-12px_rgba(0,95,184,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)]"
+                : "border-[#7C3AED]/40 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.2),0_4px_16px_-2px_rgba(0,0,0,0.06)]"
             } ${
               isDragging || resizingDirection
                 ? isSingle
-                  ? "ring-2 ring-[#005FB8] dark:ring-[#007ACC] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
-                  : "ring-2 ring-[#7C3AED] dark:ring-[#A855F7] shadow-[0_24px_56px_-4px_rgba(124,58,237,0.3)]"
+                  ? "ring-2 ring-[#005FB8] shadow-[0_24px_56px_-4px_rgba(0,95,184,0.3)]"
+                  : "ring-2 ring-[#7C3AED] shadow-[0_24px_56px_-4px_rgba(124,58,237,0.3)]"
                 : ""
             } ${
               !hasAnimated ? "ai-popup-drop-anim" : ""
             } ${
               isSmoothTransition ? "transition-all duration-300 ease-out" : ""
-            } bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC]`
+            } bg-white text-[#1F2328]`
       }
     >
       {/* 테두리 리사이즈 핸들 (플로팅 모드 전용) */}
@@ -196,7 +196,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
             className="absolute bottom-1 right-1 w-3 h-3 z-20 flex items-end justify-end pointer-events-none"
             aria-hidden="true"
           >
-            <svg className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500 opacity-60" viewBox="0 0 6 6" fill="currentColor">
+            <svg className="w-2.5 h-2.5 text-gray-400 opacity-60" viewBox="0 0 6 6" fill="currentColor">
               <circle cx="5" cy="5" r="0.6" />
               <circle cx="3" cy="5" r="0.6" />
               <circle cx="5" cy="3" r="0.6" />
@@ -214,12 +214,12 @@ export const AiAssistantPopup: React.FC<Props> = ({
         <header
           onMouseDown={inline ? undefined : startDrag}
           onDoubleClick={handleHeaderDoubleClick}
-          className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-b ${
+          className={`shrink-0 flex items-center justify-between px-3.5 py-2.5 bg-[#F6F8FA] border-b ${
             isSingle
-              ? "border-[#005FB8]/15 dark:border-[#007ACC]/25"
-              : "border-[#7C3AED]/15 dark:border-[#A855F7]/25"
+              ? "border-[#005FB8]/15"
+              : "border-[#7C3AED]/15"
           } ${inline ? "" : "cursor-grab active:cursor-grabbing"} transition-colors ${
-            !inline && isDragging ? "bg-[#EAEAEA] dark:bg-[#2D2D2D]" : ""
+            !inline && isDragging ? "bg-[#EAEAEA]" : ""
           }`}
           title={inline ? undefined : "드래그하여 이동 / 더블클릭하여 최대·최소 크기 전환"}
         >
@@ -227,15 +227,15 @@ export const AiAssistantPopup: React.FC<Props> = ({
             <span className="text-base shrink-0">✨</span>
             <div className="flex flex-col min-w-0 gap-1">
               <div className="flex items-center gap-1.5 min-w-0">
-                <h3 className="text-xs font-bold text-[#1F2328] dark:text-[#CCCCCC] truncate">
+                <h3 className="text-xs font-bold text-[#1F2328] truncate">
                   ArchReactor AI 어시스턴트
                 </h3>
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  isSingle ? "bg-[#005FB8] dark:bg-[#007ACC]" : "bg-[#7C3AED] dark:bg-[#A855F7]"
+                  isSingle ? "bg-[#005FB8]" : "bg-[#7C3AED]"
                 } animate-pulse`} />
               </div>
-              <span className="text-[10px] leading-normal text-[#8C959F] dark:text-[#858585] select-none font-sans tracking-tight">
-                Powered by <strong className="italic font-bold text-[#0969DA] dark:text-[#58A6FF]">DKU SOLID LLM</strong>
+              <span className="text-[10px] leading-normal text-[#8C959F] select-none font-sans tracking-tight">
+                Powered by <strong className="italic font-bold text-[#0969DA]">DKU SOLID LLM</strong>
               </span>
             </div>
           </div>
@@ -256,11 +256,11 @@ export const AiAssistantPopup: React.FC<Props> = ({
                   );
                 }}
                 title="최대 크기로 확대"
-                className={`w-5 h-5 flex items-center justify-center rounded text-[#57606A] dark:text-[#858585] ${
+                className={`w-5 h-5 flex items-center justify-center rounded text-[#57606A] ${
                   isSingle
-                    ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                    : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-                } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
+                    ? "hover:text-[#005FB8]"
+                    : "hover:text-[#7C3AED]"
+                } hover:bg-black/5 transition-colors cursor-pointer text-xs`}
               >
                 <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M1.5 4.5V1.5H4.5M10.5 4.5V1.5H7.5M1.5 7.5v3H4.5M10.5 7.5v3H7.5" />
@@ -277,11 +277,11 @@ export const AiAssistantPopup: React.FC<Props> = ({
                   );
                 }}
                 title="최소 크기로 축소"
-                className={`w-5 h-5 flex items-center justify-center rounded text-[#57606A] dark:text-[#858585] ${
+                className={`w-5 h-5 flex items-center justify-center rounded text-[#57606A] ${
                   isSingle
-                    ? "hover:text-[#005FB8] dark:hover:text-[#007ACC]"
-                    : "hover:text-[#7C3AED] dark:hover:text-[#A855F7]"
-                } hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs`}
+                    ? "hover:text-[#005FB8]"
+                    : "hover:text-[#7C3AED]"
+                } hover:bg-black/5 transition-colors cursor-pointer text-xs`}
               >
                 <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4.5 1.5V4.5H1.5M7.5 1.5V4.5h3M4.5 10.5V7.5H1.5M7.5 10.5V7.5h3" />
@@ -295,7 +295,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
                   onClose();
                 }}
                 title="창 닫기"
-                className="w-5 h-5 flex items-center justify-center rounded text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs select-none"
+                className="w-5 h-5 flex items-center justify-center rounded text-[#57606A] hover:text-[#CF222E] hover:bg-black/5 transition-colors cursor-pointer text-xs select-none"
               >
                 <svg className="w-3 h-3 text-current" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
                   <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" />
@@ -306,9 +306,9 @@ export const AiAssistantPopup: React.FC<Props> = ({
         </header>
 
         {/* 대화 본문 */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#1E1E1E]">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white">
           {/* 추천 질문 칩 바 */}
-          <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] dark:bg-[#1A1A1A] border-b border-[#E5E5E5] dark:border-[#333333] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
+          <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] border-b border-[#E5E5E5] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
             {QUESTION_EXAMPLES.map((example) => (
               <button
                 key={example.label}
@@ -316,10 +316,10 @@ export const AiAssistantPopup: React.FC<Props> = ({
                 disabled={!canSend}
                 onClick={() => setInputMessage(example.question + BRIEF_ANSWER_REQUEST)}
                 title={example.question}
-                className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] ${
+                className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] bg-white ${
                   isSingle
-                    ? 'hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#007ACC]'
-                    : 'hover:border-[#7C3AED] dark:hover:border-[#A855F7] hover:text-[#7C3AED] dark:hover:text-[#A855F7]'
+                    ? 'hover:border-[#005FB8] hover:text-[#005FB8]'
+                    : 'hover:border-[#7C3AED] hover:text-[#7C3AED]'
                 } whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs disabled:opacity-50`}
               >
                 {example.label}
@@ -339,7 +339,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
           />
 
           {/* 하단 입력 폼 */}
-          <footer className="shrink-0 p-2.5 bg-[#F6F8FA] dark:bg-[#252526] border-t border-[#E5E5E5] dark:border-[#3E3E42]">
+          <footer className="shrink-0 p-2.5 bg-[#F6F8FA] border-t border-[#E5E5E5]">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -354,10 +354,10 @@ export const AiAssistantPopup: React.FC<Props> = ({
                 placeholder="C 코드나 파이프라인에 대해 질문하세요..."
                 disabled={!canSend}
                 maxLength={8000}
-                className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-xs text-[#1F2328] dark:text-[#CCCCCC] placeholder:text-[#8C959F] dark:placeholder:text-[#6E7681] focus:outline-none ${
+                className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-[#D0D7DE] bg-white text-xs text-[#1F2328] placeholder:text-[#8C959F] focus:outline-none ${
                   isSingle
-                    ? "focus:border-[#005FB8] dark:focus:border-[#007ACC] focus:ring-1 focus:ring-[#005FB8] dark:focus:ring-[#007ACC]"
-                    : "focus:border-[#7C3AED] dark:focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#7C3AED] dark:focus:ring-[#8B5CF6]"
+                    ? "focus:border-[#005FB8] focus:ring-1 focus:ring-[#005FB8]"
+                    : "focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
                 } transition-colors`}
               />
               <button
@@ -369,8 +369,8 @@ export const AiAssistantPopup: React.FC<Props> = ({
                   isThinking
                     ? "bg-white text-[#1F2328] border-[#D0D7DE] hover:bg-[#F3F4F6]"
                     : isSingle
-                      ? "border-transparent bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white"
-                      : "border-transparent bg-[#7C3AED] dark:bg-[#8B5CF6] hover:bg-[#6D28D9] dark:hover:bg-[#7C3AED] text-white"
+                      ? "border-transparent bg-[#005FB8] hover:bg-[#004C99] text-white"
+                      : "border-transparent bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
                 } text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs flex items-center gap-1 shrink-0`}
               >
                 {isThinking ? (
@@ -387,7 +387,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
               </button>
             </form>
 
-            <div data-testid="attachment-bar" className="shrink-0 pt-2 mt-2 text-[11px] border-t border-[#E5E5E5] dark:border-[#333333] space-y-1.5 max-h-48 overflow-y-auto">
+            <div data-testid="attachment-bar" className="shrink-0 pt-2 mt-2 text-[11px] border-t border-[#E5E5E5] space-y-1.5 max-h-48 overflow-y-auto">
               <div className="flex items-center flex-wrap gap-1.5">
                 {attachSource && sourceContent.trim() ? (
                   <button
@@ -395,7 +395,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
                     disabled={isThinking}
                     aria-label="코드 첨부 해제"
                     onClick={() => setAttachSource(false)}
-                    className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200"
+                    className="rounded-full bg-blue-50 border border-blue-200 px-2 py-1 text-blue-700"
                   >
                     {sourceLabel} <span aria-hidden="true">×</span>
                   </button>
@@ -408,7 +408,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
                     disabled={isThinking}
                     aria-label="실행 첨부 해제"
                     onClick={() => setAttachment({ scope, enabled: false, addresses: [] })}
-                    className="rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2 py-1 text-blue-700 dark:text-blue-200"
+                    className="rounded-full bg-blue-50 border border-blue-200 px-2 py-1 text-blue-700"
                   >
                     실행 · clock {currentData.clock} <span aria-hidden="true">×</span>
                   </button>
@@ -429,12 +429,12 @@ export const AiAssistantPopup: React.FC<Props> = ({
                   aria-expanded={settingsOpen}
                   aria-controls="assistant-attachment-settings"
                   onClick={() => setSettingsOpen((value) => !value)}
-                  className="ml-auto text-[#57606A] dark:text-gray-300 hover:underline"
+                  className="ml-auto text-[#57606A] hover:underline"
                 >
                   첨부 설정 {settingsOpen ? '▴' : '▾'}
                 </button>
               </div>
-              <p className="text-[#57606A] dark:text-gray-400">선택된 코드를 어시스턴트가 참고합니다.</p>
+              <p className="text-[#57606A]">선택된 코드를 어시스턴트가 참고합니다.</p>
               {(!authenticated || statusError || !status?.enabled) && (
                 <p role="status">
                   {!authenticated
@@ -449,7 +449,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
                 </button>
               )}
               {attach && unavailable && <p role="alert">{unavailable}</p>}
-              <div id="assistant-attachment-settings" hidden={!settingsOpen} className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+              <div id="assistant-attachment-settings" hidden={!settingsOpen} className="space-y-2 border-t border-gray-200 pt-2">
                 <label className="flex gap-2 items-center">
                   <input
                     type="checkbox"
@@ -476,7 +476,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
                       size={3}
                       disabled={isThinking}
                       value={addresses.map(String)}
-                      className="w-full bg-white dark:bg-[#252526]"
+                      className="w-full bg-white"
                       onChange={(e) => {
                         const next = Array.from(e.currentTarget.selectedOptions, (option) => Number(option.value));
                         if (next.length > 16) {

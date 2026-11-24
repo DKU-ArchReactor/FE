@@ -14,24 +14,24 @@ type RegisterGroup = 'zero' | 'special' | 'args' | 'saved' | 'temp';
 // 레지스터 그룹별 고유 시그니처 색상 (이름 & 데이터값 매핑)
 const GROUP_COLORS: Record<RegisterGroup, { name: string; data: string }> = {
   zero: {
-    name: 'text-slate-500 dark:text-slate-400',
-    data: 'text-slate-500 dark:text-slate-400',
+    name: 'text-slate-500',
+    data: 'text-slate-500',
   },
   special: {
-    name: 'text-purple-600 dark:text-purple-400',
-    data: 'text-purple-700 dark:text-purple-300',
+    name: 'text-purple-600',
+    data: 'text-purple-700',
   },
   args: {
-    name: 'text-emerald-600 dark:text-emerald-400',
-    data: 'text-emerald-700 dark:text-emerald-300',
+    name: 'text-emerald-600',
+    data: 'text-emerald-700',
   },
   saved: {
-    name: 'text-amber-600 dark:text-amber-400',
-    data: 'text-amber-700 dark:text-amber-300',
+    name: 'text-amber-600',
+    data: 'text-amber-700',
   },
   temp: {
-    name: 'text-sky-600 dark:text-sky-400',
-    data: 'text-sky-700 dark:text-sky-300',
+    name: 'text-sky-600',
+    data: 'text-sky-700',
   },
 };
 
@@ -179,20 +179,20 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
               key={regKey}
               title={`${meta.desc || regKey} (Hex: ${val})`}
               className={`flex-1 min-h-0 flex items-center justify-between px-1.5 md:px-2 text-[10.5px] md:text-[11px] transition-colors duration-100 ${
-                isGroupStart ? 'border-t border-t-[#D0D7DE] dark:border-t-[#3E3E42]' : ''
+                isGroupStart ? 'border-t border-t-[#D0D7DE]' : ''
               } ${
                 isPulsing
-                  ? 'bg-[#FFF8C5] dark:bg-[#37373D] text-[#9A6700] dark:text-[#E5B567] font-bold'
+                  ? 'bg-[#FFF8C5] text-[#9A6700] font-bold'
                   : hasVal
-                  ? 'bg-white dark:bg-[#252526]/50 hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#1F2328] dark:text-[#D4D4D4]'
-                  : 'hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E]/50 text-[#656D76] dark:text-[#6E7681]'
+                  ? 'bg-white hover:bg-[#F6F8FA] text-[#1F2328]'
+                  : 'hover:bg-[#F6F8FA] text-[#656D76]'
               }`}
             >
               {/* 1열 (좌측): [ABI 이름] (레지스터 번호) - 고정 너비로 수직 정렬선 일치 */}
               <div className="w-[58px] md:w-[72px] shrink-0 flex items-center gap-0.5 md:gap-1 min-w-0">
                 <span className={`w-7 md:w-8 font-bold text-left ${
                   isPulsing 
-                    ? 'text-[#9A6700] dark:text-[#E5B567]' 
+                    ? 'text-[#9A6700]' 
                     : groupColor.name
                 }`}>
                   {meta.abi}
@@ -200,10 +200,10 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
 
                 <span className={`text-[9px] md:text-[10px] tabular-nums ${
                   isPulsing
-                    ? 'text-[#9A6700]/70 dark:text-[#E5B567]/70'
+                    ? 'text-[#9A6700]/70'
                     : hasVal
-                    ? 'text-[#57606A] dark:text-[#CCCCCC] font-medium'
-                    : 'text-[#8C959F] dark:text-[#6E7681]'
+                    ? 'text-[#57606A] font-medium'
+                    : 'text-[#8C959F]'
                 }`}>
                   ({regKey})
                 </span>
@@ -213,8 +213,8 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
               <div className="hidden md:block flex-1 min-w-0 px-2.5 text-left truncate">
                 <span className={`text-[9.5px] font-sans tracking-tight ${
                   hasVal
-                    ? 'font-bold text-[#005FB8] dark:text-[#79C0FF]'
-                    : 'text-[#8C959F] dark:text-[#858585]'
+                    ? 'font-bold text-[#005FB8]'
+                    : 'text-[#8C959F]'
                 }`}>
                   {meta.role}
                 </span>
@@ -228,10 +228,10 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
                 <span
                   className={`${valSizeClass} ${
                     isPulsing
-                      ? 'text-[#CF222E] dark:text-[#F44747] font-black'
+                      ? 'text-[#CF222E] font-black'
                       : hasVal
                       ? `${groupColor.data} font-bold`
-                      : 'text-[#8C959F] dark:text-[#6E7681] font-normal'
+                      : 'text-[#8C959F] font-normal'
                   }`}
                 >
                   {decStr}

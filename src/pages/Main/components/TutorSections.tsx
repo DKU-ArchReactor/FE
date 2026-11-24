@@ -21,28 +21,28 @@ export const TutorCrtCard: React.FC<{
   const crtInfo = analyzeCrtInstruction(selectedRow.text, selectedRow.pc);
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-xl border border-slate-300 dark:border-[#3E3E42] bg-slate-50/70 dark:bg-[#252526]/60 p-3.5 flex flex-col gap-3 shadow-2xs">
-        <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 dark:border-[#333333] pb-2.5">
+      <div className="rounded-xl border border-slate-300 bg-slate-50/70 p-3.5 flex flex-col gap-3 shadow-2xs">
+        <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200/80 pb-2.5">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] whitespace-nowrap shrink-0">
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] text-[#8C959F] whitespace-nowrap shrink-0">
                 소스 위치 미확인
               </span>
-              <strong className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC]">
+              <strong className="text-xs font-bold text-slate-800">
                 {crtInfo.title}
               </strong>
             </div>
           </div>
           {selectedRow.pc && (
-            <span className="text-[10px] font-mono text-slate-500 dark:text-[#858585] bg-white dark:bg-[#1E1E1E] px-2 py-0.5 rounded border border-slate-200 dark:border-[#333333] whitespace-nowrap shrink-0">
+            <span className="text-[10px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap shrink-0">
               PC: {tutorDecimalText(selectedRow.pc)}
             </span>
           )}
         </div>
 
-        <div className="font-mono text-xs px-3 py-2 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-slate-900 dark:text-[#D4D4D4] font-semibold flex items-center justify-between shadow-2xs">
+        <div className="font-mono text-xs px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-900 font-semibold flex items-center justify-between shadow-2xs">
           <span>{tutorDecimalText(selectedRow.text)}</span>
-          <span className="text-[10px] text-slate-400 dark:text-[#858585] font-normal">
+          <span className="text-[10px] text-slate-400 font-normal">
             ASM L{(selectedAsmIndex ?? 0) + 1}
           </span>
         </div>
@@ -68,21 +68,21 @@ export const TutorCrtCard: React.FC<{
             소스 위치와 실행 문맥
           </summary>
           <div className="space-y-2.5 pt-2">
-            <div className="flex items-start gap-1.5 text-xs text-slate-800 dark:text-[#CCCCCC]">
+            <div className="flex items-start gap-1.5 text-xs text-slate-800">
               <div>
-                <strong className="text-slate-900 dark:text-white font-bold">{crtInfo.role}</strong>
-                <p className="text-[11px] text-slate-600 dark:text-[#858585] mt-0.5 leading-relaxed">
+                <strong className="text-slate-900 font-bold">{crtInfo.role}</strong>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
                   {tutorReadingText(crtInfo.summary)}
                 </p>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-[13px] text-[var(--ar-text-muted)] leading-7">
+            <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-[13px] text-[var(--ar-text-muted)] leading-7">
               <p>{tutorReadingText(crtInfo.detail)}</p>
             </div>
 
-            <div className="p-2 rounded bg-slate-100/70 dark:bg-[#1E1E1E]/80 border border-slate-200/80 dark:border-[#333333] text-[10px] text-slate-500 dark:text-[#858585] flex items-start gap-1.5">
-              <span className="font-bold text-slate-700 dark:text-[#CCCCCC] shrink-0">하드웨어 동작:</span>
+            <div className="p-2 rounded bg-slate-100/70 border border-slate-200/80 text-[10px] text-slate-500 flex items-start gap-1.5">
+              <span className="font-bold text-slate-700 shrink-0">하드웨어 동작:</span>
               <span>{tutorReadingText(crtInfo.instructionDetail.hardwareDetail)}</span>
             </div>
           </div>
@@ -157,12 +157,12 @@ export const TutorSelectedLineSection: React.FC<{
               <span className="text-xs font-mono font-semibold text-[var(--ar-accent)]">
                 ASM: L{selectedTranslationLine}
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded font-medium shrink-0 bg-slate-100 dark:bg-[#252526] text-slate-700 dark:text-[#CCCCCC] border border-slate-200 dark:border-[#333333]">
+              <span className="text-[10px] px-2 py-0.5 rounded font-medium shrink-0 bg-slate-100 text-slate-700 border border-slate-200">
                 {badgeText}
               </span>
             </div>
             <div className="font-mono text-[13px] leading-6 px-3 py-2 rounded-md bg-[var(--ar-header-bg)] border border-[var(--ar-border)] text-[var(--ar-text-primary)] whitespace-pre-wrap break-all">
-              {tutorDecimalText(trimmed) || <span className="text-slate-400 dark:text-[#858585] italic">빈 줄</span>}
+              {tutorDecimalText(trimmed) || <span className="text-slate-400 italic">빈 줄</span>}
             </div>
             <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">{descText}</p>
           </div>
@@ -186,7 +186,7 @@ export const TutorSelectedLineSection: React.FC<{
           </div>
 
           <div className="font-mono text-[13px] leading-6 px-3 py-2 rounded-md bg-[var(--ar-header-bg)] border border-[var(--ar-border)] text-[var(--ar-text-primary)] whitespace-pre-wrap break-all">
-            {tutorDecimalText(selectedCLineText?.trim()??'') || <span className="text-slate-400 dark:text-[#858585] italic">빈 줄</span>}
+            {tutorDecimalText(selectedCLineText?.trim()??'') || <span className="text-slate-400 italic">빈 줄</span>}
           </div>
 
           <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">{tutorReadingText(cLineAnalysis.detail)}</p>
@@ -201,24 +201,24 @@ export const TutorSelectedLineSection: React.FC<{
       )}
 
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-[#333333] pb-2">
+        <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold text-slate-800 dark:text-[#CCCCCC]">
+            <span className="text-[11px] font-bold text-slate-800">
               {activeTarget === "asm" ? "선택한 ASM:" : "매핑된 ASM:"}
             </span>
-            <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-[#CCCCCC] bg-white dark:bg-[#1E1E1E] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#333333]">
+            <span className="text-[10px] font-mono font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
               {explainedAsmRows.length > 0 ? explainedAsmRows.map((r) => `L${r.asmIndex}`).join(", ") : "없음"}
             </span>
-            <span className="text-[10px] text-slate-400 dark:text-[#858585] font-mono">
+            <span className="text-[10px] text-slate-400 font-mono">
               ({explainedAsmRows.length}개 명령어)
             </span>
           </div>
-          <div className="text-[10px] text-slate-400 dark:text-[#858585] font-mono">RV32IM / 컴파일 결과 기준</div>
+          <div className="text-[10px] text-slate-400 font-mono">RV32IM / 컴파일 결과 기준</div>
         </div>
 
 
         {explainedAsmRows.length === 0 ? (
-          <div className="p-3 rounded-lg bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#333333] text-center text-xs text-slate-400 dark:text-[#858585]">
+          <div className="p-3 rounded-lg bg-white border border-slate-200 text-center text-xs text-slate-400">
             이 줄에 연결된 명령어가 없습니다. 주석·공백·컴파일러 줄 정보의 배치 또는 누락 때문일 수 있습니다.
           </div>
         ) : (
@@ -246,7 +246,7 @@ export const TutorSelectedLineSection: React.FC<{
                       ? "border-[var(--ar-accent)]"
                       : isRowExecuting
                         ? "border-emerald-500"
-                        : "border-slate-300 dark:border-[#454858]"
+                        : "border-slate-300"
                   }`}
                 >
                   <header className="sticky -top-4 z-10 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-4 py-2">
@@ -256,8 +256,8 @@ export const TutorSelectedLineSection: React.FC<{
                           isRowSelectedFocus
                             ? "bg-[var(--ar-accent)] text-white"
                             : isRowExecuting
-                              ? "bg-emerald-600 dark:bg-[#23D18B] text-white"
-                              : "bg-slate-100 dark:bg-[#2D2D2D] text-slate-600 dark:text-[#858585]"
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-100 text-slate-600"
                         }`}
                       >
                         ASM L{asmRow.asmIndex}
@@ -272,7 +272,7 @@ export const TutorSelectedLineSection: React.FC<{
                         </span>
                       )}
                       {isRowExecuting && (
-                        <span className="text-[10px] font-bold text-emerald-700 dark:text-[#7EE787] bg-emerald-100/90 dark:bg-[#23D18B]/30 px-1.5 py-0.2 rounded border border-emerald-300 dark:border-[#23D18B]/50 animate-pulse">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.2 rounded border border-emerald-300 animate-pulse">
                           실행 중
                         </span>
                       )}
@@ -324,9 +324,9 @@ export const TutorCycleOverviewSection: React.FC<{
   return (
     <div className="flex flex-col gap-3">
       {activeTarget === "asm" ? (
-        <div className="rounded-xl border border-slate-200 dark:border-[#333333] bg-slate-50/50 dark:bg-[#252526]/40 p-3.5 flex items-center gap-3">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 flex items-center gap-3">
           <div className="flex flex-col gap-0.5">
-            <strong className="text-xs text-[#1F2328] dark:text-[#CCCCCC] font-bold">
+            <strong className="text-xs text-[#1F2328] font-bold">
               RISC-V 어셈블리 실행 분석
             </strong>
             <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">
@@ -336,9 +336,9 @@ export const TutorCycleOverviewSection: React.FC<{
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-blue-100 dark:border-[#007ACC]/30 bg-blue-50/50 dark:bg-[#007ACC]/10 p-3.5 flex items-center gap-3">
+        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3.5 flex items-center gap-3">
           <div className="flex flex-col gap-0.5">
-            <strong className="text-xs text-blue-950 dark:text-[#E6EDF3] font-bold">
+            <strong className="text-xs text-blue-950 font-bold">
               라인별 실시간 컴파일 해설 지원
             </strong>
             <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">
@@ -351,17 +351,17 @@ export const TutorCycleOverviewSection: React.FC<{
       )}
 
       {currentCycleData ? (
-        <div className="rounded-xl border border-slate-200 dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-3 flex flex-col gap-2.5 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#333333] pb-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 flex flex-col gap-2.5 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-bold text-slate-800 dark:text-[#CCCCCC]">
+              <span className="text-xs font-bold text-slate-800">
                 {isSingleMode
                   ? `현재 스텝(${currentCycleData.clock} Step) 실행 분석`
                   : `현재 사이클(${currentCycleData.clock} Cycle) 실행 분석`}
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-400 dark:text-[#858585] tabular-nums">
+            <span className="text-[10px] font-mono text-slate-400 tabular-nums">
               {isSingleMode
                 ? `Step ${currentCycleData.clock} / ${simulationData?.summary?.total_cycles || 0}`
                 : `Cycle ${currentCycleData.clock} / ${simulationData?.summary?.total_cycles || 0}`}
@@ -376,12 +376,12 @@ export const TutorCycleOverviewSection: React.FC<{
 
             if (isIdleStep0) {
               return (
-                <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-[#252526] border border-slate-100 dark:border-[#333333]">
+                <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-bold text-[#005FB8] dark:text-[#79C0FF] font-sans">
+                    <span className="font-bold text-[#005FB8] font-sans">
                       [Step 0] 시뮬레이션 준비 완료
                     </span>
-                    <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585]">
+                    <span className="font-mono text-[10px] text-slate-400">
                       Entry: {tutorDecimalText(ifBuf?.pc || "0x00010000")}
                     </span>
                   </div>
@@ -398,20 +398,20 @@ export const TutorCycleOverviewSection: React.FC<{
             const crtAnalysis = isCrtCycle ? analyzeCrtInstruction(ifInst, ifBuf?.pc) : null;
             const ifAnalysis = analyzeAsmInstruction(ifInst, context?.explanation);
             return (
-              <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-[#252526] border border-slate-100 dark:border-[#333333]">
+              <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
                 <div className="flex items-center justify-between flex-wrap gap-1.5 text-[11px]">
                   <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                    <span className="font-bold text-indigo-700 dark:text-[#79C0FF] font-sans">
+                    <span className="font-bold text-indigo-700 font-sans">
                       [IF 인출 단계] {tutorDecimalText(ifInst)}
                     </span>
                     {isCrtCycle && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] whitespace-nowrap shrink-0">
+                      <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] text-[#8C959F] whitespace-nowrap shrink-0">
                         소스 위치 미확인
                       </span>
                     )}
                   </div>
                   {ifBuf?.pc && (
-                    <span className="font-mono text-[10px] text-slate-400 dark:text-[#858585] whitespace-nowrap shrink-0">
+                    <span className="font-mono text-[10px] text-slate-400 whitespace-nowrap shrink-0">
                       PC: {tutorDecimalText(ifBuf.pc)}
                     </span>
                   )}
@@ -424,20 +424,20 @@ export const TutorCycleOverviewSection: React.FC<{
           })()}
         </div>
       ) : activeTarget === "asm" ? (
-        <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42]">
-          <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+        <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] rounded-md border border-dashed border-[#D0D7DE]">
+          <span className="text-xs font-semibold text-[#1F2328]">
             어셈블리 코드를 작성하고 [시뮬레이션]을 실행하세요
           </span>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
+          <span className="text-[11px] text-[#57606A] mt-1 max-w-xs">
             작성한 명령어의 의미와 실행 모드에 따른 클록별 하드웨어 상태 변화를 확인할 수 있습니다.
           </span>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42]">
-          <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+        <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] rounded-md border border-dashed border-[#D0D7DE]">
+          <span className="text-xs font-semibold text-[#1F2328]">
             컴파일 후 코드 라인을 클릭해 보세요!
           </span>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
+          <span className="text-[11px] text-[#57606A] mt-1 max-w-xs">
             C 언어 코드 한 줄이 컴퓨터 CPU에서 구체적으로 어떻게 어셈블리로 번역되고 실행되는지 쉽게 풀어서 설명해 드립니다.
           </span>
         </div>

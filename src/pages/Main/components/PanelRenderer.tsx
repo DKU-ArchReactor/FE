@@ -5,6 +5,7 @@ import type { PanelKey } from "../types";
 // 컴포넌트 임포트
 import TutorArea from "./TutorArea";
 import PipelineVisualizer from "./PipelineVisualizer";
+import SingleCycleDatapath from "./SingleCycleDatapath";
 import RegisterVisualizer from "./RegisterVisualizer";
 import MemorySegmentVisualizer from "./MemorySegmentVisualizer";
 import MultiCycleDiagram from "./MultiCycleDiagram";
@@ -16,13 +17,13 @@ import TranslationMapping from "./TranslationMapping";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
-import {singleFlowDuration} from '../utils/instructionFlow';
+
 
 const EMPTY_REGISTERS: Record<string, string> = {};
 
 interface PanelRendererProps {
-  tutorSelection?:{kind:'c'|'asm';revision:number};
-  onTutorSelect?:(kind:'c'|'asm')=>void;
+  tutorSelection?: { kind: 'c' | 'asm'; revision: number };
+  onTutorSelect?: (kind: 'c' | 'asm') => void;
   onSourceSelection?: (selection: EditorSelection | null) => void;
   panelKey: PanelKey;
   simulationData: SimulationResult | null;
@@ -32,6 +33,8 @@ interface PanelRendererProps {
   playSpeed: number;
   onPausePlayback?: () => void;
   isPlaying?: boolean;
+  playMode?: "continuous" | "singleCycle";
+  isStandby?: boolean;
   singlePlaybackFinished?: boolean;
   playbackRevision?: number;
   loadingMessage: string | null;
@@ -68,6 +71,8 @@ interface PanelRendererProps {
   onCustomAssemblyChange: (val: string) => void;
   onSimulateAssembly: () => void;
   onResetCustomAssembly: () => void;
+  onStepBack?: () => void;
+  onStepForward?: () => void;
   onJumpToCycle: (cycle: number) => void;
 
   // 저장된 파일 목록 상태
@@ -88,11 +93,12 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   playSpeed,
   onPausePlayback,
   isPlaying,
+  playMode = "continuous",
+  isStandby,
   singlePlaybackFinished,
   playbackRevision,
   loadingMessage,
   simulationMode,
-  isSingleEngine,
   currentActiveRow,
   mappedAssemblyRows,
   activeExecutionCLine,
@@ -122,12 +128,50 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   onCustomAssemblyChange,
   onSimulateAssembly,
   onResetCustomAssembly,
+  onStepBack,
+  onStepForward,
   onJumpToCycle,
 
   savedFiles,
   isLoggedIn,
   onCloseTutor,
 }) => {
+  const onSelectAsmCallback = React.useCallback(
+    (line: number | null, index: number) => onSelectTranslationLine(line, index, false),
+    [onSelectTranslationLine]
+  );
+
+  // 불필요한 인라인 객체 재생성 방지: React.memo의 얕은 비교가 작동하도록 lessonContext 메모이제이션
+  const lessonContext = React.useMemo(
+    () => ({
+      isPlaying,
+      playbackRevision,
+      playbackFinished: singlePlaybackFinished,
+      flowDurationMs: playSpeed,
+      onPausePlayback,
+      source: editorTarget === "c" ? translationSource : undefined,
+      rows: mappedAssemblyRows,
+      selectedAsmIndex: translationSelectedAsmIndex,
+      selectedCLine: editorTarget === "c" ? translationSelectedLine : undefined,
+      onSelectAsm: onSelectAsmCallback,
+      onJumpToCycle,
+    }),
+    [
+      isPlaying,
+      playbackRevision,
+      singlePlaybackFinished,
+      playSpeed,
+      onPausePlayback,
+      editorTarget,
+      translationSource,
+      mappedAssemblyRows,
+      translationSelectedAsmIndex,
+      translationSelectedLine,
+      onSelectAsmCallback,
+      onJumpToCycle,
+    ]
+  );
+
   switch (panelKey) {
     case "cSource":
       return (
@@ -143,7 +187,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           error={translationError}
           selectedLine={translationSelectedLine}
           executionLine={activeExecutionCLine}
-          onSelectLine={(...args)=>{if(args[0]!=null)onTutorSelect?.('c');onSelectTranslationLine(...args);}}
+          onSelectLine={(...args) => { if (args[0] != null) onTutorSelect?.('c'); onSelectTranslationLine(...args); }}
           savedFiles={savedFiles}
           isLoggedIn={isLoggedIn}
           currentFileId={fileId}
@@ -166,7 +210,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           selectedLine={translationSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           executionLine={activeExecutionCLine}
-          onSelectLine={(...args)=>{if(args[0]!=null||args[1]!=null)onTutorSelect?.('asm');onSelectTranslationLine(...args);}}
+          onSelectLine={(...args) => { if (args[0] != null || args[1] != null) onTutorSelect?.('asm'); onSelectTranslationLine(...args); }}
           stageBuffers={currentData?.buffers}
           prevStageBuffers={prevData?.buffers}
           cycleEvents={currentData?.cycle_events}
@@ -174,10 +218,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           playbackCycle={currentCycle}
           mode={simulationMode}
           currentActiveStep={
-            isSingleEngine
-              ? currentActiveRow
-                ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : null
+            currentActiveRow
+              ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
               : null
           }
           activeTarget={editorTarget}
@@ -207,31 +249,48 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           selectedTranslationLine={editorTarget === "asm" ? translationSelectedLine : effectiveSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           currentActiveAsmIndex={
-            isSingleEngine
-              ? currentActiveRow
-                ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : null
+            currentActiveRow
+              ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
               : null
           }
           isUserSelected={translationSelectedLine !== null || translationSelectedAsmIndex !== null}
           activeTarget={editorTarget}
           mode={simulationMode}
           onClose={onCloseTutor}
+          onSelectLine={onSelectTranslationLine}
+          onPausePlayback={onPausePlayback}
+          onStepBack={onStepBack}
+          onStepForward={onStepForward}
+          onJumpToCycle={onJumpToCycle}
         />
       );
 
     case "pipeline":
+      if (simulationMode === "single") {
+        return (
+          <SingleCycleDatapath
+            lessonContext={lessonContext}
+            currentData={currentData}
+            prevData={prevData}
+            simulationData={simulationData}
+            loadingMessage={loadingMessage}
+          />
+        );
+      }
       return (
         <PipelineVisualizer
-          lessonContext={{isPlaying, playbackRevision, playbackFinished: singlePlaybackFinished, flowDurationMs: singleFlowDuration(playSpeed), onPausePlayback, source: editorTarget === 'c' ? translationSource : undefined,
-            rows: mappedAssemblyRows, selectedAsmIndex: translationSelectedAsmIndex,
-            selectedCLine: editorTarget === 'c' ? translationSelectedLine : undefined,
-            onSelectAsm: (line: number | null, index: number) => onSelectTranslationLine(line, index, false), onJumpToCycle}}
+          lessonContext={lessonContext}
           currentData={currentData}
           prevData={prevData}
           simulationData={simulationData}
           loadingMessage={loadingMessage}
-          mode={simulationMode}
+          mode="pipeline"
+          isPlaying={isPlaying}
+          playMode={playMode}
+          playSpeed={playSpeed}
+          currentCycle={currentCycle}
+          playbackRevision={playbackRevision}
+          onPausePlayback={onPausePlayback}
         />
       );
 
@@ -266,6 +325,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           mappedRows={mappedAssemblyRows}
           mode={simulationMode}
           loadingMessage={loadingMessage}
+          isStandby={isStandby}
         />
       );
 

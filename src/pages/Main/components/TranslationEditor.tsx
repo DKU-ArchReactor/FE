@@ -3,7 +3,6 @@ import type { EditorSelection } from '../utils/assistantSource';
 import { useRef, useEffect, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { useTheme } from "@/context/ThemeContext";
 import type { FileSummary } from "@/type/file";
 import CFileUploadPopup from "./CFileUploadPopup";
 
@@ -50,7 +49,6 @@ export default function TranslationEditor({
   activeTarget = "c",
   mode = "pipeline",
 }: Props) {
-  const { theme } = useTheme();
   const trackSelection = useAssistantSelection('c', onSourceSelection);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
@@ -228,7 +226,7 @@ export default function TranslationEditor({
     <section
       className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border shadow-sm select-none transition-all duration-200 ${
         activeTarget !== "c"
-          ? "border-[var(--ar-border)] bg-[#F8FAFC] dark:bg-[#141415]"
+          ? "border-[var(--ar-border)] bg-[#F8FAFC]"
           : "border-[var(--ar-border)] bg-[var(--ar-panel-bg)]"
       }`}
       aria-label="Translation C 편집기"
@@ -237,15 +235,15 @@ export default function TranslationEditor({
       <header
         className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors ${
           activeTarget === "c"
-            ? "border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] bg-[var(--ar-header-bg)]"
-            : "border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] bg-[var(--ar-header-bg)]"
+            ? "border-l-2 border-l-[#005FB8] bg-[var(--ar-header-bg)]"
+            : "border-l-2 border-l-[#005FB8] bg-[var(--ar-header-bg)]"
         }`}
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
               activeTarget === "c"
-                ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
+                ? "bg-[#005FB8] scale-100"
                 : "bg-transparent scale-0"
             }`}
           />
@@ -259,14 +257,14 @@ export default function TranslationEditor({
 
         {/* C 에디터 상태 문구 (우측 정렬: ASM 모드일 때와 동일한 톤앤매너) */}
         <div className="flex items-center shrink-0 ml-2">
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
+          <span className="text-[10px] text-[#57606A] font-mono truncate">
             {activeTarget === "c" ? "C 소스 직접 작성" : "ASM 모드 활성화됨"}
           </span>
         </div>
       </header>
 
       {/* 2단: 헤더 밑 툴바 라인 (버튼 전용 행: C 모드에서는 활성화, ASM 모드에서는 ASM 에디터의 툴바와 100% 동일한 비활성화 스타일) */}
-      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] dark:bg-[#1E1E1E] border-b border-[#E5E5E5] dark:border-[#3E3E42] min-w-0">
+      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           {/* 1. 불러오기 버튼 */}
           <button
@@ -276,12 +274,12 @@ export default function TranslationEditor({
             disabled={busy || activeTarget !== "c"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 focus:outline-none ${
               activeTarget !== "c"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
                 : isUploadPopupOpen
                 ? mode === "pipeline"
-                  ? "border-[#7C3AED] dark:border-[#8B5CF6] bg-[#7C3AED] dark:bg-[#8B5CF6] text-white cursor-pointer font-semibold"
-                  : "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] text-white cursor-pointer font-semibold"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                  ? "border-[#7C3AED] bg-[#7C3AED] text-white cursor-pointer font-semibold"
+                  : "border-[#005FB8] bg-[#005FB8] text-white cursor-pointer font-semibold"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
             }`}
             title="파일 불러오기 및 예제 열기"
           >
@@ -312,17 +310,17 @@ export default function TranslationEditor({
             disabled={busy || isSaving || activeTarget !== "c"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget !== "c"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
                 : saveSuccess
-                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                ? "border-emerald-500 bg-emerald-50 text-emerald-600 font-semibold cursor-pointer"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
             }`}
             title="현재 소스 코드를 서버에 저장"
           >
             {isSaving ? (
               <span className="w-3 h-3 rounded-full border-2 border-[var(--ar-accent)] border-t-transparent animate-spin shrink-0" />
             ) : saveSuccess ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">
+              <span className="text-emerald-600 font-bold text-[11px] shrink-0">
                 ✓
               </span>
             ) : (
@@ -349,8 +347,8 @@ export default function TranslationEditor({
             disabled={busy || activeTarget !== "c"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget !== "c"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
             }`}
             onClick={onReset}
             title="초기화"
@@ -372,7 +370,7 @@ export default function TranslationEditor({
             className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${
               activeTarget === "c"
                 ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 cursor-pointer shadow-2xs"
-                : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
+                : "border border-[#D0D7DE] bg-white text-[#8C959F] opacity-40 cursor-not-allowed"
             }`}
             onClick={onCompile}
             disabled={busy || !source.trim() || activeTarget !== "c"}
@@ -413,11 +411,11 @@ export default function TranslationEditor({
 
       {/* 본문: C 모드일 때는 Monaco Editor, ASM 모드일 때는 비활성화 안내 뷰 (코드는 상태에 온전히 보존됨) */}
       {activeTarget === "c" ? (
-        <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
+        <div className="min-h-0 flex-1 relative bg-white">
           <Editor
             height="100%"
             language="c"
-            theme={theme === "dark" ? "vs-dark" : "vs"}
+            theme="vs"
             value={source}
             onChange={(value) => onChange(value ?? "")}
             onMount={handleEditorMount}
@@ -442,14 +440,14 @@ export default function TranslationEditor({
           />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] select-none">
-          <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] select-none">
+          <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E5E5] flex items-center justify-center text-[#57606A] mb-3 text-lg shadow-2xs">
             🔒
           </div>
-          <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+          <p className="text-xs font-semibold text-[#1F2328]">
             현재 어셈블리(ASM) 직접 작성 모드가 활성화되어 있습니다.
           </p>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
+          <span className="text-[11px] text-[#57606A] mt-1 max-w-xs">
             작성해둔 C 코드는 안전하게 보관되어 있습니다. 상단 툴바에서 C 모드로 전환하면 언제든 다시 편집할 수 있습니다.
           </span>
         </div>
@@ -458,7 +456,7 @@ export default function TranslationEditor({
       {activeTarget === "c" && error && (
         <pre
           role="alert"
-          className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 dark:text-rose-300 font-mono"
+          className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 bg-rose-50 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 font-mono"
         >
           {error}
         </pre>

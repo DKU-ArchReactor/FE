@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useEffect } from "react";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
 import type { StageBuffer, CycleEvents, SimulationResult } from "@/type/simulation";
-import { buildMultiCycleTraceRows, type TraceRow } from "../utils/multiCycleTrace";
 import { splitInstruction } from "@/utils/instructionFormat";
 import { STAGES_CONFIG } from "../utils/riscvMonacoTheme";
+import { isBubbleOrNop } from "../utils/pipelineWireState";
 
 interface MappingRowListProps {
   rows: MappedAssemblyRow[];
@@ -41,71 +41,32 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const rowElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  const traceRows = useMemo<TraceRow[]>(() => {
-    if (!simulationData?.history?.length || mode === "single") return [];
-    return buildMultiCycleTraceRows(simulationData.history, false);
-  }, [simulationData, mode]);
-
+  // 2,000사이클 전체를 훑는 불필요한 TraceRow[] 생성을 제거하고, 현재 활성 사이클의 5개 스테이지를 즉시 매핑 (메모리 절감)
   const activeStagesByRow = useMemo(() => {
     const map: Record<number, { stage: string; isStall: boolean; isBubble: boolean }[]> = {};
     if (mode === "single") return map;
 
-    if (traceRows.length > 0 && playbackCycle && playbackCycle >= 1) {
-      const cIdx = playbackCycle - 1;
-      traceRows.forEach((tRow) => {
-        const cell = tRow.cells[cIdx];
-        if (!cell) return;
+    const cycleItem =
+      playbackCycle && playbackCycle >= 1 && simulationData?.history
+        ? simulationData.history[playbackCycle - 1]
+        : null;
 
-        const targetPc = tRow.pc ? parseInt(tRow.pc, 16) : null;
-        let matchedRowIdx = -1;
+    const targetBuffers = cycleItem?.buffers || stageBuffers;
+    const targetEvents = cycleItem?.cycle_events || cycleEvents;
 
-        if (targetPc !== null && !isNaN(targetPc)) {
-          matchedRowIdx = rows.findIndex(
-            (r) => r.pc && parseInt(r.pc, 16) === targetPc
-          );
-          if (matchedRowIdx === -1) {
-            const estimatedIdx = Math.floor(targetPc / 4);
-            if (estimatedIdx >= 0 && estimatedIdx < rows.length) {
-              matchedRowIdx = estimatedIdx;
-            }
-          }
-        }
-
-        if (matchedRowIdx === -1 && tRow.assembly) {
-          const normAsm = tRow.assembly.replace(/\s+/g, " ").trim().toLowerCase();
-          matchedRowIdx = rows.findIndex(
-            (r, idx) => !map[idx] && r.text.replace(/\s+/g, " ").trim().toLowerCase() === normAsm
-          );
-        }
-
-        if (matchedRowIdx !== -1) {
-          if (!map[matchedRowIdx]) map[matchedRowIdx] = [];
-          if (!map[matchedRowIdx].some((s) => s.stage === cell.stage)) {
-            map[matchedRowIdx].push({
-              stage: cell.stage,
-              isStall: Boolean(cell.isStall),
-              isBubble: Boolean(cell.isBubble),
-            });
-          }
-        }
-      });
-
-      return map;
-    }
-
-    if (stageBuffers) {
-      const hasGlobalStall = Boolean(cycleEvents?.stall?.has_stall);
-      const stallStage = cycleEvents?.stall?.stage;
-      const hasGlobalFlush = Boolean(cycleEvents?.control_hazard?.has_flush);
-      const flushedStages = cycleEvents?.control_hazard?.flushed_stages || ["IF", "ID"];
+    if (targetBuffers) {
+      const hasGlobalStall = Boolean(targetEvents?.stall?.has_stall);
+      const stallStage = targetEvents?.stall?.stage;
+      const hasGlobalFlush = Boolean(targetEvents?.control_hazard?.has_flush);
+      const flushedStages = targetEvents?.control_hazard?.flushed_stages || ["IF", "ID"];
 
       STAGES_CONFIG.forEach(({ key, name }) => {
-        const buf = stageBuffers[key];
-        if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
+        const buf = targetBuffers[key as keyof typeof targetBuffers];
+        if (buf && buf.assembly && !isBubbleOrNop(buf.assembly, buf.status)) {
           const isStalled =
             buf.status === "stalled" ||
             buf.status === "stall" ||
-            (hasGlobalStall && (stallStage ? stallStage === name : name === "ID"));
+            (hasGlobalStall && (stallStage ? (stallStage === name || (stallStage === "ID" && name === "IF")) : (name === "ID" || name === "IF")));
 
           const isBubble =
             buf.status === "flushed" ||
@@ -138,7 +99,7 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
     }
 
     return map;
-  }, [traceRows, playbackCycle, rows, mode, stageBuffers, cycleEvents]);
+  }, [playbackCycle, simulationData, stageBuffers, cycleEvents, rows, mode]);
 
   const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
     const container = containerRef.current;
@@ -228,7 +189,7 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
   return (
     <div
       ref={containerRef}
-      className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto text-[13px] leading-snug [scrollbar-gutter:stable] bg-white dark:bg-[#1E1E1E] text-[#24292F] dark:text-[#CCCCCC] select-text py-1"
+      className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto text-[13px] leading-snug [scrollbar-gutter:stable] bg-white text-[#24292F] select-text py-1"
       style={{ fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace" }}
       role="region"
       aria-label="어셈블리 명령어 목록"
@@ -275,7 +236,7 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
         const isExecutingAndSelected = isCurrentSingleActive && isSelectedPrimary;
         const isCrt = row.sourceLine === null;
 
-        let rowColorClass = "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]";
+        let rowColorClass = "border-transparent hover:bg-slate-100/70 text-[#24292F]";
 
         const hasEffectiveExecution = activeStages.some((s) => !s.isBubble);
         const isPipelineExecuting = mode === "pipeline" && hasEffectiveExecution;
@@ -284,16 +245,16 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
 
         if (isSelectedPrimary) {
           rowColorClass = mode === "pipeline"
-            ? "bg-purple-100/90 dark:bg-[#2E1065] border-purple-600 dark:border-[#8B5CF6] text-purple-950 dark:text-[#E9D5FF] font-bold shadow-2xs"
-            : "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs";
+            ? "bg-purple-100/90 border-purple-600 text-purple-950 font-bold shadow-2xs"
+            : "bg-blue-100/90 border-blue-600 text-blue-950 font-bold shadow-2xs";
         } else if (isSelectedSibling) {
           rowColorClass = mode === "pipeline"
-            ? "bg-purple-50/50 dark:bg-[#2E1065]/40 border-purple-300/60 dark:border-[#8B5CF6]/50 text-purple-900/80 dark:text-[#E9D5FF]/80 font-normal"
-            : "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal";
+            ? "bg-purple-50/50 border-purple-300/60 text-purple-900/80 font-normal"
+            : "bg-blue-50/50 border-blue-300/60 text-blue-900/80 font-normal";
         } else if (isLineExecuting) {
-          rowColorClass = "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs";
+          rowColorClass = "bg-emerald-100/90 border-emerald-500 text-emerald-950 font-bold shadow-2xs";
         } else if (isPipelineBubble || isSingleExecutionSibling) {
-          rowColorClass = "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal";
+          rowColorClass = "bg-emerald-50/50 border-emerald-300/60 text-emerald-900/80 font-normal";
         }
 
         return (
@@ -325,13 +286,13 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
             <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
               {isExecutingAndSelected ? (
                 <div className="flex items-center gap-0.5">
-                  <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
-                  <span className="text-[#005FB8] dark:text-[#007ACC] text-[9px] leading-none">●</span>
+                  <span className="text-emerald-600 text-xs font-bold leading-none animate-pulse">▶</span>
+                  <span className="text-[#005FB8] text-[9px] leading-none">●</span>
                 </div>
               ) : isLineExecuting ? (
-                <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
+                <span className="text-emerald-600 text-xs font-bold leading-none animate-pulse">▶</span>
               ) : isSelectedPrimary ? (
-                <span className={`${mode === "pipeline" ? "text-purple-600 dark:text-[#A78BFA]" : "text-[#005FB8] dark:text-[#007ACC]"} text-[10px] leading-none`}>●</span>
+                <span className={`${mode === "pipeline" ? "text-purple-600" : "text-[#005FB8]"} text-[10px] leading-none`}>●</span>
               ) : null}
             </div>
 
@@ -340,9 +301,9 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
                 <div
                   className={`absolute inset-0 pointer-events-none ${isSelectedPrimary || isSelectedSibling
                     ? mode === "pipeline"
-                      ? "text-purple-600 dark:text-[#A78BFA]"
-                      : "text-[#005FB8] dark:text-[#007ACC]"
-                    : "text-slate-300 dark:text-[#3E4245] group-hover:text-slate-400 dark:group-hover:text-[#585C60]"
+                      ? "text-purple-600"
+                      : "text-[#005FB8]"
+                    : "text-slate-300 group-hover:text-slate-400"
                     }`}
                 >
                   {bracketType === "start" && (
@@ -370,17 +331,17 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
             <div
               className={`w-8 shrink-0 text-right pr-3 select-none text-[13px] flex items-center justify-end ${isSelectedPrimary
                 ? mode === "pipeline"
-                  ? "text-purple-700 dark:text-[#C4B5FD] font-bold"
-                  : "text-[#005FB8] dark:text-[#79C0FF] font-bold"
+                  ? "text-purple-700 font-bold"
+                  : "text-[#005FB8] font-bold"
                 : isSelectedSibling
                   ? mode === "pipeline"
-                    ? "text-purple-500 dark:text-[#C4B5FD]/70 font-medium"
-                    : "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
+                    ? "text-purple-500 font-medium"
+                    : "text-blue-500 font-medium"
                   : isLineExecuting
-                    ? "text-emerald-700 dark:text-[#7EE787] font-bold"
+                    ? "text-emerald-700 font-bold"
                     : isPipelineBubble || isSingleExecutionSibling
-                      ? "text-emerald-600 dark:text-[#7EE787]/70"
-                      : "text-[#8C959F] dark:text-[#858585]"
+                      ? "text-emerald-600"
+                      : "text-[#8C959F]"
                 }`}
             >
               {index + 1}
@@ -391,21 +352,21 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
                 className={
                   isSelectedPrimary
                     ? mode === "pipeline"
-                      ? "text-purple-900 dark:text-[#E9D5FF] font-bold"
-                      : "text-blue-800 dark:text-[#79C0FF] font-bold"
+                      ? "text-purple-900 font-bold"
+                      : "text-blue-800 font-bold"
                     : isSelectedSibling
                       ? mode === "pipeline"
-                        ? "text-purple-700 dark:text-[#E9D5FF]/80 font-semibold"
-                        : "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
+                        ? "text-purple-700 font-semibold"
+                        : "text-blue-600 font-semibold"
                       : isLineExecuting
-                        ? "text-emerald-800 dark:text-[#7EE787] font-bold"
+                        ? "text-emerald-800 font-bold"
                         : isPipelineBubble || isSingleExecutionSibling
-                          ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
+                          ? "text-emerald-700 font-semibold"
                           : isCrt
-                            ? "text-[#6E7681] dark:text-[#858585] font-semibold"
+                            ? "text-[#6E7681] font-semibold"
                             : mode === "pipeline"
-                              ? "text-purple-700 dark:text-[#A78BFA] font-semibold"
-                              : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
+                              ? "text-purple-700 font-semibold"
+                              : "text-[#005FB8] font-semibold"
                 }
               >
                 {opcode}
@@ -416,16 +377,16 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
               <span
                 className={
                   isSelectedPrimary
-                    ? "text-slate-950 dark:text-white font-bold"
+                    ? "text-slate-950 font-bold"
                     : isSelectedSibling
-                      ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
+                      ? "text-slate-800 font-normal"
                       : isLineExecuting
-                        ? "text-slate-950 dark:text-white font-bold"
+                        ? "text-slate-950 font-bold"
                         : isPipelineBubble || isSingleExecutionSibling
-                          ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
+                          ? "text-slate-800 font-normal"
                           : isCrt
-                            ? "text-[#6E7681]/90 dark:text-[#858585]"
-                            : "text-[#24292F] dark:text-[#CCCCCC]"
+                            ? "text-[#6E7681]/90"
+                            : "text-[#24292F]"
                 }
               >
                 {operands}
@@ -439,7 +400,7 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
                       <div key={stg} className="flex items-center gap-1">
                         {isStall && (
                           <span
-                            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-[#451A03] text-amber-600 dark:text-amber-300 border border-amber-400 dark:border-amber-500 text-[8.5px] font-black shadow-2xs animate-in zoom-in-95 duration-100"
+                            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 border border-amber-400 text-[8.5px] font-black shadow-2xs animate-in zoom-in-95 duration-100"
                             title="스톨(Stall): 데이터 대기(Hazard)로 인해 1클록 지연되어 이 스테이지에 정지 상태로 유지됨"
                           >
                             <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
@@ -451,7 +412,7 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
 
                         {isBubble && !isStall ? (
                           <span
-                            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-[#182C3D] text-sky-500 dark:text-sky-300 border border-sky-400 dark:border-sky-400 text-[8.5px] font-black shadow-2xs animate-in zoom-in-95 duration-100"
+                            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-500 border border-sky-400 text-[8.5px] font-black shadow-2xs animate-in zoom-in-95 duration-100"
                             title={`플러시(Bubble): 분기/점프로 인해 무효화되어 ${stg} 단계에서 버블(NOP)로 변환됨`}
                           >
                             <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
@@ -487,16 +448,16 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
                   className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
                     ? mode === "pipeline"
                       ? "bg-purple-600 text-white font-bold shadow-2xs"
-                      : "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
+                      : "bg-[#005FB8] text-white font-bold shadow-2xs"
                     : isLineExecuting
                       ? "bg-emerald-600 text-white font-bold shadow-2xs"
                       : isSelectedSibling
                         ? mode === "pipeline"
-                          ? "bg-purple-100 dark:bg-[#2E1065] text-purple-800 dark:text-[#E9D5FF] font-semibold"
-                          : "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                          ? "bg-purple-100 text-purple-800 font-semibold"
+                          : "bg-blue-100 text-blue-800 font-semibold"
                         : isPipelineBubble || isSingleExecutionSibling
-                          ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                          : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
+                          ? "bg-emerald-100 text-emerald-800 font-semibold"
+                          : "bg-[#F0F0F0] text-[#57606A] group-hover:text-[#24292F]"
                     }`}
                 >
                   C: L{row.sourceLine}
@@ -506,16 +467,16 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
                   className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
                     ? mode === "pipeline"
                       ? "bg-purple-600 text-white font-bold shadow-2xs"
-                      : "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
+                      : "bg-[#005FB8] text-white font-bold shadow-2xs"
                     : isLineExecuting
                       ? "bg-emerald-600 text-white font-bold shadow-2xs"
                       : isSelectedSibling
                         ? mode === "pipeline"
-                          ? "bg-purple-100 dark:bg-[#2E1065] text-purple-800 dark:text-[#E9D5FF] font-semibold"
-                          : "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
+                          ? "bg-purple-100 text-purple-800 font-semibold"
+                          : "bg-blue-100 text-blue-800 font-semibold"
                         : isPipelineBubble || isSingleExecutionSibling
-                          ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                          : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
+                          ? "bg-emerald-100 text-emerald-800 font-semibold"
+                          : "bg-[#F0F0F0] text-[#8C959F] group-hover:text-[#57606A]"
                     }`}
                   title="대응하는 C 소스 위치가 확인되지 않았습니다. CRT 여부는 줄 정보만으로 확정할 수 없습니다."
                 >
@@ -528,7 +489,7 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
       })}
 
       {rows.length === 0 && (
-        <p className="p-4 text-xs text-[#8C959F] dark:text-[#858585] font-sans">
+        <p className="p-4 text-xs text-[#8C959F] font-sans">
           줄 정보가 포함된 어셈블리 명령어를 추출하지 못했습니다.
         </p>
       )}

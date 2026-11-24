@@ -1,9 +1,38 @@
 import type { CycleHistoryItem } from "@/type/simulation";
 
+export const isBubbleOrNop = (assembly: string | null | undefined, status?: string): boolean => {
+  if (!assembly) return false;
+  const trimmed = assembly.trim().toLowerCase();
+  if (
+    trimmed === "—" ||
+    trimmed === "-" ||
+    trimmed === "bubble" ||
+    trimmed === "empty" ||
+    trimmed === "flush" ||
+    trimmed === "stall" ||
+    trimmed === "nop" ||
+    trimmed.startsWith("nop")
+  ) {
+    return true;
+  }
+  if (status === "bubble" || status === "empty" || status === "flush" || status === "flushed") {
+    return true;
+  }
+  return false;
+};
+
+export const normalizeStageInst = (assembly: string | null | undefined, status?: string): string => {
+  if (!assembly || assembly === "—") return "—";
+  if (isBubbleOrNop(assembly, status)) {
+    return "bubble";
+  }
+  return assembly.trim();
+};
+
 export const parseOp = (assembly: string | null | undefined): string => {
   if (!assembly) return "";
+  if (isBubbleOrNop(assembly)) return "";
   const trimmed = assembly.trim().toLowerCase();
-  if (trimmed === "bubble" || trimmed === "empty" || trimmed === "flush" || trimmed === "stall") return "";
   const match = trimmed.match(/^([a-z0-9_.]+)/);
   return match ? match[1] : "";
 };
@@ -63,6 +92,7 @@ export const writesReg = (op: string) =>
 
 export function computePipelineWireState(currentData: CycleHistoryItem | null, isSingle: boolean) {
   const buffers = currentData?.buffers;
+  const activity = currentData?.stage_activity;
   const cycle_events = currentData?.cycle_events;
   const clock = currentData?.clock;
   const isStall = Boolean(!isSingle && cycle_events?.stall?.has_stall);
@@ -70,14 +100,20 @@ export function computePipelineWireState(currentData: CycleHistoryItem | null, i
   const isBranchFlush = Boolean(!isSingle && cycle_events?.control_hazard?.has_flush);
 
   const singleCycleInst = isSingle
-    ? buffers?.IF?.assembly || currentData?.stage_activity?.IF?.assembly || currentData?.if_stage?.assembly || "—"
+    ? buffers?.IF?.assembly || activity?.IF?.assembly || currentData?.if_stage?.assembly || "—"
     : null;
 
-  const ifInst = isSingle ? singleCycleInst || "—" : buffers?.IF?.assembly || "—";
-  const idInst = isSingle ? singleCycleInst || "—" : buffers?.ID?.assembly || "—";
-  const exInst = isSingle ? singleCycleInst || "—" : buffers?.EX?.assembly || "—";
-  const memInst = isSingle ? singleCycleInst || "—" : buffers?.MEM?.assembly || "—";
-  const wbInst = isSingle ? singleCycleInst || "—" : buffers?.WB?.assembly || "—";
+  const ifRaw = isSingle ? singleCycleInst || "—" : activity?.IF?.assembly || buffers?.IF?.assembly || "—";
+  const idRaw = isSingle ? singleCycleInst || "—" : activity?.ID?.assembly || buffers?.ID?.assembly || "—";
+  const exRaw = isSingle ? singleCycleInst || "—" : activity?.EX?.assembly || buffers?.EX?.assembly || "—";
+  const memRaw = isSingle ? singleCycleInst || "—" : activity?.MEM?.assembly || buffers?.MEM?.assembly || "—";
+  const wbRaw = isSingle ? singleCycleInst || "—" : activity?.WB?.assembly || buffers?.WB?.assembly || "—";
+
+  const ifInst = normalizeStageInst(ifRaw, isSingle ? undefined : (activity?.IF?.status || buffers?.IF?.status));
+  const idInst = normalizeStageInst(idRaw, isSingle ? undefined : (activity?.ID?.status || buffers?.ID?.status));
+  const exInst = normalizeStageInst(exRaw, isSingle ? undefined : (activity?.EX?.status || buffers?.EX?.status));
+  const memInst = normalizeStageInst(memRaw, isSingle ? undefined : (activity?.MEM?.status || buffers?.MEM?.status));
+  const wbInst = normalizeStageInst(wbRaw, isSingle ? undefined : (activity?.WB?.status || buffers?.WB?.status));
 
   const isIfActive = ifInst !== "—" && ifInst !== "bubble" && ifInst !== "empty";
   const isIdActive = idInst !== "—" && idInst !== "bubble" && idInst !== "empty";
@@ -99,9 +135,13 @@ export function computePipelineWireState(currentData: CycleHistoryItem | null, i
   const ifPcMuxToPcActive = isIfActive;
   const ifPcToImemActive = isIfActive;
   const ifPcToPlus4Active = isIfActive;
-  const ifPcToIfIdActive = isIfActive && usesPc(ifOp);
+  const ifPcToIfIdActive = isIfActive;
   const ifPlus4LoopbackActive = isIfActive && !isBranchFlush;
-  const branchLoopbackActive = isBranchFlush || Boolean(cycle_events?.control_hazard?.taken);
+  const branchLoopbackActive = Boolean(
+    isBranchFlush ||
+    cycle_events?.control_hazard?.taken ||
+    (isExActive && (exOp === "jal" || exOp === "jalr"))
+  );
   const ifImemToIfIdActive = isIfActive;
 
   // [ID 단계 와이어 활성 조건]
@@ -112,7 +152,7 @@ export function computePipelineWireState(currentData: CycleHistoryItem | null, i
   const idRd1ToIdExActive = isIdActive && usesRs1(idOp);
   const idRd2ToIdExActive = isIdActive && usesRs2(idOp);
   const idImmToIdExActive = isIdActive && usesImm(idOp);
-  const idPcToIdExActive = isIdActive && usesPc(idOp);
+  const idPcToIdExActive = isIdActive;
 
   // [EX 단계 와이어 활성 조건]
   const exRd1ToAluActive = isExActive && usesRs1(exOp);
@@ -121,29 +161,35 @@ export function computePipelineWireState(currentData: CycleHistoryItem | null, i
   const exRd2ToWriteDataActive = isExActive && isStore(exOp);
   const exImmTrunkActive = isExActive && usesImm(exOp);
   const exImmToAluSrcActive =
-    isExActive && (isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
+    isExActive && (isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || isAuipc(exOp) || exOp === "jalr");
   const exAluSrcToAluActive =
     isExActive &&
-    (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isBranch(exOp) || isLui(exOp) || exOp === "jalr");
-  const exBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exImmToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
-  const exPcToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp) || isAuipc(exOp));
+    (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isBranch(exOp) || isLui(exOp) || isAuipc(exOp) || exOp === "jalr");
+  const exBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp));
+  const exImmToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp));
+  const exPcToBranchAddActive = isExActive && (isBranch(exOp) || isJump(exOp));
   const exAluToExMemActive =
-    isExActive && (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || exOp === "jalr");
+    isExActive &&
+    (isRType(exOp) || isITypeAlu(exOp) || isLoad(exOp) || isStore(exOp) || isLui(exOp) || isAuipc(exOp) || isJump(exOp) || isBranch(exOp));
+
+  // [EX 단계 제어선 전달 조건 (M 및 WB 신호 하강)]
+  const exMToExMemActive = isExActive && (isLoad(exOp) || isStore(exOp) || isBranch(exOp));
+  const exWbToExMemActive = isExActive && writesReg(exOp);
 
   // [MEM 단계 와이어 활성 조건]
   const memAluTrunkActive =
     isMemActive &&
-    (isLoad(memOp) || isStore(memOp) || isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
+    (isLoad(memOp) || isStore(memOp) || isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || isJump(memOp));
   const memAluToDmemAddrActive = isMemActive && (isLoad(memOp) || isStore(memOp));
   const memAluBypassActive =
-    isMemActive && (isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || memOp === "jalr");
+    isMemActive && (isRType(memOp) || isITypeAlu(memOp) || isLui(memOp) || isAuipc(memOp) || isJump(memOp));
   const memWriteDataActive = isMemActive && isStore(memOp);
   const memDmemReadDataActive = isMemActive && isLoad(memOp);
+  const memWbToMemWbActive = isMemActive && writesReg(memOp);
 
   // [WB 단계 와이어 활성 조건]
   const wbAluBypassActive =
-    isWbActive && (isRType(wbOp) || isITypeAlu(wbOp) || isLui(wbOp) || isAuipc(wbOp) || wbOp === "jalr");
+    isWbActive && (isRType(wbOp) || isITypeAlu(wbOp) || isLui(wbOp) || isAuipc(wbOp) || isJump(wbOp));
   const wbDmemReadDataActive = isWbActive && isLoad(wbOp);
   const wbReverseFeedbackActive = isWbActive && writesReg(wbOp);
 
@@ -198,11 +244,14 @@ export function computePipelineWireState(currentData: CycleHistoryItem | null, i
     exImmToBranchAddActive,
     exPcToBranchAddActive,
     exAluToExMemActive,
+    exMToExMemActive,
+    exWbToExMemActive,
     memAluTrunkActive,
     memAluToDmemAddrActive,
     memAluBypassActive,
     memWriteDataActive,
     memDmemReadDataActive,
+    memWbToMemWbActive,
     wbAluBypassActive,
     wbDmemReadDataActive,
     wbReverseFeedbackActive,
