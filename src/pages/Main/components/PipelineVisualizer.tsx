@@ -51,20 +51,20 @@ const PLUS4_LOOPBACK_PTS = parseSvgPathPoints("M 801,128 L 801,168 L 870,168 L 8
 const MUX_TO_PC_PTS = parseSvgPathPoints("M 380,52 L 380,78");
 
 // ID 단계 경로
-const ID_IFID_TO_REGS_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 280,336 L 280,366");
+const ID_IFID_TO_REGS_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 295,336 L 295,366");
 const ID_IFID_TO_IMM_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 578,336 L 578,366");
 const ID_IFID_TO_CU_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 801,336 L 801,366");
-const ID_RD1_TO_IDEX_PTS = parseSvgPathPoints("M 240,480 L 240,538");
-const ID_RD2_TO_IDEX_PTS = parseSvgPathPoints("M 350,480 L 350,538");
+const ID_RD1_TO_IDEX_PTS = parseSvgPathPoints("M 225,480 L 225,538");
+const ID_RD2_TO_IDEX_PTS = parseSvgPathPoints("M 365,480 L 365,538");
 const ID_IMM_TO_IDEX_PTS = parseSvgPathPoints("M 578,482 L 578,538");
 const ID_PC_TO_IDEX_PTS = parseSvgPathPoints("M 701,311 L 701,538");
 
 // EX 단계 경로
-const EX_RD1_TO_ALU_PTS = parseSvgPathPoints("M 240,566 L 240,739");
-const EX_RD2_TO_MUX_PTS = parseSvgPathPoints("M 350,566 L 350,663");
-const EX_RD2_TO_EXMEM_PTS = parseSvgPathPoints("M 350,566 L 350,595 L 480,595 L 480,908");
-const EX_IMM_TO_MUX_PTS = parseSvgPathPoints("M 578,566 L 578,630 L 410,630 L 410,663");
-const EX_MUX_TO_ALU_PTS = parseSvgPathPoints("M 380,703 L 380,739");
+const EX_RD1_TO_ALU_PTS = parseSvgPathPoints("M 225,566 L 225,739");
+const EX_RD2_TO_MUX_PTS = parseSvgPathPoints("M 365,566 L 365,663");
+const EX_RD2_TO_EXMEM_PTS = parseSvgPathPoints("M 365,566 L 365,595 L 480,595 L 480,908");
+const EX_IMM_TO_MUX_PTS = parseSvgPathPoints("M 578,566 L 578,630 L 425,630 L 425,663");
+const EX_MUX_TO_ALU_PTS = parseSvgPathPoints("M 395,703 L 395,739");
 const EX_ALU_TO_EXMEM_PTS = parseSvgPathPoints("M 310,869 L 310,908");
 const EX_IMM_TO_BRANCH_PTS = parseSvgPathPoints("M 578,566 L 578,743");
 const EX_PC_TO_BRANCH_PTS = parseSvgPathPoints("M 701,566 L 701,720 L 652,720 L 652,743");
@@ -79,11 +79,11 @@ const MEM_DMEM_TO_MEMWB_PTS = parseSvgPathPoints("M 470,1106 L 470,1154");
 // WB 단계 경로
 const WB_ALU_TO_MUX_PTS = parseSvgPathPoints("M 225,1182 L 225,1218 L 410,1218 L 410,1256");
 const WB_DMEM_TO_MUX_PTS = parseSvgPathPoints("M 470,1182 L 470,1256");
-const WB_FEEDBACK_PTS = parseSvgPathPoints("M 440,1296 L 440,1315 L 85,1315 L 85,424 L 165,424");
+const WB_FEEDBACK_PTS = parseSvgPathPoints("M 440,1296 L 440,1315 L 85,1315 L 85,424 L 180,424");
 
 // 제어 신호(Control Signal) 경로
 const ID_CU_TO_IDEX_PTS = parseSvgPathPoints("M 801,482 L 801,538");
-const EX_CTRL_TO_MUX_PTS = parseSvgPathPoints("M 755,566 L 755,684 L 430,684");
+const EX_CTRL_TO_MUX_PTS = parseSvgPathPoints("M 755,566 L 755,684 L 445,684");
 const EX_M_TO_EXMEM_PTS = parseSvgPathPoints("M 801,566 L 801,908");
 const EX_WB_TO_EXMEM_PTS = parseSvgPathPoints("M 847,566 L 847,908");
 const MEM_CTRL_TO_DMEM_PTS = parseSvgPathPoints("M 801,936 L 801,1051 L 550,1051");
@@ -551,9 +551,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 }) => {
   // [모든 훅은 React Rules of Hooks에 따라 조건문이나 조기 반환보다 먼저 최상단에서 무조건 실행]
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
-  const [animProgress, setAnimProgress] = useState<number>(0.5);
+  const [animProgress, setAnimProgress] = useState<number>(0);
   const [isSubstepLooping, setIsSubstepLooping] = useState<boolean>(true);
   const flowDuration = lessonContext?.flowDurationMs ?? 3000;
+  const progressRef = React.useRef<number>(0);
+  const prevDataRef = React.useRef(currentData);
 
   // 뷰포트 교차 감지: 회로도가 화면 밖(다른 탭/뷰포트)으로 슬라이드되면 RAF 애니메이션을 일시 정지하여 CPU 낭비 방지
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -573,13 +575,31 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
     return () => observer.disconnect();
   }, []);
 
+  // 사이클 데이터(currentData)가 변경되면 진행률을 0으로 리셋
+  useEffect(() => {
+    if (prevDataRef.current !== currentData) {
+      prevDataRef.current = currentData;
+      progressRef.current = 0;
+      setAnimProgress(0);
+    }
+  }, [currentData]);
+
+  // 처음으로 돌아가기 (정지 및 0으로 리셋)
+  const handleResetToStart = () => {
+    setIsSubstepLooping(false);
+    progressRef.current = 0;
+    setAnimProgress(0);
+  };
+
   useEffect(() => {
     if (!isSubstepLooping || !isIntersecting) {
       return;
     }
 
     let frameId: number;
-    const start = performance.now();
+    // 일시 정지 후 다시 재생할 때 이전에 멈췄던 위치(progressRef.current)부터 자연스럽게 이어지도록 시작 시점 오프셋 적용
+    const currentProg = Math.max(0, Math.min(1, progressRef.current));
+    const start = performance.now() - currentProg * flowDuration;
     let lastTick = 0;
     const minFrameInterval = 16; // 60 FPS 상한 제한 (120Hz/240Hz ProMotion 디스플레이의 무리한 고주파수 재연산 차단)
 
@@ -590,7 +610,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       lastTick = now;
 
       const elapsed = (now - start) % flowDuration;
-      setAnimProgress(elapsed / flowDuration);
+      const prog = elapsed / flowDuration;
+      progressRef.current = prog;
+      setAnimProgress(prog);
     };
 
     frameId = requestAnimationFrame(loop);
@@ -1226,6 +1248,32 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </title>
             </g>
 
+            {/* 처음으로 돌아가기 (정지 및 리셋) 원형 버튼 (네모 아이콘) */}
+            <g
+              className="select-none cursor-pointer transition-opacity hover:opacity-80"
+              onClick={handleResetToStart}
+            >
+              <circle
+                cx="146"
+                cy="-30"
+                r="18"
+                fill="#F1F5F9"
+                stroke="#94A3B8"
+                strokeWidth="1.5"
+                className="transition-colors duration-150"
+              />
+              <rect
+                x="140"
+                y="-36"
+                width="12"
+                height="12"
+                rx="2.5"
+                fill="#64748B"
+                className="pointer-events-none transition-colors duration-150"
+              />
+              <title>처음으로 돌아가기 (정지 및 리셋)</title>
+            </g>
+
             {/* 1. IF: Instruction Fetch (Row center: 142.5 -> card y=104, h=76) */}
             <g>
               <rect
@@ -1477,9 +1525,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
             </g>
 
             {/* ============================================================ */}
-            {/* [2열: 우측 열] 순수 데이터패스 본체 (좌측 80px 당김: translate(150, 0)) */}
+            {/* [2열: 우측 열] 순수 데이터패스 본체 (좌측 60px 당김: translate(170, 0)) */}
             {/* ============================================================ */}
-            <g key={clock ?? 0} transform="translate(150, 0)">
+            <g key={clock ?? 0} transform="translate(170, 0)">
               {/* ============================================================ */}
               {/* 부품 0: PC MUX (분기 선택기: 0=PC+4, 1=Branch Target - EX/WB와 규격 통일: 100x38, center 380) */}
               {/* ============================================================ */}
@@ -1728,7 +1776,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               />
               {/* IF/ID BUFFER ➔ Register File 분기 버스 */}
               <path
-                d="M 380,336 L 280,336 L 280,366"
+                d="M 380,336 L 295,336 L 295,366"
                 fill="none"
                 stroke={idToRegsActive ? "#EA580C" : inactiveStroke}
                 {...syncWireProps(idToRegsActive, idStep1State)}
@@ -1753,9 +1801,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
               />
 
-              {/* 부품 3: Registers (x=165, width=230, y=368..480, center=280) */}
+              {/* 부품 3: Registers (x=180, width=230, y=368..480, center=295) */}
               <rect
-                x="165"
+                x="180"
                 y="368"
                 width="230"
                 height="112"
@@ -1765,8 +1813,25 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 stroke={idToRegsActive ? "#EA580C" : "#94A3B8"}
                 strokeWidth="2.8"
               />
+
+              {/* 좌측 중앙: 값이 들어가는 레지스터명 (WB rd) */}
+              {writesReg(wbOp) && wbParsed.rd && (
+                <text
+                  x="200"
+                  y="424"
+                  dominantBaseline="central"
+                  fill="#8B5CF6"
+                  fontSize="13"
+                  fontWeight="bold"
+                  fontFamily="'D2Coding', Consolas, monospace"
+                  textAnchor="middle"
+                >
+                  {wbParsed.rd}
+                </text>
+              )}
+
               <text
-                x="280"
+                x="295"
                 y="424"
                 dominantBaseline="central"
                 fill={idToRegsActive ? "#C2410C" : "#94A3B8"}
@@ -1777,6 +1842,36 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               >
                 Registers
               </text>
+
+              {/* 하단: 값이 나오는 레지스터명 (ID rs1, rs2) */}
+              {idParsed.rs1 && (
+                <text
+                  x="225"
+                  y="462"
+                  dominantBaseline="central"
+                  fill="#EA580C"
+                  fontSize="13"
+                  fontWeight="bold"
+                  fontFamily="'D2Coding', Consolas, monospace"
+                  textAnchor="middle"
+                >
+                  {idParsed.rs1}
+                </text>
+              )}
+              {idParsed.rs2 && (
+                <text
+                  x="365"
+                  y="462"
+                  dominantBaseline="central"
+                  fill="#EA580C"
+                  fontSize="13"
+                  fontWeight="bold"
+                  fontFamily="'D2Coding', Consolas, monospace"
+                  textAnchor="middle"
+                >
+                  {idParsed.rs2}
+                </text>
+              )}
 
               {/* 부품 4: Imm Gen (세로형 타원 rx=44, ry=58, cx=578, cy=424) */}
               <ellipse
@@ -1853,9 +1948,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               {/* ID 단계 출력 버스 ➔ ID/EX BUFFER (Y = 480 ➔ 538) */}
               {/* 1) Read Data 1 */}
               <line
-                x1="240"
+                x1="225"
                 y1="480"
-                x2="240"
+                x2="225"
                 y2="538"
                 stroke={idRd1ToIdExActive ? "#EA580C" : inactiveStroke}
                 {...syncWireProps(idRd1ToIdExActive, idStep2State)}
@@ -1863,9 +1958,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               />
               {/* 2) Read Data 2 */}
               <line
-                x1="350"
+                x1="365"
                 y1="480"
-                x2="350"
+                x2="365"
                 y2="538"
                 stroke={idRd2ToIdExActive ? "#EA580C" : inactiveStroke}
                 {...syncWireProps(idRd2ToIdExActive, idStep2State)}
@@ -2075,7 +2170,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
               {/* EX 제어선: ID/EX EX셀 ➔ ALUSrc MUX 우측면 인입 */}
               <path
-                d="M 755,566 L 755,684 L 430,684"
+                d="M 755,566 L 755,684 L 445,684"
                 fill="none"
                 stroke={exAluSrcToAluActive ? "#16A34A" : inactiveStroke}
                 strokeDasharray="6 3"
@@ -2111,31 +2206,31 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               {/* ============================================================ */}
               {/* [STAGE 3] EXECUTE / ALU (EX) : Y = 566 ~ 910                  */}
               {/* ============================================================ */}
-              {/* 1) Read Data 1 (X = 240) ➔ ALU 좌측 입력 포트(X = 240, Y = 739)로 직하강 */}
+              {/* 1) Read Data 1 (X = 225) ➔ ALU 좌측 입력 포트(X = 225, Y = 739)로 직하강 */}
               <line
-                x1="240"
+                x1="225"
                 y1="566"
-                x2="240"
+                x2="225"
                 y2="739"
                 stroke={exRd1ToAluActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exRd1ToAluActive, exRd1State)}
                 markerEnd={exRd1ToAluActive ? "url(#m-arr-green)" : inactiveMarker}
               />
 
-              {/* 2) Read Data 2 Trunk (X = 350, Y = 566 -> 595) */}
+              {/* 2) Read Data 2 Trunk (X = 365, Y = 566 -> 595) */}
               <line
-                x1="350"
+                x1="365"
                 y1="566"
-                x2="350"
+                x2="365"
                 y2="595"
                 stroke={exRd2TrunkActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exRd2TrunkActive, exStep1State)}
               />
-              {/* Read Data 2 ➔ ALUSrc MUX 좌측 입력(X = 350, Y = 595 -> 663) */}
+              {/* Read Data 2 ➔ ALUSrc MUX 좌측 입력(X = 365, Y = 595 -> 663) */}
               <line
-                x1="350"
+                x1="365"
                 y1="595"
-                x2="350"
+                x2="365"
                 y2="663"
                 stroke={exRd2ToAluSrcActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exRd2ToAluSrcActive, exStep1State)}
@@ -2143,14 +2238,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               />
               {/* Read Data 2 분기 ➔ EX/MEM 버퍼 (Data Memory Write Data용, x=480 직하강) */}
               <path
-                d="M 350,595 L 480,595 L 480,908"
+                d="M 365,595 L 480,595 L 480,908"
                 fill="none"
                 stroke={exRd2ToWriteDataActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exRd2ToWriteDataActive, exRd2MemState)}
                 markerEnd={exRd2ToWriteDataActive ? "url(#m-arr-green)" : inactiveMarker}
               />
               <circle
-                cx="350"
+                cx="365"
                 cy="595"
                 r={exRd2ToWriteDataActive && exRd2MemState && exRd2MemState.progress < 1.0 ? 5.5 : 3.5}
                 fill={exRd2ToWriteDataActive ? "#16A34A" : inactiveStroke}
@@ -2169,9 +2264,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 stroke={exImmTrunkActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exImmTrunkActive, exStep1State)}
               />
-              {/* Imm ➔ ALUSrc MUX 우측 입력(X = 410, Y = 663) 분기 */}
+              {/* Imm ➔ ALUSrc MUX 우측 입력(X = 425, Y = 663) 분기 */}
               <path
-                d="M 578,630 L 410,630 L 410,663"
+                d="M 578,630 L 425,630 L 425,663"
                 fill="none"
                 stroke={exImmToAluSrcActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exImmToAluSrcActive, exStep1State)}
@@ -2188,9 +2283,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 }}
               />
 
-              {/* ALUSrc MUX (알약형 / Stadium Capsule: x=330, y=665, w=100, h=38, rx=19, center 380) */}
+              {/* ALUSrc MUX (알약형 / Stadium Capsule: x=345, y=665, w=100, h=38, rx=19, center 395) */}
               <rect
-                x="330"
+                x="345"
                 y="665"
                 width="100"
                 height="38"
@@ -2202,7 +2297,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.8"
               />
               <text
-                x="380"
+                x="395"
                 y="684"
                 dominantBaseline="central"
                 fill={exAluSrcToAluActive ? "#15803D" : "#94A3B8"}
@@ -2214,11 +2309,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 MUX
               </text>
 
-              {/* ALUSrc MUX 출력 (X = 380, Y = 703) ➔ ALU 우측 입력 포트(X = 380, Y = 739) */}
+              {/* ALUSrc MUX 출력 (X = 395, Y = 703) ➔ ALU 우측 입력 포트(X = 395, Y = 739) */}
               <line
-                x1="380"
+                x1="395"
                 y1="703"
-                x2="380"
+                x2="395"
                 y2="739"
                 stroke={exAluSrcToAluActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exAluSrcToAluActive, exStep2State)}
@@ -2652,7 +2747,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               {/* ★ 역방향 피드백 버스 (WB MUX ➔ ID RegFile Write Data In)     */}
               {/* ============================================================ */}
               <path
-                d="M 440,1296 L 440,1315 L 85,1315 L 85,424 L 165,424"
+                d="M 440,1296 L 440,1315 L 85,1315 L 85,424 L 180,424"
                 fill="none"
                 stroke={wbReverseFeedbackActive ? "#8B5CF6" : inactiveStroke}
                 {...syncWireProps(wbReverseFeedbackActive, wbStep2State)}
