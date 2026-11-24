@@ -157,27 +157,27 @@ export function useSimulationPlayback({
     };
   }, [simulationData, historyList.length]);
 
-  const activeCycleIndex = Math.min(currentCycle, Math.max(0, historyList.length - 1));
+  const activeCycleIndex = Math.max(0, currentCycle - 1);
 
   const currentData: CycleHistoryItem | null =
     historyList.length === 0
       ? null
-      : isStandby
+      : (isStandby || currentCycle === 0)
         ? initialResetData
         : (historyList[activeCycleIndex] ?? null);
 
   const prevData: CycleHistoryItem | null =
-    currentCycle === 0
+    (isStandby || currentCycle <= 1)
       ? initialResetData
-      : (historyList[Math.min(currentCycle - 1, historyList.length - 1)] ?? null);
+      : (historyList[Math.min(Math.max(0, currentCycle - 2), historyList.length - 1)] ?? null);
 
   // Single 모드 또는 Pipeline 모드에서 현재 활성 실행 중인 어셈블리 행 계산
   const currentActiveRow = (() => {
-    if (isStandby || !currentData || !mappedAssemblyRows.length) return null;
+    if (isStandby || currentCycle === 0 || !currentData || !mappedAssemblyRows.length) return null;
 
     if (isSingleEngine) {
-      // Step 0일 때 historyList[0], Step 1일 때 historyList[1], ...
-      const stepIdx = Math.min(currentCycle, historyList.length - 1);
+      // Step 0일 때 Standby(대기), Step 1일 때 historyList[0], ...
+      const stepIdx = Math.min(Math.max(0, currentCycle - 1), historyList.length - 1);
       const stepData = historyList[stepIdx];
       if (!stepData) return null;
 
@@ -380,7 +380,7 @@ export function useSimulationPlayback({
     setFinishedSingleFrame(null);
 
     if (currentPos >= maxPos && (!isSingleEngine || (!isPlaying && singleClock.current?.remaining === 0))) {
-      setCurrentCycle(0);
+      setCurrentCycle(1);
       setIsStandby(false);
       setIsPlaying(true);
       setPlaybackRevision((v) => v + 1);
@@ -390,6 +390,9 @@ export function useSimulationPlayback({
       setIsPlaying(nextState);
       if (nextState) {
         setIsStandby(false);
+        if (currentPos === 0) {
+          setCurrentCycle(1);
+        }
         setPlaybackRevision((v) => v + 1);
       }
       triggerPlaybackFeedback(nextState ? "play" : "pause");
@@ -409,7 +412,7 @@ export function useSimulationPlayback({
   const handleResetAndPlay = () => {
     setFinishedSingleFrame(null);
     onClearSelection();
-    setCurrentCycle(0);
+    setCurrentCycle(1);
     setIsStandby(false);
     setIsPlaying(true);
     setPlaybackRevision((v) => v + 1);
@@ -427,7 +430,11 @@ export function useSimulationPlayback({
       return false;
     });
     onClearSelection();
-    setIsStandby(false);
+    if (val === 0) {
+      setIsStandby(true);
+    } else {
+      setIsStandby(false);
+    }
     setCurrentCycle(val);
   };
 

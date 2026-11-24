@@ -79,8 +79,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       activeHeader: 'bg-purple-600 text-white',
     };
 
-  // Single-Cycle 및 Pipeline 모드 공통: Cycle k는 Ck+1(열 인덱스 k)를 활성 실행 중인 열로 하이라이트 (초기 대기 상태일 때는 하이라이트 해제)
-  const activeCycleCol = (isStandby || history.length === 0) ? -1 : Math.min(currentCycle, history.length - 1);
+  // Single-Cycle 및 Pipeline 모드 공통: Cycle k는 Ck(열 인덱스 k - 1)를 활성 실행 중인 열로 하이라이트 (초기 대기 상태일 때는 하이라이트 해제)
+  const activeCycleCol = (isStandby || currentCycle === 0 || history.length === 0) ? -1 : Math.min(currentCycle - 1, history.length - 1);
 
   const {
     leftScrollRef,
@@ -433,7 +433,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                     <button
                       key={cIdx}
                       type="button"
-                      onClick={() => onJumpToCycle?.(cIdx)}
+                      onClick={() => onJumpToCycle?.(cIdx + 1)}
                       className={`shrink-0 flex flex-col items-center justify-center font-mono text-[10px] font-bold border-r border-[#E5E5E5] dark:border-[#333333] cursor-pointer transition-colors relative ${isCurrent
                           ? `${highlightTint.activeHeader} shadow-inner font-extrabold`
                           : hasStall

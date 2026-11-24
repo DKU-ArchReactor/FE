@@ -287,10 +287,22 @@ export default function TranslationMapping({
 
     let executingLine: number | null = null;
     if (isSimulated) {
-      if (mode === "single" && currentActiveStep !== null && currentActiveStep !== undefined && currentActiveStep >= 0) {
+      if (currentActiveStep !== null && currentActiveStep !== undefined && currentActiveStep >= 0) {
         executingLine = currentActiveStep + 1;
       } else if (mode === "pipeline" && stageBuffers) {
-        const activeStage = stageBuffers.EX || stageBuffers.ID || stageBuffers.WB;
+        const stages = ["IF", "ID", "EX", "MEM", "WB"] as const;
+        let activeStage: { assembly?: string; status?: string; flush_info?: { is_flushed?: boolean } } | null = null;
+        for (const st of stages) {
+          const candidate = (stageBuffers as any)[st];
+          if (!candidate) continue;
+          const status = (candidate.status || "").toLowerCase();
+          if (status === "empty" || status === "bubble" || status === "flush" || status === "flushed") continue;
+          if (candidate.flush_info?.is_flushed) continue;
+          const asm = (candidate.assembly || "").trim().toLowerCase();
+          if (!asm || asm === "bubble" || asm === "empty" || asm === "—") continue;
+          activeStage = candidate;
+          break;
+        }
         if (activeStage?.assembly) {
           const norm = activeStage.assembly.trim().toLowerCase();
           const foundIdx = rows.findIndex((r) => r.text.trim().toLowerCase() === norm);

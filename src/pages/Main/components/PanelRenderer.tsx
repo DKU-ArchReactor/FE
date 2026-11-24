@@ -95,7 +95,6 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   playbackRevision,
   loadingMessage,
   simulationMode,
-  isSingleEngine,
   currentActiveRow,
   mappedAssemblyRows,
   activeExecutionCLine,
@@ -213,10 +212,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           playbackCycle={currentCycle}
           mode={simulationMode}
           currentActiveStep={
-            isSingleEngine
-              ? currentActiveRow
-                ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : null
+            currentActiveRow
+              ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
               : null
           }
           activeTarget={editorTarget}
@@ -246,10 +243,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           selectedTranslationLine={editorTarget === "asm" ? translationSelectedLine : effectiveSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           currentActiveAsmIndex={
-            isSingleEngine
-              ? currentActiveRow
-                ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : null
+            currentActiveRow
+              ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
               : null
           }
           isUserSelected={translationSelectedLine !== null || translationSelectedAsmIndex !== null}

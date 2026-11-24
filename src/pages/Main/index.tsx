@@ -344,9 +344,7 @@ const MainPage: React.FC = () => {
     />
   );
 
-  const maxCycle = simSession.isSingleEngine
-    ? playback.totalCycles
-    : Math.max(0, playback.totalCycles - 1);
+  const maxCycle = playback.totalCycles;
 
 const handleMobileCodeSelect = () => {
   setIsMobileCodeView(true);
