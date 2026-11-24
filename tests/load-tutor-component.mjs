@@ -14,6 +14,7 @@ export function loadTutor(file,{details=true}={}){
     const exports={};modules.set(filename,exports);
     const source=ts.transpileModule(readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
     const require=id=>{
+      if(id==='@/api/config')return {default:{post:()=>{throw new Error('Rendering tutor evidence must not issue API requests');}}};
       if(id.endsWith('TutorDetailPages'))return {default:({title,pages})=>createElement('section',null,title,details?JSON.stringify(typeof pages==='function'?pages():pages):null)};
       if(id.endsWith('.css'))return {};
       if(id.startsWith('.')){const base=path.resolve(path.dirname(filename),id);const target=['.ts','.tsx'].map(ext=>base+ext).find(existsSync);if(target)return load(target);}

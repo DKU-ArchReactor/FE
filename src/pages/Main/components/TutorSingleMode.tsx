@@ -8,6 +8,8 @@ import {
 } from '../utils/tutorAnalysis';
 import { tutorInstructionDetails } from '../utils/tutorInstructionDetails';
 import { TutorText } from './TutorEvidence';
+import TutorDetailPages from './TutorDetailPages';
+import { tutorDecimalText } from '../utils/tutorReadable';
 import './TutorSingleMode.css';
 
 export interface TutorSingleModeProps {
@@ -113,8 +115,14 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   // ASM 명령어 분석
   const item = currentRow ? instructionAt(simulation.tutor, currentRow.pc) : undefined;
   const instruction = currentRow ? analyzeAsmInstruction(currentRow.text, item?.explanation) : null;
-  const details = item ? tutorInstructionDetails(item, simulation.tutor, historyIndex) : null;
-  const observations = details ? [...details.observations].sort((a, b) => a[1].history_index - b[1].history_index) : [];
+  const details = useMemo(
+    () => item ? tutorInstructionDetails(item, simulation.tutor, historyIndex) : null,
+    [item, simulation.tutor, historyIndex]
+  );
+  const observations = useMemo(
+    () => details ? [...details.observations].sort((a, b) => a[1].history_index - b[1].history_index) : [],
+    [details]
+  );
   const latest = observations.at(-1);
 
   // ASM 활성화 탭 계산 (데이터가 유효한 탭만 동적으로 노출)
@@ -306,7 +314,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                     /* ---------------- C [코드 설명] 탭 ---------------- */
                     <>
                       <div className="tutor-single-code-box">
-                        <code>{cText.trim() || (line != null ? '// 빈 라인 또는 주석' : 'C 위치 정보 없음')}</code>
+                        <code>{tutorDecimalText(cText.trim()) || (line != null ? '// 빈 라인 또는 주석' : 'C 위치 정보 없음')}</code>
                       </div>
 
                       <div className="tutor-single-meaning">
@@ -328,7 +336,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                           <strong className="block font-semibold text-[var(--ar-text-primary)] mb-1">
                             컴파일된 어셈블리 동작 요약
                           </strong>
-                          <p>{lineExplanation.summary}</p>
+                          <p><TutorText text={lineExplanation.summary} /></p>
                         </div>
                       )}
                     </>
@@ -532,7 +540,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                         activeAsmTabId === 'desc' ? (
                           <>
                             <div className="tutor-single-code-box">
-                              <code>{row.text}</code>
+                              <code>{tutorDecimalText(row.text)}</code>
                             </div>
                             <div className="tutor-single-meaning">
                               <span className="tutor-single-meaning-arrow" aria-hidden="true">→</span>
@@ -571,7 +579,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                                   <span>Step {val.step} · {stage}</span>
                                   {val.cycle != null && (
                                     <span className="font-mono text-[11px] text-[var(--ar-text-muted)]">
-                                      CORE Clock {val.cycle}
+                                      실행 클록 {val.cycle}
                                     </span>
                                   )}
                                 </div>
@@ -606,7 +614,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                                     <span className="font-bold text-[var(--ar-accent)] mr-1.5">
                                       {step.title}:
                                     </span>
-                                    <span className="text-[var(--ar-text-primary)]">{step.text}</span>
+                                    <span className="text-[var(--ar-text-primary)]"><TutorText text={step.text} /></span>
                                   </div>
                                 ))}
                               </div>
@@ -614,7 +622,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                             {item?.teaching?.operand_roles && item.teaching.operand_roles.length > 0 && (
                               <div className="space-y-1.5">
                                 <strong className="block text-xs font-semibold text-[var(--ar-text-muted)]">
-                                  피연산자 역할
+                                  명령어에 적힌 각 항목의 역할
                                 </strong>
                                 <div className="grid grid-cols-2 gap-2">
                                   {item.teaching.operand_roles.map((role, rIdx) => (
@@ -623,20 +631,27 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                                       className="p-2 rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] text-xs"
                                     >
                                       <span className="font-mono font-bold text-[var(--ar-accent)] mr-1.5">
-                                        {role.operand}
+                                        {(['첫 번째', '두 번째', '세 번째'][rIdx] ?? `${rIdx + 1}번째`) + ' 항목 · ' + tutorDecimalText(role.operand)}
                                       </span>
-                                      <span className="text-[var(--ar-text-muted)]">{role.role}</span>
+                                      <span className="text-[var(--ar-text-muted)]"><TutorText text={role.role} /></span>
                                     </div>
                                   ))}
                                 </div>
                               </div>
+                            )}
+                            {details && (
+                              <TutorDetailPages
+                                title="관련 개념과 코드 위치 자세히 보기"
+                                context={`ASM: L${row.index + 1} · ${tutorDecimalText(row.text)}`}
+                                pages={() => details.pages}
+                              />
                             )}
                           </div>
                         )
                       ) : (
                         <>
                           <div className="tutor-single-code-box">
-                            <code>{row.text}</code>
+                            <code>{tutorDecimalText(row.text)}</code>
                           </div>
                           <div className="tutor-single-meaning">
                             <span className="tutor-single-meaning-arrow" aria-hidden="true">→</span>

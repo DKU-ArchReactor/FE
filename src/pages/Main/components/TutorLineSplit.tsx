@@ -1,4 +1,6 @@
 import {useMemo,useState} from 'react';
+import {tutorDecimalText} from '../utils/tutorReadable';
+
 import type {SimulationResult} from '@/type/simulation';
 import {analyzeAsmInstruction,analyzeCLine,analyzeCrtInstruction,instructionAt} from '../utils/tutorAnalysis';
 import type {MappedAssemblyRow} from '../utils/translationCompile';
@@ -38,11 +40,11 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
     ...(row.sourceLine==null?[{title:'소스 위치와 실행 문맥',blocks:[{text:analyzeCrtInstruction(row.text,row.pc).summary},{text:analyzeCrtInstruction(row.text,row.pc).detail}]}]:[]),
   ]:[];
   return <div className="dev-tutor-line-split" data-has-c={hasC} data-single-screen={singleScreen}>
-    {hasC&&(!singleScreen||view==='c')&&<TutorDetailHost key={`c-${line}`} inline label="C 줄 자세히 보기" onOpen={()=>{if(row)onSelect(row.index);}}><aside className="dev-tutor-c-panel" aria-label="선택한 C 줄 설명">
+    {hasC&&(!singleScreen||view==='c')&&<TutorDetailHost key={`c-${line}`} inline scrollable={singleScreen} label="C 줄 자세히 보기" onOpen={()=>{if(row)onSelect(row.index);}}><aside className="dev-tutor-c-panel" aria-label="선택한 C 줄 설명">
       <header><strong>{line!=null?`C: L${line}`:'C 위치 미확인'}</strong></header>
-      <div className="dev-tutor-c-reading"><div className="dev-tutor-c-explanation"><code title={cText}>{cText.trim()||'선택 명령어의 C 위치 정보가 없습니다.'}</code>
+      <div className="dev-tutor-c-reading"><div className="dev-tutor-c-explanation"><code title={cText}>{tutorDecimalText(cText.trim())||'선택 명령어의 C 위치 정보가 없습니다.'}</code>
         <p><TutorText text={cAnalysis?.summary??'시작 코드·어셈블리 직접 작성·디버그 정보 누락 등으로 C 줄이 확인되지 않을 수 있습니다.'}/></p>
-        </div>{lineExplanation&&<small className="dev-tutor-c-mapping"><span>연결된 ASM의 동작</span>{lineExplanation.summary}</small>}
+        </div>{lineExplanation&&<small className="dev-tutor-c-mapping"><span>연결된 ASM의 동작</span>{tutorDecimalText(lineExplanation.summary)}</small>}
       </div>
       <footer>
         {cAnalysis&&<TutorDetailPages title="C 설명 자세히" context={`C: L${line} · ${cText.trim()}`} pages={[
@@ -58,14 +60,14 @@ export default function TutorLineSplit({rows,source,line,selectedIndex,simulatio
         <button aria-label="다음 C 줄" title="다음 C 줄" disabled={after==null} onClick={()=>jumpC(after)}>↓</button>
       </nav>}
     </aside></TutorDetailHost>}
-    {(!singleScreen||view==='asm'||!hasC)&&<TutorDetailHost key={`${hasC?line:'asm'}-${row?.index}`} inline onOpen={()=>{if(row)onSelect(row.index);}}>
+    {(!singleScreen||view==='asm'||!hasC)&&<TutorDetailHost key={`${hasC?line:'asm'}-${row?.index}`} inline scrollable={singleScreen} onOpen={()=>{if(row)onSelect(row.index);}}>
       <section className="dev-tutor-asm-panel" data-asm-index={row?.index} aria-label="선택한 어셈블리 설명">
         <header><strong>{hasC&&line!=null?`C L${line} · 연결된 ASM`:'어셈블리 명령어'}</strong>
           {singleScreen&&hasC&&(line!=null?<button className="dev-tutor-inline-switch" aria-label="연결된 C 설명 보기" onClick={()=>{if(row)onSelect(row.index);setScreen({key:selectionKey,kind:'c'});}}>↑ C L{line} 설명</button>:<span title="컴파일 결과에 이 명령어의 C 소스 위치가 없습니다. 시작·종료 코드 등은 C 줄과 연결되지 않을 수 있습니다.">C 연결 없음 · 시작·종료 코드 또는 위치 정보 없음</span>)}
           <span>{group.length?`${position+1} / ${group.length}`:'0 / 0'}</span></header>
         {row&&instruction?<>
           <div className="dev-tutor-asm-reading">
-            <code className="dev-tutor-asm-code">{row.text}</code>
+            <code className="dev-tutor-asm-code">{tutorDecimalText(row.text)}</code>
             <div className="dev-tutor-asm-meta"><span>ASM: L{row.index+1}</span><span>{instruction.action}</span></div>
             <p className="dev-tutor-asm-meaning" title={instruction.explanation}><TutorText text={instruction.explanation}/></p>
             {latest&&<div className="dev-tutor-asm-result" data-observed><strong>실제 실행 · {latest[0]}</strong><p><TutorText text={latest[1].summary}/></p></div>}
