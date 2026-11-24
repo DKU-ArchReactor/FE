@@ -140,11 +140,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
             <button
               type="button"
-              disabled={isCompiling}
+              disabled={isCompiling || isCyclePlaying}
               onClick={() => onChangeEditorTarget?.("c")}
-              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : "C 소스 코드 작성 모드"}
+              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : isCyclePlaying ? "1회 재생 중에는 변경할 수 없습니다" : "C 소스 코드 작성 모드"}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
-                isCompiling ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                isCompiling || isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
               } ${
                 editorTarget === "c"
                   ? isSingle
@@ -157,11 +157,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
             <button
               type="button"
-              disabled={isCompiling}
+              disabled={isCompiling || isCyclePlaying}
               onClick={() => onChangeEditorTarget?.("asm")}
-              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : "어셈블리(ASM) 직접 작성 모드"}
+              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : isCyclePlaying ? "1회 재생 중에는 변경할 수 없습니다" : "어셈블리(ASM) 직접 작성 모드"}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
-                isCompiling ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                isCompiling || isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
               } ${
                 editorTarget === "asm"
                   ? isSingle
@@ -183,8 +183,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
             <button
               type="button"
+              disabled={isCyclePlaying}
               onClick={() => onChangeSimulationMode?.("single")}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
+                isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              } ${
                 isSingle
                   ? "bg-[var(--ar-mode-single)] hover:bg-[var(--ar-mode-single-hover)] text-white border-[var(--ar-mode-single)] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
@@ -194,8 +197,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
             <button
               type="button"
+              disabled={isCyclePlaying}
               onClick={() => onChangeSimulationMode?.("pipeline")}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
+                isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              } ${
                 !isSingle
                   ? "bg-[var(--ar-mode-pipeline)] hover:bg-[var(--ar-mode-pipeline-hover)] text-white border-[var(--ar-mode-pipeline)] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
@@ -284,11 +290,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               type="range"
               min={0}
               max={maxCycle}
-              disabled={!isReady || totalCycles <= 1}
+              disabled={!isReady || totalCycles <= 1 || isCyclePlaying}
               value={currentCycle}
               onChange={(e) => onJumpToCycle(Number(e.target.value))}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed disabled:pointer-events-none z-30"
-              title={`현재 위치: ${currentCycle}/${maxCycle}`}
+              title={isCyclePlaying ? "1회 재생 진행 중..." : `현재 위치: ${currentCycle}/${maxCycle}`}
             />
           </div>
 
@@ -306,8 +312,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* 1) 초기화 버튼 (정사각형 정지/리셋 아이콘) */}
         <button
           onClick={onReset}
-          disabled={!isReady || currentCycle === 0}
-          title="처음으로 초기화 (Reset / Stop)"
+          disabled={!isReady || currentCycle === 0 || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : "처음으로 초기화 (Reset / Stop)"}
           className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -319,16 +325,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <button
           type="button"
           onClick={onPlayCurrentCycle ?? onResetAndPlay}
-          disabled={!isReady || totalCycles <= 0}
+          disabled={!isReady || totalCycles <= 0 || isCyclePlaying}
           title={
             isCyclePlaying
-              ? "현재 사이클 1회 재생 중 (클릭 시 다시 1회 반복)"
+              ? "현재 사이클 1회 재생 중..."
               : "현재 사이클 1회 재생 (Play Current Cycle)"
           }
-          className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
+          className={`p-1 rounded transition-colors cursor-pointer disabled:cursor-not-allowed ${
             isCyclePlaying
-              ? "text-[#10B981] dark:text-[#34D399] bg-[#ECFDF5] dark:bg-[#064E3B]/40 font-bold"
-              : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545]"
+              ? "text-[#10B981] dark:text-[#34D399] bg-[#ECFDF5] dark:bg-[#064E3B]/40 font-bold ring-1 ring-[#10B981]/50"
+              : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:pointer-events-none"
           }`}
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -339,8 +345,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* 3) 이전 스텝/사이클 버튼 */}
         <button
           onClick={onStepBack}
-          disabled={!isReady || currentCycle <= 0}
-          title={isSingle ? "이전 스텝 (Step Back)" : "이전 사이클 (Cycle Back)"}
+          disabled={!isReady || currentCycle <= 0 || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : isSingle ? "이전 스텝 (Step Back)" : "이전 사이클 (Cycle Back)"}
           className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -351,10 +357,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* 4) 재생 / 일시정지 (PLAY / PAUSE) 버튼 */}
         <button
           onClick={onTogglePlay}
-          disabled={!isReady || totalCycles <= 1}
-          title={isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
+          disabled={!isReady || totalCycles <= 1 || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
           className={`w-[76px] shrink-0 justify-center py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
-            isPlaying 
+            isPlaying && !isCyclePlaying 
               ? 'bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold' 
               : isSingle
               ? 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
@@ -362,7 +368,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           }`}
         >
           <span className="w-2.5 h-2.5 flex items-center justify-center shrink-0">
-            {isPlaying ? (
+            {isPlaying && !isCyclePlaying ? (
               <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                 <rect x="5" y="4" width="4" height="16" rx="1" />
                 <rect x="15" y="4" width="4" height="16" rx="1" />
@@ -373,14 +379,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </svg>
             )}
           </span>
-          <span className="w-10 text-center tracking-wide">{isPlaying ? "PAUSE" : "PLAY"}</span>
+          <span className="w-10 text-center tracking-wide">{isPlaying && !isCyclePlaying ? "PAUSE" : "PLAY"}</span>
         </button>
 
         {/* 5) 다음 스텝/사이클 버튼 */}
         <button
           onClick={onStepForward}
-          disabled={!isReady || currentCycle >= maxCycle}
-          title={isSingle ? "다음 스텝 실행 (Step Forward)" : "다음 사이클 진행 (Cycle Forward)"}
+          disabled={!isReady || currentCycle >= maxCycle || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : isSingle ? "다음 스텝 실행 (Step Forward)" : "다음 사이클 진행 (Cycle Forward)"}
           className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -403,7 +409,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
               key={label}
               type="button"
-              disabled={!isReady}
+              disabled={!isReady || isCyclePlaying}
               onClick={() => onChangeSpeed(speed)}
               className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
                 isSelected

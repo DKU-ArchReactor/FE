@@ -76,7 +76,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
               type="range"
               min={0}
               max={maxCycle}
-              disabled={!isSimulationReady || totalCycles <= 1}
+              disabled={!isSimulationReady || totalCycles <= 1 || isCyclePlaying}
               value={currentCycle}
               onChange={(e) => onJumpToCycle(Number(e.target.value))}
               className={`flex-1 min-w-0 h-1 bg-[#E1E4E8] dark:bg-[#333333] rounded appearance-none cursor-pointer focus:outline-none transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
@@ -99,7 +99,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
                   <button
                     key={label}
                     type="button"
-                    disabled={!isSimulationReady}
+                    disabled={!isSimulationReady || isCyclePlaying}
                     onClick={() => onChangeSpeed(speed)}
                     className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
                       isSelected
@@ -121,8 +121,8 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             <button
               type="button"
               onClick={onReset}
-              disabled={!isSimulationReady || currentCycle === 0}
-              title="처음으로 초기화 (Reset / Stop)"
+              disabled={!isSimulationReady || currentCycle === 0 || isCyclePlaying}
+              title={isCyclePlaying ? "1회 재생 진행 중..." : "처음으로 초기화 (Reset / Stop)"}
               className="p-1.5 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#3A3A3A] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
             >
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -133,16 +133,16 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             <button
               type="button"
               onClick={onPlayCurrentCycle ?? onResetAndPlay}
-              disabled={!isSimulationReady || totalCycles <= 0}
+              disabled={!isSimulationReady || totalCycles <= 0 || isCyclePlaying}
               title={
                 isCyclePlaying
-                  ? "현재 사이클 1회 재생 중"
+                  ? "현재 사이클 1회 재생 중..."
                   : "현재 사이클 1회 재생 (1-Cycle Play)"
               }
-              className={`p-1.5 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
+              className={`p-1.5 rounded transition-colors cursor-pointer disabled:cursor-not-allowed ${
                 isCyclePlaying
-                  ? "text-[#10B981] dark:text-[#34D399] bg-[#ECFDF5] dark:bg-[#064E3B]/40 font-bold"
-                  : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#3A3A3A]"
+                  ? "text-[#10B981] dark:text-[#34D399] bg-[#ECFDF5] dark:bg-[#064E3B]/40 font-bold ring-1 ring-[#10B981]/50"
+                  : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#3A3A3A] disabled:opacity-30 disabled:pointer-events-none"
               }`}
             >
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -153,8 +153,8 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             <button
               type="button"
               onClick={onStepBack}
-              disabled={!isSimulationReady || currentCycle <= 0}
-              title="이전 단계 (Step Back)"
+              disabled={!isSimulationReady || currentCycle <= 0 || isCyclePlaying}
+              title={isCyclePlaying ? "1회 재생 진행 중..." : "이전 단계 (Step Back)"}
               className="p-1.5 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#3A3A3A] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -165,10 +165,10 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             <button
               type="button"
               onClick={onTogglePlay}
-              disabled={!isSimulationReady || totalCycles <= 1}
-              title={isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
+              disabled={!isSimulationReady || totalCycles <= 1 || isCyclePlaying}
+              title={isCyclePlaying ? "1회 재생 진행 중..." : isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
               className={`px-4 py-1 rounded text-[11px] font-bold text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
-                isPlaying
+                isPlaying && !isCyclePlaying
                   ? "bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold"
                   : isSingleEngine
                     ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]"
@@ -176,7 +176,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
               }`}
             >
               <span className="w-2.5 h-2.5 flex items-center justify-center shrink-0">
-                {isPlaying ? (
+                {isPlaying && !isCyclePlaying ? (
                   <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                     <rect x="5" y="4" width="4" height="16" rx="1" />
                     <rect x="15" y="4" width="4" height="16" rx="1" />
@@ -187,14 +187,14 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
                   </svg>
                 )}
               </span>
-              <span className="tracking-wide">{isPlaying ? "PAUSE" : "PLAY"}</span>
+              <span className="tracking-wide">{isPlaying && !isCyclePlaying ? "PAUSE" : "PLAY"}</span>
             </button>
 
             <button
               type="button"
               onClick={onStepForward}
-              disabled={!isSimulationReady || currentCycle >= maxCycle}
-              title="한 단계 실행 (Step Over / Forward)"
+              disabled={!isSimulationReady || currentCycle >= maxCycle || isCyclePlaying}
+              title={isCyclePlaying ? "1회 재생 진행 중..." : "한 단계 실행 (Step Over / Forward)"}
               className="p-1.5 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#3A3A3A] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

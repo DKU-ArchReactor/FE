@@ -27,37 +27,21 @@ export function useSimulationPlayback({
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playMode, setPlayMode] = useState<"continuous" | "singleCycle">("continuous");
-  const [isStandby, setIsStandby] = useState<boolean>(true);
   const [playSpeed, setPlaySpeed] = useState<number>(3000);
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
-  const [targetCycles, setTargetCycles] = useState<Record<"c" | "asm", number>>({ c: 0, asm: 0 });
-  const [prevTarget, setPrevTarget] = useState<"c" | "asm">(editorTarget);
-  const currentCycle = targetCycles[editorTarget];
-  const setCurrentCycle: React.Dispatch<React.SetStateAction<number>> = (action) => {
-    setTargetCycles((prev) => {
-      const nextVal = typeof action === "function" ? action(prev[editorTarget]) : action;
-      return { ...prev, [editorTarget]: nextVal };
-    });
-  };
 
-  useEffect(() => {
-    setIsStandby(true);
-  }, [simulationData]);
+  type PlaybackKey = `${"c" | "asm"}:${"single" | "pipeline"}`;
+  const currentKey: PlaybackKey = `${editorTarget}:${isSingleEngine ? "single" : "pipeline"}`;
 
-  if (prevTarget !== editorTarget) {
-    setPrevTarget(editorTarget);
-    setIsPlaying(false);
-    const validCycle = historyList.length > 0 ? Math.min(targetCycles[editorTarget], historyList.length) : 0;
-    if (validCycle !== targetCycles[editorTarget]) {
-      setTargetCycles((prev) => ({ ...prev, [editorTarget]: validCycle }));
-    }
-  }
-
-  const [playbackFeedback, setPlaybackFeedback] = useState<{
-    type: "play" | "pause" | "reset" | "trash" | "check";
-    id: number;
-  } | null>(null);
+  const [modeStates, setModeStates] = useState<
+    Record<PlaybackKey, { cycle: number; isStandby: boolean }>
+  >({
+    "c:single": { cycle: 0, isStandby: true },
+    "c:pipeline": { cycle: 0, isStandby: true },
+    "asm:single": { cycle: 0, isStandby: true },
+    "asm:pipeline": { cycle: 0, isStandby: true },
+  });
 
   const timerRef = useRef<number | null>(null);
   const playbackClock = useRef<{
@@ -66,6 +50,54 @@ export function useSimulationPlayback({
     duration: number;
     remaining: number;
     started: number | null;
+  } | null>(null);
+
+  const prevKeyRef = useRef<PlaybackKey>(currentKey);
+  if (prevKeyRef.current !== currentKey) {
+    prevKeyRef.current = currentKey;
+    setIsPlaying(false);
+    if (playbackClock.current) {
+      playbackClock.current = null;
+    }
+    setFinishedSingleFrame(null);
+    setPlaybackRevision((v) => v + 1);
+  }
+
+  const rawCycle = modeStates[currentKey].cycle;
+  const currentCycle = historyList.length > 0 ? Math.min(rawCycle, historyList.length) : rawCycle;
+  const isStandby = modeStates[currentKey].isStandby;
+
+  const setCurrentCycle: React.Dispatch<React.SetStateAction<number>> = (action) => {
+    setModeStates((prev) => {
+      const cur = prev[currentKey].cycle;
+      const nextVal = typeof action === "function" ? action(cur) : action;
+      return {
+        ...prev,
+        [currentKey]: {
+          ...prev[currentKey],
+          cycle: nextVal,
+        },
+      };
+    });
+  };
+
+  const setIsStandby: React.Dispatch<React.SetStateAction<boolean>> = (action) => {
+    setModeStates((prev) => {
+      const cur = prev[currentKey].isStandby;
+      const nextVal = typeof action === "function" ? action(cur) : action;
+      return {
+        ...prev,
+        [currentKey]: {
+          ...prev[currentKey],
+          isStandby: nextVal,
+        },
+      };
+    });
+  };
+
+  const [playbackFeedback, setPlaybackFeedback] = useState<{
+    type: "play" | "pause" | "reset" | "trash" | "check";
+    id: number;
   } | null>(null);
 
   const triggerPlaybackFeedback = (type: "play" | "pause" | "reset" | "trash" | "check") => {
@@ -274,9 +306,36 @@ export function useSimulationPlayback({
   const handleSimulationComplete = () => {
     setFinishedSingleFrame(null);
     setIsPlaying(false);
-    setIsStandby(true);
-    setCurrentCycle(0);
+    setModeStates((prev) => ({
+      ...prev,
+      [`${editorTarget}:single`]: { cycle: 0, isStandby: true },
+      [`${editorTarget}:pipeline`]: { cycle: 0, isStandby: true },
+    }));
     setPlaySpeed(3000);
+    if (playbackClock.current) {
+      playbackClock.current = null;
+    }
+    setPlaybackRevision((v) => v + 1);
+  };
+
+  const handleResetAll = () => {
+    setFinishedSingleFrame(null);
+    setIsPlaying(false);
+    setPlayMode("continuous");
+    onClearSelection();
+    setModeStates({
+      "c:single": { cycle: 0, isStandby: true },
+      "c:pipeline": { cycle: 0, isStandby: true },
+      "asm:single": { cycle: 0, isStandby: true },
+      "asm:pipeline": { cycle: 0, isStandby: true },
+    });
+    setPlaySpeed(3000);
+    if (playbackClock.current) {
+      playbackClock.current = null;
+    }
+    timelineSync.setProgress(0, 0);
+    setPlaybackRevision((v) => v + 1);
+    triggerPlaybackFeedback("reset");
   };
 
   const singlePlaybackDelay = playSpeed;
@@ -359,6 +418,7 @@ export function useSimulationPlayback({
   };
 
   const handleStepBack = () => {
+    if (isPlaying && playMode === "singleCycle") return;
     setFinishedSingleFrame(null);
     playbackClock.current = null;
     setPlayMode("continuous");
@@ -380,6 +440,7 @@ export function useSimulationPlayback({
   };
 
   const handleStepForward = () => {
+    if (isPlaying && playMode === "singleCycle") return;
     setFinishedSingleFrame(null);
     playbackClock.current = null;
     setPlayMode("continuous");
@@ -398,7 +459,7 @@ export function useSimulationPlayback({
 
   // 1회 재생 버튼 핸들러: 현재 사이클(k-1 -> k]을 1회만 재생하고 k에서 멈춤
   const handlePlayCurrentCycle = () => {
-    if (!isSimulationReady || totalCycles <= 0) return;
+    if (!isSimulationReady || totalCycles <= 0 || (isPlaying && playMode === "singleCycle")) return;
     onClearSelection();
     setFinishedSingleFrame(null);
 
@@ -411,18 +472,6 @@ export function useSimulationPlayback({
         playbackClock.current.remaining = playSpeed;
       }
       setIsPlaying(true);
-      setPlaybackRevision((v) => v + 1);
-      triggerPlaybackFeedback("play");
-      return;
-    }
-
-    // 이미 1회 재생 중인 상태에서 다시 1회 버튼을 누르면: 처음부터 다시 1회 반복 재생
-    if (isPlaying && playMode === "singleCycle") {
-      timelineSync.setProgress(currentCycle, 0);
-      if (playbackClock.current) {
-        playbackClock.current.remaining = playSpeed;
-        playbackClock.current.started = performance.now();
-      }
       setPlaybackRevision((v) => v + 1);
       triggerPlaybackFeedback("play");
       return;
@@ -443,6 +492,7 @@ export function useSimulationPlayback({
 
   // 일반 PLAY / PAUSE 토글 버튼 핸들러 (연속 재생 모드)
   const handleTogglePlay = () => {
+    if (isPlaying && playMode === "singleCycle") return;
     const currentPos = currentCycle;
     const maxPos = totalCycles;
 
@@ -474,6 +524,7 @@ export function useSimulationPlayback({
   };
 
   const handleReset = () => {
+    if (isPlaying && playMode === "singleCycle") return;
     setFinishedSingleFrame(null);
     setIsPlaying(false);
     setPlayMode("continuous");
@@ -492,6 +543,7 @@ export function useSimulationPlayback({
   };
 
   const handleResetAndPlay = () => {
+    if (isPlaying && playMode === "singleCycle") return;
     setFinishedSingleFrame(null);
     onClearSelection();
     setPlayMode("continuous");
@@ -508,6 +560,7 @@ export function useSimulationPlayback({
   };
 
   const handleJumpToCycle = (val: number) => {
+    if (isPlaying && playMode === "singleCycle") return;
     playbackClock.current = null;
     setPlayMode("continuous");
     setPlaybackRevision(value => value + 1);
@@ -559,6 +612,7 @@ export function useSimulationPlayback({
     handleStepForward,
     handleTogglePlay,
     handleReset,
+    handleResetAll,
     handleResetAndPlay,
     handleJumpToCycle,
     triggerPlaybackFeedback,
