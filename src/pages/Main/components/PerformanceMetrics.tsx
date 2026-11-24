@@ -23,7 +23,7 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
             PERFORMANCE & CPI
           </h3>
         </div>
-        <span className="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-semibold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800">
+        <span className="text-[10px] font-mono text-purple-700 font-semibold px-2 py-0.5 rounded bg-purple-50 border border-purple-200">
           Ideal CPI: 1.00
         </span>
       </div>
@@ -51,19 +51,19 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
           </div>
 
           {/* IPC 카드 */}
-          <div className="p-2.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col justify-between">
+          <div className="p-2.5 rounded-lg bg-[#F6F8FA] border border-[#D0D7DE] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-[#57606A] dark:text-[#858585] uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-[#57606A] uppercase tracking-wider">
                 {isSingle ? "IPC (Inst / Step)" : "IPC (Inst / Cycle)"}
               </span>
             </div>
             <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-2xl font-black font-mono text-emerald-700 dark:text-[#7EE787]">
+              <span className="text-2xl font-black font-mono text-emerald-700">
                 {simulationData ? stats.ipc : '—'}
               </span>
-              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681] font-mono">{isSingle ? "inst/step" : "inst/clk"}</span>
+              <span className="text-[10px] text-[#8C959F] font-mono">{isSingle ? "inst/step" : "inst/clk"}</span>
             </div>
-            <span className="text-[9px] text-[#57606A] dark:text-[#858585] mt-0.5">
+            <span className="text-[9px] text-[#57606A] mt-0.5">
               {isSingle ? "1스텝당 평균 완수율" : "1클록당 평균 완수율"}
             </span>
           </div>
@@ -71,35 +71,35 @@ export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ simulati
 
         {/* 세부 수치 그리드 */}
         <div className="grid grid-cols-3 gap-1.5 shrink-0 text-center">
-          <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
-            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">완수 명령어</span>
-            <span className="text-xs font-mono font-bold text-[#1F2328] dark:text-[#CCCCCC]">
+          <div className="p-1.5 rounded-lg bg-[#F6F8FA] border border-[#D0D7DE]">
+            <span className="text-[9px] text-[#57606A] block font-semibold">완수 명령어</span>
+            <span className="text-xs font-mono font-bold text-[#1F2328]">
               {stats.completedInstructions ?? '—'}
             </span>
           </div>
-          <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
-            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">스톨(Stall)</span>
-            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
+          <div className="p-1.5 rounded-lg bg-[#F6F8FA] border border-[#D0D7DE]">
+            <span className="text-[9px] text-[#57606A] block font-semibold">스톨(Stall)</span>
+            <span className="text-xs font-mono font-bold text-amber-600">
               {stats.stalls ?? '—'} 클록
             </span>
           </div>
-          <div className="p-1.5 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42]">
-            <span className="text-[9px] text-[#57606A] dark:text-[#858585] block font-semibold">포워딩 입력</span>
-            <span className="text-xs font-mono font-bold text-[#005FB8] dark:text-[#79C0FF]">
+          <div className="p-1.5 rounded-lg bg-[#F6F8FA] border border-[#D0D7DE]">
+            <span className="text-[9px] text-[#57606A] block font-semibold">포워딩 입력</span>
+            <span className="text-xs font-mono font-bold text-[#005FB8]">
               {stats.forwards ?? '—'} 회
             </span>
           </div>
         </div>
 
         {/* 버블 비율 프로그레스 바 */}
-        {!stats.isSingle && <div className="p-2 rounded-lg bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] flex flex-col gap-1 shrink-0">
+        {!stats.isSingle && <div className="p-2 rounded-lg bg-[#F6F8FA] border border-[#D0D7DE] flex flex-col gap-1 shrink-0">
           <div className="flex items-center justify-between text-[10px]">
-            <span className="font-semibold text-[#57606A] dark:text-[#858585]">비어 있거나 취소된 단계 비율</span>
-            <span className="font-mono font-bold text-[#1F2328] dark:text-[#CCCCCC]">{stats.bubbleRatio}%</span>
+            <span className="font-semibold text-[#57606A]">비어 있거나 취소된 단계 비율</span>
+            <span className="font-mono font-bold text-[#1F2328]">{stats.bubbleRatio}%</span>
           </div>
-          <div className="w-full h-1.5 bg-[#E1E4E8] dark:bg-[#333333] rounded-full overflow-hidden flex">
+          <div className="w-full h-1.5 bg-[#E1E4E8] rounded-full overflow-hidden flex">
             <div
-              className="h-full bg-[#005FB8] dark:bg-[#007ACC] transition-all duration-300"
+              className="h-full bg-[#005FB8] transition-all duration-300"
               style={{ width: `${100 - stats.bubbleRatio}%` }}
               title="명령어가 있는 단계 비율"
             />

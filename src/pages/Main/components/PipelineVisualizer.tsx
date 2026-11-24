@@ -540,6 +540,7 @@ interface PipelineVisualizerProps {
   mode?: "single" | "pipeline";
   playSpeed?: number;
   isPlaying?: boolean;
+  playMode?: "continuous" | "singleCycle";
   currentCycle?: number;
   playbackRevision?: number;
   onPausePlayback?: () => void;
@@ -557,6 +558,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   lessonContext,
   playSpeed,
   isPlaying,
+  playMode = "continuous",
   playbackRevision,
   currentCycle,
   onPausePlayback: _onPausePlayback,
@@ -570,36 +572,24 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const startTimeRef = React.useRef<number>(performance.now());
   const pausedProgressRef = React.useRef<number>(0);
   const prevDataRef = React.useRef(currentData);
+  const prevCycleRef = React.useRef(currentCycle);
   const prevFlowDurationRef = React.useRef(flowDuration);
 
-  // 뷰포트 교차 감지: 회로도가 화면 밖(다른 탭/뷰포트)으로 슬라이드되면 RAF 애니메이션을 일시 정지하여 CPU 낭비 방지
+  // 뷰포트 컨테이너 ref
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [isIntersecting, setIsIntersecting] = useState<boolean>(true);
 
+  // 1. 사이클(currentCycle)이나 데이터(currentData)가 변경되면 진행률 리셋 (재생 중이면 0부터, 정지/탐색 중이면 완료점 1)
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsIntersecting(entry.isIntersecting);
-      },
-      { threshold: 0.05 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // 1. 사이클 데이터(currentData)가 변경되면 진행률을 즉시 0으로 리셋하고 재생 시작
-  useEffect(() => {
-    if (prevDataRef.current !== currentData) {
+    if (prevDataRef.current !== currentData || prevCycleRef.current !== currentCycle) {
       prevDataRef.current = currentData;
+      prevCycleRef.current = currentCycle;
       startTimeRef.current = performance.now();
-      progressRef.current = 0;
-      pausedProgressRef.current = 0;
-      setAnimProgress(0);
+      const initialProg = isPlaying ? 0 : 1;
+      progressRef.current = initialProg;
+      pausedProgressRef.current = initialProg;
+      setAnimProgress(initialProg);
       setIsSubstepPlaying(!!isPlaying);
-      timelineSync.setProgress(currentCycle ?? 0, 0);
+      timelineSync.setProgress(currentCycle ?? 0, (currentCycle ?? 0) === 0 ? 0 : initialProg);
     }
   }, [currentData, currentCycle, isPlaying]);
 
@@ -613,15 +603,23 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
   // 3. 외부 시뮬레이션 바(상단 ControlPanel)에서 Play / Pause 누를 때:
   // 제자리 일시정지 및 제자리 재개 동작 수행
+  // 단, playMode가 singleCycle(1회 재생)인 경우 무조건 ( 에서 시작하여 ] 에서 정지
   useEffect(() => {
     if (isPlaying) {
-      if (pausedProgressRef.current > 0 && pausedProgressRef.current < 1) {
-        // 일시정지되었던 위치에서 그대로 이어서 재생
+      if (playMode === "singleCycle") {
+        // 1회 재생은 무조건 ( 부터 시작하여 ] 까지 주행
+        startTimeRef.current = performance.now();
+        progressRef.current = 0;
+        pausedProgressRef.current = 0;
+        setAnimProgress(0);
+        timelineSync.setProgress(currentCycle ?? 0, 0);
+      } else if (pausedProgressRef.current > 0 && pausedProgressRef.current < 0.98) {
+        // 연속 재생: 중간에 PAUSE로 정지했던 위치가 있으면 제자리에서 재개
         startTimeRef.current = performance.now() - pausedProgressRef.current * flowDuration;
         progressRef.current = pausedProgressRef.current;
         setAnimProgress(pausedProgressRef.current);
       } else {
-        // 사이클 처음부터 재생
+        // 사이클 처음부터 재생 (이미 완료되었거나 0인 경우)
         startTimeRef.current = performance.now();
         progressRef.current = 0;
         pausedProgressRef.current = 0;
@@ -630,14 +628,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       }
       setIsSubstepPlaying(true);
     } else {
-      // 일시정지: 현재 진행률을 정확히 보존하고 정지
-      pausedProgressRef.current = progressRef.current;
+      // 일시정지: 0.98 이상이면 1.0(완료)으로 정규화하여 0.998 미세 프리즈 방지
+      const cur = progressRef.current;
+      pausedProgressRef.current = cur >= 0.98 ? 1.0 : cur;
       setIsSubstepPlaying(false);
     }
-  }, [isPlaying, playbackRevision]);
+  }, [isPlaying, playbackRevision, playMode, flowDuration, currentCycle]);
 
   useEffect(() => {
-    if (!isSubstepPlaying || !isIntersecting) {
+    if (!isSubstepPlaying) {
       return;
     }
 
@@ -666,7 +665,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isSubstepPlaying, isIntersecting, flowDuration, currentCycle]);
+  }, [isSubstepPlaying, flowDuration, currentCycle]);
 
   const isSingle = mode === "single";
 
@@ -1138,8 +1137,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
       buffers?.[stage]?.assembly?.toLowerCase() === "flush"
     );
     const isStalled = Boolean(
-      (cycleEvents?.stall?.has_stall && cycleEvents?.stall?.stage === stage) ||
-      buffers?.[stage]?.status === "stall"
+      (cycleEvents?.stall?.has_stall && (cycleEvents?.stall?.stage === stage || (cycleEvents?.stall?.stage === "ID" && stage === "IF"))) ||
+      buffers?.[stage]?.status === "stall" ||
+      buffers?.[stage]?.status === "stalled"
     );
     const isStallBubble = Boolean(
       !isStalled &&
@@ -1245,7 +1245,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
         {(isStalled || isStallBubble) && !isFlushed && (
           <g
             transform={`translate(196, ${cardY + 54.5})`}
-            style={{ filter: "drop-shadow(0 1.5px 3px rgba(217, 119, 6, 0.25))" }}
+            style={{
+              filter: isStalled
+                ? "drop-shadow(0 1.5px 3px rgba(217, 119, 6, 0.25))"
+                : "drop-shadow(0 1.5px 3px rgba(14, 165, 233, 0.25))",
+            }}
           >
             <rect
               x="-28"
@@ -1253,8 +1257,8 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               width="56"
               height="21"
               rx="10.5"
-              fill="#FEF3C7"
-              stroke="#F59E0B"
+              fill={isStalled ? "#FEF3C7" : "#E0F2FE"}
+              stroke={isStalled ? "#F59E0B" : "#0EA5E9"}
               strokeWidth="1.5"
             />
             <text
@@ -1262,12 +1266,12 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               y="0.5"
               dominantBaseline="central"
               textAnchor="middle"
-              fill="#D97706"
+              fill={isStalled ? "#D97706" : "#0284C7"}
               fontSize="11"
               fontWeight="800"
               fontFamily="sans-serif"
             >
-              STALL
+              {isStalled ? "STALL" : "BUBBLE"}
             </text>
           </g>
         )}

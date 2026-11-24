@@ -4,6 +4,7 @@ import { mapAssembly, type MappedAssemblyRow } from '../utils/translationCompile
 import { analyzeCLine, fetchTutor } from '../utils/tutorAnalysis';
 import { TutorCycleEvidence } from './TutorEvidence';
 import './TutorTypography.css';
+import './TutorSingleMode.css';
 import { tutorExecutionFocus } from '../utils/tutorFocus';
 import { TutorDetailHost } from './TutorDetailPages';
 import TutorPipelineLesson from './TutorPipelineLesson';
@@ -37,6 +38,9 @@ export interface TutorAreaProps {
   onClose?: () => void;
   onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
   onPausePlayback?: () => void;
+  onStepBack?: () => void;
+  onStepForward?: () => void;
+  onJumpToCycle?: (cycle: number) => void;
 }
 
 // Static ASM requests and the selected C line have independent cancellation/retry lifetimes.
@@ -76,6 +80,9 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   onClose,
   onSelectLine,
   onPausePlayback,
+  onStepBack,
+  onStepForward,
+  onJumpToCycle,
 }) => {
   const isCompiled = Boolean(simulationData);
   const isSingleMode = mode === "single" || simulationData?.simulator?.mode === "single";
@@ -103,7 +110,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const executionFocus = historyIndex != null && historyIndex >= 0
     ? tutorExecutionFocus(currentCycleData, effectiveRows, simulationData?.simulator.mode === 'single') : null;
   const currentActiveAsmIndex = executionFocus?.index ?? providedActiveAsmIndex;
-  const selectionScope = `${isUserSelected}:${manualAsmIndex}:${providedTranslationLine}:${activeTarget}`;
+  const selectionScope = `${isUserSelected}:${manualAsmIndex}:${providedTranslationLine}:${activeTarget}:${currentActiveAsmIndex}`;
   const [stageSelection, setStageSelection] = useState<{ rows: MappedAssemblyRow[]; scope: string; index: number } | null>(null);
   const [wasPlaying, setWasPlaying] = useState(isPlaying);
   const [singleIntent, setSingleIntent] = useState({ run: simulationData, revision: selectionRevision, kind: 'asm' as 'c' | 'asm', version: 0 });
@@ -112,6 +119,10 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   else if (!wasPlaying && isPlaying) setSingleIntent({ ...singleIntent, kind: 'asm', version: singleIntent.version + 1 });
   if (wasPlaying !== isPlaying) { setWasPlaying(isPlaying); if (isPlaying) setStageSelection(null); }
   const stageIndex = stageSelection?.rows === effectiveRows && stageSelection.scope === selectionScope ? stageSelection.index : null;
+  const isExecutionActive = Boolean(
+    (historyIndex != null && historyIndex >= 0) || currentActiveAsmIndex != null
+  );
+  const shouldShowSingleCard = isUserSelected || isExecutionActive || stageIndex != null;
   const followsExecution = stageIndex == null && !isUserSelected && manualAsmIndex == null;
   const selectedAsmIndex = stageIndex ?? (followsExecution ? currentActiveAsmIndex : manualAsmIndex);
   const selectedTranslationLine = (followsExecution || stageIndex != null || selectionKind === 'asm' && activeTarget === 'asm') && selectedAsmIndex != null
@@ -216,22 +227,27 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             ARCHREACTOR TUTOR
           </h3>
-          {isSingleMode && (
-            <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[var(--ar-mode-single)]/15 text-[var(--ar-mode-single)] border border-[var(--ar-mode-single)]/30">
-              SINGLE
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
-            {followsExecution && executionFocus ? `${executionFocus.stage} · 실행 따라가기` : activeTarget === "asm" ? "ASM INSTRUCTION" : "INSTRUCTION"}
-          </span>
+          {isUserSelected && (
+            <button
+              type="button"
+              className="tutor-return-exec-btn mr-0!"
+              title="현재 실행 중인 위치로 돌아가기"
+              onClick={() => onSelectLine?.(null, null)}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-2.5 h-2.5">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span>실행 위치로</span>
+            </button>
+          )}
           {onClose && (
             <button
               type="button"
               onClick={onClose}
               title="튜터 모달 닫기"
-              className="w-5 h-5 rounded flex items-center justify-center bg-black/5 dark:bg-white/10 text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)] transition-colors cursor-pointer text-xs font-bold leading-none shrink-0"
+              className="w-5 h-5 rounded flex items-center justify-center bg-black/5 text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)] transition-colors cursor-pointer text-xs font-bold leading-none shrink-0"
             >
               ✕
             </button>
@@ -263,25 +279,46 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             selectionRevision={selectionRevision}
           />
         ) : isSingleMode && simulationData ? (
-          <TutorSingleMode
-            rows={effectiveRows}
-            source={cLines}
-            line={isCrtSelected ? null : selectedTranslationLine}
-            selectedIndex={selectedAsmIndex}
-            simulation={simulationData}
-            currentCycleData={currentCycleData}
-            historyIndex={historyIndex}
-            hasC={activeTarget !== 'asm'}
-            requestedView={singleIntent.kind}
-            selectionKey={singleIntent.version}
-            isPlaying={isPlaying}
-            isUserSelected={isUserSelected}
-            onSelect={index => {
-              setStageSelection({ rows: effectiveRows, scope: selectionScope, index });
-            }}
-            onSelectLine={onSelectLine}
-            onPausePlayback={onPausePlayback}
-          />
+          shouldShowSingleCard ? (
+            <TutorSingleMode
+              rows={effectiveRows}
+              source={cLines}
+              line={isCrtSelected ? null : selectedTranslationLine}
+              selectedIndex={selectedAsmIndex}
+              simulation={simulationData}
+              currentCycleData={currentCycleData}
+              historyIndex={historyIndex}
+              hasC={activeTarget !== 'asm'}
+              requestedView={singleIntent.kind}
+              selectionKey={singleIntent.version}
+              isPlaying={isPlaying}
+              isUserSelected={isUserSelected}
+              onSelect={index => {
+                setStageSelection({ rows: effectiveRows, scope: selectionScope, index });
+              }}
+              onSelectLine={onSelectLine}
+              onPausePlayback={onPausePlayback}
+              onStepBack={onStepBack}
+              onStepForward={onStepForward}
+              onJumpToCycle={onJumpToCycle}
+            />
+          ) : (
+            <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-6 text-center select-none m-auto">
+              <div className="w-12 h-12 rounded-xl bg-[var(--ar-mode-single)]/10 border border-[var(--ar-mode-single)]/25 flex items-center justify-center text-[var(--ar-mode-single)] mb-3 text-xl shadow-2xs">
+                ▶
+              </div>
+              <strong className="text-xs font-semibold text-[var(--ar-text-primary)]">
+                시뮬레이션 대기 중 (0 사이클)
+              </strong>
+              <p className="text-[11px] text-[var(--ar-text-muted)] mt-1.5 max-w-xs leading-relaxed">
+                하단의 재생(▶) 또는 스텝(▷) 버튼을 누르면 첫 번째 명령어부터 단계별 실행 해설이 시작됩니다.
+              </p>
+              <div className="mt-3.5 inline-flex items-center gap-1.5 text-[10px] text-[var(--ar-text-muted)] bg-[var(--ar-header-bg)] px-3 py-1.5 rounded-md border border-[var(--ar-border)]">
+                <span>💡</span>
+                <span>코드 라인을 클릭하면 실행 전에도 명령어 해설을 미리 확인할 수 있습니다.</span>
+              </div>
+            </div>
+          )
         ) : splitView && simulationData ? (
           <TutorLineSplit
             rows={effectiveRows}
@@ -297,16 +334,16 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             onSelect={index => setStageSelection({ rows: effectiveRows, scope: selectionScope, index })}
           />
         ) : !isCompiled ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42] my-auto">
-            <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
+          <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] rounded-md border border-dashed border-[#D0D7DE] my-auto">
+            <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E5E5] flex items-center justify-center text-[#57606A] mb-3 text-lg shadow-2xs">
               💡
             </div>
-            <strong className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+            <strong className="text-xs font-semibold text-[#1F2328]">
               {activeTarget === "asm"
                 ? "어셈블리 코드를 작성하고 [시뮬레이션]을 실행하세요"
                 : "C 코드를 작성하고 [컴파일]을 실행하세요"}
             </strong>
-            <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1.5 max-w-xs leading-relaxed">
+            <span className="text-[11px] text-[#57606A] mt-1.5 max-w-xs leading-relaxed">
               {activeTarget === "asm"
                 ? "컴파일 및 어셈블 검증이 완료된 코드에 한해 하드웨어 동작과 명령어 해설이 이곳에 제공됩니다."
                 : "정상적으로 컴파일된 코드에 한해 라인별 문법 해설과 파이프라인 하드웨어 동작 풀이가 이곳에 제공됩니다."}

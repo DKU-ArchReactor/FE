@@ -385,7 +385,7 @@ export function useSimulationPlayback({
       }
 
       if (playMode === "singleCycle") {
-        // 1회 재생 완료 시 해당 사이클 완료 상태로 일시정지
+        // 1회 재생 완료 시 해당 사이클 ] 위치에서 일시정지 (PAUSE 상태로 전환)
         setIsPlaying(false);
         setPlayMode("continuous");
         timelineSync.setProgress(currentCycle, 1);
@@ -409,7 +409,7 @@ export function useSimulationPlayback({
         clock.started = null;
       }
     };
-  }, [isPlaying, playSpeed, totalCycles, isSimulationReady, isSingleEngine, currentCycle, playMode, currentData]);
+  }, [isPlaying, playSpeed, totalCycles, isSimulationReady, isSingleEngine, currentCycle, playMode, currentData, playbackRevision]);
 
   const pauseForFlow = () => {
     playbackClock.current = null;
@@ -435,6 +435,7 @@ export function useSimulationPlayback({
       if (next === 0) {
         setIsStandby(true);
       }
+      timelineSync.setProgress(next, next === 0 ? 0 : 1);
       return next;
     });
   };
@@ -454,37 +455,41 @@ export function useSimulationPlayback({
     setPlaybackRevision((v) => v + 1);
     setIsStandby(false);
     const maxLimit = totalCycles;
-    setCurrentCycle((prev) => Math.min(maxLimit, prev + 1));
+    setCurrentCycle((prev) => {
+      const next = Math.min(maxLimit, prev + 1);
+      timelineSync.setProgress(next, next === 0 ? 0 : 1);
+      return next;
+    });
   };
 
-  // 1회 재생 버튼 핸들러: 현재 사이클(k-1 -> k]을 1회만 재생하고 k에서 멈춤
+  // 1회 재생 버튼 핸들러: 무조건 ( 로 이동하여 ] 까지 1회 재생 후 ] 에서 PAUSE
   const handlePlayCurrentCycle = () => {
-    if (!isSimulationReady || totalCycles <= 0 || (isPlaying && playMode === "singleCycle")) return;
+    if (!isSimulationReady || totalCycles <= 0) return;
+    // 1회 재생 주행 중에는 중복 클릭 방지
+    if (isPlaying && playMode === "singleCycle") return;
+
     onClearSelection();
     setFinishedSingleFrame(null);
 
     // Standby 상태이거나 Cycle 0이면 Cycle 1로 세팅 후 재생
+    const targetCycle = isStandby || currentCycle === 0 ? 1 : currentCycle;
     if (isStandby || currentCycle === 0) {
       setCurrentCycle(1);
       setIsStandby(false);
-      setPlayMode("singleCycle");
-      if (playbackClock.current) {
-        playbackClock.current.remaining = playSpeed;
-      }
-      setIsPlaying(true);
-      setPlaybackRevision((v) => v + 1);
-      triggerPlaybackFeedback("play");
-      return;
     }
 
-    // 일시정지 중이거나 대기 중인 상태에서 1회 재생 시작
+    // 연속재생 중이든, 일시정지 중이든, 완료 상태이든
+    // 무조건 ( 로 이동하여 ] 까지 1회 재생하고 ] 에서 PAUSE 상태로 전환
     setPlayMode("singleCycle");
-    // 해당 사이클이 이미 끝까지 도달(remaining <= 0)한 상태라면 처음(0)부터 다시 재생
-    if (playbackClock.current && playbackClock.current.remaining <= 0) {
-      playbackClock.current.remaining = playSpeed;
-      timelineSync.setProgress(currentCycle, 0);
-    }
-    setIsStandby(false);
+    playbackClock.current = {
+      cycle: targetCycle,
+      frame: currentData,
+      duration: playSpeed,
+      remaining: playSpeed,
+      started: null,
+    };
+    timelineSync.setProgress(targetCycle, 0);
+
     setIsPlaying(true);
     setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("play");
@@ -500,25 +505,35 @@ export function useSimulationPlayback({
     setFinishedSingleFrame(null);
     setPlayMode("continuous");
 
-    if (currentPos >= maxPos && (!isPlaying && playbackClock.current?.remaining === 0)) {
+    if (currentPos >= maxPos && (!isPlaying && (playbackClock.current?.remaining ?? 0) <= 0)) {
+      // 마지막 사이클까지 완료된 상태에서 PLAY를 누르면 처음부터 다시 연속 재생
       setCurrentCycle(1);
       setIsStandby(false);
+      playbackClock.current = null;
       setIsPlaying(true);
       setPlaybackRevision((v) => v + 1);
       triggerPlaybackFeedback("play");
     } else {
       const nextState = !isPlaying;
-      setIsPlaying(nextState);
       if (nextState) {
         setIsStandby(false);
         if (currentPos === 0) {
           setCurrentCycle(1);
-        }
-        if (playbackClock.current && playbackClock.current.remaining <= 0) {
-          playbackClock.current.remaining = playSpeed;
+          playbackClock.current = null;
+        } else if ((playbackClock.current?.remaining ?? 0) <= 0) {
+          // 해당 사이클이 이미 ](완료)에 도달한 상태에서 PLAY를 누르면
+          // 다음 사이클(k+1)로 전진하여 연속 재생 시작
+          if (currentPos < maxPos) {
+            setCurrentCycle(currentPos + 1);
+            playbackClock.current = null;
+          } else {
+            setCurrentCycle(1);
+            playbackClock.current = null;
+          }
         }
         setPlaybackRevision((v) => v + 1);
       }
+      setIsPlaying(nextState);
       triggerPlaybackFeedback(nextState ? "play" : "pause");
     }
   };
@@ -578,7 +593,7 @@ export function useSimulationPlayback({
       setIsStandby(false);
     }
     setCurrentCycle(val);
-    timelineSync.setProgress(val, 0);
+    timelineSync.setProgress(val, val === 0 ? 0 : 1);
   };
 
   return {

@@ -62,14 +62,14 @@ export default function AssistantCompileHint({ language, onOpen, onDismiss }: Pr
       onClick={onOpen}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`absolute right-0 top-full mt-4 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--ar-accent)] bg-white dark:bg-[#252526] px-3 py-2.5 shadow-xl text-[#1F2328] dark:text-gray-100 cursor-pointer select-none transition-all duration-500 ease-in-out ${
+      className={`absolute right-0 top-full mt-4 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--ar-accent)] bg-white px-3 py-2.5 shadow-xl text-[#1F2328] cursor-pointer select-none transition-all duration-500 ease-in-out ${
         isVisible
           ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
           : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'
       }`}
     >
-      <span aria-hidden="true" className="absolute -top-1.5 right-4 h-3 w-3 rotate-45 border-l border-t border-[var(--ar-accent)] bg-white dark:bg-[#252526]" />
-      <p role="status" className="text-xs leading-relaxed text-[#1F2328] dark:text-gray-200">
+      <span aria-hidden="true" className="absolute -top-1.5 right-4 h-3 w-3 rotate-45 border-l border-t border-[var(--ar-accent)] bg-white" />
+      <p role="status" className="text-xs leading-relaxed text-[#1F2328]">
         어시스턴트를 이용해 {language === 'c' ? '컴파일된' : '어셈블된'} 코드의 흐름을 이해해 보세요.
       </p>
     </aside>

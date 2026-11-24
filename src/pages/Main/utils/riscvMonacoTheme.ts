@@ -11,39 +11,39 @@ export const STAGES_CONFIG: {
     key: "IF",
     name: "IF",
     badgeBg: "bg-[#EF4444] text-white",
-    mappedBg: "bg-red-500/10 dark:bg-red-500/20 border-red-400/60 dark:border-red-500/50 text-red-950 dark:text-red-200",
+    mappedBg: "bg-red-500/10 border-red-400/60 text-red-950",
   },
   {
     key: "ID",
     name: "ID",
     badgeBg: "bg-[#F97316] text-white",
-    mappedBg: "bg-orange-500/10 dark:bg-orange-500/20 border-orange-400/60 dark:border-orange-500/50 text-orange-950 dark:text-orange-200",
+    mappedBg: "bg-orange-500/10 border-orange-400/60 text-orange-950",
   },
   {
     key: "EX",
     name: "EX",
-    badgeBg: "bg-[#22C55E] dark:bg-[#15803D] text-white",
-    mappedBg: "bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-400/60 dark:border-emerald-500/50 text-emerald-950 dark:text-emerald-200",
+    badgeBg: "bg-[#22C55E] text-white",
+    mappedBg: "bg-emerald-500/10 border-emerald-400/60 text-emerald-950",
   },
   {
     key: "MEM",
     name: "MEM",
     badgeBg: "bg-[#0EA5E9] text-white",
-    mappedBg: "bg-sky-500/10 dark:bg-sky-500/20 border-sky-400/60 dark:border-sky-500/50 text-sky-950 dark:text-sky-200",
+    mappedBg: "bg-sky-500/10 border-sky-400/60 text-sky-950",
   },
   {
     key: "WB",
     name: "WB",
     badgeBg: "bg-[#8B5CF6] text-white",
-    mappedBg: "bg-purple-500/10 dark:bg-purple-500/20 border-purple-400/60 dark:border-purple-500/50 text-purple-950 dark:text-purple-200",
+    mappedBg: "bg-purple-500/10 border-purple-400/60 text-purple-950",
   },
 ];
 
-export function getRiscvMonacoThemeName(mode: "single" | "pipeline", theme: "light" | "dark"): string {
+export function getRiscvMonacoThemeName(mode: "single" | "pipeline", _theme?: string): string {
   if (mode === "single") {
-    return theme === "dark" ? "riscv-asm-single-dark" : "riscv-asm-single-light";
+    return "riscv-asm-single-light";
   }
-  return theme === "dark" ? "riscv-asm-theme-dark" : "riscv-asm-theme-light";
+  return "riscv-asm-theme-light";
 }
 
 export function registerRiscvAndThemes(monacoInstance: Monaco): void {
@@ -80,32 +80,6 @@ export function registerRiscvAndThemes(monacoInstance: Monaco): void {
     },
   });
 
-  // [파이프라인 모드] 다크: Opcode 보라색 bold (#A78BFA)
-  monacoInstance.editor.defineTheme("riscv-asm-theme-dark", {
-    base: "vs-dark",
-    inherit: false,
-    rules: [
-      { token: "keyword", foreground: "A78BFA", fontStyle: "bold" },
-      { token: "keyword.directive", foreground: "858585", fontStyle: "italic" },
-      { token: "type.identifier", foreground: "E9D5FF", fontStyle: "bold" },
-      { token: "variable.predefined", foreground: "CCCCCC" },
-      { token: "identifier", foreground: "CCCCCC" },
-      { token: "number", foreground: "CCCCCC" },
-      { token: "number.hex", foreground: "CCCCCC" },
-      { token: "comment", foreground: "6E7681", fontStyle: "italic" },
-      { token: "string", foreground: "CCCCCC" },
-    ],
-    colors: {
-      "editor.background": "#1E1E1E",
-      "editor.foreground": "#CCCCCC",
-      "editorLineNumber.foreground": "#858585",
-      "editorLineNumber.activeForeground": "#C4B5FD",
-      "editorGutter.background": "#1E1E1E",
-      "editor.lineHighlightBackground": "#00000000",
-      "editor.lineHighlightBorder": "#00000000",
-    },
-  });
-
   // [싱글 사이클 모드] 라이트: Opcode 파란색 bold (#005FB8)
   monacoInstance.editor.defineTheme("riscv-asm-single-light", {
     base: "vs",
@@ -127,32 +101,6 @@ export function registerRiscvAndThemes(monacoInstance: Monaco): void {
       "editorLineNumber.foreground": "#8C959F",
       "editorLineNumber.activeForeground": "#005FB8",
       "editorGutter.background": "#FFFFFF",
-      "editor.lineHighlightBackground": "#00000000",
-      "editor.lineHighlightBorder": "#00000000",
-    },
-  });
-
-  // [싱글 사이클 모드] 다크: Opcode 파란색 bold (#569CD6)
-  monacoInstance.editor.defineTheme("riscv-asm-single-dark", {
-    base: "vs-dark",
-    inherit: false,
-    rules: [
-      { token: "keyword", foreground: "569CD6", fontStyle: "bold" },
-      { token: "keyword.directive", foreground: "858585", fontStyle: "italic" },
-      { token: "type.identifier", foreground: "9CDCFE", fontStyle: "bold" },
-      { token: "variable.predefined", foreground: "CCCCCC" },
-      { token: "identifier", foreground: "CCCCCC" },
-      { token: "number", foreground: "CCCCCC" },
-      { token: "number.hex", foreground: "CCCCCC" },
-      { token: "comment", foreground: "6E7681", fontStyle: "italic" },
-      { token: "string", foreground: "CCCCCC" },
-    ],
-    colors: {
-      "editor.background": "#1E1E1E",
-      "editor.foreground": "#CCCCCC",
-      "editorLineNumber.foreground": "#858585",
-      "editorLineNumber.activeForeground": "#79C0FF",
-      "editorGutter.background": "#1E1E1E",
       "editor.lineHighlightBackground": "#00000000",
       "editor.lineHighlightBorder": "#00000000",
     },

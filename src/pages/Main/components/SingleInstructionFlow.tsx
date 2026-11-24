@@ -3,7 +3,6 @@ import {
   instructionTransfers,
   instructionPaths,
   transferTimeline,
-  singleFlowDuration,
   type TransferUnit,
   type buildInstructionFlow,
 } from "../utils/instructionFlow";
@@ -14,7 +13,7 @@ import type { SimulationResult } from "@/type/simulation";
 
 export default function SingleInstructionFlow({
   flow,
-  duration = singleFlowDuration(1000),
+  duration = 3000,
   onPause,
   isPlaying,
   executionStatus,
@@ -30,7 +29,7 @@ export default function SingleInstructionFlow({
   const transfers = useMemo(() => instructionTransfers(flow), [flow]);
   const paths = useMemo(() => instructionPaths(flow), [flow]);
   const timeline = useMemo(
-    () => transferTimeline(transfers, paths, duration),
+    () => transferTimeline(transfers, paths, duration, duration),
     [transfers, paths, duration],
   );
   const totalDuration = timeline.reduce(
@@ -73,8 +72,8 @@ export default function SingleInstructionFlow({
       local: globalChanged && isPlaying ? false : clock.local,
       elapsed:
         globalChanged &&
-        isPlaying &&
-        (clock.local || clock.elapsed >= clock.scheduleDuration)
+          isPlaying &&
+          (clock.local || clock.elapsed >= clock.scheduleDuration)
           ? 0
           : scaledElapsed,
     });
@@ -109,9 +108,9 @@ export default function SingleInstructionFlow({
       : "설명 재생 완료";
   const progress = entry.travel
     ? Math.max(
-        0,
-        Math.min(1, (clock.elapsed - entry.start - entry.lead) / entry.travel),
-      )
+      0,
+      Math.min(1, (clock.elapsed - entry.start - entry.lead) / entry.travel),
+    )
     : Math.min(1, (clock.elapsed - entry.start) / entry.duration);
   const arrived = useMemo(
     () => transfers.slice(0, index).map((value) => value.id),

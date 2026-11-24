@@ -3,7 +3,6 @@ import type { EditorSelection } from '../utils/assistantSource';
 import { useMemo, useEffect, useRef, useState } from "react";
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { useTheme } from "@/context/ThemeContext";
 import { getAccessToken } from "@/api/authSession";
 import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
 import { RISCV_LANGUAGE_ID } from "../utils/riscvLanguage";
@@ -81,7 +80,6 @@ export default function TranslationMapping({
   currentFileId,
   isSimulated = false,
 }: Props) {
-  const { theme } = useTheme();
   const trackSelection = useAssistantSelection('asm', onSourceSelection);
   const sourceLines = source.split(/\r?\n/);
   const rows: MappedAssemblyRow[] = useMemo(() => {
@@ -147,8 +145,8 @@ export default function TranslationMapping({
   };
 
   const activeThemeName = useMemo(
-    () => getRiscvMonacoThemeName(mode, theme),
-    [mode, theme]
+    () => getRiscvMonacoThemeName(mode),
+    [mode]
   );
 
   useEffect(() => {
@@ -405,7 +403,7 @@ export default function TranslationMapping({
       <header
         className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors ${activeTarget === "asm"
           ? "border-l-2 border-l-amber-500 bg-[var(--ar-header-bg)]"
-          : "border-l-2 border-l-[#005FB8] dark:border-l-[#007ACC] bg-[var(--ar-header-bg)]"
+          : "border-l-2 border-l-[#005FB8] bg-[var(--ar-header-bg)]"
           }`}
       >
         <div className="flex items-center gap-1.5 min-w-0">
@@ -424,7 +422,7 @@ export default function TranslationMapping({
         </div>
 
         <div className="flex items-center shrink-0 ml-2">
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
+          <span className="text-[10px] text-[#57606A] font-mono truncate">
             {activeTarget === "asm"
               ? "명령어 직접 작성"
               : "C 컴파일 명령어 매핑"}
@@ -433,7 +431,7 @@ export default function TranslationMapping({
       </header>
 
       {/* 2단: 헤더 밑 툴바 라인 */}
-      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] dark:bg-[#1E1E1E] border-b border-[#E5E5E5] dark:border-[#3E3E42] min-w-0">
+      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           <button
             ref={uploadButtonRef}
@@ -441,12 +439,12 @@ export default function TranslationMapping({
             onClick={() => setIsUploadPopupOpen((prev) => !prev)}
             disabled={busy || activeTarget !== "asm"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 focus:outline-none ${activeTarget !== "asm"
-              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
               : isUploadPopupOpen
                 ? mode === "pipeline"
-                  ? "border-[#7C3AED] dark:border-[#8B5CF6] bg-[#7C3AED] dark:bg-[#8B5CF6] text-white cursor-pointer font-semibold"
-                  : "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] dark:bg-[#007ACC] text-white cursor-pointer font-semibold"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                  ? "border-[#7C3AED] bg-[#7C3AED] text-white cursor-pointer font-semibold"
+                  : "border-[#005FB8] bg-[#005FB8] text-white cursor-pointer font-semibold"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
               }`}
             title="어셈블리 파일 불러오기 및 예제 템플릿 열기"
           >
@@ -474,15 +472,15 @@ export default function TranslationMapping({
             onClick={handleSaveAsmClick}
             disabled={busy || activeTarget !== "asm" || !assembly?.trim()}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget !== "asm"
-              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
               : asmSaveSuccess
-                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                ? "border-emerald-500 bg-emerald-50 text-emerald-600 font-semibold cursor-pointer"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
               }`}
             title="현재 어셈블리 코드를 main.s 파일로 다운로드"
           >
             {asmSaveSuccess ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">✓</span>
+              <span className="text-emerald-600 font-bold text-[11px] shrink-0">✓</span>
             ) : (
               <svg
                 className="w-3 h-3 fill-none stroke-current inline @[320px]:hidden shrink-0"
@@ -506,8 +504,8 @@ export default function TranslationMapping({
             onClick={onResetAssembly}
             disabled={busy || activeTarget !== "asm"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget !== "asm"
-              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-              : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
+              : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
               }`}
             title="기본 어셈블리 템플릿으로 초기화"
           >
@@ -526,7 +524,7 @@ export default function TranslationMapping({
             type="button"
             className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${activeTarget === "asm"
               ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 cursor-pointer shadow-2xs"
-              : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
+              : "border border-[#D0D7DE] bg-white text-[#8C959F] opacity-40 cursor-not-allowed"
               }`}
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
@@ -562,7 +560,7 @@ export default function TranslationMapping({
 
       {/* 본문: ASM 직접 작성 모드일 때는 Monaco Editor, C 모드일 때는 매핑 뷰 */}
       {activeTarget === "asm" ? (
-        <div className={`min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E] asm-monaco-container ${mode === "single" ? "is-single-mode" : "is-pipeline-mode"}`}>
+        <div className={`min-h-0 flex-1 relative bg-white asm-monaco-container ${mode === "single" ? "is-single-mode" : "is-pipeline-mode"}`}>
           <Editor
             beforeMount={handleAsmBeforeMount}
             onMount={handleAsmEditorMount}
@@ -602,22 +600,22 @@ export default function TranslationMapping({
           />
         </div>
       ) : busy || (!assembly && rows.length === 0) ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E]">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8]">
           {busy ? (
             <div className="w-7 h-7 border-2 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin mb-3" />
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
+            <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E5E5] flex items-center justify-center text-[#57606A] mb-3 text-lg shadow-2xs">
               📜
             </div>
           )}
-          <p className={`text-xs font-semibold ${busy ? "text-[var(--ar-accent)]" : "text-[#1F2328] dark:text-[#CCCCCC]"}`}>
+          <p className={`text-xs font-semibold ${busy ? "text-[var(--ar-accent)]" : "text-[#1F2328]"}`}>
             {busy
               ? "컴파일 및 어셈블리 매핑 중…"
               : error
                 ? "컴파일 오류로 어셈블리를 생성할 수 없습니다."
                 : "왼쪽 에디터에서 C 코드를 작성하고 [⚡ 컴파일]을 누르세요."}
           </p>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
+          <span className="text-[11px] text-[#57606A] mt-1 max-w-xs">
             컴파일 완료 후 C 코드의 줄을 클릭하면 매핑된 어셈블리 라인이 즉시 강조됩니다.
           </span>
         </div>
@@ -640,7 +638,7 @@ export default function TranslationMapping({
       {activeTarget === "asm" && error && (
         <pre
           role="alert"
-          className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 dark:text-rose-300 font-mono"
+          className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 bg-rose-50 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 font-mono"
         >
           {error}
         </pre>

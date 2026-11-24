@@ -364,15 +364,14 @@ export function useSimulationSession({
     }
 
     const request = beginRequest();
-    if (callbacks.isPlaying || callbacks.currentCycle > 0) {
-      callbacks.triggerPlaybackFeedback("reset");
+    if (callbacks.isPlaying) {
+      callbacks.triggerPlaybackFeedback("pause");
     }
 
     setSimulationEngineMode(m);
 
     const cachedResult = currentSession.simulationCache[m];
     if (cachedResult) {
-      callbacks.onSimulationComplete(cachedResult);
       return;
     }
 

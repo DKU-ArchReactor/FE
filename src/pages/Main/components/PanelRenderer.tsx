@@ -33,6 +33,7 @@ interface PanelRendererProps {
   playSpeed: number;
   onPausePlayback?: () => void;
   isPlaying?: boolean;
+  playMode?: "continuous" | "singleCycle";
   isStandby?: boolean;
   singlePlaybackFinished?: boolean;
   playbackRevision?: number;
@@ -70,6 +71,8 @@ interface PanelRendererProps {
   onCustomAssemblyChange: (val: string) => void;
   onSimulateAssembly: () => void;
   onResetCustomAssembly: () => void;
+  onStepBack?: () => void;
+  onStepForward?: () => void;
   onJumpToCycle: (cycle: number) => void;
 
   // 저장된 파일 목록 상태
@@ -90,6 +93,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   playSpeed,
   onPausePlayback,
   isPlaying,
+  playMode = "continuous",
   isStandby,
   singlePlaybackFinished,
   playbackRevision,
@@ -124,6 +128,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   onCustomAssemblyChange,
   onSimulateAssembly,
   onResetCustomAssembly,
+  onStepBack,
+  onStepForward,
   onJumpToCycle,
 
   savedFiles,
@@ -253,6 +259,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           onClose={onCloseTutor}
           onSelectLine={onSelectTranslationLine}
           onPausePlayback={onPausePlayback}
+          onStepBack={onStepBack}
+          onStepForward={onStepForward}
+          onJumpToCycle={onJumpToCycle}
         />
       );
 
@@ -277,6 +286,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           loadingMessage={loadingMessage}
           mode="pipeline"
           isPlaying={isPlaying}
+          playMode={playMode}
           playSpeed={playSpeed}
           currentCycle={currentCycle}
           playbackRevision={playbackRevision}

@@ -68,7 +68,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const indicatorRef = useRef<HTMLDivElement>(null);
 
   // 현재 연속 진행 위치(0 ~ maxCycle)를 유지하는 ref (PAUSE 시 제자리 정지, PLAY 시 제자리 재개)
-  const continuousPosRef = useRef<number>(currentCycle > 0 ? currentCycle - 1 : 0);
+  const continuousPosRef = useRef<number>(currentCycle > 0 ? currentCycle : 0);
   const prevCycleRef = useRef<number>(currentCycle);
 
   // timelineSync를 통한 내부/외부 시뮬레이션 타임라인 실시간 동기화
@@ -90,7 +90,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     if (prevCycleRef.current !== currentCycle) {
       prevCycleRef.current = currentCycle;
       if (!isPlaying) {
-        const base = currentCycle <= 0 ? 0 : Math.max(0, currentCycle - 1);
+        const base = currentCycle <= 0 ? 0 : currentCycle;
         continuousPosRef.current = base;
         const pct = maxCycle > 0 ? Math.min(100, Math.max(0, (base / maxCycle) * 100)) : 0;
         if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
@@ -148,8 +148,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               } ${
                 editorTarget === "c"
                   ? isSingle
-                    ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
-                    : "bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED] text-white border-[#7C3AED] dark:border-[#8B5CF6] shadow-xs"
+                    ? "bg-[#005FB8] hover:bg-[#004C99] text-white border-[#005FB8] shadow-xs"
+                    : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-[#7C3AED] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -165,8 +165,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               } ${
                 editorTarget === "asm"
                   ? isSingle
-                    ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
-                    : "bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED] text-white border-[#7C3AED] dark:border-[#8B5CF6] shadow-xs"
+                    ? "bg-[#005FB8] hover:bg-[#004C99] text-white border-[#005FB8] shadow-xs"
+                    : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-[#7C3AED] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -213,21 +213,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* [스텝 / 사이클 정보] */}
-        <div className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5 w-[84px]">
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider font-medium shrink-0 w-10 text-right">
+        <div className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[#24292F] ml-0.5 w-[84px]">
+          <span className="text-[10px] text-[#57606A] uppercase tracking-wider font-medium shrink-0 w-10 text-right">
             {isSingle ? "Step:" : "Cycle:"}
           </span>
           <div className="flex items-baseline gap-0.5 font-mono tabular-nums">
             <span
               className={`text-base font-bold transition-colors ${
                 isSingle
-                  ? "text-[#005FB8] dark:text-[#DCDCAA]"
-                  : "text-[#7C3AED] dark:text-[#C084FC]"
+                  ? "text-[#005FB8]"
+                  : "text-[#7C3AED]"
               }`}
             >
               {currentCycle}
             </span>
-            <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+            <span className="text-[10px] text-[#8C959F]">
               /{maxCycle}
             </span>
           </div>
@@ -243,7 +243,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 return (
                   <div
                     key={`tick-${tick}`}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[2.5px] h-[2.5px] bg-[#94A3B8] dark:bg-[#64748B] rounded-full"
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[2.5px] h-[2.5px] bg-[#94A3B8] rounded-full"
                     style={{ left: `${tickPos}%` }}
                   />
                 );
@@ -251,14 +251,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
 
             {/* 배경 트랙 */}
-            <div ref={trackRef} className="absolute inset-x-0 h-1.5 bg-[#E2E8F0] dark:bg-[#2D333B] rounded-full overflow-hidden">
+            <div ref={trackRef} className="absolute inset-x-0 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
               {/* 채워진 진행 바 (DOM 직접 조작으로 리렌더링 없이 부드럽게 연속 슬라이딩) */}
               <div
                 ref={fillBarRef}
                 className={`h-full rounded-full ${
                   isSingle
-                    ? "bg-[#005FB8] dark:bg-[#007ACC]"
-                    : "bg-[#7C3AED] dark:bg-[#8B5CF6]"
+                    ? "bg-[#005FB8]"
+                    : "bg-[#7C3AED]"
                 }`}
                 style={{
                   width: `${initialPct}%`,
@@ -276,10 +276,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 }}
               >
                 <div
-                  className={`w-3.5 h-3.5 rounded-full shadow-md border-2 border-white dark:border-[#1E1E1E] ${
+                  className={`w-3.5 h-3.5 rounded-full shadow-md border-2 border-white ${
                     isSingle
-                      ? "bg-[#005FB8] dark:bg-[#388BFD]"
-                      : "bg-[#7C3AED] dark:bg-[#A855F7]"
+                      ? "bg-[#005FB8]"
+                      : "bg-[#7C3AED]"
                   }`}
                 />
               </div>
@@ -299,7 +299,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
 
           {!isReady && (
-            <div className="hidden sm:flex items-center gap-1 shrink-0 px-2 py-0.5 rounded bg-[#F6F8FA] dark:bg-[#1E1E1E] border border-[#D0D7DE] dark:border-[#3E3E42] text-[#57606A] dark:text-[#858585] text-[10px]">
+            <div className="hidden sm:flex items-center gap-1 shrink-0 px-2 py-0.5 rounded bg-[#F6F8FA] border border-[#D0D7DE] text-[#57606A] text-[10px]">
               <span>💡</span>
               <span>C 코드 작성 후 <strong>[컴파일]</strong>을 누르면 시뮬레이터가 동작합니다</span>
             </div>
@@ -308,13 +308,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* 2. VS Code 디버그 액션 툴바 (Control Buttons - 모바일 숨김) */}
-      <div className="hidden md:flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] dark:bg-[#333333] p-0.5 rounded border border-[#D0D7DE] dark:border-[#3E3E42]">
+      <div className="hidden md:flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] p-0.5 rounded border border-[#D0D7DE]">
         {/* 1) 초기화 버튼 (정사각형 정지/리셋 아이콘) */}
         <button
           onClick={onReset}
           disabled={!isReady || currentCycle === 0 || isCyclePlaying}
           title={isCyclePlaying ? "1회 재생 진행 중..." : "처음으로 초기화 (Reset / Stop)"}
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          className="p-1 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
             <rect x="5" y="5" width="14" height="14" rx="2" />
@@ -333,8 +333,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           }
           className={`p-1 rounded transition-colors cursor-pointer disabled:cursor-not-allowed ${
             isCyclePlaying
-              ? "text-[#10B981] dark:text-[#34D399] bg-[#ECFDF5] dark:bg-[#064E3B]/40 font-bold ring-1 ring-[#10B981]/50"
-              : "text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:pointer-events-none"
+              ? "text-[#10B981] bg-[#ECFDF5] font-bold ring-1 ring-[#10B981]/50"
+              : "text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:pointer-events-none"
           }`}
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -347,7 +347,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           onClick={onStepBack}
           disabled={!isReady || currentCycle <= 0 || isCyclePlaying}
           title={isCyclePlaying ? "1회 재생 진행 중..." : isSingle ? "이전 스텝 (Step Back)" : "이전 사이클 (Cycle Back)"}
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          className="p-1 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -361,10 +361,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           title={isCyclePlaying ? "1회 재생 진행 중..." : isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
           className={`w-[76px] shrink-0 justify-center py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
             isPlaying && !isCyclePlaying 
-              ? 'bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold' 
+              ? 'bg-[#D97706] hover:bg-[#B45309] text-white font-extrabold' 
               : isSingle
-              ? 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
-              : 'bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED]'
+              ? 'bg-[#005FB8] hover:bg-[#004C99]'
+              : 'bg-[#7C3AED] hover:bg-[#6D28D9]'
           }`}
         >
           <span className="w-2.5 h-2.5 flex items-center justify-center shrink-0">
@@ -387,7 +387,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           onClick={onStepForward}
           disabled={!isReady || currentCycle >= maxCycle || isCyclePlaying}
           title={isCyclePlaying ? "1회 재생 진행 중..." : isSingle ? "다음 스텝 실행 (Step Forward)" : "다음 사이클 진행 (Cycle Forward)"}
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          className="p-1 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -396,7 +396,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* 3. 속도 조절 (모바일 숨김) */}
-      <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] dark:border-[#3E3E42] pl-2 text-[10px]">
+      <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] pl-2 text-[10px]">
         {[
           { label: "0.5x", speed: 6000 },
           { label: "1.0x", speed: 3000 },
@@ -414,9 +414,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
                 isSelected
                   ? isSingle
-                    ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold"
-                    : "bg-[#7C3AED] dark:bg-[#8B5CF6] text-white font-bold"
-                  : "text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC] hover:bg-[#EAEAEA] dark:hover:bg-[#333333]"
+                    ? "bg-[#005FB8] text-white font-bold"
+                    : "bg-[#7C3AED] text-white font-bold"
+                  : "text-[#57606A] hover:text-[#24292F] hover:bg-[#EAEAEA]"
               }`}
             >
               {label}

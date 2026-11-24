@@ -32,7 +32,7 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
             key={msg.id}
             className={`flex flex-col gap-1 ${msg.sender === "user" ? "items-end" : "items-start"}`}
           >
-            <div className="flex items-center gap-1.5 text-[10px] text-[#57606A] dark:text-[#858585] px-1">
+            <div className="flex items-center gap-1.5 text-[10px] text-[#57606A] px-1">
               <span>{msg.sender === "user" ? "나" : "ArchReactor AI"}</span>
               <span>·</span>
               <span>{msg.time}</span>
@@ -41,9 +41,9 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
               className={`rounded-2xl px-3.5 py-2.5 min-w-0 max-w-[85%] break-words shadow-2xs ${
                 msg.sender === "user"
                   ? isSingle
-                    ? "bg-[#005FB8] dark:bg-[#007ACC] text-white rounded-tr-none font-medium whitespace-pre-wrap"
-                    : "bg-[#7C3AED] dark:bg-[#8B5CF6] text-white rounded-tr-none font-medium whitespace-pre-wrap"
-                  : "bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] text-[#1F2328] dark:text-[#CCCCCC] rounded-tl-none font-normal"
+                    ? "bg-[#005FB8] text-white rounded-tr-none font-medium whitespace-pre-wrap"
+                    : "bg-[#7C3AED] text-white rounded-tr-none font-medium whitespace-pre-wrap"
+                  : "bg-[#F3F4F6] border border-[#E5E5E5] text-[#1F2328] rounded-tl-none font-normal"
               }`}
             >
               {msg.sender === "ai" ? (
@@ -96,7 +96,7 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
                 </button>
               )}
               {msg.notice && (
-                <p role="status" className="mt-1 text-[#57606A] dark:text-[#AAAAAA]">
+                <p role="status" className="mt-1 text-[#57606A]">
                   {msg.notice}
                 </p>
               )}
@@ -110,14 +110,14 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
             role="status"
             aria-live="polite"
             data-testid="assistant-progress"
-            className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F3F4F6] dark:bg-[#2D2D2D] border border-[#E5E5E5] dark:border-[#3E3E42] max-w-[140px]"
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F3F4F6] border border-[#E5E5E5] max-w-[140px]"
           >
             <div
               className={`w-4 h-4 border-2 ${
-                isSingle ? "border-[#005FB8] dark:border-[#007ACC]" : "border-[#7C3AED] dark:border-[#8B5CF6]"
+                isSingle ? "border-[#005FB8]" : "border-[#7C3AED]"
               } border-t-transparent rounded-full animate-spin`}
             />
-            <span className="text-[11px] text-[#57606A] dark:text-[#858585] font-medium animate-pulse">
+            <span className="text-[11px] text-[#57606A] font-medium animate-pulse">
               {responsePhase === "waiting" ? "답변 준비 중…" : "답변 받는 중…"}
             </span>
           </div>
