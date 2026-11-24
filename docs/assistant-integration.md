@@ -1,0 +1,161 @@
+# AI assistant and backend tutor integration
+
+## Scope and dependencies
+
+This frontend consumes the backend tutor APIs and SOLID assistant APIs, including
+[BE #9](https://github.com/DKU-ArchReactor/BE/pull/9)'s selected execution context.
+Set `VITE_API_URL` to the backend URL (currently
+`https://d1j3nkcez6kncs.cloudfront.net`). No SOLID key belongs in frontend settings.
+The frontend implementation is not a deployment. Merging main/develop currently
+triggers existing S3 deployment workflows; confirm deployment authorization and
+account/bucket configuration separately before merging.
+
+## User flow
+
+- Logged-in simulations request `capture_assistant_context: true` for both engine
+  results. Guest simulations omit it. Outer `tutor` and `assistant_context` remain
+  attached to their exact simulation response. Missing/unavailable descriptors
+  disable execution attachment without disabling general questions.
+- The assistant checks `/api/v1/assistant/status` whenever opened. Disabled,
+  failed status checks and logged-out sessions cannot send messages or quick
+  questions. The user can explicitly recheck status.
+- Execution attachment is **off by default**. When selected, the question captures
+  the actual history item's `clock`, execution UUID, result version, ELF hash and
+  mode. It sends at most 16 explicitly selected aligned memory addresses; by
+  default no memory is requested. Values/trace/tutor text are not reconstructed
+  into the chat request. The backend resolves authorized evidence.
+- Single mode's initial UI step 0 is a synthetic pre-execution frame and cannot
+  be attached. UI step 1 attaches CORE clock 0. Pipeline uses the selected history
+  item's clock directly. Playback after sending does not change a pending question.
+- The answer's evidence badge uses `done.context`, and appears only when the
+  server returned a matching reference. A pending request is labelled separately.
+  Domain refusals, greetings and clarification notices have no completed badge.
+- Code edits, editor type switches, recompilation, mode changes, logout and account
+  changes invalidate the relevant attachment. In-flight compile/run requests are
+  cancelled and generation checks discard late responses even if cancellation is
+  ignored. Returning to an earlier cached engine still requires explicit selection.
+- Chat text remains in component memory only, never localStorage. Account changes
+  clear it and abort requests. Normal workspace changes preserve completed chat;
+  prior messages describe prior runs, while each new context reference is explicit.
+
+## SSE and error handling
+
+POST fetch with Bearer auth and streaming TextDecoder handles split Korean UTF-8,
+CRLF, comments and delta/done/error. An EOF before done is an error. Stop, close,
+unmount and account switch abort the connection. A 90-second client deadline
+bounds a stalled connection; backend classification and answer still share their
+existing 60-second deadline. There is no automatic request retry.
+
+HTTP 401/403 asks for login, 429 explains limits and 503 explains readiness.
+CONTEXT_NOT_FOUND / EXPIRED / MISMATCH / CYCLE_UNAVAILABLE / MEMORY_UNAVAILABLE /
+TOO_LARGE offer explicit corrective action; they never silently drop context and
+retry. Schema 422 arrays receive a readable format error. SSE provider and
+classification errors terminate the loading state. max_tokens shows truncation.
+“질문 다시 입력” restores the question into the editor; the user reviews the current
+attachment and submits a **new** request, which may consume another quota unit.
+
+Only completed user/assistant pairs are included in subsequent bounded history
+(maximum 20 messages, 8,000 Unicode code points each, 24,000 total). Failed,
+cancelled and truncated pairs are excluded. The current server has no decision
+field in done, so its three exact fixed service notices are excluded using
+`isServiceNotice`; synchronize these strings if the backend changes them. Empty
+usage alone never means a refusal, and is never displayed as zero token usage.
+
+## Limits
+
+Execution references do not attach compile-time C-line explanations, the entire trace,
+console output or a full memory dump. It is not an autonomous execution analyzer.
+Snapshot defaults remain server-controlled (three recent executions / 30 minutes).
+Each compile currently runs both modes, so two snapshots can be retained. Local
+expiry disables attachment; eviction before expiry is reported by the server.
+The frontend cannot guarantee model accuracy or domain containment.
+
+## Verification
+
+```sh
+npm ci
+npm test
+npx playwright install chromium --only-shell
+npm run test:browser
+npm run build
+```
+
+Browser tests use a local-only harness rendering the real popup, session hook,
+playback hook and auth-session hook, with mocked compile/simulation/status/chat
+responses, plus a full workspace smoke test with two-cycle excerpts of CORE
+`tests/program2.elf` (commit `7e9e6c856522f4af4c2e62a7fc3b2f1074ad228c`). They do not call SOLID, modify production data or spend model quota.
+`tests/` is not a production build entry. Use `PLAYWRIGHT_BROWSERS_PATH` if a
+separate browser cache is desired. Screenshots are saved in ignored test-results/.
+
+Before release, verify the deployed backend schema and exercise real login,
+compile, single/pipeline, optional memory, streaming, expiry and quota behaviour
+against the intended environment. This PR's browser tests establish frontend
+contract behaviour; they do not substitute for an authenticated production E2E.
+
+## Markdown and attachment guidance follow-up
+
+Assistant messages render Markdown headings, lists, tables, quotes, code and KaTeX math. Both dollar delimiters and SOLID-style LaTeX delimiters are supported; code examples remain literal. The renderer loads on demand and keeps streaming text available while loading. Raw HTML is skipped, remote Markdown images are not loaded, and links are limited to HTTP(S). KaTeX trust is disabled and expansion/size are bounded. All KaTeX consumers use the same patched version through the package override.
+
+Each question records whether execution evidence was attached. The popup explains how to compile/assemble, step and attach when there is no result, and explicitly warns when an available result is not selected. At that earlier follow-up, editor source was not attached. The current editor-source section below supersedes that behavior.
+
+Validation: 20 Node tests (including Markdown/math, unsafe output, partial streaming syntax), production build and changed-source lint pass. Static browser preview: `/tests/browser/markdown.html` (development only, synthetic data, no model call). This follow-up does not rerun the previous 17 browser scenarios or the production model smoke test. The existing dependency audit findings outside the added rendering dependency chain remain a separate maintenance task.
+
+
+## Current editor source (requires the editor-source backend API)
+
+When a question is sent, the active C editor or editable ASM input is captured as `editor_source: { language, content }`. It defaults on, can be disabled, and sends nothing while typing. Compiled assembly from an older build is never substituted. The popup shows language/length and each question's attachment state. A draft is not proof of execution and may differ from an attached snapshot.
+
+Limits: 12,000 Unicode code points / 48,000 UTF-8 bytes. Empty text is omitted; oversize text is rejected rather than silently truncated. If `/assistant/status` lacks `editor_source_supported: true`, the UI explains that the backend is not ready and does not send the source request. Deploy the supporting backend first. Turning attachment off omits the current editor field; previous answers may still contain quoted code in conversation history.
+
+Latest verification: 23 Node tests, build and changed-source lint passed. Browser checks on the actual PR main screen verified C/ASM selection, source counts and logged-out blocking. The isolated `/tests/browser/source-attachment.html` fixture verified C capture, edit refresh, ASM capture, opt-out, and unsupported-server blocking with an unchanged request count. This fixture uses synthetic code and mock SSE, not SOLID. The production backend remains the separate live API; source-bearing SOLID smoke testing is pending deployment of the new backend.
+
+
+## Compact attachments and selected code
+
+Attachment chips now sit below the send input; details and memory selection are collapsed under attachment settings. Dragging (or keyboard-selecting) nonblank text in the active C/ASM Monaco editor automatically selects that snippet for the next question. The chip shows original line numbers, and the message records the sent range. Moving focus to chat retains the selection. Clearing the selection uses the whole current draft; changing language or document invalidates an old selection. Removing the code chip disables source attachment until re-enabled or a new valid selection is made.
+
+The API contract remains `editor_source: { language, content }`; only the selected text is sent, without a full-document copy or local range metadata. Existing source size checks and backend capability gating still apply. Prior answer text can still quote previously attached code.
+
+Execution is separate: use `+ 실행 · clock N` to attach the currently selected cycle, and the chip's remove button to omit it. There is no duplicate execution checkbox. Code selection does not infer an execution cycle, and cycle ranges are not supported. Memory selection, expiry and request-time snapshot validation remain unchanged.
+
+Validation: 25 Node tests and production build; local UI checks use actual C/ASM Monaco drag selections and isolated mock chat requests. These do not constitute a live SOLID source-attachment test.
+
+Welcome copy is one sentence. Eight emoji-labeled suggestions share one horizontally scrolling row above the conversation: code explanation, C/ASM mapping, registers, control flow, stack, hazards, CPI, and code/execution comparison. They fill the input without sending; users review attachments and press Send. Prompts distinguish provided execution evidence from general explanations and request missing data.
+
+## 컴파일 안내 및 질문 예시
+
+- C 컴파일 또는 ASM 어셈블 결과가 도착하면 어시스턴트 버튼을 강조하고, 코드 흐름을 질문하도록 안내하는 말풍선을 표시합니다. 실패하거나 무효화된 요청에는 표시하지 않습니다.
+- 말풍선 닫기·어시스턴트 열기·새 빌드·코드/작성 모드 변경 시 안내를 정리합니다. 닫은 안내는 단순 스텝 이동에 다시 나타나지 않습니다.
+- 첫 인사는 “코드와 실행 과정에서 궁금한 점을 물어보세요.”입니다. 대화 안의 질문 예시 영역은 제거하고, 중복 주제를 통합한 이모지 버튼 8개를 상단 한 줄의 가로 스크롤로 표시합니다. 예시 선택은 입력창만 채우고 자동 전송하지 않습니다.
+- 로컬 모의 검증: `/tests/browser/compile-hint.html`에서 실제 Main 화면의 컴파일·어셈블·실패·닫기·열기를 확인할 수 있습니다. 앱 API 요청은 모의 응답이며 실제 SOLID를 호출하지 않습니다.
+- `develop` 병합은 DEV S3 자동 배포를 실행합니다. `main` 운영 배포는 별도입니다. 이 UI 변경은 백엔드 질문 한도 변경과 독립적입니다.
+
+
+## 실제 SOLID 버튼 검증 (2026-11-13)
+
+로컬 프론트에서 운영 백엔드에 로그인하고 내장 loop.c를 pipeline으로 컴파일한 뒤 clock 25의 실행과 C 원문 전체를 첨부했습니다. 8개 버튼을 같은 대화에서 각각 한 번 전송했습니다. 이전 답변이 후속 질문에 영향을 줄 수 있는 사용 흐름 검증이며 독립 평가나 정확도 보장은 아닙니다. 대화 원문·계정 정보·비밀값은 이 문서에 저장하지 않습니다.
+
+| 버튼 | 관찰 결과 |
+| --- | --- |
+| 코드 설명 | 응답 수신. 정적 합계 10 설명은 맞지만 불필요한 전체 실행 해설과 추측이 길게 이어짐. |
+| C·ASM 매핑 | 일반 요청 실패 안내. UI 정보만으로 서버/판별/공급자 중 원인은 확정하지 못함. |
+| 레지스터 변화 | 응답 수신 후 길이 제한으로 중단. 명령어별 읽기/쓰기는 설명했으나 추측성 타이밍 설명 포함. |
+| 분기·반복 | C 반복 조건 설명은 맞음. 초기화 여부 추측과 주소 계산 오류 포함. |
+| 스택 구조 | 간결 지침 적용 후 짧게 수신. 두 주소 차이 0x20(32바이트)를 4바이트로 잘못 계산. |
+| 해저드 분석 | 짧게 수신하고 스톨을 인식. load 주소 계산 단계를 MEM으로 잘못 설명하고 플러시 여부는 누락. |
+| CPI 분석 | 짧게 수신. 포워딩만으로 load-use 스톨 대부분을 없앨 수 있다는 근거 없는 개선 효과 제시. |
+| 코드·실행 비교 | 짧게 수신. not_verified임에도 유사한 코드라는 이유로 동일 구현이라고 과도하게 확정. |
+
+길이 개선: 추천 질문에 결론 한 문장 + 핵심 근거 2~3개, 약 500자, 반복 표/요약 생략 지침을 추가했습니다. 마지막 4개 질문은 이 지침으로 검증했으며 잘림 없이 완료했습니다. 모든 직접 입력 질문에 적용할 기본 규칙은 백엔드 시스템 프롬프트의 별도 로컬 변경으로 준비했습니다. 운영 배포 전이므로 이 결과는 새 백엔드 지침의 실모델 검증이 아닙니다.
+
+남은 개선: (1) PerformanceMetrics가 서버 누적 지표 대신 WB PC/명령어를 중복 제거해 계산하므로 반복 실행 및 어시스턴트 지표와 달라질 수 있습니다. 서버의 누적 완료 명령어/포워딩 수와 집계 기준을 통일해야 합니다. (2) 주소 산술, load-use/포워딩 효과, 초안과 실행 동일성 판단을 회귀 평가에 포함해야 합니다. (3) 매핑 요청 오류는 응답 오류 코드와 서버 상관관계 식별자를 통한 진단이 필요합니다. 추가 실제 요청 재시도는 하지 않았습니다.
+
+검증: 프론트 Node 테스트 29개와 변경 파일 lint 통과. 답변을 짧게 하는 것만으로 기술적 정확성이 보장되지는 않습니다.
+
+## 검증된 실행 답변의 수신 처리
+
+BE PR #14의 실행 답변은 서버 검증이 끝난 후 하나의 `delta`와 `done`으로 도착할 수 있습니다. 연결/keepalive 주석만 수신하면 `답변 준비 중…`을 유지하고, 비어 있지 않은 delta부터 `답변 받는 중…`으로 표시합니다. 완료 또는 오류 전까지 입력·중복 전송은 막고, 전송 버튼 자리는 활성화된 중단 버튼으로 바뀝니다. 종료하면 다시 전송 버튼으로 돌아옵니다. 첫 delta 이전의 중단과 수신 중 창 닫기도 연결을 취소합니다.
+
+서버의 고정 실행 근거 확인 실패 문구는 서비스 안내로 분류합니다. `done.context`가 있더라도 성공한 분석의 참고 실행 배지를 붙이지 않고, 해당 질문/답변을 다음 대화 이력에서 제외합니다. `질문 다시 입력`은 입력창만 채우며 자동 재요청하지 않습니다. 현재 SSE에 판별 상태 필드가 없으므로 고정 문구를 정확히 비교합니다(주변 공백 제외). 서버 문구가 바뀌면 이 목록도 함께 갱신해야 합니다.
+
+검증: Node 테스트 34개, Playwright 21개, production build 및 변경 TypeScript 파일 lint 통과. `/tests/browser/validated-response.html`에서 대기, 단일 delta, 완료, 근거 확인 실패, 오류, 연결 종료를 직접 조작할 수 있습니다. 이 화면은 API를 모두 모의 처리하며 실제 SOLID 평가나 운영 배포 검증을 대신하지 않습니다. 다른 로컬 서버와 충돌 시 `PLAYWRIGHT_PORT=4184 npm run test:browser`로 별도 포트를 사용할 수 있습니다.

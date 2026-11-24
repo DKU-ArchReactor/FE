@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { FileSummary } from "@/type/file";
 import { getFiles, getFileById, saveFile } from "@/api/file";
+import { getAccessToken, useAuthSession } from "@/api/authSession";
 
 export const DEFAULT_TRANSLATION_SOURCE =
   "int main(void) {\n    int a = 5;\n    int b = 3;\n    int sum = a + b;\n    return sum;\n}\n";
@@ -8,14 +9,16 @@ export const TRANSLATION_SOURCE_KEY = "archreactor.translation.source";
 
 export function useFileManager(
   initialFileId: string | null,
+  example?: { source: string; fileName: string },
   onInitialResetSimulation?: () => void
 ) {
+  const [savedTranslation, setSavedTranslation] = useState<{ id: string; content: string } | null>(null);
   const [fileId, setFileId] = useState<string | null>(initialFileId);
-  const [cFileName, setCFileName] = useState<string>("main.c");
+  const [cFileName, setCFileName] = useState<string>(example?.fileName ?? "main.c");
+  const [asmFileName, setAsmFileName] = useState<string>("main.s");
   const [savedFiles, setSavedFiles] = useState<FileSummary[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(
-    () => !!localStorage.getItem("access_token")
-  );
+  const auth = useAuthSession();
+  const isLoggedIn = auth.authenticated;
 
   const loadedInitialFileIdRef = useRef<string | null>(null);
   const onInitialResetRef = useRef(onInitialResetSimulation);
@@ -25,7 +28,7 @@ export function useFileManager(
   }, [onInitialResetSimulation]);
 
   const [translationSource, setTranslationSource] = useState(
-    () => sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE
+    () => example?.source ?? (sessionStorage.getItem(TRANSLATION_SOURCE_KEY) || DEFAULT_TRANSLATION_SOURCE)
   );
   const [translationAssembly, setTranslationAssembly] = useState("");
   const [translationError, setTranslationError] = useState("");
@@ -33,14 +36,13 @@ export function useFileManager(
 
   // 로그인 상태 및 파일 목록 불러오기
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
+    if (!isLoggedIn) {
       return;
     }
     getFiles()
       .then((list) => setSavedFiles(list))
       .catch((err) => console.error("Saved file list fetch error:", err));
-  }, []);
+  }, [isLoggedIn, auth.epoch]);
 
   const updateTranslationSource = useCallback(
     (
@@ -53,6 +55,7 @@ export function useFileManager(
       setTranslationSource(source);
       setCFileName(fileName);
       setFileId(keepFileId);
+      setSavedTranslation(keepFileId ? { id: keepFileId, content: source } : null);
       sessionStorage.setItem(TRANSLATION_SOURCE_KEY, source);
       setTranslationAssembly("");
       setTranslationError("");
@@ -84,7 +87,7 @@ export function useFileManager(
   );
 
   const handleSaveTranslationFile = async (nameToSave?: string): Promise<boolean> => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (!token) {
       alert("파일 저장은 로그인 후 이용할 수 있습니다.");
       return false;
@@ -101,12 +104,41 @@ export function useFileManager(
       });
       setFileId(saved.file_id);
       setCFileName(saved.title);
+      setSavedTranslation({ id: saved.file_id, content: translationSource });
       const updatedList = await getFiles();
       setSavedFiles(updatedList);
       return true;
     } catch (err) {
       console.error("Save file error:", err);
       alert("파일 저장 중 오류가 발생했습니다.");
+      return false;
+    }
+  };
+
+  const handleSaveAssemblyFile = async (content: string, nameToSave?: string): Promise<boolean> => {
+    const token = getAccessToken();
+    if (!token) {
+      alert("파일 저장은 로그인 후 이용할 수 있습니다.");
+      return false;
+    }
+
+    const title = (nameToSave || asmFileName || "main.s").trim();
+    if (!title) return false;
+
+    try {
+      const saved = await saveFile({
+        title,
+        content,
+        lang: "asm",
+      });
+      setFileId(saved.file_id);
+      setAsmFileName(saved.title);
+      const updatedList = await getFiles();
+      setSavedFiles(updatedList);
+      return true;
+    } catch (err) {
+      console.error("Save assembly file error:", err);
+      alert("어셈블리 파일 저장 중 오류가 발생했습니다.");
       return false;
     }
   };
@@ -133,15 +165,31 @@ export function useFileManager(
       });
   }, [initialFileId, updateTranslationSource]);
 
+  const ensureFileContent = useCallback(
+    async (targetId: string): Promise<{ title: string; content: string } | null> => {
+      try {
+        const detail = await getFileById(targetId);
+        return { title: detail.title, content: detail.content };
+      } catch (err) {
+        console.error("File detail fetch error:", err);
+        return null;
+      }
+    },
+    []
+  );
+
   return {
     fileId,
+    savedTranslationFileId: savedTranslation?.id === fileId && savedTranslation.content === translationSource ? fileId : null,
     setFileId,
     cFileName,
     setCFileName,
-    savedFiles,
+    asmFileName,
+    setAsmFileName,
+    cContent: translationSource,
+    savedFiles: isLoggedIn ? savedFiles : [],
     setSavedFiles,
     isLoggedIn,
-    setIsLoggedIn,
     translationSource,
     setTranslationSource,
     translationAssembly,
@@ -151,8 +199,10 @@ export function useFileManager(
     translationBusy,
     setTranslationBusy,
     updateTranslationSource,
+    ensureFileContent,
     handleOpenSavedFileInEditor,
     handleSaveTranslationFile,
+    handleSaveAssemblyFile,
     DEFAULT_TRANSLATION_SOURCE,
   };
 }

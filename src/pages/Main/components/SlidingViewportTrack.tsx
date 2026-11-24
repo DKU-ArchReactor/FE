@@ -12,6 +12,9 @@ interface SlidingViewportTrackProps {
   onSlotResizeStart: (secIdx: number, slotIdx: number, topRatio: number, btmRatio: number, e: React.MouseEvent) => void;
   onPairReset?: (secIdx: number, slotIdx: number) => void;
   onSlotReset?: (secIdx: number, slotIdx: number) => void;
+  mobileLeadSection?: React.ReactNode;
+  mobileExtraSection?: React.ReactNode;
+  mobileViewportIndex?: number;
 }
 
 export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
@@ -25,15 +28,29 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
   onSlotResizeStart,
   onPairReset,
   onSlotReset,
+  mobileLeadSection,
+  mobileExtraSection,
+  mobileViewportIndex,
 }) => {
+  const effectiveMobileIndex = mobileViewportIndex ?? rightViewportIndex;
+
   return (
     <div ref={containerRef} className="flex-1 h-full min-w-0 overflow-hidden relative">
       <div
-        className="flex h-full w-full transition-transform duration-500 ease-in-out"
-        style={{
-          transform: `translate3d(-${rightViewportIndex * 100}%, 0, 0)`,
-        }}
+        className="flex h-full w-full transition-transform duration-500 ease-in-out translate-x-[var(--mobile-tx)] md:translate-x-[var(--desktop-tx)]"
+        style={
+          {
+            "--mobile-tx": `-${effectiveMobileIndex * 100}%`,
+            "--desktop-tx": `-${rightViewportIndex * 100}%`,
+          } as React.CSSProperties
+        }
       >
+        {mobileLeadSection && (
+          <div className="flex md:hidden h-full min-h-0 shrink-0 w-full overflow-hidden flex-col gap-1.5">
+            {mobileLeadSection}
+          </div>
+        )}
+
         {sections.map((section, secIdx) => {
           return (
             <div
@@ -44,9 +61,14 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
               <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {section.slots.map((slot, slotIdx) => {
                   const isMetricsFixed =
-                    section.id === "sec-4" &&
+                    section.id === "sec-5" &&
                     slot.type === "single" &&
                     slot.panel === "metrics";
+
+                  const isTimingDiagram =
+                    section.id === "sec-5" &&
+                    slot.type === "single" &&
+                    slot.panel === "multiCycle";
 
                   const defaultRatio =
                     section.slots.length === 2 &&
@@ -61,12 +83,16 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                       <div
                         className={
                           isMetricsFixed
-                            ? "shrink-0 min-h-fit flex w-full"
+                            ? "shrink min-h-0 flex flex-col w-full overflow-hidden"
+                            : isTimingDiagram
+                            ? "min-h-0 overflow-hidden flex flex-col"
                             : "min-h-0 overflow-hidden flex"
                         }
                         style={
                           isMetricsFixed
-                            ? { flex: "0 0 auto" }
+                            ? { flex: "0 1 auto", maxHeight: "min(60%, calc(100% - 40vh))" }
+                            : isTimingDiagram
+                            ? { flex: `${flexVal} 1 0%`, minHeight: "max(40%, 40vh)" }
                             : { flex: `${flexVal} 1 0%` }
                         }
                       >
@@ -75,7 +101,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                           <div
                             className={
                               isMetricsFixed
-                                ? "w-full flex flex-col p-[1.5px]"
+                                ? "w-full max-h-full flex flex-col min-h-0 overflow-hidden p-[1.5px]"
                                 : "w-full h-full flex flex-col min-h-0 overflow-hidden p-[1.5px]"
                             }
                           >
@@ -113,14 +139,14 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                                 onPairReset?.(secIdx, slotIdx);
                               }}
                               title="좌우로 드래그하여 가로 분할 비율 조절 (더블클릭: 50:50 리셋)"
-                              className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+                              className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
                             >
                               <div
                                 className={`w-[3px] rounded-full transition-all duration-200 ${
                                   resizingPair?.secIdx === secIdx &&
                                   resizingPair?.slotIdx === slotIdx
-                                    ? "h-16 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                                    : "h-8 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-14 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                                    ? "h-16 bg-[var(--ar-accent)] shadow-sm"
+                                    : "h-8 bg-[#D0D7DE] group-hover:h-14 group-hover:bg-[var(--ar-accent)]"
                                 }`}
                               />
                             </div>
@@ -138,7 +164,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                       </div>
 
                       {/* 세로 슬롯 간 실시간 높이 조절 스플리터 바 */}
-                      {slotIdx < section.slots.length - 1 && (
+                      {slotIdx < section.slots.length - 1 && section.id !== "sec-5" && (
                         <div
                           onMouseDown={(e) => {
                             if (e.detail === 2) {
@@ -147,11 +173,10 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                               onSlotReset?.(secIdx, slotIdx);
                               return;
                             }
-                            const isSec4 = section.id === "sec-4";
-                            const topSlot = isSec4 ? section.slots[0] : section.slots[slotIdx];
-                            const btmSlot = isSec4 ? section.slots[2] : section.slots[slotIdx + 1];
-                            const topRatio = topSlot?.flexRatio ?? (isSec4 ? 1.8 : 1);
-                            const btmRatio = btmSlot?.flexRatio ?? (isSec4 ? 1.0 : 1);
+                            const topSlot = section.slots[slotIdx];
+                            const btmSlot = section.slots[slotIdx + 1];
+                            const topRatio = topSlot?.flexRatio ?? 1;
+                            const btmRatio = btmSlot?.flexRatio ?? 1;
                             onSlotResizeStart(
                               secIdx,
                               slotIdx,
@@ -165,19 +190,15 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                             e.stopPropagation();
                             onSlotReset?.(secIdx, slotIdx);
                           }}
-                          title={
-                            section.id === "sec-4"
-                              ? "위아래로 드래그하여 다이어그램과 해저드 영역 높이 조절 (더블클릭: 기본 위치 리셋)"
-                              : "위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 기본 리셋)"
-                          }
-                          className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+                          title="위아래로 드래그하여 슬롯 높이 비율 조절 (더블클릭: 기본 리셋)"
+                          className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
                         >
                           <div
                             className={`h-[3px] rounded-full transition-all duration-200 ${
                               resizingRowSlot?.secIdx === secIdx &&
                               resizingRowSlot?.slotIdx === slotIdx
-                                ? "w-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                                : "w-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                                ? "w-24 bg-[var(--ar-accent)] shadow-sm"
+                                : "w-10 bg-[#D0D7DE] group-hover:w-20 group-hover:bg-[var(--ar-accent)]"
                             }`}
                           />
                         </div>
@@ -189,6 +210,12 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
             </div>
           );
         })}
+
+        {mobileExtraSection && (
+          <div className="flex md:hidden h-full min-h-0 shrink-0 w-full overflow-hidden p-[1.5px]">
+            {mobileExtraSection}
+          </div>
+        )}
       </div>
     </div>
   );

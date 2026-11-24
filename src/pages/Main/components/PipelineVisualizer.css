@@ -1,0 +1,148 @@
+/* 1) 실선 펄스 애니메이션 (dash 없음, 굵기와 투명도만 펄스 전파) */
+@keyframes solidPulseStep0 {
+  0%       { opacity: 0.35; stroke-width: 2.8; }
+  12%, 28% { opacity: 1.0;  stroke-width: 4.0; }
+  45%      { opacity: 0.85; stroke-width: 2.8; }
+  85%      { opacity: 0.8;  stroke-width: 2.8; }
+  100%     { opacity: 0.35; stroke-width: 2.8; }
+}
+@keyframes solidPulseStep1 {
+  0%, 18%  { opacity: 0.25; stroke-width: 2.8; }
+  30%, 48% { opacity: 1.0;  stroke-width: 4.0; }
+  65%      { opacity: 0.85; stroke-width: 2.8; }
+  85%      { opacity: 0.8;  stroke-width: 2.8; }
+  100%     { opacity: 0.25; stroke-width: 2.8; }
+}
+@keyframes solidPulseStep2 {
+  0%, 40%  { opacity: 0.25; stroke-width: 2.8; }
+  52%, 72% { opacity: 1.0;  stroke-width: 4.0; }
+  82%      { opacity: 0.85; stroke-width: 2.8; }
+  90%      { opacity: 0.8;  stroke-width: 2.8; }
+  100%     { opacity: 0.25; stroke-width: 2.8; }
+}
+@keyframes solidPulseStep3 {
+  0%, 65%  { opacity: 0.25; stroke-width: 2.8; }
+  75%, 94% { opacity: 1.0;  stroke-width: 4.0; }
+  98%      { opacity: 0.85; stroke-width: 2.8; }
+  100%     { opacity: 0.35; stroke-width: 2.8; }
+}
+
+.wire-solid-step-0 {
+  animation: solidPulseStep0 2.0s linear infinite;
+}
+.wire-solid-step-1 {
+  animation: solidPulseStep1 2.0s linear infinite;
+}
+.wire-solid-step-2 {
+  animation: solidPulseStep2 2.0s linear infinite;
+}
+.wire-solid-step-3 {
+  animation: solidPulseStep3 2.0s linear infinite;
+}
+
+/* 2) 점선 제어선 애니메이션 (strokeDasharray 6 3 유지, dashoffset 행진 및 펄스) */
+@keyframes dashedPulseStep0 {
+  0%       { stroke-dashoffset: 36; opacity: 0.35; stroke-width: 2.8; }
+  12%, 28% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+  45%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+  85%      { stroke-dashoffset: -36; opacity: 0.8; stroke-width: 2.8; }
+  100%     { stroke-dashoffset: -54; opacity: 0.35; stroke-width: 2.8; }
+}
+@keyframes dashedPulseStep1 {
+  0%, 18%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
+  30%, 48% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+  65%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+  85%      { stroke-dashoffset: -36; opacity: 0.8; stroke-width: 2.8; }
+  100%     { stroke-dashoffset: -54; opacity: 0.25; stroke-width: 2.8; }
+}
+@keyframes dashedPulseStep2 {
+  0%, 40%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
+  52%, 72% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+  82%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+  90%      { stroke-dashoffset: -27; opacity: 0.8; stroke-width: 2.8; }
+  100%     { stroke-dashoffset: -36; opacity: 0.25; stroke-width: 2.8; }
+}
+@keyframes dashedPulseStep3 {
+  0%, 65%  { stroke-dashoffset: 36; opacity: 0.25; stroke-width: 2.8; }
+  75%, 94% { stroke-dashoffset: 18; opacity: 1.0;  stroke-width: 3.6; }
+  98%      { stroke-dashoffset: 0;  opacity: 0.85; stroke-width: 2.8; }
+  100%     { stroke-dashoffset: -18; opacity: 0.35; stroke-width: 2.8; }
+}
+
+.wire-dashed-step-0 {
+  stroke-dasharray: 6 3;
+  animation: dashedPulseStep0 2.0s linear infinite;
+}
+.wire-dashed-step-1 {
+  stroke-dasharray: 6 3;
+  animation: dashedPulseStep1 2.0s linear infinite;
+}
+.wire-dashed-step-2 {
+  stroke-dasharray: 6 3;
+  animation: dashedPulseStep2 2.0s linear infinite;
+}
+.wire-dashed-step-3 {
+  stroke-dasharray: 6 3;
+  animation: dashedPulseStep3 2.0s linear infinite;
+}
+
+@keyframes dotPulse0 {
+  0%, 100% { r: 3.5; opacity: 0.5; }
+  15%      { r: 5.5; opacity: 1.0; }
+  35%      { r: 3.5; opacity: 0.85; }
+}
+@keyframes dotPulse1 {
+  0%, 15%, 100% { r: 3.5; opacity: 0.5; }
+  35%           { r: 5.5; opacity: 1.0; }
+  55%           { r: 3.5; opacity: 0.85; }
+}
+@keyframes dotPulse2 {
+  0%, 38%, 100% { r: 3.5; opacity: 0.5; }
+  58%           { r: 5.5; opacity: 1.0; }
+  78%           { r: 3.5; opacity: 0.85; }
+}
+@keyframes dotPulse3 {
+  0%, 62%, 100% { r: 3.5; opacity: 0.5; }
+  82%           { r: 5.5; opacity: 1.0; }
+  98%           { r: 3.5; opacity: 0.85; }
+}
+.dot-step-0 { animation: dotPulse0 2.0s ease-in-out infinite; }
+.dot-step-1 { animation: dotPulse1 2.0s ease-in-out infinite; }
+.dot-step-2 { animation: dotPulse2 2.0s ease-in-out infinite; }
+.dot-step-3 { animation: dotPulse3 2.0s ease-in-out infinite; }
+
+@keyframes boxPulse0 {
+  0%, 100% { stroke-width: 2px; }
+  15%      { stroke-width: 3.2px; }
+  35%      { stroke-width: 2px; }
+}
+@keyframes boxPulse1 {
+  0%, 15%, 100% { stroke-width: 2px; }
+  35%           { stroke-width: 3.2px; }
+  55%           { stroke-width: 2px; }
+}
+@keyframes boxPulse2 {
+  0%, 38%, 100% { stroke-width: 2px; }
+  58%           { stroke-width: 3.2px; }
+  78%           { stroke-width: 2px; }
+}
+@keyframes boxPulse3 {
+  0%, 62%, 100% { stroke-width: 2px; }
+  82%           { stroke-width: 3.2px; }
+  98%           { stroke-width: 2px; }
+}
+.box-step-0 { animation: boxPulse0 2.0s ease-in-out infinite; }
+.box-step-1 { animation: boxPulse1 2.0s ease-in-out infinite; }
+.box-step-2 { animation: boxPulse2 2.0s ease-in-out infinite; }
+.box-step-3 { animation: boxPulse3 2.0s ease-in-out infinite; }
+
+/* 4) 점선 제어선 실시간 흐름 애니메이션 스타일 (CSSOM 재연산 방지를 위해 외부 파일로 분리) */
+@keyframes dashedFlow {
+  from { stroke-dashoffset: 36; }
+  to   { stroke-dashoffset: 0; }
+}
+.wire-dashed-flowing {
+  stroke-dasharray: 6 3;
+  animation: dashedFlow 1.2s linear infinite;
+}
+

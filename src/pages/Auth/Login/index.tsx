@@ -1,8 +1,9 @@
+import { setAuthTokens } from '@/api/authSession';
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { login } from "@/api/auth";
-import type { LoginRequest, ValidationErrorResponse } from "@/type/auth";
+import type { LoginRequest } from "@/type/auth";
+import { parseApiError } from "@/utils/errorParser";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -25,22 +26,12 @@ const LoginPage = () => {
 
     try {
       const res = await login(formData);
-      localStorage.setItem("access_token", res.access_token);
-      localStorage.setItem("token_type", res.token_type);
-      navigate("/");
+      setAuthTokens(res.access_token, res.token_type);
+      navigate("/simulator");
     } catch (error) {
-      if (axios.isAxiosError<ValidationErrorResponse>(error)) {
-        const detail = error.response?.data?.detail;
-        if (Array.isArray(detail) && detail.length > 0) {
-          setErrorMsg(detail.map((d) => d.msg).join(", "));
-        } else if (typeof detail === "string") {
-          setErrorMsg(detail);
-        } else {
-          setErrorMsg("로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.");
-        }
-      } else {
-        setErrorMsg("서버와 통신 중 오류가 발생했습니다.");
-      }
+      setErrorMsg(
+        parseApiError(error, "로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.")
+      );
     } finally {
       setIsLoading(false);
     }

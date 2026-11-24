@@ -1,43 +1,37 @@
 import React, { useState, useEffect } from 'react';
+import { formatSignedDecimal } from '../utils/memoryLayout';
 
 interface RegisterVisualizerProps {
   registers: Record<string, string>;
   prevRegisters?: Record<string, string>;
   playSpeed?: number;
   cycle?: number;
+  mode?: 'single' | 'pipeline';
 }
-
-// 16진수 문자열을 사람이 읽기 편한 부호 있는 10진수로 변환 (32비트 2의 보수)
-const formatSignedDec = (hexStr: string): string => {
-  const num = parseInt(hexStr, 16);
-  if (isNaN(num)) return '0';
-  const signed = num | 0;
-  return signed.toLocaleString();
-};
 
 type RegisterGroup = 'zero' | 'special' | 'args' | 'saved' | 'temp';
 
 // 레지스터 그룹별 고유 시그니처 색상 (이름 & 데이터값 매핑)
 const GROUP_COLORS: Record<RegisterGroup, { name: string; data: string }> = {
   zero: {
-    name: 'text-slate-500 dark:text-slate-400',
-    data: 'text-slate-500 dark:text-slate-400',
+    name: 'text-slate-500',
+    data: 'text-slate-500',
   },
   special: {
-    name: 'text-purple-600 dark:text-purple-400',
-    data: 'text-purple-700 dark:text-purple-300',
+    name: 'text-purple-600',
+    data: 'text-purple-700',
   },
   args: {
-    name: 'text-emerald-600 dark:text-emerald-400',
-    data: 'text-emerald-700 dark:text-emerald-300',
+    name: 'text-emerald-600',
+    data: 'text-emerald-700',
   },
   saved: {
-    name: 'text-amber-600 dark:text-amber-400',
-    data: 'text-amber-700 dark:text-amber-300',
+    name: 'text-amber-600',
+    data: 'text-amber-700',
   },
   temp: {
-    name: 'text-sky-600 dark:text-sky-400',
-    data: 'text-sky-700 dark:text-sky-300',
+    name: 'text-sky-600',
+    data: 'text-sky-700',
   },
 };
 
@@ -91,6 +85,7 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   prevRegisters,
   playSpeed = 1000,
   cycle = 0,
+  mode = 'pipeline',
 }) => {
   // x0부터 x31까지 고정 순서 (32개)
   const regKeys = REG_KEYS;
@@ -106,8 +101,10 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
     prevRegsRef.current = registers;
 
     if (!referencePrev) {
-      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
-      return;
+      const timer = window.setTimeout(() => {
+        setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     const changed = new Set<string>();
@@ -121,42 +118,57 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
     });
 
     if (changed.size > 0) {
-      setPulsingKeys(changed);
+      const startTimer = window.setTimeout(() => {
+        setPulsingKeys(changed);
+      }, 0);
       // 속도의 절반(50%) 동안 점등 상태 유지 후 원래 파스텔 색상으로 복귀
       const halfDuration = Math.max(120, Math.round(playSpeed * 0.5));
-      const timer = window.setTimeout(() => {
+      const endTimer = window.setTimeout(() => {
         setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
       }, halfDuration);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(startTimer);
+        clearTimeout(endTimer);
+      };
     } else {
-      setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      const timer = window.setTimeout(() => {
+        setPulsingKeys((prev) => (prev.size === 0 ? prev : new Set()));
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [cycle, registers, prevRegisters, playSpeed, regKeys]);
 
   return (
     <div className="flex-1 bg-[var(--ar-panel-bg)] rounded-lg border border-[var(--ar-border)] flex flex-col min-h-0 overflow-hidden select-none font-mono text-[var(--ar-text-primary)] shadow-sm transition-colors duration-150">
       {/* VS Code VARIABLES / WATCH 스타일 헤더 (레지스터 전용 앰버 액센트 바) */}
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-amber-500 font-sans">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[11px] text-amber-500 font-bold">◆</span>
-          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
+      <div className="h-8 shrink-0 flex items-center justify-between px-2 md:px-3.5 bg-[var(--ar-header-bg)] border-b border-[var(--ar-border)] min-w-0 border-l-2 border-l-amber-500 font-sans">
+        <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+          <span className="text-[10px] md:text-[11px] text-amber-500 font-bold shrink-0">◆</span>
+          <h3 className="font-sans text-[9.5px] sm:text-[10px] md:text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-tight md:tracking-wide truncate">
             REGISTERS (x0 ~ x31)
           </h3>
         </div>
-        <span className="text-[10px] text-[var(--ar-text-muted)] font-mono">
-          CLK:{cycle ?? 0}
+        <span className="hidden md:inline text-[10px] text-[var(--ar-text-muted)] font-mono shrink-0 w-16 text-right tabular-nums">
+          {mode === 'single' ? `STEP:${cycle ?? 0}` : `CYCLE:${cycle ?? 0}`}
         </span>
       </div>
 
       {/* 32개 레지스터 그리드: VS Code 디버거 변수 인스펙터 룩앤필 */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1.5 py-0.5 divide-y divide-[var(--ar-border-subtle)]">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-1 md:px-1.5 py-0.5 divide-y divide-[var(--ar-border-subtle)]">
         {regKeys.map((regKey, idx) => {
           const val = registers[regKey] || '0x00000000';
+          const decStr = formatSignedDecimal(val);
           const isPulsing = pulsingKeys.has(regKey);
           const hasVal = val !== '0x00000000';
           const meta = REGISTER_METAS[regKey] || { abi: regKey, group: 'temp' as RegisterGroup };
           const groupColor = GROUP_COLORS[meta.group] || GROUP_COLORS.temp;
+          const valSizeClass =
+            decStr.length > 10
+              ? 'text-[8.5px] md:text-[10.5px]'
+              : decStr.length > 7
+              ? 'text-[9.5px] md:text-[11px]'
+              : 'text-[10.5px] md:text-[11px]';
 
           // 그룹 경계선
           const prevMeta = idx > 0 ? REGISTER_METAS[regKeys[idx - 1]] : undefined;
@@ -166,63 +178,63 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
             <div
               key={regKey}
               title={`${meta.desc || regKey} (Hex: ${val})`}
-              className={`flex-1 min-h-0 flex items-center justify-between px-2 text-[11px] transition-colors duration-100 ${
-                isGroupStart ? 'border-t border-t-[#D0D7DE] dark:border-t-[#3E3E42]' : ''
+              className={`flex-1 min-h-0 flex items-center justify-between px-1.5 md:px-2 text-[10.5px] md:text-[11px] transition-colors duration-100 ${
+                isGroupStart ? 'border-t border-t-[#D0D7DE]' : ''
               } ${
                 isPulsing
-                  ? 'bg-[#FFF8C5] dark:bg-[#37373D] text-[#9A6700] dark:text-[#E5B567] font-bold'
+                  ? 'bg-[#FFF8C5] text-[#9A6700] font-bold'
                   : hasVal
-                  ? 'bg-white dark:bg-[#252526]/50 hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#1F2328] dark:text-[#D4D4D4]'
-                  : 'hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E]/50 text-[#656D76] dark:text-[#6E7681]'
+                  ? 'bg-white hover:bg-[#F6F8FA] text-[#1F2328]'
+                  : 'hover:bg-[#F6F8FA] text-[#656D76]'
               }`}
             >
               {/* 1열 (좌측): [ABI 이름] (레지스터 번호) - 고정 너비로 수직 정렬선 일치 */}
-              <div className="w-[72px] shrink-0 flex items-center gap-1 min-w-0">
-                <span className={`w-8 font-bold text-left ${
+              <div className="w-[58px] md:w-[72px] shrink-0 flex items-center gap-0.5 md:gap-1 min-w-0">
+                <span className={`w-7 md:w-8 font-bold text-left ${
                   isPulsing 
-                    ? 'text-[#9A6700] dark:text-[#E5B567]' 
+                    ? 'text-[#9A6700]' 
                     : groupColor.name
                 }`}>
                   {meta.abi}
                 </span>
 
-                <span className={`text-[10px] tabular-nums ${
+                <span className={`text-[9px] md:text-[10px] tabular-nums ${
                   isPulsing
-                    ? 'text-[#9A6700]/70 dark:text-[#E5B567]/70'
+                    ? 'text-[#9A6700]/70'
                     : hasVal
-                    ? 'text-[#57606A] dark:text-[#CCCCCC] font-medium'
-                    : 'text-[#8C959F] dark:text-[#6E7681]'
+                    ? 'text-[#57606A] font-medium'
+                    : 'text-[#8C959F]'
                 }`}>
                   ({regKey})
                 </span>
               </div>
 
-              {/* 2열 (중앙): 독립된 역할 설명 열 (왼쪽 시작선 완벽 일치 및 값 존재 시 볼드 파랑 강조) */}
-              <div className="flex-1 min-w-0 px-2.5 text-left truncate">
+              {/* 2열 (중앙): 독립된 역할 설명 열 (모바일 숨김, md 이상 노출) */}
+              <div className="hidden md:block flex-1 min-w-0 px-2.5 text-left truncate">
                 <span className={`text-[9.5px] font-sans tracking-tight ${
                   hasVal
-                    ? 'font-bold text-[#005FB8] dark:text-[#79C0FF]'
-                    : 'text-[#8C959F] dark:text-[#858585]'
+                    ? 'font-bold text-[#005FB8]'
+                    : 'text-[#8C959F]'
                 }`}>
                   {meta.role}
                 </span>
               </div>
 
-              {/* 3열 (우측): 부호 있는 10진수 값 (우측 끝 정렬) */}
+              {/* 3열 (우측): 부호 있는 10진수 값 (길이에 따른 반응형 폰트 축소로 잘림 방지) */}
               <div
                 title={`Hex: ${val}`}
-                className="w-24 shrink-0 text-right tabular-nums font-mono select-text cursor-help"
+                className="flex-1 md:flex-none md:w-24 min-w-0 text-right tabular-nums font-mono select-text cursor-help whitespace-nowrap"
               >
                 <span
-                  className={`text-[11px] ${
+                  className={`${valSizeClass} ${
                     isPulsing
-                      ? 'text-[#CF222E] dark:text-[#F44747] font-black'
+                      ? 'text-[#CF222E] font-black'
                       : hasVal
                       ? `${groupColor.data} font-bold`
-                      : 'text-[#8C959F] dark:text-[#6E7681] font-normal'
+                      : 'text-[#8C959F] font-normal'
                   }`}
                 >
-                  {formatSignedDec(val)}
+                  {decStr}
                 </span>
               </div>
             </div>
@@ -233,4 +245,4 @@ const RegisterVisualizer: React.FC<RegisterVisualizerProps> = ({
   );
 };
 
-export default RegisterVisualizer;
+export default React.memo(RegisterVisualizer);

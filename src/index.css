@@ -1,8 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 /* ======================================================== */
 /* ArchReactor IDE 테마 CSS 변수 & 계층화 팔레트              */
 /* ======================================================== */
@@ -14,44 +12,28 @@
   --ar-border-subtle: #F1F5F9;
   --ar-text-primary: #1F2328;
   --ar-text-muted: #656D76;
-  --ar-accent: #005FB8;
-}
 
-html.dark {
-  --ar-canvas-bg: #141416;
-  --ar-panel-bg: #1E1E22;
-  --ar-header-bg: #26262B;
-  --ar-border: #33353F;
-  --ar-border-subtle: #2A2C35;
-  --ar-text-primary: #D4D4D8;
-  --ar-text-muted: #8E8EA0;
-  --ar-accent: #007ACC;
+  /* 모드 기본 색상 정의 */
+  --ar-mode-single: #005FB8;
+  --ar-mode-single-hover: #004C99;
+  --ar-mode-pipeline: #7C3AED;
+  --ar-mode-pipeline-hover: #6D28D9;
+  --ar-accent: var(--ar-mode-single);
+  --ar-accent-hover: var(--ar-mode-single-hover);
 }
 
 /* Single Mode (정밀/시퀀셜) Ambient 틴트 */
 html.mode-single {
   --ar-canvas-bg: #F8FAFC;
-  --ar-accent: #0284C7;
-}
-html.dark.mode-single {
-  --ar-canvas-bg: #12151B;
-  --ar-panel-bg: #1A1E26;
-  --ar-header-bg: #222733;
-  --ar-border: #2C3545;
-  --ar-accent: #38BDF8;
+  --ar-accent: var(--ar-mode-single);
+  --ar-accent-hover: var(--ar-mode-single-hover);
 }
 
-/* Pipeline Mode (병렬/파이프라인) Ambient 틴트 */
+/* Pipeline Mode (병렬/파이프라인) Ambient 틴트 (배경은 그레이 유지, 보라색 포인트 액센트) */
 html.mode-pipeline {
-  --ar-canvas-bg: #F2EEF8;
-  --ar-accent: #7C3AED;
-}
-html.dark.mode-pipeline {
-  --ar-canvas-bg: #15131C;
-  --ar-panel-bg: #1D1A27;
-  --ar-header-bg: #262234;
-  --ar-border: #36304A;
-  --ar-accent: #A855F7;
+  --ar-canvas-bg: #F8FAFC;
+  --ar-accent: var(--ar-mode-pipeline);
+  --ar-accent-hover: var(--ar-mode-pipeline-hover);
 }
 
 body {
@@ -59,11 +41,6 @@ body {
   background-color: var(--ar-canvas-bg);
   color: var(--ar-text-primary);
   transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-html.dark body {
-  background-color: var(--ar-canvas-bg);
-  color: var(--ar-text-primary);
 }
 
 /* ======================================================== */
@@ -79,7 +56,7 @@ html.dark body {
   }
 }
 
-html.mode-single:not(.dark) main.is-playing-single-light {
+html.mode-single main.is-playing-single-light {
   background:
     radial-gradient(ellipse 90% 70% at 20% 20%, rgba(224, 242, 254, 0.35) 0%, rgba(255, 255, 255, 0) 70%),
     radial-gradient(ellipse 80% 60% at 80% 80%, rgba(232, 244, 252, 0.3) 0%, rgba(255, 255, 255, 0) 70%),
@@ -100,51 +77,69 @@ html.mode-single:not(.dark) main.is-playing-single-light {
   transition: background 0.8s ease-in-out;
 }
 
+html.mode-pipeline main.is-playing-pipeline-light {
+  background:
+    radial-gradient(ellipse 90% 70% at 20% 20%, rgba(243, 232, 255, 0.32) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 80% 60% at 80% 80%, rgba(245, 243, 255, 0.28) 0%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #faf7fd 12.5%,
+      #f5f0fa 25%,
+      #ede4f7 37.5%,
+      #ffffff 50%,
+      #faf7fd 62.5%,
+      #f5f0fa 75%,
+      #ede4f7 87.5%,
+      #ffffff 100%
+    );
+  background-size: 100% 100%, 100% 100%, 200% 200%;
+  animation: playPastelFogGlide 18s linear infinite;
+  transition: background 0.8s ease-in-out;
+}
+
 /* 패널 외곽 소프트 섀도우 통일 (밝은 캔버스 위에서 깔끔한 입체감 유지) */
 .shadow-sm {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
   transition: box-shadow 0.6s ease-in-out;
 }
-html.dark .shadow-sm {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.25) !important;
-}
 
 /* Single Light 재생(PLAY) 시 각 컴포넌트 그림자만 파스텔톤 하늘색으로 변환 (테두리는 기존 테두리 유지) */
-html.mode-single:not(.dark) main.is-playing-single-light .rounded-lg.shadow-sm {
+html.mode-single main.is-playing-single-light .rounded-lg.shadow-sm {
   box-shadow: 0 4px 16px 0 rgba(56, 189, 248, 0.16), 0 1px 3px 0 rgba(14, 165, 233, 0.1) !important;
 }
 
-/* ======================================================== */
-/* 테마 전환 시 자연스럽고 부드러운 색상/배경 페이드 트랜지션 */
-/* ======================================================== */
-html.theme-transitioning,
-html.theme-transitioning *,
-html.theme-transitioning *::before,
-html.theme-transitioning *::after {
-  transition: background-color 350ms cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 350ms cubic-bezier(0.4, 0, 0.2, 1),
-              color 350ms cubic-bezier(0.4, 0, 0.2, 1),
-              fill 350ms cubic-bezier(0.4, 0, 0.2, 1),
-              stroke 350ms cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 350ms cubic-bezier(0.4, 0, 0.2, 1) !important;
-  transition-delay: 0s !important;
+/* Pipeline Light 재생(PLAY) 시 각 컴포넌트 그림자 파스텔톤 연보라색으로 변환 */
+html.mode-pipeline main.is-playing-pipeline-light .rounded-lg.shadow-sm {
+  box-shadow: 0 4px 16px 0 rgba(192, 132, 252, 0.18), 0 1px 3px 0 rgba(168, 85, 247, 0.12) !important;
 }
 
 /* Monaco Editor 선택 라인 하이라이트 스타일 */
 /* 1. 코드 영역 배경색 */
 .monaco-selected-c-line {
-  background-color: #eff6ff !important; /* bg-blue-50 */
+  background-color: #eff6ff !important; /* bg-blue-50 (기본/싱글사이클) */
+}
+html.mode-pipeline .monaco-selected-c-line {
+  background-color: #f5f3ff !important; /* bg-purple-50 (파이프라인) */
 }
 
-/* 2. 라인 넘버 뒤의 거터 전체 행을 파란색으로 채우고, 맨 왼쪽에 4px 파란 액센트 바 배치 */
+/* 2. 라인 넘버 뒤의 거터 전체 행을 채우고, 맨 왼쪽에 4px 액센트 바 배치 */
 .monaco-editor .margin-view-overlays > div:has(.monaco-selected-c-linenumber) {
   background-color: #eff6ff !important;
   box-shadow: inset 4px 0 0 0 #2563eb !important; /* 맨 왼쪽 4px 파란 바 */
+}
+html.mode-pipeline .monaco-editor .margin-view-overlays > div:has(.monaco-selected-c-linenumber) {
+  background-color: #f5f3ff !important;
+  box-shadow: inset 4px 0 0 0 #7c3aed !important; /* 맨 왼쪽 4px 보라색 바 */
 }
 
 /* 3. 라인 넘버 숫자 텍스트 선명하게 강조 */
 .monaco-editor .line-numbers.monaco-selected-c-linenumber {
   color: #1d4ed8 !important; /* blue-700 진한 파란색 */
+  font-weight: 700 !important;
+}
+html.mode-pipeline .monaco-editor .line-numbers.monaco-selected-c-linenumber {
+  color: #6d28d9 !important; /* purple-700 진한 보라색 */
   font-weight: 700 !important;
 }
 
@@ -182,53 +177,6 @@ html.theme-transitioning *::after {
   background-color: #ffffff !important;
 }
 
-html.dark .monaco-editor .margin {
-  background-color: #1e1e1e !important;
-}
-
-/* Dark mode Monaco Line Highlights */
-html.dark .monaco-selected-c-line {
-  background-color: #04395e !important;
-}
-
-html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-selected-c-linenumber) {
-  background-color: #04395e !important;
-  box-shadow: inset 4px 0 0 0 #007acc !important;
-}
-
-html.dark .monaco-editor .line-numbers.monaco-selected-c-linenumber {
-  color: #9cdcfe !important;
-  font-weight: 700 !important;
-}
-
-html.dark .monaco-executing-c-line {
-  background-color: #133a27 !important;
-}
-
-html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-c-linenumber) {
-  background-color: #133a27 !important;
-  box-shadow: inset 4px 0 0 0 #23d18b !important;
-}
-
-html.dark .monaco-editor .line-numbers.monaco-executing-c-linenumber {
-  color: #7ee787 !important;
-  font-weight: 700 !important;
-}
-
-html.dark .monaco-executing-selected-c-line {
-  background-color: #0e3a47 !important;
-}
-
-html.dark .monaco-editor .margin-view-overlays > div:has(.monaco-executing-selected-c-linenumber) {
-  background-color: #0e3a47 !important;
-  box-shadow: inset 4px 0 0 0 #007acc !important;
-}
-
-html.dark .monaco-editor .line-numbers.monaco-executing-selected-c-linenumber {
-  color: #4fc1ff !important;
-  font-weight: 700 !important;
-}
-
 /* VS Code 스타일 얇은 스크롤바 */
 ::-webkit-scrollbar {
   width: 7px;
@@ -243,12 +191,6 @@ html.dark .monaco-editor .line-numbers.monaco-executing-selected-c-linenumber {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 100, 100, 0.45);
-}
-html.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-}
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
 }
 
 /* Play/Pause/Reset/Trash 화면 중앙 팝업 & 블러 페이드아웃 애니메이션 (1.15초 프리미엄 트랜지션) */
@@ -330,4 +272,172 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 .upload-popup-drop-anim {
   transform-origin: top left;
   animation: uploadPopupDropFromButton 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ======================================================== */
+/* Monaco Editor ASM 직접 작성 모드 전용 하이라이트 스타일   */
+/* (선택 라인은 C 에디터의 싱글/파이프라인 포커싱 색상과 100% 통일) */
+/* ======================================================== */
+.asm-monaco-container .monaco-editor,
+.asm-monaco-container .monaco-editor .monaco-editor-background,
+.asm-monaco-container .monaco-editor .margin {
+  background-color: transparent !important;
+}
+
+/* 1. 라인 넘버 왼쪽 여백: 매핑 뷰의 4px 테두리 + 20px 화살표 + 14px 브래킷 = 38px 여백을 라인번호 왼쪽에 부여 */
+.asm-monaco-container .monaco-editor .glyph-margin {
+  width: 38px !important;
+  background-color: transparent !important;
+}
+
+/* ======================================================== */
+/* 1. 기본 상태 (Default / Unfocused Line Numbers)          */
+/* 모든 일반 라인넘버는 모드 불문 중립 회색(#8C959F, #858585) & 두께 400 */
+/* ======================================================== */
+.asm-monaco-container .monaco-editor .line-numbers {
+  left: 38px !important;
+  width: 32px !important;
+  box-sizing: border-box !important;
+  color: #8C959F !important;
+  font-family: 'D2Coding', Consolas, 'Fira Code', monospace !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 24px !important;
+  padding-right: 12px !important;
+  text-align: right !important;
+}
+
+/* 2. 에디터 본문 텍스트 폰트 및 행간 정확한 매칭 */
+.asm-monaco-container .monaco-editor .view-lines,
+.asm-monaco-container .monaco-editor .view-line {
+  font-family: 'D2Coding', Consolas, 'Fira Code', monospace !important;
+  font-size: 13px !important;
+  line-height: 24px !important;
+  letter-spacing: normal !important;
+}
+
+/* ======================================================== */
+/* 2. 포커싱(커서 활성 / 선택) 라인 넘버                   */
+/* 1) 싱글 모드: 파란색 볼드체 (#005FB8 / 다크 #79C0FF, 700)   */
+/* 2) 파이프라인 모드: 보라색 볼드체 (#6D28D9 / 다크 #C4B5FD, 700) */
+/* ======================================================== */
+
+/* [싱글 모드 - 포커싱/선택 라인넘버] */
+.asm-monaco-container.is-single-mode .monaco-editor.focused .line-numbers.active-line-number,
+.asm-monaco-container .monaco-editor .line-numbers.monaco-selected-asm-linenumber-single,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-selected-asm-linenumber-single {
+  color: #005FB8 !important;
+  font-weight: 700 !important;
+}
+
+/* [파이프라인 모드 - 포커싱/선택 라인넘버] */
+.asm-monaco-container.is-pipeline-mode .monaco-editor.focused .line-numbers.active-line-number,
+.asm-monaco-container .monaco-editor .line-numbers.monaco-selected-asm-linenumber-pipeline,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-selected-asm-linenumber-pipeline {
+  color: #6D28D9 !important;
+  font-weight: 700 !important;
+}
+
+/* ======================================================== */
+/* 3. 실행 중인 라인 넘버 (에메랄드 볼드체 #047857)           */
+/* ======================================================== */
+.asm-monaco-container .monaco-editor .line-numbers.monaco-executing-asm-linenumber,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-executing-asm-linenumber,
+.asm-monaco-container .monaco-editor .line-numbers.monaco-executing-selected-asm-linenumber,
+.asm-monaco-container .monaco-editor .line-numbers.active-line-number.monaco-executing-selected-asm-linenumber {
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+/* ======================================================== */
+/* 4. 선택/실행 라인 배경 및 좌측 인디케이터 바              */
+/* ======================================================== */
+
+/* [싱글 모드 선택 라인] */
+.monaco-selected-asm-line-single {
+  background-color: #eff6ff !important;
+}
+.monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber-single) {
+  background-color: #eff6ff !important;
+  box-shadow: inset 4px 0 0 0 #005fb8 !important;
+}
+
+/* [파이프라인 모드 선택 라인] */
+.monaco-selected-asm-line-pipeline {
+  background-color: #f5f3ff !important;
+}
+.monaco-editor .margin-view-overlays > div:has(.monaco-selected-asm-linenumber-pipeline) {
+  background-color: #f5f3ff !important;
+  box-shadow: inset 4px 0 0 0 #7c3aed !important;
+}
+
+/* [실행 라인] */
+.monaco-executing-asm-line {
+  background-color: #ecfdf5 !important;
+}
+.monaco-editor .margin-view-overlays > div:has(.monaco-executing-asm-linenumber) {
+  background-color: #ecfdf5 !important;
+  box-shadow: inset 4px 0 0 0 #059669 !important;
+}
+
+/* [실행 중이면서 선택된 라인] */
+.monaco-executing-selected-asm-line-single {
+  background-color: #eff6ff !important;
+}
+.monaco-executing-selected-asm-line-pipeline {
+  background-color: #f5f3ff !important;
+}
+
+/* ======================================================== */
+/* 5. Opcode 하이라이트                                     */
+/* ======================================================== */
+
+/* 싱글모드 선택된 라인 Opcode: 파란색 볼드 */
+.monaco-selected-asm-opcode-single {
+  color: #005FB8 !important;
+  font-weight: 700 !important;
+}
+
+/* 파이프라인 모드 선택된 라인 Opcode: 보라색 볼드 */
+.monaco-selected-asm-opcode-pipeline {
+  color: #6D28D9 !important;
+  font-weight: 700 !important;
+}
+
+/* 실행 중인 라인 Opcode: 에메랄드 볼드 */
+.monaco-executing-asm-opcode {
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+/* ======================================================== */
+/* ArchReactor 브랜드 로고 인터랙티브 틸트 & 젤리 호버 효과 */
+/* ======================================================== */
+@keyframes logoWobble {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  22% {
+    transform: scale(1.1) rotate(-8deg);
+  }
+  48% {
+    transform: scale(1.1) rotate(6deg);
+  }
+  74% {
+    transform: scale(1.08) rotate(-3deg);
+  }
+  100% {
+    transform: scale(1.08) rotate(0deg);
+  }
+}
+
+.ar-logo-wobble {
+  transform-origin: center center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+.group:hover .ar-logo-wobble,
+.landing-brand:hover .ar-logo-wobble {
+  animation: logoWobble 0.46s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }

@@ -30,69 +30,96 @@ export interface TraceRow {
 
 export const STAGE_STYLES: Record<
   CellType,
-  { bg: string; text: string; border: string; activeRing: string }
+  {
+    bg: string;
+    activeBg: string;
+    hoverBg: string;
+    text: string;
+    border: string;
+  }
 > = {
+  // 무지개 스펙트럼 (Red -> Orange -> Green -> Blue -> Purple)
   IF: {
-    bg: "bg-indigo-500",
+    bg: "bg-[#FCA5A5]", // 평소: 부드러운 파스텔 코랄 레드
+    activeBg: "bg-[#EF4444]", // 포커스: 짙고 선명한 레드
+    hoverBg: "hover:bg-[#EF4444]", // 호버 시 진해짐
     text: "text-white",
-    border: "border-indigo-600",
-    activeRing: "ring-indigo-300",
+    border: "border-0",
   },
   ID: {
-    bg: "bg-sky-500",
+    bg: "bg-[#FDBA74]", // 평소: 파스텔 오렌지
+    activeBg: "bg-[#F97316]", // 포커스: 짙은 딥 오렌지
+    hoverBg: "hover:bg-[#F97316]",
     text: "text-white",
-    border: "border-sky-600",
-    activeRing: "ring-sky-300",
+    border: "border-0",
   },
   EX: {
-    bg: "bg-amber-500",
-    text: "text-white",
-    border: "border-amber-600",
-    activeRing: "ring-amber-300",
+    bg: "bg-[#A3E635]", // 평소: 파스텔 연두 (Lime 400)
+    activeBg: "bg-[#22C55E]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
+    hoverBg: "hover:bg-[#22C55E]",
+    text: "text-white font-bold",
+    border: "border-0",
   },
   MEM: {
-    bg: "bg-emerald-500",
+    bg: "bg-[#93C5FD]", // 평소: 파스텔 스카이블루
+    activeBg: "bg-[#0EA5E9]", // 포커스: 짙은 블루
+    hoverBg: "hover:bg-[#0EA5E9]",
     text: "text-white",
-    border: "border-emerald-600",
-    activeRing: "ring-emerald-300",
+    border: "border-0",
   },
   WB: {
-    bg: "bg-rose-500",
+    bg: "bg-[#C4B5FD]", // 평소: 파스텔 바이올렛
+    activeBg: "bg-[#8B5CF6]", // 포커스: 짙은 바이올렛 퍼플
+    hoverBg: "hover:bg-[#8B5CF6]",
     text: "text-white",
-    border: "border-rose-600",
-    activeRing: "ring-rose-300",
+    border: "border-0",
   },
   DONE: {
-    bg: "bg-emerald-600",
-    text: "text-white",
-    border: "border-emerald-700",
-    activeRing: "ring-emerald-300",
+    bg: "bg-[#A3E635]", // 평소: 파스텔 연두 (Lime 400)
+    activeBg: "bg-[#22C55E]", // 포커스: 생기있고 화사한 파스텔 초록 (Green 500)
+    hoverBg: "hover:bg-[#22C55E]",
+    text: "text-white font-bold",
+    border: "border-0",
   },
+  // 장애 / 스톨 / 버블
   STALL_IF: {
-    bg: "bg-red-100",
-    text: "text-red-700 font-extrabold",
-    border: "border-red-400 border-dashed",
-    activeRing: "ring-red-300",
+    bg: "bg-[#FDE68A]", // Amber 200 / Amber 900
+    activeBg: "bg-[#F59E0B]", // Amber 500 / Amber 700
+    hoverBg: "hover:bg-[#F59E0B]",
+    text: "text-amber-900",
+    border: "border-0",
   },
   STALL_ID: {
-    bg: "bg-red-100",
-    text: "text-red-700 font-extrabold",
-    border: "border-red-400 border-dashed",
-    activeRing: "ring-red-300",
+    bg: "bg-[#FDE68A]",
+    activeBg: "bg-[#F59E0B]",
+    hoverBg: "hover:bg-[#F59E0B]",
+    text: "text-amber-900",
+    border: "border-0",
   },
   BUBBLE: {
-    bg: "bg-purple-100",
-    text: "text-purple-700 font-extrabold",
-    border: "border-purple-400 border-dashed",
-    activeRing: "ring-purple-300",
+    bg: "bg-[#BAE6FD]",
+    activeBg: "bg-[#38BDF8]",
+    hoverBg: "hover:bg-[#38BDF8]",
+    text: "text-white",
+    border: "border-0",
   },
 };
 
 export const isValidStageInst = (buf?: StageBuffer | null): buf is StageBuffer => {
   if (!buf || !buf.assembly) return false;
   const norm = buf.assembly.trim().toLowerCase();
-  if (!norm || norm === "bubble" || norm === "empty" || norm === "nop (bubble)") return false;
-  if (buf.status === "bubble" || buf.status === "empty") return false;
+  if (
+    !norm ||
+    norm === "bubble" ||
+    norm === "empty" ||
+    norm === "nop (bubble)" ||
+    norm === "nop"
+  ) {
+    return false;
+  }
+  if (buf.status === "bubble" || buf.status === "empty" || buf.status === "flushed") {
+    return false;
+  }
   return true;
 };
 
@@ -305,7 +332,7 @@ export function buildMultiCycleTraceRows(
       nextStageRow.IF = rowId;
     }
 
-    // 6. 분기/점프 플러시(Flush) 또는 버블(Bubble)로 인해 파이프라인에서 도중 취소된 명령어 표시
+    // 6. 분기/점프 플러시(Flush) 또는 버블(Bubble)로 인해 파이프라인에서 도중 취소된 명령어 표시 (방식 B: WB까지 버블 전파)
     if (prevStageRow.ID !== undefined && !usedPrevStages.has("ID")) {
       const flushedRow = rows[prevStageRow.ID];
       if (flushedRow && !flushedRow.cells[cIdx]) {
@@ -315,6 +342,7 @@ export function buildMultiCycleTraceRows(
           label: "BBL",
           isBubble: true,
         };
+        nextStageRow.EX = prevStageRow.ID;
       }
     }
     if (prevStageRow.IF !== undefined && !usedPrevStages.has("IF")) {
@@ -326,6 +354,31 @@ export function buildMultiCycleTraceRows(
           label: "BBL",
           isBubble: true,
         };
+        nextStageRow.ID = prevStageRow.IF;
+      }
+    }
+    if (prevStageRow.EX !== undefined && !usedPrevStages.has("EX")) {
+      const flushedRow = rows[prevStageRow.EX];
+      if (flushedRow && !flushedRow.cells[cIdx]) {
+        flushedRow.cells[cIdx] = {
+          type: "BUBBLE",
+          stage: "MEM",
+          label: "BBL",
+          isBubble: true,
+        };
+        nextStageRow.MEM = prevStageRow.EX;
+      }
+    }
+    if (prevStageRow.MEM !== undefined && !usedPrevStages.has("MEM")) {
+      const flushedRow = rows[prevStageRow.MEM];
+      if (flushedRow && !flushedRow.cells[cIdx]) {
+        flushedRow.cells[cIdx] = {
+          type: "BUBBLE",
+          stage: "WB",
+          label: "BBL",
+          isBubble: true,
+        };
+        nextStageRow.WB = prevStageRow.MEM;
       }
     }
 

@@ -1,11 +1,19 @@
+import { useAssistantSelection } from '../hooks/useAssistantSelection';
+import type { EditorSelection } from '../utils/assistantSource';
 import { useMemo, useEffect, useRef, useState } from "react";
-import Editor from "@monaco-editor/react";
-import { useTheme } from "@/context/ThemeContext";
+import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
+import { getAccessToken } from "@/api/authSession";
 import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
-import type { StageBuffer } from "@/type/simulation";
+import { RISCV_LANGUAGE_ID } from "../utils/riscvLanguage";
+import { getRiscvMonacoThemeName, registerRiscvAndThemes } from "../utils/riscvMonacoTheme";
+import type { StageBuffer, CycleEvents, SimulationResult } from "@/type/simulation";
+import type { FileSummary } from "@/type/file";
 import AsmFileUploadPopup from "./AsmFileUploadPopup";
+import { MappingRowList } from "./MappingRowList";
 
 type Props = {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   source: string;
   assembly: string;
   mappedRows?: MappedAssemblyRow[];
@@ -14,7 +22,7 @@ type Props = {
   selectedLine?: number | null;
   selectedAsmIndex?: number | null;
   executionLine?: number | null;
-  onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
+  onSelectLine?: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   stageBuffers?: {
     IF?: StageBuffer | null;
     ID?: StageBuffer | null;
@@ -22,44 +30,32 @@ type Props = {
     MEM?: StageBuffer | null;
     WB?: StageBuffer | null;
   };
-  mode?: "single" | "pipeline"; // 싱글 사이클 모드 vs 5단계 파이프라인 모드
-  currentActiveStep?: number | null; // Single 모드에서 현재 실행 중인 어셈블리 행 인덱스 (0~17)
+  prevStageBuffers?: {
+    IF?: StageBuffer | null;
+    ID?: StageBuffer | null;
+    EX?: StageBuffer | null;
+    MEM?: StageBuffer | null;
+    WB?: StageBuffer | null;
+  };
+  cycleEvents?: CycleEvents | null;
+  simulationData?: SimulationResult | null;
+  playbackCycle?: number;
+  mode?: "single" | "pipeline";
+  currentActiveStep?: number | null;
   activeTarget?: "c" | "asm";
   onAssemblyChange?: (assembly: string) => void;
   onSimulateAssembly?: () => void;
   onResetAssembly?: () => void;
+  onSave?: (name?: string) => Promise<boolean>;
+  onOpenSavedFile?: (fileId: string) => void;
+  savedFiles?: FileSummary[];
+  currentFileId?: string | null;
+  isSimulated?: boolean;
 };
-
-const STAGES_CONFIG: {
-  key: "IF" | "ID" | "EX" | "MEM" | "WB";
-  name: string;
-  badgeBg: string;
-}[] = [
-    { key: "IF", name: "IF", badgeBg: "bg-indigo-600 text-white" },
-    { key: "ID", name: "ID", badgeBg: "bg-sky-600 text-white" },
-    { key: "EX", name: "EX", badgeBg: "bg-amber-600 text-white" },
-    { key: "MEM", name: "MEM", badgeBg: "bg-emerald-600 text-white" },
-    { key: "WB", name: "WB", badgeBg: "bg-rose-600 text-white" },
-  ];
-
-// 명령어(Opcode)와 피연산자(Operands) 분리 헬퍼
-function splitInstruction(text: string): { opcode: string; operands: string } {
-  const trimmed = text.trim();
-  const firstSpace = trimmed.search(/\s/);
-  if (firstSpace === -1) {
-    return { opcode: trimmed, operands: "" };
-  }
-  const rawOperands = trimmed.slice(firstSpace).trim();
-  // 쉼표 다음에 공백이 없으면 공백 한 칸 추가 (예: "a0,a1" -> "a0, a1")
-  const formattedOperands = rawOperands.replace(/,([^\s])/g, ", $1");
-  return {
-    opcode: trimmed.slice(0, firstSpace),
-    operands: formattedOperands,
-  };
-}
 
 export default function TranslationMapping({
   source,
+  onSourceSelection,
   assembly,
   mappedRows,
   busy,
@@ -69,172 +65,353 @@ export default function TranslationMapping({
   executionLine,
   onSelectLine,
   stageBuffers,
+  cycleEvents,
+  simulationData,
+  playbackCycle,
   mode = "pipeline",
   currentActiveStep,
   activeTarget = "c",
   onAssemblyChange,
   onSimulateAssembly,
   onResetAssembly,
+  onSave,
+  onOpenSavedFile,
+  savedFiles = [],
+  currentFileId,
+  isSimulated = false,
 }: Props) {
-  const { theme } = useTheme();
+  const trackSelection = useAssistantSelection('asm', onSourceSelection);
   const sourceLines = source.split(/\r?\n/);
   const rows: MappedAssemblyRow[] = useMemo(() => {
     if (mappedRows && mappedRows.length > 0) return mappedRows;
     return mapAssembly(assembly, sourceLines.length);
   }, [mappedRows, assembly, sourceLines.length]);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rowElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
   const [asmSaveSuccess, setAsmSaveSuccess] = useState(false);
 
-  // ASM 파일 다운로드 저장 핸들러
-  const handleSaveAsmClick = () => {
-    if (!assembly) return;
-    try {
-      const blob = new Blob([assembly], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "main.s";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+  const asmEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const asmMonacoRef = useRef<Parameters<OnMount>[1] | null>(null);
+  const asmDecorationsRef = useRef<string[]>([]);
+  const selectedLineRef = useRef<number | null | undefined>(selectedLine);
+  const activeTargetRef = useRef<"c" | "asm">(activeTarget);
+  const assemblyRef = useRef<string>(assembly);
+  const rowsRef = useRef<MappedAssemblyRow[]>(rows);
+  const onSelectLineRef = useRef<Props["onSelectLine"]>(onSelectLine);
+  const lastMouseSelectTimeRef = useRef<number>(0);
 
-      setAsmSaveSuccess(true);
-      setTimeout(() => setAsmSaveSuccess(false), 2000);
-    } catch (err) {
-      console.error("ASM save error:", err);
+  useEffect(() => {
+    selectedLineRef.current = selectedLine;
+  }, [selectedLine]);
+
+  useEffect(() => {
+    activeTargetRef.current = activeTarget;
+  }, [activeTarget]);
+
+  useEffect(() => {
+    assemblyRef.current = assembly;
+  }, [assembly]);
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+
+  useEffect(() => {
+    onSelectLineRef.current = onSelectLine;
+  }, [onSelectLine]);
+
+  const resolveAsmRowIndex = (lineNum: number): number | null => {
+    const lines = (assemblyRef.current || "").split(/\r?\n/);
+    const rawTarget = (lines[lineNum - 1] ?? "").replace(/#.*/, "").trim();
+    if (!rawTarget || rawTarget.startsWith(".") || /^[.$\w]+:$/.test(rawTarget)) {
+      return null;
     }
+    let execIdx = -1;
+    for (let i = 0; i < Math.min(lineNum, lines.length); i++) {
+      const clean = lines[i].replace(/#.*/, "").trim();
+      if (!clean || clean.startsWith(".") || /^[.$\w]+:$/.test(clean)) continue;
+      if (/^[a-zA-Z][\w.]*\s*[^=]*$/.test(clean)) {
+        execIdx++;
+      }
+    }
+    const currentRows = rowsRef.current;
+    if (execIdx >= 0 && execIdx < currentRows.length) return execIdx;
+    const normTarget = rawTarget.replace(/\s+/g, " ").trim().toLowerCase();
+    const byText = currentRows.findIndex(
+      (r) => r.text.replace(/\s+/g, " ").trim().toLowerCase() === normTarget
+    );
+    return byText >= 0 ? byText : execIdx >= 0 ? execIdx : null;
   };
 
-  // 파이프라인 스테이지별 활성 명령어 매핑 (현재 클록 사이클 기준)
-  const activeStagesByInst = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    if (!stageBuffers || mode === "single") return map;
+  const activeThemeName = useMemo(
+    () => getRiscvMonacoThemeName(mode),
+    [mode]
+  );
 
-    STAGES_CONFIG.forEach(({ key, name }) => {
-      const buf = stageBuffers[key];
-      if (buf && buf.assembly && buf.assembly !== "bubble" && buf.assembly !== "empty") {
-        const norm = buf.assembly.replace(/\s+/g, " ").trim().toLowerCase();
-        if (norm) {
-          if (!map[norm]) map[norm] = [];
-          if (!map[norm].includes(name)) map[norm].push(name);
+  useEffect(() => {
+    if (asmEditorRef.current && asmMonacoRef.current) {
+      registerRiscvAndThemes(asmMonacoRef.current);
+      asmMonacoRef.current.editor.setTheme(activeThemeName);
+    }
+  }, [activeThemeName]);
+
+  const handleAsmBeforeMount: BeforeMount = (monacoInstance) => {
+    asmMonacoRef.current = monacoInstance;
+    registerRiscvAndThemes(monacoInstance);
+  };
+
+  const handleAsmEditorMount: OnMount = (editorInstance, monacoInstance) => {
+    trackSelection(editorInstance);
+    asmEditorRef.current = editorInstance;
+    asmMonacoRef.current = monacoInstance;
+
+    registerRiscvAndThemes(monacoInstance);
+    monacoInstance.editor.setTheme(activeThemeName);
+    if (editorInstance.getModel()) {
+      monacoInstance.editor.setModelLanguage(editorInstance.getModel()!, RISCV_LANGUAGE_ID);
+    }
+    editorInstance.setPosition({ lineNumber: 1, column: 1 });
+
+    editorInstance.onMouseDown((e) => {
+      if (activeTargetRef.current !== "asm") return;
+
+      const isLineNumberClick =
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+        Boolean(e.target.element?.closest(".line-numbers"));
+
+      const clickedLine = e.target.position?.lineNumber;
+      if (clickedLine) {
+        lastMouseSelectTimeRef.current = Date.now();
+        const asmLines = (editorInstance.getModel()?.getValue() ?? assembly).split(/\r?\n/);
+        const lineContent = asmLines[clickedLine - 1]?.replace(/#.*$/, "").replace(/\/\/.*$/, "").trim();
+        const isEmptyLine = !lineContent || lineContent.length === 0;
+
+        if (isEmptyLine) {
+          onSelectLineRef.current?.(null, null, false);
+          return;
+        }
+
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        if (selectedLineRef.current === clickedLine && isLineNumberClick && !isMobile) {
+          onSelectLineRef.current?.(null, null, false);
+        } else {
+          const asmIdx = resolveAsmRowIndex(clickedLine);
+          onSelectLineRef.current?.(clickedLine, asmIdx, isLineNumberClick);
         }
       }
     });
-    return map;
-  }, [stageBuffers, mode]);
 
-  // 헬퍼: 타겟 요소(그룹 마지막 행)가 컨테이너 뷰포트 하단에 완전히 드러나도록 스크롤
-  const scrollGroupIntoView = (lastEl: HTMLElement, firstEl?: HTMLElement) => {
-    const container = containerRef.current;
-    if (!container) return;
+    const domNode = editorInstance.getDomNode();
+    domNode?.addEventListener("click", (evt) => {
+      if (activeTargetRef.current !== "asm") return;
+      if (Date.now() - lastMouseSelectTimeRef.current < 80) return;
+      const lineNumEl = (evt.target as HTMLElement | null)?.closest(".line-numbers");
+      if (lineNumEl) {
+        const parsed = parseInt((lineNumEl.textContent || "").trim(), 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          const asmLines = (asmEditorRef.current?.getModel()?.getValue() ?? assembly).split(/\r?\n/);
+          const lineContent = asmLines[parsed - 1]?.replace(/#.*$/, "").replace(/\/\/.*$/, "").trim();
+          if (!lineContent || lineContent.length === 0) {
+            onSelectLineRef.current?.(null, null, false);
+            return;
+          }
+          const asmIdx = resolveAsmRowIndex(parsed);
+          onSelectLineRef.current?.(parsed, asmIdx, true);
+        }
+      }
+    });
 
-    const cRect = container.getBoundingClientRect();
-    const lastRect = lastEl.getBoundingClientRect();
+    editorInstance.onDidChangeCursorPosition((e) => {
+      if (activeTargetRef.current !== "asm") return;
+      if (
+        e.reason === monacoInstance.editor.CursorChangeReason.Explicit &&
+        e.source !== "modelChange" &&
+        Date.now() - lastMouseSelectTimeRef.current > 80
+      ) {
+        const line = e.position.lineNumber;
+        if (line) {
+          const asmLines = (editorInstance.getModel()?.getValue() ?? assembly).split(/\r?\n/);
+          const lineContent = asmLines[line - 1]?.replace(/#.*$/, "").replace(/\/\/.*$/, "").trim();
+          const isEmptyLine = !lineContent || lineContent.length === 0;
 
-    // 그룹 마지막 행의 바닥이 컨테이너 바닥보다 아래에 있다면 -> 끝까지 확실하게 아래로 스크롤 (여백 28px)
-    if (lastRect.bottom > cRect.bottom - 28) {
-      const scrollDiff = lastRect.bottom - (cRect.bottom - 28);
-      container.scrollTo({
-        top: container.scrollTop + scrollDiff,
-        behavior: "smooth",
-      });
+          if (isEmptyLine) {
+            onSelectLineRef.current?.(null, null, false);
+          } else {
+            const asmIdx = resolveAsmRowIndex(line);
+            onSelectLineRef.current?.(line, asmIdx, false);
+          }
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!asmEditorRef.current || !asmMonacoRef.current) return;
+    if (activeTarget !== "asm") {
+      asmDecorationsRef.current = asmEditorRef.current.deltaDecorations(
+        asmDecorationsRef.current,
+        []
+      );
       return;
     }
 
-    // 그룹 첫 번째 행이 컨테이너 천장보다 위에 있다면 -> 위로 스크롤
-    if (firstEl) {
-      const firstRect = firstEl.getBoundingClientRect();
-      if (firstRect.top < cRect.top + 12) {
-        const scrollDiff = (cRect.top + 12) - firstRect.top;
-        container.scrollTo({
-          top: Math.max(0, container.scrollTop - scrollDiff),
-          behavior: "smooth",
-        });
+    const newDecorations: editor.IModelDeltaDecoration[] = [];
+    const asmLines = (asmEditorRef.current.getModel()?.getValue() ?? assembly).split(/\r?\n/);
+    const isLineContentValid = (l: number | null | undefined): l is number => {
+      if (!l || l <= 0 || l > asmLines.length) return false;
+      const clean = asmLines[l - 1]?.replace(/#.*$/, "").replace(/\/\/.*$/, "").trim();
+      return Boolean(clean && clean.length > 0);
+    };
+
+    const getOpcodeDecoration = (lineNum: number, inlineClass: string) => {
+      if (!asmEditorRef.current || !asmMonacoRef.current) return null;
+      const lineContent = asmEditorRef.current.getModel()?.getLineContent(lineNum) || "";
+      const clean = lineContent.replace(/#.*$/, "").replace(/\/\/.*$/, "");
+      const match = clean.match(/^(\s*(?:[a-zA-Z_]\w*:\s*)?)([a-zA-Z][\w.]*)/);
+      if (match && !match[2].startsWith(".")) {
+        const startCol = match[1].length + 1;
+        const endCol = startCol + match[2].length;
+        return {
+          range: new asmMonacoRef.current.Range(lineNum, startCol, lineNum, endCol),
+          options: {
+            inlineClassName: inlineClass,
+          },
+        };
       }
+      return null;
+    };
+
+    let executingLine: number | null = null;
+    if (isSimulated) {
+      if (currentActiveStep !== null && currentActiveStep !== undefined && currentActiveStep >= 0) {
+        executingLine = currentActiveStep + 1;
+      } else if (mode === "pipeline" && stageBuffers) {
+        const stages = ["IF", "ID", "EX", "MEM", "WB"] as const;
+        let activeStage: { assembly?: string; status?: string; flush_info?: { is_flushed?: boolean } } | null = null;
+        for (const st of stages) {
+          const candidate = (stageBuffers as any)[st];
+          if (!candidate) continue;
+          const status = (candidate.status || "").toLowerCase();
+          if (status === "empty" || status === "bubble" || status === "flush" || status === "flushed") continue;
+          if (candidate.flush_info?.is_flushed) continue;
+          const asm = (candidate.assembly || "").trim().toLowerCase();
+          if (!asm || asm === "bubble" || asm === "empty" || asm === "—") continue;
+          activeStage = candidate;
+          break;
+        }
+        if (activeStage?.assembly) {
+          const norm = activeStage.assembly.trim().toLowerCase();
+          const foundIdx = rows.findIndex((r) => r.text.trim().toLowerCase() === norm);
+          if (foundIdx >= 0) {
+            executingLine = foundIdx + 1;
+          }
+        }
+      }
+
+      if (isLineContentValid(executingLine)) {
+        const isAlsoSelected = selectedLine === executingLine;
+        newDecorations.push({
+          range: new asmMonacoRef.current.Range(executingLine, 1, executingLine, 1),
+          options: {
+            isWholeLine: true,
+            className: isAlsoSelected
+              ? (mode === "pipeline" ? "monaco-executing-selected-asm-line-pipeline" : "monaco-executing-selected-asm-line-single")
+              : "monaco-executing-asm-line",
+            lineNumberClassName: isAlsoSelected
+              ? (mode === "pipeline" ? "monaco-selected-asm-linenumber-pipeline" : "monaco-selected-asm-linenumber-single")
+              : "monaco-executing-asm-linenumber",
+          },
+        });
+
+        const opDec = getOpcodeDecoration(
+          executingLine,
+          isAlsoSelected
+            ? (mode === "pipeline" ? "monaco-selected-asm-opcode-pipeline" : "monaco-selected-asm-opcode-single")
+            : "monaco-executing-asm-opcode"
+        );
+        if (opDec) newDecorations.push(opDec);
+      }
+    }
+
+    if (isLineContentValid(selectedLine) && selectedLine !== executingLine) {
+      newDecorations.push({
+        range: new asmMonacoRef.current.Range(selectedLine, 1, selectedLine, 1),
+        options: {
+          isWholeLine: true,
+          className: mode === "pipeline"
+            ? "monaco-selected-asm-line-pipeline"
+            : "monaco-selected-asm-line-single",
+          lineNumberClassName: mode === "pipeline"
+            ? "monaco-selected-asm-linenumber-pipeline"
+            : "monaco-selected-asm-linenumber-single",
+        },
+      });
+
+      const opDec = getOpcodeDecoration(
+        selectedLine,
+        mode === "pipeline" ? "monaco-selected-asm-opcode-pipeline" : "monaco-selected-asm-opcode-single"
+      );
+      if (opDec) newDecorations.push(opDec);
+    }
+
+    asmDecorationsRef.current = asmEditorRef.current.deltaDecorations(
+      asmDecorationsRef.current,
+      newDecorations
+    );
+  }, [selectedLine, currentActiveStep, stageBuffers, mode, activeTarget, rows, isSimulated, assembly]);
+
+  const [isSaving, setIsSaving] = useState(false);
+  const isLoggedIn = !!getAccessToken();
+
+  const handleSaveAsmClick = async () => {
+    if (busy || isSaving || !assembly?.trim()) return;
+    if (!isLoggedIn) {
+      alert("파일 저장은 로그인 후 이용할 수 있습니다.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const inputName = window.prompt("저장할 어셈블리 파일 이름을 입력해 주세요:", "main.s");
+      if (!inputName || !inputName.trim()) {
+        setIsSaving(false);
+        return;
+      }
+      let targetName = inputName.trim();
+      if (!targetName.toLowerCase().endsWith(".s") && !targetName.toLowerCase().endsWith(".asm")) {
+        targetName += ".s";
+      }
+
+      const res = await onSave?.(targetName);
+      if (res !== false) {
+        setAsmSaveSuccess(true);
+        setTimeout(() => setAsmSaveSuccess(false), 2000);
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
-
-  // Single 모드에서 실행 라인이 바뀔 때: 해당 C 구문에 속한 연관 라인 그룹 전체(맨 마지막 행까지)를 한눈에 볼 수 있도록 자동 스크롤
-  useEffect(() => {
-    if (mode !== "single" || currentActiveStep === null || currentActiveStep === undefined) return;
-    if (!containerRef.current) return;
-
-    const activeRow = rows[currentActiveStep];
-    if (!activeRow) return;
-
-    // 현재 실행 라인과 동일한 C 라인 번호를 갖는 마지막 어셈블리 행 인덱스 찾기
-    let lastSiblingIndex = currentActiveStep;
-    for (let i = currentActiveStep; i < rows.length; i++) {
-      if (rows[i].sourceLine === activeRow.sourceLine) {
-        lastSiblingIndex = i;
-      } else {
-        break;
-      }
-    }
-
-    // 그룹의 마지막 행 및 현재 실행 행 요소
-    const lastEl = rowElementsRef.current.get(lastSiblingIndex);
-    const activeEl = rowElementsRef.current.get(currentActiveStep);
-
-    if (lastEl) {
-      scrollGroupIntoView(lastEl, activeEl);
-    }
-  }, [mode, currentActiveStep, rows]);
-
-  const matchingIndices = useMemo(() => {
-    if (!selectedLine) return new Set<number>();
-    const indices = new Set<number>();
-    rows.forEach((row, idx) => {
-      if (row.sourceLine === selectedLine) {
-        indices.add(idx);
-      }
-    });
-    return indices;
-  }, [rows, selectedLine]);
-
-  // 선택된 라인이 바뀔 때: 해당 그룹의 마지막 행까지 한눈에 보이도록 스크롤 이동
-  useEffect(() => {
-    if (!selectedLine || !containerRef.current) return;
-
-    // 선택된 C 라인에 매핑된 어셈블리 행들 중 마지막 행과 첫 행 찾기
-    let firstIdx = -1;
-    let lastIdx = -1;
-    rows.forEach((row, idx) => {
-      if (row.sourceLine === selectedLine) {
-        if (firstIdx === -1) firstIdx = idx;
-        lastIdx = idx;
-      }
-    });
-
-    if (lastIdx !== -1) {
-      const lastEl = rowElementsRef.current.get(lastIdx);
-      const firstEl = rowElementsRef.current.get(firstIdx);
-
-      if (lastEl) {
-        scrollGroupIntoView(lastEl, firstEl);
-      }
-    }
-  }, [selectedLine, rows]);
 
   return (
     <section
       className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="RISC-V 어셈블리 결과"
     >
-      {/* 1단: 메인 헤더 바 (어셈블리 제목 + 파일명/개수, 우측 상태 문구) */}
-      <header className="shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 py-1.5 min-w-0 border-l-2 border-l-sky-500">
+      {/* 1단: 메인 헤더 바 */}
+      <header
+        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors ${activeTarget === "asm"
+          ? "border-l-2 border-l-amber-500 bg-[var(--ar-header-bg)]"
+          : "border-l-2 border-l-[#005FB8] bg-[var(--ar-header-bg)]"
+          }`}
+      >
         <div className="flex items-center gap-1.5 min-w-0">
           <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
-              activeTarget === "asm"
-                ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
-                : "bg-transparent scale-0"
-            }`}
+            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${activeTarget === "asm"
+              ? "bg-amber-500 scale-100"
+              : "bg-transparent scale-0"
+              }`}
           />
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
             RISC-V ASSEMBLY
@@ -244,9 +421,8 @@ export default function TranslationMapping({
           </span>
         </div>
 
-        {/* 현재 모드에 대한 ASM 에디터 상태 문구: 윗줄 오른쪽 정렬 */}
         <div className="flex items-center shrink-0 ml-2">
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono truncate">
+          <span className="text-[10px] text-[#57606A] font-mono truncate">
             {activeTarget === "asm"
               ? "명령어 직접 작성"
               : "C 컴파일 명령어 매핑"}
@@ -254,22 +430,22 @@ export default function TranslationMapping({
         </div>
       </header>
 
-      {/* 2단: 헤더 밑 툴바 라인 (C 에디터와 100% 동일한 버튼 디자인 및 반응형 아이콘) */}
-      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] dark:bg-[#1E1E1E] border-b border-[#E5E5E5] dark:border-[#3E3E42] min-w-0">
+      {/* 2단: 헤더 밑 툴바 라인 */}
+      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 1. 불러오기 버튼 (드롭다운 화살표 및 팝업 연동) */}
           <button
             ref={uploadButtonRef}
             type="button"
             onClick={() => setIsUploadPopupOpen((prev) => !prev)}
             disabled={busy || activeTarget !== "asm"}
-            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
-              activeTarget !== "asm"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : isUploadPopupOpen
-                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
-            }`}
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 focus:outline-none ${activeTarget !== "asm"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
+              : isUploadPopupOpen
+                ? mode === "pipeline"
+                  ? "border-[#7C3AED] bg-[#7C3AED] text-white cursor-pointer font-semibold"
+                  : "border-[#005FB8] bg-[#005FB8] text-white cursor-pointer font-semibold"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
+              }`}
             title="어셈블리 파일 불러오기 및 예제 템플릿 열기"
           >
             <svg
@@ -284,30 +460,27 @@ export default function TranslationMapping({
             </svg>
             <span className="hidden @[380px]:inline">불러오기</span>
             <span
-              className={`text-[8.5px] opacity-75 transition-transform duration-150 ${
-                isUploadPopupOpen ? "rotate-180" : ""
-              }`}
+              className={`text-[8.5px] opacity-75 transition-transform duration-150 ${isUploadPopupOpen ? "rotate-180" : ""
+                }`}
             >
               ▼
             </span>
           </button>
 
-          {/* 2. 저장 버튼 */}
           <button
             type="button"
             onClick={handleSaveAsmClick}
             disabled={busy || activeTarget !== "asm" || !assembly?.trim()}
-            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
-              activeTarget !== "asm"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : asmSaveSuccess
-                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
-            }`}
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget !== "asm"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
+              : asmSaveSuccess
+                ? "border-emerald-500 bg-emerald-50 text-emerald-600 font-semibold cursor-pointer"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
+              }`}
             title="현재 어셈블리 코드를 main.s 파일로 다운로드"
           >
             {asmSaveSuccess ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">✓</span>
+              <span className="text-emerald-600 font-bold text-[11px] shrink-0">✓</span>
             ) : (
               <svg
                 className="w-3 h-3 fill-none stroke-current inline @[320px]:hidden shrink-0"
@@ -326,16 +499,14 @@ export default function TranslationMapping({
             </span>
           </button>
 
-          {/* 3. 초기화 버튼 */}
           <button
             type="button"
             onClick={onResetAssembly}
             disabled={busy || activeTarget !== "asm"}
-            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
-              activeTarget !== "asm"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
-            }`}
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${activeTarget !== "asm"
+              ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
+              : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
+              }`}
             title="기본 어셈블리 템플릿으로 초기화"
           >
             <svg
@@ -349,24 +520,21 @@ export default function TranslationMapping({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 어셈블리 시뮬레이션 버튼 (C 에디터 컴파일 버튼과 동일한 h-[22px], 블루 솔리드, 반응형 쐐기 번개 도형) */}
           <button
             type="button"
+            className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${activeTarget === "asm"
+              ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 cursor-pointer shadow-2xs"
+              : "border border-[#D0D7DE] bg-white text-[#8C959F] opacity-40 cursor-not-allowed"
+              }`}
             onClick={onSimulateAssembly}
             disabled={busy || !assembly?.trim() || activeTarget !== "asm"}
-            className={`h-[22px] rounded px-2.5 text-[10.5px] font-semibold transition-colors flex items-center justify-center gap-1 shrink-0 ${
-              activeTarget === "asm"
-                ? "bg-[#005FB8] dark:bg-[#007ACC] text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] cursor-pointer"
-                : "border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681] opacity-40 cursor-not-allowed"
-            }`}
-            title={activeTarget === "asm" ? "작성된 어셈블리를 하드웨어에 로드하고 시뮬레이션 준비" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
+            title={activeTarget === "asm" ? "어셈블리 빌드 및 시뮬레이션 준비" : "어셈블리 작성 모드를 선택한 후 실행할 수 있습니다"}
           >
             {busy ? (
               <span className="w-3 h-3 flex items-center justify-center shrink-0">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               </span>
             ) : (
-              /* 좁아졌을 때 나타나는 단색 번개 쐐기형 기하 도형 아이콘 */
               <svg
                 className="w-3 h-3 fill-current inline @[200px]:hidden shrink-0"
                 viewBox="0 0 24 24"
@@ -384,20 +552,27 @@ export default function TranslationMapping({
         onClose={() => setIsUploadPopupOpen(false)}
         anchorRef={uploadButtonRef}
         onSelectAssembly={(code) => onAssemblyChange?.(code)}
+        savedFiles={savedFiles}
+        currentFileId={currentFileId}
+        onOpenSavedFile={onOpenSavedFile}
+        mode={mode}
       />
 
       {/* 본문: ASM 직접 작성 모드일 때는 Monaco Editor, C 모드일 때는 매핑 뷰 */}
       {activeTarget === "asm" ? (
-        <div className="min-h-0 flex-1 relative bg-white dark:bg-[#1E1E1E]">
+        <div className={`min-h-0 flex-1 relative bg-white asm-monaco-container ${mode === "single" ? "is-single-mode" : "is-pipeline-mode"}`}>
           <Editor
+            beforeMount={handleAsmBeforeMount}
+            onMount={handleAsmEditorMount}
             height="100%"
-            language="plaintext"
-            theme={theme === "dark" ? "vs-dark" : "vs"}
+            language={RISCV_LANGUAGE_ID}
+            theme={activeThemeName}
             value={assembly}
             onChange={(val) => onAssemblyChange?.(val ?? "")}
             options={{
               automaticLayout: true,
               fontSize: 13,
+              lineHeight: 24,
               fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace",
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
@@ -406,226 +581,67 @@ export default function TranslationMapping({
               insertSpaces: true,
               lineNumbers: "on",
               lineNumbersMinChars: 3,
-              padding: { top: 8, bottom: 8 },
+              glyphMargin: true,
+              folding: false,
+              lineDecorationsWidth: 22,
+              padding: { top: 4, bottom: 4 },
               readOnly: busy,
               stickyScroll: { enabled: false },
+              renderLineHighlight: "none",
+              overviewRulerBorder: false,
+              hideCursorInOverviewRuler: true,
+              renderWhitespace: "none",
+              guides: {
+                indentation: false,
+                highlightActiveIndentation: false,
+                bracketPairs: false,
+              },
             }}
           />
         </div>
-      ) : !assembly && rows.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E]">
-          <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
-            📜
-          </div>
-          <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+      ) : busy || (!assembly && rows.length === 0) ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8]">
+          {busy ? (
+            <div className="w-7 h-7 border-2 border-[var(--ar-accent)] border-t-transparent rounded-full animate-spin mb-3" />
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E5E5] flex items-center justify-center text-[#57606A] mb-3 text-lg shadow-2xs">
+              📜
+            </div>
+          )}
+          <p className={`text-xs font-semibold ${busy ? "text-[var(--ar-accent)]" : "text-[#1F2328]"}`}>
             {busy
               ? "컴파일 및 어셈블리 매핑 중…"
               : error
                 ? "컴파일 오류로 어셈블리를 생성할 수 없습니다."
                 : "왼쪽 에디터에서 C 코드를 작성하고 [⚡ 컴파일]을 누르세요."}
           </p>
-          <span className="text-[11px] text-[#57606A] dark:text-[#858585] mt-1 max-w-xs">
+          <span className="text-[11px] text-[#57606A] mt-1 max-w-xs">
             컴파일 완료 후 C 코드의 줄을 클릭하면 매핑된 어셈블리 라인이 즉시 강조됩니다.
           </span>
         </div>
       ) : (
-        <div
-          ref={containerRef}
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto text-[13px] leading-snug [scrollbar-gutter:stable] bg-white dark:bg-[#1E1E1E] text-[#24292F] dark:text-[#CCCCCC] select-text py-1"
-          style={{ fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace" }}
-          role="region"
-          aria-label="어셈블리 명령어 목록"
+        <MappingRowList
+          rows={rows}
+          selectedLine={selectedLine}
+          selectedAsmIndex={selectedAsmIndex}
+          executionLine={executionLine}
+          onSelectLine={onSelectLine}
+          stageBuffers={stageBuffers}
+          cycleEvents={cycleEvents}
+          simulationData={simulationData}
+          playbackCycle={playbackCycle}
+          mode={mode}
+          currentActiveStep={currentActiveStep}
+        />
+      )}
+
+      {activeTarget === "asm" && error && (
+        <pre
+          role="alert"
+          className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 bg-rose-50 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 font-mono"
         >
-          {rows.map((row, index) => {
-            const isMatched = matchingIndices.has(index);
-            const isFirstOfMatch =
-              isMatched && !matchingIndices.has(index - 1);
-            const { opcode, operands } = splitInstruction(row.text);
-
-            const normRowText = row.text.replace(/\s+/g, " ").trim().toLowerCase();
-            const activeStages = activeStagesByInst[normRowText] || [];
-            const isCurrentSingleActive =
-              mode === "single" && currentActiveStep === index;
-            // 같은 C 실행 라인에 속해 있는 형제 어셈블리 라인인지 확인
-            const isExecutionSibling =
-              executionLine !== null &&
-              executionLine !== undefined &&
-              row.sourceLine === executionLine &&
-              !isCurrentSingleActive;
-
-            // 선택 라인(파란색) 그룹
-            const isSelectedPrimary =
-              selectedAsmIndex !== null && selectedAsmIndex !== undefined
-                ? selectedAsmIndex === index
-                : isFirstOfMatch;
-            const isSelectedSibling = isMatched && !isSelectedPrimary;
-
-            // 실행 중인 라인이면서 동시에 사용자가 선택한 라인인 경우
-            const isExecutingAndSelected = isCurrentSingleActive && isSelectedPrimary;
-            const isCrt = row.sourceLine === null;
-
-            return (
-              <div
-                key={`${row.pc || index}-${row.sourceLine}-${index}`}
-                ref={(el) => {
-                  if (el) rowElementsRef.current.set(index, el);
-                  else rowElementsRef.current.delete(index);
-                }}
-                onClick={() => {
-                  if (selectedLine === row.sourceLine && selectedAsmIndex === index) {
-                    onSelectLine?.(null, null);
-                  } else {
-                    onSelectLine?.(row.sourceLine, index);
-                  }
-                }}
-                className={`flex items-baseline transition-colors duration-100 cursor-pointer group py-0.5 border-l-4 ${isCurrentSingleActive && !isSelectedPrimary
-                    ? "bg-emerald-100/90 dark:bg-[#133A27] border-emerald-500 dark:border-[#23D18B] text-emerald-950 dark:text-[#7EE787] font-bold shadow-2xs"
-                    : isSelectedPrimary
-                      ? "bg-blue-100/90 dark:bg-[#04395E] border-blue-600 dark:border-[#007ACC] text-blue-950 dark:text-[#9CDCFE] font-bold shadow-2xs"
-                      : isSelectedSibling
-                        ? "bg-blue-50/50 dark:bg-[#04395E]/40 border-blue-300/60 dark:border-[#007ACC]/50 text-blue-900/80 dark:text-[#9CDCFE]/80 font-normal"
-                        : isExecutionSibling
-                          ? "bg-emerald-50/50 dark:bg-[#133A27]/40 border-emerald-300/60 dark:border-[#23D18B]/50 text-emerald-900/80 dark:text-[#7EE787]/80 font-normal"
-                          : activeStages.length > 0
-                            ? "bg-amber-50/70 dark:bg-[#3D2E12]/50 border-transparent"
-                            : "border-transparent hover:bg-slate-100/70 dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
-                  }`}
-              >
-                {/* 1. 화살표 / 인디케이터 */}
-                <div className="w-5 shrink-0 flex items-center justify-center select-none pl-0.5">
-                  {isExecutingAndSelected ? (
-                    <div className="flex items-center gap-0.5">
-                      <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
-                      <span className="text-[#005FB8] dark:text-[#007ACC] text-[9px] leading-none">●</span>
-                    </div>
-                  ) : isCurrentSingleActive ? (
-                    <span className="text-emerald-600 dark:text-[#23D18B] text-xs font-bold leading-none animate-pulse">▶</span>
-                  ) : isSelectedPrimary ? (
-                    <span className="text-[#005FB8] dark:text-[#007ACC] text-[10px] leading-none">●</span>
-                  ) : null}
-                </div>
-
-                {/* 2. 라인 번호 */}
-                <div
-                  className={`w-9 shrink-0 text-right pr-4 select-none text-[13px] ${isSelectedPrimary
-                      ? "text-[#005FB8] dark:text-[#79C0FF] font-bold"
-                      : isSelectedSibling
-                        ? "text-blue-500 dark:text-[#79C0FF]/70 font-medium"
-                        : isCurrentSingleActive
-                          ? "text-emerald-700 dark:text-[#7EE787] font-bold"
-                          : isExecutionSibling
-                            ? "text-emerald-600 dark:text-[#7EE787]/70"
-                            : "text-[#8C959F] dark:text-[#858585]"
-                    }`}
-                >
-                  {index + 1}
-                </div>
-
-                {/* 3. Opcode (CRT 비매핑 코드는 회색, C 매핑 코드는 파란색) */}
-                <div className="w-[52px] shrink-0 font-bold select-text">
-                  <span
-                    className={
-                      isSelectedPrimary
-                        ? "text-blue-800 dark:text-[#79C0FF] font-bold"
-                        : isSelectedSibling
-                          ? "text-blue-600 dark:text-[#79C0FF]/80 font-semibold"
-                          : isCurrentSingleActive
-                            ? "text-emerald-800 dark:text-[#7EE787] font-bold"
-                            : isExecutionSibling
-                              ? "text-emerald-700 dark:text-[#7EE787]/80 font-semibold"
-                              : isCrt
-                                ? "text-[#6E7681] dark:text-[#858585] font-semibold"
-                                : "text-[#005FB8] dark:text-[#569CD6] font-semibold"
-                    }
-                  >
-                    {opcode}
-                  </span>
-                </div>
-
-                {/* 4. Operands */}
-                <div className="flex-1 pr-2 whitespace-pre-wrap break-words select-text flex items-center gap-2">
-                  <span
-                    className={
-                      isSelectedPrimary
-                        ? "text-slate-950 dark:text-white font-bold"
-                        : isSelectedSibling
-                          ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                          : isCurrentSingleActive
-                            ? "text-slate-950 dark:text-white font-bold"
-                            : isExecutionSibling
-                              ? "text-slate-800 dark:text-[#D4D4D4] font-normal"
-                              : isCrt
-                                ? "text-[#6E7681]/90 dark:text-[#858585]"
-                                : "text-[#24292F] dark:text-[#CCCCCC]"
-                    }
-                  >
-                    {operands}
-                  </span>
-
-                  {/* 파이프라인 스테이지 뱃지 */}
-                  {activeStages.length > 0 && (
-                    <div className="flex items-center gap-1 shrink-0 select-none">
-                      {activeStages.map((stg) => {
-                        const cfg = STAGES_CONFIG.find((s) => s.name === stg);
-                        return (
-                          <span
-                            key={stg}
-                            className={`text-[9px] px-1 py-0.2 rounded font-sans font-bold shadow-2xs animate-in zoom-in-95 duration-100 ${cfg?.badgeBg || "bg-slate-700 text-white"
-                              }`}
-                          >
-                            {stg}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* 5. 우측 C 매핑 라인 태그 (CRT와 C: L$ 규격/스타일 일원화) */}
-                <div className="shrink-0 pr-4 flex items-center select-none">
-                  {row.sourceLine !== null ? (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
-                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                          : isCurrentSingleActive
-                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                            : isSelectedSibling
-                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                              : isExecutionSibling
-                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#57606A] dark:text-[#858585] group-hover:text-[#24292F] dark:group-hover:text-[#CCCCCC]"
-                        }`}
-                    >
-                      C: L{row.sourceLine}
-                    </span>
-                  ) : (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium transition-colors ${isSelectedPrimary
-                          ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold shadow-2xs"
-                          : isCurrentSingleActive
-                            ? "bg-emerald-600 text-white font-bold shadow-2xs"
-                            : isSelectedSibling
-                              ? "bg-blue-100 dark:bg-[#04395E] text-blue-800 dark:text-[#9CDCFE] font-semibold"
-                              : isExecutionSibling
-                                ? "bg-emerald-100 dark:bg-[#133A27] text-emerald-800 dark:text-[#7EE787] font-semibold"
-                                : "bg-[#F0F0F0] dark:bg-[#252526] text-[#8C959F] dark:text-[#858585] group-hover:text-[#57606A] dark:group-hover:text-[#CCCCCC]"
-                        }`}
-                      title="C 런타임(CRT) 진입 및 초기화 부트스트랩 코드"
-                    >
-                      CRT
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {rows.length === 0 && (
-            <p className="p-4 text-xs text-[#8C959F] dark:text-[#858585] font-sans">
-              줄 정보가 포함된 어셈블리 명령어를 추출하지 못했습니다.
-            </p>
-          )}
-        </div>
+          {error}
+        </pre>
       )}
     </section>
   );

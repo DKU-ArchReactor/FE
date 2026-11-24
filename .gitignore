@@ -25,3 +25,16 @@ dist-ssr
 
 .env
 .prettierrc
+
+test-results/
+playwright-report/
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Session rules
+SESSION_RULES.md
+AGENTS.md

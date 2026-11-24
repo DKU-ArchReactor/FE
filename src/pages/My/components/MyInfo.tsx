@@ -1,3 +1,4 @@
+import { clearAuthTokens, getAccessToken } from '@/api/authSession';
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMe } from "@/api/auth";
@@ -11,7 +12,7 @@ const MyInfo = () => {
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      const token = localStorage.getItem("access_token");
+      const token = getAccessToken();
       if (!token) {
         setErrorMsg("로그인이 필요한 서비스입니다.");
         setIsLoading(false);
@@ -32,8 +33,7 @@ const MyInfo = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("token_type");
+    clearAuthTokens();
     navigate("/login");
   };
 

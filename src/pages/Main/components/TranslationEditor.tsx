@@ -1,11 +1,13 @@
+import { useAssistantSelection } from '../hooks/useAssistantSelection';
+import type { EditorSelection } from '../utils/assistantSource';
 import { useRef, useEffect, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { useTheme } from "@/context/ThemeContext";
 import type { FileSummary } from "@/type/file";
 import CFileUploadPopup from "./CFileUploadPopup";
 
 type Props = {
+  onSourceSelection?: (selection: EditorSelection | null) => void;
   source: string;
   fileName?: string;
   onChange: (source: string) => void;
@@ -16,17 +18,19 @@ type Props = {
   error: string;
   selectedLine?: number | null;
   executionLine?: number | null;
-  onSelectLine?: (line: number | null) => void;
+  onSelectLine?: (line: number | null, asmIndex?: number | null, openTutorModal?: boolean) => void;
   savedFiles?: FileSummary[];
   isLoggedIn?: boolean;
   currentFileId?: string | null;
   onOpenSavedFile?: (fileId: string) => void;
   onSave?: (fileName?: string) => Promise<boolean> | boolean | void;
   activeTarget?: "c" | "asm";
+  mode?: "single" | "pipeline";
 };
 
 export default function TranslationEditor({
   source,
+  onSourceSelection,
   fileName = "main.c",
   onChange,
   onCompile,
@@ -43,17 +47,24 @@ export default function TranslationEditor({
   onOpenSavedFile,
   onSave,
   activeTarget = "c",
+  mode = "pipeline",
 }: Props) {
-  const { theme } = useTheme();
+  const trackSelection = useAssistantSelection('c', onSourceSelection);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<any>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const selectedLineRef = useRef<number | null | undefined>(selectedLine);
   const activeTargetRef = useRef<"c" | "asm">(activeTarget);
+  const onSelectLineRef = useRef<Props["onSelectLine"]>(onSelectLine);
+  const lastMouseSelectTimeRef = useRef<number>(0);
 
   useEffect(() => {
     activeTargetRef.current = activeTarget;
   }, [activeTarget]);
+
+  useEffect(() => {
+    onSelectLineRef.current = onSelectLine;
+  }, [onSelectLine]);
 
   // 저장 상태 관리
   const [isSaving, setIsSaving] = useState(false);
@@ -104,20 +115,58 @@ export default function TranslationEditor({
   }, [selectedLine]);
 
   const handleEditorMount: OnMount = (editorInstance, monacoInstance) => {
+    trackSelection(editorInstance);
     editorRef.current = editorInstance;
     monacoRef.current = monacoInstance;
 
-    // 마우스 클릭 시 동일 라인이면 토글 해제(null), 다른 라인이면 해당 라인 선택
+    // 마우스 클릭 시: 줄 번호 클릭이면 모바일 튜터 모달 오픈(openTutorModal=true), 코드 본문 클릭이면 수정 가능하도록 라인만 선택(openTutorModal=false)
     editorInstance.onMouseDown((e) => {
       // 어셈블리 작성 모드일 때는 C 라인 클릭 및 선택 비활성화
       if (activeTargetRef.current !== "c") return;
 
+      const isLineNumberClick =
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+        e.target.type === monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+        Boolean(e.target.element?.closest(".line-numbers"));
+
       const clickedLine = e.target.position?.lineNumber;
       if (clickedLine) {
-        if (selectedLineRef.current === clickedLine) {
-          onSelectLine?.(null);
+        lastMouseSelectTimeRef.current = Date.now();
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        if (selectedLineRef.current === clickedLine && (!isMobile || !isLineNumberClick)) {
+          onSelectLineRef.current?.(null, null, false);
         } else {
-          onSelectLine?.(clickedLine);
+          onSelectLineRef.current?.(clickedLine, null, isLineNumberClick);
+        }
+      }
+    });
+
+    // 모바일 터치 환경에서 줄 번호(.line-numbers) 탭 시 튜터 모달 오픈 보장
+    const domNode = editorInstance.getDomNode();
+    domNode?.addEventListener("click", (evt) => {
+      if (activeTargetRef.current !== "c") return;
+      if (Date.now() - lastMouseSelectTimeRef.current < 80) return;
+      const lineNumEl = (evt.target as HTMLElement | null)?.closest(".line-numbers");
+      if (lineNumEl) {
+        const parsed = parseInt((lineNumEl.textContent || "").trim(), 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          onSelectLineRef.current?.(parsed, null, true);
+        }
+      }
+    });
+
+    // 모바일 터치 환경에서 코드 본문 탭으로 커서가 이동한 경우: 모달은 띄우지 않고 라인 하이라이트만 연동
+    editorInstance.onDidChangeCursorPosition((e) => {
+      if (activeTargetRef.current !== "c") return;
+      if (
+        e.reason === monacoInstance.editor.CursorChangeReason.Explicit &&
+        e.source !== "keyboard" &&
+        e.source !== "modelChange" &&
+        Date.now() - lastMouseSelectTimeRef.current > 80
+      ) {
+        const line = e.position.lineNumber;
+        if (line) {
+          onSelectLineRef.current?.(line, null, false);
         }
       }
     });
@@ -177,50 +226,45 @@ export default function TranslationEditor({
     <section
       className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border shadow-sm select-none transition-all duration-200 ${
         activeTarget !== "c"
-          ? "border-[var(--ar-border)] bg-[#F8FAFC] dark:bg-[#141415]"
+          ? "border-[var(--ar-border)] bg-[#F8FAFC]"
           : "border-[var(--ar-border)] bg-[var(--ar-panel-bg)]"
       }`}
       aria-label="Translation C 편집기"
     >
-      {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명) */}
+      {/* 1단: 메인 헤더 바 (C 소스 코드 + 파일명, 우측 상태 문구) */}
       <header
-        className={`shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 py-1.5 min-w-0 transition-colors border-l-2 border-l-blue-600 dark:border-l-blue-500 ${
-          activeTarget !== "c"
-            ? "bg-[#F1F5F9] dark:bg-[#1A1A1C]"
-            : "bg-[var(--ar-header-bg)]"
+        className={`h-8 shrink-0 flex items-center justify-between gap-2 border-b border-[var(--ar-border)] px-3.5 min-w-0 transition-colors ${
+          activeTarget === "c"
+            ? "border-l-2 border-l-[#005FB8] bg-[var(--ar-header-bg)]"
+            : "border-l-2 border-l-[#005FB8] bg-[var(--ar-header-bg)]"
         }`}
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-200 ${
               activeTarget === "c"
-                ? "bg-[#005FB8] dark:bg-[#007ACC] scale-100"
+                ? "bg-[#005FB8] scale-100"
                 : "bg-transparent scale-0"
             }`}
           />
-          <h3
-            className={`font-sans text-[11px] font-semibold uppercase tracking-wide truncate whitespace-nowrap transition-colors ${
-              activeTarget !== "c"
-                ? "text-[var(--ar-text-muted)]"
-                : "text-[var(--ar-text-primary)]"
-            }`}
-          >
+          <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide truncate whitespace-nowrap">
             C SOURCE CODE
           </h3>
           <span className="text-[10px] font-mono truncate text-[var(--ar-text-muted)]">
             ({fileName})
           </span>
         </div>
+
+        {/* C 에디터 상태 문구 (우측 정렬: ASM 모드일 때와 동일한 톤앤매너) */}
+        <div className="flex items-center shrink-0 ml-2">
+          <span className="text-[10px] text-[#57606A] font-mono truncate">
+            {activeTarget === "c" ? "C 소스 직접 작성" : "ASM 모드 활성화됨"}
+          </span>
+        </div>
       </header>
 
-      {/* 2단: 헤더 밑 툴바 라인 (버튼 전용 행) */}
-      <div
-        className={`shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 border-b min-w-0 transition-colors ${
-          activeTarget !== "c"
-            ? "border-[#D0D7DE] dark:border-[#2C2C2E] bg-[#E6E8EB] dark:bg-[#161618] opacity-50 pointer-events-none"
-            : "border-[#E5E5E5] dark:border-[#3E3E42] bg-[#FAFBFD] dark:bg-[#1E1E1E]"
-        }`}
-      >
+      {/* 2단: 헤더 밑 툴바 라인 (버튼 전용 행: C 모드에서는 활성화, ASM 모드에서는 ASM 에디터의 툴바와 100% 동일한 비활성화 스타일) */}
+      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           {/* 1. 불러오기 버튼 */}
           <button
@@ -228,12 +272,14 @@ export default function TranslationEditor({
             type="button"
             onClick={() => setIsUploadPopupOpen((prev) => !prev)}
             disabled={busy || activeTarget !== "c"}
-            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
+            className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 focus:outline-none ${
               activeTarget !== "c"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
                 : isUploadPopupOpen
-                ? "border-[#005FB8] dark:border-[#007ACC] bg-[#005FB8] text-white dark:bg-[#007ACC] cursor-pointer font-semibold"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                ? mode === "pipeline"
+                  ? "border-[#7C3AED] bg-[#7C3AED] text-white cursor-pointer font-semibold"
+                  : "border-[#005FB8] bg-[#005FB8] text-white cursor-pointer font-semibold"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
             }`}
             title="파일 불러오기 및 예제 열기"
           >
@@ -264,17 +310,17 @@ export default function TranslationEditor({
             disabled={busy || isSaving || activeTarget !== "c"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget !== "c"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
                 : saveSuccess
-                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                ? "border-emerald-500 bg-emerald-50 text-emerald-600 font-semibold cursor-pointer"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
             }`}
             title="현재 소스 코드를 서버에 저장"
           >
             {isSaving ? (
-              <span className="w-3 h-3 rounded-full border-2 border-[#005FB8] dark:border-[#007ACC] border-t-transparent animate-spin shrink-0" />
+              <span className="w-3 h-3 rounded-full border-2 border-[var(--ar-accent)] border-t-transparent animate-spin shrink-0" />
             ) : saveSuccess ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px] shrink-0">
+              <span className="text-emerald-600 font-bold text-[11px] shrink-0">
                 ✓
               </span>
             ) : (
@@ -301,8 +347,8 @@ export default function TranslationEditor({
             disabled={busy || activeTarget !== "c"}
             className={`h-[22px] rounded border px-2 text-[10.5px] font-medium transition-colors flex items-center justify-center gap-1 shrink-0 ${
               activeTarget !== "c"
-                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#8C959F] dark:text-[#6E7681]"
-                : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#2D2D2D] text-[#24292F] dark:text-[#CCCCCC] hover:bg-[#F3F4F6] dark:hover:bg-[#37373D] cursor-pointer"
+                ? "opacity-40 cursor-not-allowed border-[#D0D7DE] bg-white text-[#8C959F]"
+                : "border-[#D0D7DE] bg-white text-[#24292F] hover:bg-[#F3F4F6] cursor-pointer"
             }`}
             onClick={onReset}
             title="초기화"
@@ -318,13 +364,17 @@ export default function TranslationEditor({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          {/* 4. 컴파일 버튼 */}
+          {/* 4. 컴파일 버튼 (C 모드일 때만 활성화 & 파란색 액센트, ASM 모드일 때는 비활성화 회색 처리) */}
           <button
             type="button"
-            className="h-[22px] rounded bg-[#005FB8] dark:bg-[#007ACC] px-2.5 text-[10.5px] font-semibold text-white hover:bg-[#004C99] dark:hover:bg-[#0062A3] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1 shrink-0"
+            className={`h-[22px] rounded transition-colors flex items-center justify-center gap-1 shrink-0 px-2.5 text-[10.5px] font-semibold ${
+              activeTarget === "c"
+                ? "bg-[var(--ar-accent)] text-white hover:bg-[var(--ar-accent-hover)] disabled:opacity-50 cursor-pointer shadow-2xs"
+                : "border border-[#D0D7DE] bg-white text-[#8C959F] opacity-40 cursor-not-allowed"
+            }`}
             onClick={onCompile}
-            disabled={busy || !source.trim()}
-            title="C 코드 컴파일 및 어셈블리 변환"
+            disabled={busy || !source.trim() || activeTarget !== "c"}
+            title={activeTarget === "c" ? "C 코드 컴파일 및 어셈블리 변환" : "C 코드 작성 모드를 선택한 후 실행할 수 있습니다"}
           >
             {busy ? (
               <span className="w-3 h-3 flex items-center justify-center shrink-0">
@@ -349,59 +399,64 @@ export default function TranslationEditor({
         onClose={() => setIsUploadPopupOpen(false)}
         anchorRef={uploadButtonRef}
         onFile={onFile}
+        onSelectExample={(code, tmplFileName) => {
+          onFile(new File([code], tmplFileName || "example.c", { type: "text/x-c" }));
+        }}
         savedFiles={savedFiles}
         isLoggedIn={isLoggedIn}
         currentFileId={currentFileId}
         onOpenSavedFile={onOpenSavedFile}
+        mode={mode}
       />
 
-      <div
-        className={`min-h-0 flex-1 relative transition-all duration-200 ${
-          activeTarget !== "c"
-            ? "bg-[#EBECEF] dark:bg-[#141415] opacity-65 grayscale-[35%]"
-            : "bg-white dark:bg-[#1E1E1E]"
-        }`}
-      >
-        {activeTarget !== "c" && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none select-none">
-            <div className="px-3.5 py-1.5 rounded-full bg-[#24292F]/85 dark:bg-[#252528]/95 text-white dark:text-[#E0E0E0] text-[11px] font-medium backdrop-blur-xs shadow-lg border border-black/10 dark:border-white/10 flex items-center gap-1.5 animate-fadeIn">
-              <span>🔒</span>
-              <span>어셈블리 작성 모드 (C 코드 읽기 전용)</span>
-            </div>
+      {/* 본문: C 모드일 때는 Monaco Editor, ASM 모드일 때는 비활성화 안내 뷰 (코드는 상태에 온전히 보존됨) */}
+      {activeTarget === "c" ? (
+        <div className="min-h-0 flex-1 relative bg-white">
+          <Editor
+            height="100%"
+            language="c"
+            theme="vs"
+            value={source}
+            onChange={(value) => onChange(value ?? "")}
+            onMount={handleEditorMount}
+            options={{
+              automaticLayout: true,
+              fontSize: 13,
+              fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace",
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              wordWrap: "off",
+              tabSize: 4,
+              insertSpaces: true,
+              lineNumbers: "on",
+              lineNumbersMinChars: 3,
+              glyphMargin: false,
+              folding: false,
+              lineDecorationsWidth: 16,
+              padding: { top: 8, bottom: 8 },
+              readOnly: busy,
+              stickyScroll: { enabled: false },
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center bg-[#F8F8F8] select-none">
+          <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E5E5] flex items-center justify-center text-[#57606A] mb-3 text-lg shadow-2xs">
+            🔒
           </div>
-        )}
-        <Editor
-          height="100%"
-          language="c"
-          theme={theme === "dark" ? "vs-dark" : "vs"}
-          value={source}
-          onChange={(value) => onChange(value ?? "")}
-          onMount={handleEditorMount}
-          options={{
-            automaticLayout: true,
-            fontSize: 13,
-            fontFamily: "'D2Coding', Consolas, 'Fira Code', monospace",
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            wordWrap: "off",
-            tabSize: 4,
-            insertSpaces: true,
-            lineNumbers: "on",
-            lineNumbersMinChars: 3,
-            glyphMargin: false,
-            folding: false,
-            lineDecorationsWidth: 16,
-            padding: { top: 8, bottom: 8 },
-            readOnly: busy || activeTarget !== "c",
-            stickyScroll: { enabled: false },
-          }}
-        />
-      </div>
+          <p className="text-xs font-semibold text-[#1F2328]">
+            현재 어셈블리(ASM) 직접 작성 모드가 활성화되어 있습니다.
+          </p>
+          <span className="text-[11px] text-[#57606A] mt-1 max-w-xs">
+            작성해둔 C 코드는 안전하게 보관되어 있습니다. 상단 툴바에서 C 모드로 전환하면 언제든 다시 편집할 수 있습니다.
+          </span>
+        </div>
+      )}
 
-      {error && (
+      {activeTarget === "c" && error && (
         <pre
           role="alert"
-          className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 dark:text-rose-300 font-mono"
+          className="max-h-24 shrink-0 overflow-auto border-t border-rose-200 bg-rose-50 px-3 py-2 text-[11px] whitespace-pre-wrap text-rose-700 font-mono"
         >
           {error}
         </pre>

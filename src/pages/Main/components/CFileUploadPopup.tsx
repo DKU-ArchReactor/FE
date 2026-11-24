@@ -1,16 +1,76 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React from "react";
 import type { FileSummary } from "@/type/file";
-import { getFileById } from "@/api/file";
+import { useUploadPopup } from "../hooks/useUploadPopup";
+
+const C_TEMPLATES = [
+  {
+    title: "기본 산술 연산 (Basic Arithmetic)",
+    desc: "변수 선언 및 덧셈 연산과 레지스터 반환 과정",
+    fileName: "addition.c",
+    code: `int main(void) {
+    int a = 5;
+    int b = 3;
+    int sum = a + b;
+    return sum;
+}
+`,
+  },
+  {
+    title: "반복문과 누적 합 (Loop & Sum)",
+    desc: "for 반복문을 사용한 1부터 4까지의 누적 합 계산",
+    fileName: "loop.c",
+    code: `int main(void) {
+    int sum = 0;
+    for (int i = 1; i <= 4; i++) {
+        sum += i;
+    }
+    return sum;
+}
+`,
+  },
+  {
+    title: "배열과 메모리 접근 (Array & Memory)",
+    desc: "전역 배열 메모리로부터 값을 로드하여 연산",
+    fileName: "memory.c",
+    code: `volatile int values[2] = {12, 30};
+
+int main(void) {
+    int first = values[0];
+    int second = values[1];
+    return first + second;
+}
+`,
+  },
+  {
+    title: "조건 분기문 (Branch & If-Else)",
+    desc: "if-else 조건 분기에 따른 분기 명령어 생성 과정",
+    fileName: "condition.c",
+    code: `int main(void) {
+    int a = 10;
+    int b = 20;
+    int max;
+    if (a > b) {
+        max = a;
+    } else {
+        max = b;
+    }
+    return max;
+}
+`,
+  },
+];
 
 interface CFileUploadPopupProps {
   isOpen: boolean;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onFile: (file: File) => void;
+  onSelectExample?: (code: string, fileName?: string) => void;
   savedFiles: FileSummary[];
   isLoggedIn: boolean;
   currentFileId?: string | null;
   onOpenSavedFile?: (fileId: string) => void;
+  mode?: "single" | "pipeline";
 }
 
 export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
@@ -18,88 +78,26 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
   onClose,
   anchorRef,
   onFile,
+  onSelectExample,
   savedFiles,
   isLoggedIn,
   currentFileId,
   onOpenSavedFile,
+  mode = "pipeline",
 }) => {
-  const popupRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [popupPos, setPopupPos] = useState<{ top: number; left: number }>({
-    top: 0,
-    left: 0,
-  });
-
-  // 팝업 위치 계산 (업로드 버튼 바로 아래, 우하단으로 펼쳐지도록 버튼의 왼쪽 정렬)
-  const updatePopupPos = useCallback(() => {
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      const popupWidth = 360;
-      const left = Math.max(
-        12,
-        Math.min(window.innerWidth - popupWidth - 12, rect.left)
-      );
-      const top = rect.bottom + 6;
-      setPopupPos({ top, left });
-    }
-  }, [anchorRef]);
-
-  // 팝업 열릴 때 위치 계산 및 리사이즈/스크롤 이벤트 동기화
-  useEffect(() => {
-    if (isOpen) {
-      updatePopupPos();
-      window.addEventListener("resize", updatePopupPos);
-      window.addEventListener("scroll", updatePopupPos, true);
-      return () => {
-        window.removeEventListener("resize", updatePopupPos);
-        window.removeEventListener("scroll", updatePopupPos, true);
-      };
-    }
-  }, [isOpen, updatePopupPos]);
-
-  // 외부 클릭 시 업로드 팝업 닫기
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(target) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(target)
-      ) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, onClose, anchorRef]);
+  const isPipeline = mode === "pipeline";
+  const {
+    popupRef,
+    fileInputRef,
+    isDragOver,
+    popupPos,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleDownloadSavedFile,
+  } = useUploadPopup(isOpen, onClose, anchorRef, 360, onFile);
 
   if (!isOpen) return null;
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      onFile(files[0]);
-      onClose();
-    }
-  };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -110,33 +108,6 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
     event.target.value = "";
   };
 
-  // 저장된 파일 목록에서 개별 파일 로컬 다운로드 핸들러
-  const handleDownloadSavedFile = async (
-    e: React.MouseEvent,
-    file: FileSummary
-  ) => {
-    e.stopPropagation();
-    try {
-      const detail = await getFileById(file.file_id);
-      const blob = new Blob([detail.content], {
-        type: "text/plain;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download =
-        detail.title ||
-        `${file.title || "source"}.${file.lang === "asm" ? "s" : "c"}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("File download error:", err);
-      alert("파일을 다운로드하지 못했습니다.");
-    }
-  };
-
   return (
     <div
       ref={popupRef}
@@ -145,20 +116,20 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
         left: `${popupPos.left}px`,
         width: "360px",
       }}
-      className="fixed z-50 rounded-xl overflow-hidden shadow-2xl border border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#1E1E1E] text-[#1F2328] dark:text-[#CCCCCC] upload-popup-drop-anim flex flex-col max-h-[470px] select-none"
+      className="fixed z-50 rounded-xl overflow-hidden shadow-2xl border border-[#D0D7DE] bg-white text-[#1F2328] upload-popup-drop-anim flex flex-col max-h-[520px] select-none"
     >
       {/* 팝업 헤더 */}
-      <div className="px-3.5 py-2 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F6F8FA] dark:bg-[#252526] flex items-center justify-between shrink-0">
+      <div className="px-3.5 py-2 border-b border-[#E5E5E5] bg-[#F6F8FA] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs">📂</span>
-          <span className="text-xs font-bold text-[#1F2328] dark:text-[#CCCCCC]">
-            파일 업로드 및 불러오기
+          <span className="text-xs font-bold text-[#1F2328]">
+            C 소스 불러오기 및 예제
           </span>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 rounded text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold"
+          className="p-1 rounded text-[#57606A] hover:text-[#CF222E] hover:bg-black/5 transition-colors cursor-pointer text-xs font-bold"
           title="창 닫기"
         >
           ✕
@@ -166,12 +137,12 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
       </div>
 
       {/* 1. 상단 섹션: 로컬 파일 업로드 드롭존 */}
-      <div className="p-3 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#FAFBFD] dark:bg-[#1E1E1E] shrink-0">
+      <div className="p-3 border-b border-[#E5E5E5] bg-[#FAFBFD] shrink-0">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-bold text-[#1F2328] dark:text-[#CCCCCC] flex items-center gap-1">
+          <span className="text-[11px] font-bold text-[#1F2328] flex items-center gap-1">
             <span>📤</span> C 소스 파일 업로드
           </span>
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] font-mono">
+          <span className="text-[10px] text-[#57606A] font-mono">
             .c 파일 지원 (최대 64KB)
           </span>
         </div>
@@ -183,8 +154,12 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
           onClick={() => fileInputRef.current?.click()}
           className={`rounded-lg border-2 border-dashed p-3.5 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all duration-150 ${
             isDragOver
-              ? "border-[#005FB8] dark:border-[#007ACC] bg-blue-50/70 dark:bg-[#007ACC]/10 text-[#005FB8] dark:text-[#79C0FF] scale-[1.01]"
-              : "border-[#D0D7DE] dark:border-[#3E3E42] bg-white dark:bg-[#252526] text-[#57606A] dark:text-[#858585] hover:border-[#005FB8] dark:hover:border-[#007ACC] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-slate-50 dark:hover:bg-[#2D2D2D]"
+              ? isPipeline
+                ? "border-[#7C3AED] bg-purple-50/70 text-[#7C3AED] scale-[1.01]"
+                : "border-[#005FB8] bg-blue-50/70 text-[#005FB8] scale-[1.01]"
+              : isPipeline
+              ? "border-[#D0D7DE] bg-white text-[#57606A] hover:border-[#7C3AED] hover:text-[#7C3AED] hover:bg-purple-50/30"
+              : "border-[#D0D7DE] bg-white text-[#57606A] hover:border-[#005FB8] hover:text-[#005FB8] hover:bg-slate-50"
           }`}
         >
           <svg
@@ -200,13 +175,13 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
             />
           </svg>
           <div className="text-center">
-            <p className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
+            <p className="text-xs font-semibold text-[#1F2328]">
               클릭하여 파일 선택{" "}
-              <span className="font-normal text-[#57606A] dark:text-[#858585]">
+              <span className="font-normal text-[#57606A]">
                 또는 드래그 앤 드롭
               </span>
             </p>
-            <p className="text-[10px] text-[#8C959F] dark:text-[#6E7681] mt-0.5">
+            <p className="text-[10px] text-[#8C959F] mt-0.5">
               선택 시 즉시 에디터에 코드가 불러와집니다.
             </p>
           </div>
@@ -221,37 +196,37 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
         />
       </div>
 
-      {/* 2. 하단 섹션: 저장된 파일 목록 */}
-      <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#252526]">
-        <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] dark:border-[#3E3E42] bg-[#F3F3F3] dark:bg-[#1E1E1E] flex items-center justify-between shrink-0">
+      {/* 2. 중간 섹션: 저장된 파일 목록 */}
+      <div className="flex flex-col min-h-0 bg-white border-b border-[#E5E5E5]">
+        <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] bg-[#F3F3F3] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs">📂</span>
-            <span className="text-xs font-semibold text-[#1F2328] dark:text-[#CCCCCC]">
-              저장된 파일 목록
+            <span className="text-xs">💾</span>
+            <span className="text-xs font-semibold text-[#1F2328]">
+              저장된 C 파일 목록
             </span>
-            <span className="text-[10px] font-mono text-[#57606A] dark:text-[#858585]">
+            <span className="text-[10px] font-mono text-[#57606A]">
               ({isLoggedIn ? savedFiles.length : 0})
             </span>
           </div>
           {isLoggedIn && savedFiles.length > 0 && (
-            <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+            <span className="text-[10px] text-[#8C959F]">
               클릭하여 열기
             </span>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-1.5 space-y-1 min-h-[120px] max-h-56 divide-y divide-[#F0F0F0] dark:divide-[#333333]/50 [scrollbar-width:thin]">
+        <div className="overflow-y-auto p-1.5 space-y-1 max-h-36 divide-y divide-[#F0F0F0] [scrollbar-width:thin]">
           {!isLoggedIn ? (
-            <div className="py-6 px-4 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col gap-1 items-center justify-center">
-              <span className="font-medium text-[#1F2328] dark:text-[#CCCCCC]">
+            <div className="py-4 px-3 text-center text-xs text-[#57606A] flex flex-col gap-0.5 items-center justify-center">
+              <span className="font-medium text-[#1F2328]">
                 로그인이 필요합니다
               </span>
-              <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+              <span className="text-[10px] text-[#8C959F]">
                 로그인 후 저장한 C/ASM 파일을 불러올 수 있습니다.
               </span>
             </div>
           ) : savedFiles.length === 0 ? (
-            <div className="py-6 px-4 text-center text-xs text-[#57606A] dark:text-[#858585] flex flex-col items-center justify-center">
+            <div className="py-4 px-3 text-center text-xs text-[#57606A] flex flex-col items-center justify-center">
               저장된 파일이 없습니다
             </div>
           ) : (
@@ -274,16 +249,18 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
                   title="클릭하여 C 소스 코드에 열기"
                   className={`w-full px-2.5 py-1.5 rounded text-left transition-colors flex items-center justify-between gap-2 cursor-pointer group/row ${
                     isSelected
-                      ? "bg-blue-50 dark:bg-[#04395E] text-[#005FB8] dark:text-[#9CDCFE] font-semibold"
-                      : "hover:bg-[#F3F4F6] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]"
+                      ? isPipeline
+                        ? "bg-purple-50 text-[#7C3AED] font-semibold"
+                        : "bg-blue-50 text-[#005FB8] font-semibold"
+                      : "hover:bg-[#F3F4F6] text-[#24292F]"
                   }`}
                 >
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     <span
                       className={`text-[9px] font-bold px-1 py-0.2 rounded uppercase shrink-0 ${
                         f.lang === "asm"
-                          ? "bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300"
-                          : "bg-sky-100 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300"
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-sky-100 text-sky-700"
                       }`}
                     >
                       {f.lang || "c"}
@@ -292,12 +269,18 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {dateStr && (
-                      <span className="text-[9.5px] text-[#8C959F] dark:text-[#6E7681] font-mono">
+                      <span className="text-[9.5px] text-[#8C959F] font-mono">
                         {dateStr}
                       </span>
                     )}
                     {isSelected && (
-                      <span className="text-[9.5px] font-bold text-[#005FB8] dark:text-[#79C0FF]">
+                      <span
+                        className={`text-[9.5px] font-bold ${
+                          isPipeline
+                            ? "text-[#7C3AED]"
+                            : "text-[#005FB8]"
+                        }`}
+                      >
                         열림
                       </span>
                     )}
@@ -306,7 +289,11 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
                       type="button"
                       onClick={(e) => handleDownloadSavedFile(e, f)}
                       title={`'${f.title}' 파일 로컬 다운로드`}
-                      className="p-1 rounded text-[#8C959F] dark:text-[#6E7681] hover:text-[#005FB8] dark:hover:text-[#79C0FF] hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer ml-0.5"
+                      className={`p-1 rounded text-[#8C959F] hover:bg-black/10 transition-colors cursor-pointer ml-0.5 ${
+                        isPipeline
+                          ? "hover:text-[#7C3AED]"
+                          : "hover:text-[#005FB8]"
+                      }`}
                     >
                       <svg
                         className="w-3.5 h-3.5"
@@ -327,6 +314,55 @@ export const CFileUploadPopup: React.FC<CFileUploadPopupProps> = ({
               );
             })
           )}
+        </div>
+      </div>
+
+      {/* 3. 하단 섹션: ArchReactor C 예제 템플릿 목록 */}
+      <div className="flex-1 flex flex-col min-h-0 bg-white">
+        <div className="px-3.5 py-1.5 border-b border-[#E5E5E5] bg-[#F3F3F3] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs">📜</span>
+            <span className="text-xs font-semibold text-[#1F2328]">
+              C 언어 예제 템플릿
+            </span>
+          </div>
+          <span className="text-[10px] text-[#8C959F]">
+            클릭하여 열기
+          </span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-1.5 space-y-1 min-h-[120px] max-h-56 divide-y divide-[#F0F0F0] [scrollbar-width:thin]">
+          {C_TEMPLATES.map((tmpl, idx) => (
+            <div
+              key={idx}
+              onClick={() => {
+                if (onSelectExample) {
+                  onSelectExample(tmpl.code, tmpl.fileName);
+                } else {
+                  onFile(new File([tmpl.code], tmpl.fileName, { type: "text/x-c" }));
+                }
+                onClose();
+              }}
+              title="클릭하여 C 에디터에 예제 코드 로드"
+              className="w-full px-2.5 py-2 rounded text-left transition-colors flex flex-col gap-0.5 cursor-pointer hover:bg-[#F3F4F6] group/row"
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-xs font-semibold group-hover/row:underline ${
+                    isPipeline
+                      ? "text-[#7C3AED]"
+                      : "text-[#005FB8]"
+                  }`}
+                >
+                  {tmpl.title}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">로드 ➔</span>
+              </div>
+              <span className="text-[10.5px] text-[#57606A] leading-snug">
+                {tmpl.desc}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

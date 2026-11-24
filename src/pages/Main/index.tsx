@@ -1,10 +1,14 @@
-import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
-import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
+import type { EditorSelection } from './utils/assistantSource';
+import { useAuthSession } from '@/api/authSession';
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
 import ControlPanel from "./components/ControlPanel";
 import PanelRenderer from "./components/PanelRenderer";
 import SlidingViewportTrack from "./components/SlidingViewportTrack";
+import AssistantCompileHint from "./components/AssistantCompileHint";
 import AiAssistantPopup from "@/components/AiAssistantPopup";
 import PlaybackFeedbackOverlay from "./components/PlaybackFeedbackOverlay";
+import { MobileWorkspaceControls } from "./components/MobileWorkspaceControls";
 
 import type { PanelKey, SectionConfig } from "./types";
 import { getDefaultSections } from "./types";
@@ -13,55 +17,91 @@ import { useSimulationPlayback } from "./hooks/useSimulationPlayback";
 import { useSimulationSession } from "./hooks/useSimulationSession";
 import { useFileManager } from "./hooks/useFileManager";
 import { useWorkspaceSplitter } from "./hooks/useWorkspaceSplitter";
+import { getLearningExample } from "@/data/learningExamples";
 
 const DEFAULT_CUSTOM_ASSEMBLY = [
-  "# RISC-V 32IM 어셈블리 직접 작성",
-  ".globl main",
-  "main:",
-  "    addi x1, x0, 5",
-  "    addi x2, x0, 10",
-  "    add  x3, x1, x2",
-  "    slli x4, x3, 2",
-  "    ret",
-  "",
+  "addi t0, zero, 5",
+  "addi t1, zero, 10",
+  "add  t2, t0, t1",
+  "slli a0, t2, 2",
+  "ret",
 ].join("\n");
 
 const MainPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const navigate = useNavigate();
   const initialFileId =
     searchParams.get("fileId") ||
     (location.state as { fileId?: string } | null)?.fileId ||
     null;
 
-  // 1. 라우트 및 뷰포트 상태
-  const isManagementPath = location.pathname === "/management";
-  const isPipelinePath = location.pathname === "/pipeline";
-
-  const rightViewportIndex = useMemo(() => {
-    if (isManagementPath) return 2;
-    if (isPipelinePath) return 1;
-    return 0;
-  }, [isManagementPath, isPipelinePath]);
+  // 1. 뷰포트 상태 (로컬 상태로 관리하여 URL 변경 및 히스토리 스택 누적 방지)
+  const [rightViewportIndex, setRightViewportIndex] = useState(0);
 
   // 2. 파일 및 소스 코드 상태 훅
   const resetSimulationRef = useRef<(() => void) | null>(null);
-  const fileMgr = useFileManager(initialFileId, () => {
-    resetSimulationRef.current?.();
-  });
+  const fileMgr = useFileManager(
+    initialFileId,
+    initialFileId ? undefined : getLearningExample(searchParams.get("example")),
+    () => {
+      resetSimulationRef.current?.();
+    }
+  );
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
+  const [sourceSelection, setSourceSelection] = useState<EditorSelection | null>(null);
+  const [tutorSelection,setTutorSelection]=useState<{kind:'c'|'asm';revision:number}>({kind:'asm',revision:0});
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
+  const [isMobileCodeView, setIsMobileCodeView] = useState(true);
+  const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
+  const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
+  const assistantHintTimerRef = useRef<number | null>(null);
+  const aiPopupOpenRef = useRef(isAiPopupOpen);
+  useEffect(() => { aiPopupOpenRef.current = isAiPopupOpen; }, [isAiPopupOpen]);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [translationSelectedLine, setTranslationSelectedLine] = useState<number | null>(null);
-  const [translationSelectedAsmIndex, setTranslationSelectedAsmIndex] = useState<number | null>(null);
+  const clearAssistantHint = useCallback(() => {
+    if (assistantHintTimerRef.current !== null) {
+      window.clearTimeout(assistantHintTimerRef.current);
+      assistantHintTimerRef.current = null;
+    }
+    setAssistantHint(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (assistantHintTimerRef.current !== null) {
+        window.clearTimeout(assistantHintTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsMobileAssistantViewport(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const [isMobileTutorModalOpen, setIsMobileTutorModalOpen] = useState(false);
   const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
 
   // 4. 시뮬레이션 세션 & 엔진 모드 훅 ("single" | "pipeline")
+  const auth = useAuthSession();
+  const cWorkspaceKey = JSON.stringify([fileMgr.translationSource, auth.epoch]);
+  const asmWorkspaceKey = JSON.stringify([customAssembly, auth.epoch]);
+  const workspaceKey = editorTarget === "c" ? cWorkspaceKey : asmWorkspaceKey;
+
   const simSession = useSimulationSession({
+    workspaceKey,
+    editorTarget,
+    cWorkspaceKey,
+    asmWorkspaceKey,
+    savedFileId: auth.authenticated ? fileMgr.savedTranslationFileId : null,
     translationSource: fileMgr.translationSource,
     translationAssembly: fileMgr.translationAssembly,
     translationBusy: fileMgr.translationBusy,
@@ -70,10 +110,45 @@ const MainPage: React.FC = () => {
     setTranslationAssembly: fileMgr.setTranslationAssembly,
   });
 
+  // 싱글 모드와 파이프라인 모드별 독립된 라인 선택 상태 캐시
+  type ModeSelection = { line: number | null; asmIndex: number | null };
+  const [modeSelections, setModeSelections] = useState<
+    Record<"single" | "pipeline", ModeSelection>
+  >({
+    single: { line: null, asmIndex: null },
+    pipeline: { line: null, asmIndex: null },
+  });
+
+  const currentSelection = modeSelections[simSession.simulationEngineMode];
+  const translationSelectedLine = currentSelection.line;
+  const translationSelectedAsmIndex = currentSelection.asmIndex;
+
+  const showAssistantHint = assistantHint?.workspace === workspaceKey && !isAiPopupOpen && !fileMgr.translationBusy;
+  const onCompilationComplete = () => {
+    setModeSelections({
+      single: { line: null, asmIndex: null },
+      pipeline: { line: null, asmIndex: null },
+    });
+    if (assistantHintTimerRef.current !== null) {
+      window.clearTimeout(assistantHintTimerRef.current);
+      assistantHintTimerRef.current = null;
+    }
+    // 컴파일 완료 3초 뒤에 힌트 팝업 표시
+    assistantHintTimerRef.current = window.setTimeout(() => {
+      if (!aiPopupOpenRef.current) {
+        setAssistantHint({ workspace: workspaceKey, language: editorTarget });
+      }
+      assistantHintTimerRef.current = null;
+    }, 3000);
+  };
+
   const handleClearSelection = useCallback(() => {
-    setTranslationSelectedLine(null);
-    setTranslationSelectedAsmIndex(null);
-  }, []);
+    setModeSelections((prev) => ({
+      ...prev,
+      [simSession.simulationEngineMode]: { line: null, asmIndex: null },
+    }));
+    setIsMobileTutorModalOpen(false);
+  }, [simSession.simulationEngineMode]);
 
   // 5. 시뮬레이션 재생 및 스텝 컨트롤 훅
   const playback = useSimulationPlayback({
@@ -86,10 +161,13 @@ const MainPage: React.FC = () => {
   });
 
   const onResetSimulation = () => {
+    clearAssistantHint();
     simSession.clearSimulationCache();
-    playback.setCurrentCycle(0);
-    playback.setIsPlaying(false);
-    playback.triggerPlaybackFeedback("reset");
+    setModeSelections({
+      single: { line: null, asmIndex: null },
+      pipeline: { line: null, asmIndex: null },
+    });
+    playback.handleResetAll();
   };
 
   useEffect(() => {
@@ -126,15 +204,28 @@ const MainPage: React.FC = () => {
   } = useResizableLayout(sections, setSections);
 
   // 7. 에디터 상호작용 및 시뮬레이션 연결 핸들러
-  const handleSelectTranslationLine = (line: number | null, asmIndex: number | null = null) => {
-    if (line !== null) {
+  const handleSelectTranslationLine = (
+    line: number | null,
+    asmIndex: number | null = null,
+    openTutorModal: boolean = asmIndex !== null
+  ) => {
+    if (line !== null || asmIndex !== null) {
       playback.setIsPlaying((prev) => {
         if (prev) playback.triggerPlaybackFeedback("pause");
         return false;
       });
     }
-    setTranslationSelectedLine(line);
-    setTranslationSelectedAsmIndex(asmIndex);
+    setModeSelections((prev) => ({
+      ...prev,
+      [simSession.simulationEngineMode]: { line, asmIndex },
+    }));
+    if ((line !== null || asmIndex !== null) && openTutorModal && simSession.simulationData) {
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        setIsMobileTutorModalOpen(true);
+      }
+    } else if (line === null && asmIndex === null) {
+      setIsMobileTutorModalOpen(false);
+    }
   };
 
   const handleTranslationFile = async (file: File) => {
@@ -164,23 +255,31 @@ const MainPage: React.FC = () => {
   const canGoNextViewport = rightViewportIndex < 2;
 
   const handleGoPrevViewport = () => {
-    if (rightViewportIndex === 2) navigate("/pipeline");
-    else if (rightViewportIndex === 1) navigate("/");
+    setRightViewportIndex((prev) => Math.max(0, prev - 1));
   };
 
   const handleGoNextViewport = () => {
-    if (rightViewportIndex === 0) navigate("/pipeline");
-    else if (rightViewportIndex === 1) navigate("/management");
+    setRightViewportIndex((prev) => Math.min(2, prev + 1));
   };
 
-  const renderPanel = (panelKey: PanelKey) => (
+  const renderPanel = (panelKey: PanelKey, onCloseTutor?: () => void) => (
     <PanelRenderer
       panelKey={panelKey}
+      onCloseTutor={onCloseTutor}
+      onSourceSelection={setSourceSelection}
+      tutorSelection={tutorSelection}
+      onTutorSelect={kind=>setTutorSelection(value=>({kind,revision:value.revision+1}))}
       simulationData={simSession.simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
       currentCycle={playback.currentCycle}
       playSpeed={playback.playSpeed}
+      onPausePlayback={playback.pauseForFlow}
+      singlePlaybackFinished={playback.singlePlaybackFinished}
+      playbackRevision={playback.playbackRevision}
+      isPlaying={playback.isPlaying}
+      playMode={playback.playMode}
+      isStandby={playback.isStandby}
       loadingMessage={simSession.loadingMessage}
       simulationMode={simSession.simulationEngineMode}
       isSingleEngine={simSession.isSingleEngine}
@@ -196,6 +295,7 @@ const MainPage: React.FC = () => {
       customAssembly={customAssembly}
       translationBusy={fileMgr.translationBusy}
       translationError={fileMgr.translationError}
+      asmError={simSession.asmError}
       translationSelectedLine={translationSelectedLine}
       translationSelectedAsmIndex={translationSelectedAsmIndex}
       onUpdateTranslationSource={(val) =>
@@ -215,44 +315,90 @@ const MainPage: React.FC = () => {
           }
         );
       }}
-      onTranslationCompile={() =>
-        simSession.handleTranslationCompile({
+      onTranslationCompile={() => {
+        clearAssistantHint();
+        return simSession.handleTranslationCompile({
+          onCompilationComplete,
           onSimulationComplete: playback.handleSimulationComplete,
           triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
-        })
-      }
+        });
+      }}
       onTranslationFile={handleTranslationFile}
       onSelectTranslationLine={handleSelectTranslationLine}
       onSaveTranslationFile={fileMgr.handleSaveTranslationFile}
+      onSaveAssemblyFile={(name) => fileMgr.handleSaveAssemblyFile(customAssembly, name)}
       onOpenSavedFileInEditor={(id) => fileMgr.handleOpenSavedFileInEditor(id, onResetSimulation)}
-      onCustomAssemblyChange={setCustomAssembly}
-      onSimulateAssembly={() =>
-        simSession.handleAssemblySimulation(customAssembly, {
+      onOpenSavedAssemblyFile={async (id) => {
+        const detail = await fileMgr.ensureFileContent(id);
+        if (detail) {
+          setCustomAssembly(detail.content);
+          fileMgr.setFileId(id);
+          fileMgr.setAsmFileName(detail.title);
+          onResetSimulation();
+        }
+      }}
+      onCustomAssemblyChange={(value) => {
+        clearAssistantHint();
+        simSession.clearSimulationCache();
+        simSession.setAsmError("");
+        setCustomAssembly(value);
+      }}
+      onSimulateAssembly={() => {
+        clearAssistantHint();
+        return simSession.handleAssemblySimulation(customAssembly, {
+          onCompilationComplete,
           onSimulationComplete: playback.handleSimulationComplete,
           triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
-        })
-      }
+        });
+      }}
       onResetCustomAssembly={() => {
+        clearAssistantHint();
         playback.triggerPlaybackFeedback("trash");
         setCustomAssembly(DEFAULT_CUSTOM_ASSEMBLY);
         simSession.clearSimulationCache();
+        simSession.setAsmError("");
         playback.setCurrentCycle(0);
         playback.setIsPlaying(false);
       }}
+      onStepBack={playback.handleStepBack}
+      onStepForward={playback.handleStepForward}
       onJumpToCycle={playback.handleJumpToCycle}
       savedFiles={fileMgr.savedFiles}
       isLoggedIn={fileMgr.isLoggedIn}
     />
   );
 
+  const maxCycle = playback.totalCycles;
+
+const handleMobileCodeSelect = () => {
+  setIsMobileCodeView(true);
+  setIsMobileAssistantViewport(false);
+};
+
+const handleMobileViewportSelect = (index: number) => {
+  setIsMobileCodeView(false);
+  setIsMobileAssistantViewport(false);
+  setRightViewportIndex(index);
+  };
+
+  const handleMobileAssistantSelect = () => {
+    clearAssistantHint();
+    setIsMobileCodeView(false);
+    setIsMobileAssistantViewport(true);
+  };
+
   return (
     <main
-      className={`flex-1 flex flex-col px-4 pb-3 pt-2.5 w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
-        playback.isPlaying && simSession.isSingleEngine ? "is-playing-single-light" : ""
+      className={`flex-1 flex flex-col px-0 pb-0 pt-2 md:px-4 md:pb-3 md:pt-2.5 w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
+        playback.isPlaying
+          ? simSession.isSingleEngine
+            ? "is-playing-single-light"
+            : "is-playing-pipeline-light"
+          : ""
       }`}
     >
       {/* 1. 최상단 제어 바 */}
-      <div className="h-[42px] shrink-0 flex items-stretch gap-2 mb-2 min-h-0 w-full">
+      <div className="h-[42px] shrink-0 flex items-stretch gap-2 mb-2 px-3 md:px-0 min-h-0 w-full">
         <div className="flex-1 h-full min-w-0 flex">
           <ControlPanel
             currentCycle={playback.currentCycle}
@@ -264,19 +410,25 @@ const MainPage: React.FC = () => {
             onTogglePlay={playback.handleTogglePlay}
             onReset={playback.handleReset}
             onResetAndPlay={playback.handleResetAndPlay}
+            onPlayCurrentCycle={playback.handlePlayCurrentCycle}
+            isCyclePlaying={playback.isCyclePlaying}
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={playback.isSimulationReady}
+            isCompiling={fileMgr.translationBusy}
             mode={simSession.simulationEngineMode}
+            simulationData={simSession.simulationData}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
-              if (editorTarget !== target && (playback.isPlaying || playback.currentCycle > 0)) {
-                playback.triggerPlaybackFeedback("reset");
-              }
+              if (fileMgr.translationBusy) return;
+              clearAssistantHint();
+              setSourceSelection(null);
               setEditorTarget(target);
               if (target === "asm") {
-                setTranslationSelectedLine(null);
-                setTranslationSelectedAsmIndex(null);
+                setModeSelections({
+                  single: { line: null, asmIndex: null },
+                  pipeline: { line: null, asmIndex: null },
+                });
               }
             }}
             onChangeSimulationMode={(m) =>
@@ -290,25 +442,31 @@ const MainPage: React.FC = () => {
           />
         </div>
 
-        {/* AI 어시스턴트 팝업 버튼 */}
+        {/* AI 어시스턴트 팝업 버튼 (모바일에서는 하단 바텀바로 분리 예정) */}
+        <div className="hidden md:block relative h-full aspect-square shrink-0">
         <button
           ref={aiButtonRef}
           type="button"
-          onClick={() => setIsAiPopupOpen((prev) => !prev)}
+          onClick={() => { clearAssistantHint(); setIsAiPopupOpen((prev) => !prev); }}
+          aria-describedby={showAssistantHint ? 'assistant-compile-hint' : undefined}
           title={isAiPopupOpen ? "AI 어시스턴트 창 닫기" : "ArchReactor AI 어시스턴트 열기"}
-          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 group active:scale-95 ${
+          className={`h-full aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 shrink-0 select-none border-0 outline-none group active:scale-95 ${showAssistantHint ? 'ring-2 ring-[var(--ar-accent)] ring-offset-2 shadow-lg' : ''} ${
             isAiPopupOpen
-              ? "bg-gradient-to-tr from-[#004C99] via-[#007ACC] to-[#0284C7] text-white ring-2 ring-[#38BDF8]/70 ring-offset-1 dark:ring-offset-[#18181B] shadow-inner"
-              : "bg-gradient-to-tr from-[#0066CC] via-[#0091FF] to-[#38BDF8] hover:from-[#0055B3] hover:via-[#0080FF] hover:to-[#7DD3FC] text-white shadow-[0_2px_12px_rgba(0,145,255,0.32)] hover:shadow-[0_4px_18px_rgba(0,145,255,0.48)] hover:scale-[1.03]"
+              ? simSession.isSingleEngine
+                ? "bg-gradient-to-tr from-[#003870] via-[#005FB8] to-[#1E70BF] text-white shadow-[0_4px_18px_rgba(0,95,184,0.45)] scale-[1.03]"
+                : "bg-gradient-to-tr from-[#581C87] via-[#7C3AED] to-[#9D4EDD] text-white shadow-[0_4px_18px_rgba(124,58,237,0.45)] scale-[1.03]"
+              : simSession.isSingleEngine
+              ? "bg-gradient-to-tr from-[#005FB8] via-[#0D6EFD] to-[#2B7FFF] hover:from-[#004C99] hover:via-[#005FB8] hover:to-[#1E70BF] text-white shadow-[0_2px_12px_rgba(0,95,184,0.35)] hover:shadow-[0_4px_18px_rgba(0,95,184,0.5)] hover:scale-[1.03]"
+              : "bg-gradient-to-tr from-[#7C3AED] via-[#8B5CF6] to-[#A855F7] hover:from-[#6D28D9] hover:via-[#7C3AED] hover:to-[#9333EA] text-white shadow-[0_2px_12px_rgba(124,58,237,0.35)] hover:shadow-[0_4px_18px_rgba(124,58,237,0.5)] hover:scale-[1.03]"
           }`}
         >
           <div className="relative flex items-center justify-center">
             <svg
-              className="w-[19px] h-[19px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+              className="w-[23px] h-[23px] text-white transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={2.2}
             >
               <path
                 strokeLinecap="round"
@@ -318,18 +476,29 @@ const MainPage: React.FC = () => {
             </svg>
           </div>
         </button>
+        {showAssistantHint && <AssistantCompileHint language={assistantHint.language} onDismiss={clearAssistantHint} onOpen={() => { clearAssistantHint(); setIsAiPopupOpen(true); }} />}
+        </div>
       </div>
 
       <AiAssistantPopup
+        key={auth.epoch}
+        sourceSelection={sourceSelection}
+        editorLanguage={editorTarget}
+        editorContent={editorTarget === 'c' ? fileMgr.translationSource : customAssembly}
+        authenticated={auth.authenticated}
+        simulation={simSession.simulationData}
+        currentData={playback.currentData}
+        mode={simSession.simulationEngineMode}
+        beforeExecution={simSession.isSingleEngine && playback.currentCycle === 0}
         isOpen={isAiPopupOpen}
         onClose={() => setIsAiPopupOpen(false)}
         anchorRef={aiButtonRef}
       />
 
-      {/* 2. 메인 워크스페이스 분할 레이아웃 */}
+      {/* 2. 메인 워크스페이스 분할 레이아웃 (모바일: 탭별 100% 풀화면 전환 / md 이상: 좌우 고정 분할) */}
       <div
         ref={mainWorkspaceRef}
-        className={`flex-1 flex w-full min-h-0 overflow-hidden items-stretch ${
+        className={`flex-1 flex flex-col md:flex-row px-3 pb-2 md:px-0 md:pb-0 w-full min-h-0 overflow-hidden items-stretch ${
           resizingLeftPane ||
           resizingLeftVertical ||
           resizingLeftCodeCol
@@ -337,29 +506,29 @@ const MainPage: React.FC = () => {
             : ""
         }`}
       >
-        {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) */}
+        {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) (데스크톱 전용, 모바일에서는 슬라이딩 트랙 0번 슬라이드로 동작) */}
         <div
           ref={leftPaneContainerRef}
-          className="flex flex-col h-full min-h-0 overflow-hidden pr-1"
-          style={{ width: `${leftPaneWidth}%` }}
+className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:flex-none h-full min-h-0 overflow-hidden md:pr-1.5"
+          style={{ "--left-pane-w": `${leftPaneWidth}%` } as React.CSSProperties}
         >
-          {/* 상단: C 소스 + ASM 가로 분할 */}
+          {/* 상단: C 소스 + ASM (모바일: 세로 1:1 배치 & 전체 높이 / md 이상: 가로 분할 & 비율 높이) */}
           <div
-            className="flex flex-col w-full min-h-0 overflow-hidden"
-            style={{ height: `${leftTopHeightPercent}%` }}
+            className="flex flex-col w-full flex-1 md:flex-none h-full md:h-[var(--left-top-h)] min-h-0 overflow-hidden"
+            style={{ "--left-top-h": `calc((100% - 6px) * ${leftTopHeightPercent / 100})` } as React.CSSProperties}
           >
             <div
               ref={leftTopContainerRef}
-              className="flex-1 flex w-full min-h-0 overflow-hidden"
+              className="flex-1 flex flex-col md:flex-row gap-1.5 md:gap-0 w-full min-h-0 overflow-hidden"
             >
               <div
-                className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
-                style={{ width: `${leftCodeColRatio}%` }}
+                className="flex flex-col w-full md:w-[var(--c-col-w)] flex-1 md:flex-none md:h-full min-h-0 overflow-hidden p-[1.5px]"
+                style={{ "--c-col-w": `${leftCodeColRatio}%` } as React.CSSProperties}
               >
                 {renderPanel("cSource")}
               </div>
 
-              {/* C 소스와 ASM 사이 분할 스플리터 */}
+              {/* C 소스와 ASM 사이 분할 스플리터 (모바일 숨김) */}
               <div
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -376,27 +545,26 @@ const MainPage: React.FC = () => {
                   setLeftCodeColRatio(50);
                 }}
                 title="드래그하여 C 코드와 ASM 영역 너비 조절 (더블클릭: 50:50 리셋)"
-                className="w-2.5 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+                className="hidden md:flex w-2.5 -mx-0.5 relative items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
               >
                 <div
                   className={`w-[3px] rounded-full transition-all duration-200 ${
                     resizingLeftCodeCol
-                      ? "h-24 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                      : "h-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-20 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                      ? "h-24 bg-[var(--ar-accent)] shadow-sm"
+                      : "h-10 bg-[#D0D7DE] group-hover:h-20 group-hover:bg-[var(--ar-accent)]"
                   }`}
                 />
               </div>
 
               <div
-                className="flex flex-col h-full min-h-0 overflow-hidden p-[1.5px]"
-                style={{ width: `${100 - leftCodeColRatio}%` }}
+                className="flex flex-col w-full md:flex-1 md:h-full min-h-0 overflow-hidden p-[1.5px]"
               >
                 {renderPanel("source")}
               </div>
             </div>
           </div>
 
-          {/* 상단(에디터)과 하단(튜터) 사이 세로 분할 스플리터 */}
+          {/* 상단(에디터)과 하단(튜터) 사이 세로 분할 스플리터 (모바일 숨김) */}
           <div
             onMouseDown={(e) => {
               e.preventDefault();
@@ -413,27 +581,27 @@ const MainPage: React.FC = () => {
               setLeftTopHeightPercent(56);
             }}
             title="위아래로 드래그하여 코드 영역과 튜터 높이 비율 조절 (더블클릭: 56:44 기본 리셋)"
-            className="h-2.5 -my-0.5 relative flex items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-sm transition-colors"
+            className="hidden md:flex h-2.5 -my-0.5 relative items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
           >
             <div
               className={`h-[3px] rounded-full transition-all duration-200 ${
                 resizingLeftVertical
-                  ? "w-28 bg-[#005FB8] dark:bg-[#007ACC] shadow-sm"
-                  : "w-12 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-24 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                  ? "w-28 bg-[var(--ar-accent)] shadow-sm"
+                  : "w-12 bg-[#D0D7DE] group-hover:w-24 group-hover:bg-[var(--ar-accent)]"
               }`}
             />
           </div>
 
-          {/* 하단: 튜터 영역 */}
+          {/* 하단: 튜터 영역 (모바일 숨김) */}
           <div
-            className="w-full min-h-0 overflow-hidden flex flex-col p-[1.5px]"
-            style={{ height: `${100 - leftTopHeightPercent}%` }}
+            className="hidden md:flex w-full min-h-0 overflow-hidden flex-col p-[1.5px]"
+            style={{ flex: 1 }}
           >
             {renderPanel("tutor")}
           </div>
         </div>
 
-        {/* 좌우 메인 분할선 스플리터 */}
+        {/* 좌우 메인 분할선 스플리터 (모바일 숨김) */}
         <div
           onMouseDown={(e) => {
             if (e.detail === 2) {
@@ -450,35 +618,38 @@ const MainPage: React.FC = () => {
             setLeftPaneWidth(50);
           }}
           title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 50:50 기본 리셋)"
-          className="w-3 -mx-0.5 relative flex items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20 rounded-md transition-colors"
+          className="hidden md:flex w-2.5 relative items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[var(--ar-accent)]/10 rounded-md transition-colors"
         >
           <div
             className={`w-[4px] rounded-full transition-all duration-200 ${
               resizingLeftPane
-                ? "h-36 bg-[#005FB8] dark:bg-[#007ACC] shadow-md ring-2 ring-[#005FB8]/30 dark:ring-[#007ACC]/30"
-                : "h-16 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-28 group-hover:bg-[#005FB8] dark:group-hover:bg-[#007ACC]"
+                ? "h-36 bg-[var(--ar-accent)] shadow-md ring-2 ring-[var(--ar-accent)]/30"
+                : "h-16 bg-[#D0D7DE] group-hover:h-28 group-hover:bg-[var(--ar-accent)]"
             }`}
           />
         </div>
 
-        {/* 우측 슬라이딩 뷰포트 영역 */}
-        <div className="flex-1 flex h-full min-w-0 overflow-hidden relative items-stretch pl-1">
+        {/* 슬라이딩 뷰포트 영역 (모바일: 5개 탭 전체 슬라이드 트랙 / md 이상: 우측 3개 뷰포트 트랙) */}
+        <div className="flex w-full flex-1 h-full min-w-0 min-h-0 overflow-hidden relative items-stretch md:pl-1">
           {canGoPrevViewport && (
-            <div className="w-5 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 mr-1">
+            <div className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 mr-1">
               <button
                 type="button"
                 onClick={handleGoPrevViewport}
                 title="이전 뷰포트(왼쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   simSession.isSingleEngine
-                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
-                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
+                    ? "text-[#8C959F] hover:text-[#005FB8] hover:bg-[#005FB8]/10"
+                    : "text-[#8C959F] hover:text-purple-600 hover:bg-purple-500/10"
                 }`}
               >
-                <span className="text-base font-bold leading-none transition-transform group-hover:-translate-x-0.5">
-                  ‹
-                </span>
-                <span className="text-[9px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
+                <svg
+                  className="w-3.5 h-3.5 fill-current transition-transform duration-150 group-hover:-translate-x-0.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M16 4L6 12l10 8V4z" />
+                </svg>
+                <span className="text-[11px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
                   PREV
                 </span>
               </button>
@@ -488,6 +659,9 @@ const MainPage: React.FC = () => {
           <SlidingViewportTrack
             sections={sections}
             rightViewportIndex={rightViewportIndex}
+            mobileViewportIndex={
+              isMobileCodeView ? 0 : isMobileAssistantViewport ? 4 : rightViewportIndex + 1
+            }
             containerRef={containerRef}
             renderPanel={renderPanel}
             resizingPair={resizingPair}
@@ -496,24 +670,53 @@ const MainPage: React.FC = () => {
             onSlotResizeStart={handleSlotResizeStart}
             onPairReset={handlePairReset}
             onSlotReset={handleSlotReset}
+            mobileLeadSection={
+              <>
+                <div className="flex flex-col w-full flex-1 min-h-0 overflow-hidden p-[1.5px]">
+                  {renderPanel("cSource")}
+                </div>
+                <div className="flex flex-col w-full flex-1 min-h-0 overflow-hidden p-[1.5px]">
+                  {renderPanel("source")}
+                </div>
+              </>
+            }
+            mobileExtraSection={
+              <AiAssistantPopup
+                key={`mobile-${auth.epoch}`}
+                inline
+                sourceSelection={sourceSelection}
+                editorLanguage={editorTarget}
+                editorContent={editorTarget === "c" ? fileMgr.translationSource : customAssembly}
+                authenticated={auth.authenticated}
+                simulation={simSession.simulationData}
+                currentData={playback.currentData}
+                mode={simSession.simulationEngineMode}
+                beforeExecution={simSession.isSingleEngine && playback.currentCycle === 0}
+                isOpen={true}
+                onClose={() => setIsMobileAssistantViewport(false)}
+              />
+            }
           />
 
           {canGoNextViewport && (
-            <div className="w-5 shrink-0 flex items-stretch select-none animate-in fade-in duration-200 ml-1">
+            <div className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 ml-1">
               <button
                 type="button"
                 onClick={handleGoNextViewport}
                 title="다음 뷰포트(오른쪽 영역)로 이동"
                 className={`w-full h-full rounded-md border-0 bg-transparent flex flex-col items-center justify-center gap-2.5 transition-all duration-150 cursor-pointer group active:scale-[0.98] ${
                   simSession.isSingleEngine
-                    ? "text-[#8C959F] dark:text-[#858585] hover:text-[#005FB8] dark:hover:text-[#007ACC] hover:bg-[#005FB8]/10 dark:hover:bg-[#007ACC]/20"
-                    : "text-[#8C959F] dark:text-[#858585] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/20"
+                    ? "text-[#8C959F] hover:text-[#005FB8] hover:bg-[#005FB8]/10"
+                    : "text-[#8C959F] hover:text-purple-600 hover:bg-purple-500/10"
                 }`}
               >
-                <span className="text-base font-bold leading-none transition-transform group-hover:translate-x-0.5">
-                  ›
-                </span>
-                <span className="text-[9px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
+                <svg
+                  className="w-3.5 h-3.5 fill-current transition-transform duration-150 group-hover:translate-x-0.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M8 4l10 8-10 8V4z" />
+                </svg>
+                <span className="text-[11px] font-mono font-bold tracking-widest [writing-mode:vertical-rl]">
                   NEXT
                 </span>
               </button>
@@ -521,6 +724,47 @@ const MainPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 3. 모바일 전용 하단 재생 콘솔 + 바닥 밀착 5버튼 바텀바 (md 미만 노출) */}
+      <MobileWorkspaceControls
+        currentCycle={playback.currentCycle}
+        maxCycle={maxCycle}
+        totalCycles={playback.totalCycles}
+        playSpeed={playback.playSpeed}
+        isPlaying={playback.isPlaying}
+        isSimulationReady={playback.isSimulationReady}
+        isSingleEngine={simSession.isSingleEngine}
+        isMobileCodeView={isMobileCodeView}
+        isMobileAssistantViewport={isMobileAssistantViewport}
+        rightViewportIndex={rightViewportIndex}
+        onJumpToCycle={playback.handleJumpToCycle}
+        onChangeSpeed={playback.setPlaySpeed}
+        onReset={playback.handleReset}
+        onResetAndPlay={playback.handleResetAndPlay}
+        onPlayCurrentCycle={playback.handlePlayCurrentCycle}
+        isCyclePlaying={playback.isCyclePlaying}
+        onStepBack={playback.handleStepBack}
+        onTogglePlay={playback.handleTogglePlay}
+        onStepForward={playback.handleStepForward}
+        onSelectCode={handleMobileCodeSelect}
+        onSelectViewport={handleMobileViewportSelect}
+        onSelectAssistant={handleMobileAssistantSelect}
+      />
+
+      {/* 4. 모바일 전용 튜터 해설 모달 (코드 클릭 시 노출) */}
+      {isMobileTutorModalOpen && simSession.simulationData && (
+        <div
+          className="fixed inset-0 z-50 md:hidden bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-3 animate-in fade-in duration-150"
+          onClick={() => setIsMobileTutorModalOpen(false)}
+        >
+          <div
+            className="w-full max-h-[72vh] flex flex-col relative rounded-lg overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {renderPanel("tutor", () => setIsMobileTutorModalOpen(false))}
+          </div>
+        </div>
+      )}
 
       {/* Play / Pause / Reset / Trash / Check 화면 중앙 애니메이션 피드백 */}
       <PlaybackFeedbackOverlay feedback={playback.playbackFeedback} />

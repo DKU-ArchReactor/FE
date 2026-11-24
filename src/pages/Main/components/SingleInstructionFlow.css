@@ -1,0 +1,53 @@
+.ar-single-flow {
+  --ar-flow-border: #cbd5e1;
+  --ar-flow-region-border: #586b82;
+  --ar-flow-region-heading-bg: #eef2f6;
+  --ar-flow-device-border: #8797ac;
+  --ar-flow-idle-text: #64748b;
+  --ar-flow-wire: #94a3b8;
+  --ar-flow-address: #b56a08;
+  --ar-flow-data: #087fce;
+  --ar-flow-control: #8951ce;
+  --ar-flow-address-token: #965600;
+  --ar-flow-data-token: #0969b0;
+  --ar-flow-control-token: #7540ae;
+  --ar-flow-address-text: #965600;
+  --ar-flow-data-text: #0969b0;
+  --ar-flow-control-text: #7540ae;
+  --ar-flow-device-bg: #f8fafc;
+  --ar-flow-result-bg: #f1f5f9;
+  --ar-flow-region-bg: var(--ar-panel-bg);
+}
+.ar-single-flow-diagram {
+  font-family: sans-serif;
+}
+.ar-single-flow-diagram .font-mono {
+  font-family: "D2Coding", Consolas, monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-device-active {
+    stroke-width: 2.6;
+    stroke-opacity: 1;
+  }
+  .flow-arrow-stream {
+    stroke-dashoffset: 0;
+    stroke-dasharray: none;
+    stroke-width: 3.2;
+    stroke-opacity: 1;
+  }
+  .flow-token {
+    display: none;
+  }
+  .flow-control-trail {
+    display: none;
+  }
+  .flow-data-trail {
+    display: none;
+  }
+  .flow-packet {
+    display: none;
+  }
+  .flow-data-word {
+    display: none;
+  }
+}

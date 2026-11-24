@@ -1,155 +1,88 @@
+import { clearAuthTokens, getAuthSession, useAuthSession } from '@/api/authSession';
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getMe } from "@/api/auth";
 import type { UserMeResponse } from "@/type/auth";
-import ThemeSwitch from "@/components/ThemeSwitch";
+import { ArchLogo } from "@/components/ArchLogo";
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<UserMeResponse | null>(null);
-
-  const [aspectTier, setAspectTier] = useState<"normal" | "ultrawide" | "superwide">(() => {
-    if (typeof window === "undefined") return "normal";
-    const ratio = window.innerWidth / Math.max(1, window.innerHeight);
-    if (ratio >= 32 / 9) return "superwide";
-    if (ratio >= 21 / 9) return "ultrawide";
-    return "normal";
-  });
-
-  useEffect(() => {
-    const checkAspectRatio = () => {
-      const ratio = window.innerWidth / Math.max(1, window.innerHeight);
-      if (ratio >= 32 / 9) setAspectTier("superwide");
-      else if (ratio >= 21 / 9) setAspectTier("ultrawide");
-      else setAspectTier("normal");
-    };
-    checkAspectRatio();
-    window.addEventListener("resize", checkAspectRatio);
-    return () => window.removeEventListener("resize", checkAspectRatio);
-  }, []);
+  const auth = useAuthSession();
+  const [profile, setProfile] = useState<{ epoch: number; user: UserMeResponse } | null>(null);
+  const user = auth.authenticated && profile?.epoch === auth.epoch ? profile.user : null;
 
   const isActive = (path: string) => location.pathname === path;
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setUser(null);
-      return;
-    }
-
-    getMe()
-      .then((data) => setUser(data))
-      .catch(() => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("token_type");
-        setUser(null);
-      });
-  }, [location.pathname]);
+    if (!auth.authenticated) return;
+    let active = true;
+    getMe().then(data => {
+      if (active && getAuthSession().epoch === auth.epoch) setProfile({ epoch: auth.epoch, user: data });
+    }).catch(() => {
+      if (!active || getAuthSession().epoch !== auth.epoch) return;
+      clearAuthTokens();
+    });
+    return () => { active = false; };
+  }, [location.pathname, auth.authenticated, auth.epoch]);
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("token_type");
-    setUser(null);
+    clearAuthTokens();
+    setProfile(null);
     navigate("/login");
   };
 
-  // 우측 3단계 뷰포트 내비게이션 아이템:
-  // 1: State -> /
-  // 2: Timing -> /pipeline
-  // 3: Pipeline -> /management
-  const navItems =
-    aspectTier === "superwide"
-      ? []
-      : aspectTier === "ultrawide"
-      ? [
-          {
-            label: "State ➔ Timing",
-            path: "/",
-            active: location.pathname === "/" || location.pathname === "/pipeline",
-          },
-          {
-            label: "Timing ➔ Pipeline",
-            path: "/management",
-            active: location.pathname === "/management",
-          },
-        ]
-      : [
-          {
-            label: "State",
-            path: "/",
-            active: isActive("/"),
-          },
-          {
-            label: "Timing",
-            path: "/pipeline",
-            active: isActive("/pipeline"),
-          },
-          {
-            label: "Pipeline",
-            path: "/management",
-            active: isActive("/management"),
-          },
-        ];
-
   return (
     <header className="sticky top-0 z-50 w-full bg-[var(--ar-panel-bg)] border-b border-[var(--ar-border)] select-none transition-colors duration-150 shadow-xs">
-      <div className="w-full px-4 h-12 flex justify-between items-center">
-        {/* 좌측: 로고 및 뷰포트 내비게이션 탭 */}
-        <div className="flex items-center gap-6">
+      <div className="w-full px-3 md:px-4 h-11 md:h-12 flex justify-between items-center">
+        {/* 좌측: 브랜드 로고 및 플랫폼명 (우상단 첨자 RV32I) */}
+        <div className="flex items-center gap-4 md:gap-6 min-w-0">
           <div 
-            className="text-[#005FB8] dark:text-[#007ACC] font-bold text-lg cursor-pointer tracking-tight flex items-center gap-2 group" 
+            className="text-[var(--ar-accent)] hover:text-[var(--ar-accent-hover)] font-bold cursor-pointer tracking-tight flex items-center gap-1.5 md:gap-2 group transition-colors duration-150 shrink-0" 
             onClick={() => navigate("/")}
             title="ArchReactor - RISC-V Pipeline Visualizer"
           >
-            <img 
-              src="/logo.png" 
-              alt="ArchReactor Logo" 
-              className="w-7 h-7 object-contain transition-transform duration-200 group-hover:scale-105" 
-            />
-            <span className="font-extrabold tracking-tight">ArchReactor</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className={`px-3 py-1 rounded text-xs font-semibold border transition-all cursor-pointer ${
-                  item.active
-                    ? "bg-[var(--ar-header-bg)] text-[var(--ar-accent)] border-[var(--ar-border)] shadow-xs"
-                    : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)] hover:bg-black/5 dark:hover:bg-white/5"
-                }`}
+            <ArchLogo className="w-[22px] h-[22px] md:w-[27px] md:h-[27px] text-current transition-colors duration-150 drop-shadow-xs shrink-0 ar-logo-wobble" />
+            
+            <div className="relative inline-flex items-center select-none">
+              <span 
+                className="text-[17px] md:text-[20px] font-[900] tracking-tight leading-none"
+                style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
               >
-                {item.label}
-              </button>
-            ))}
+                ArchReactor
+              </span>
+              
+              {/* 우상단 첨자 RV32I */}
+              <span className="text-[9px] md:text-[10px] font-bold font-mono text-gray-400 tracking-wider -top-1.5 -right-1 translate-x-1 md:translate-x-1.5 -translate-y-1">
+                RV32I
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* 우측: 테마 토글 스위치 + 유저 메뉴 */}
-        <nav className="flex items-center gap-2">
-          {/* 테마 토글 스위치 (VS Code Light / Dark 슬라이딩 스위치) */}
-          <ThemeSwitch />
-
-          <div className="h-3.5 w-px bg-[#D0D7DE] dark:border-[#3E3E42] mx-0.5" />
-
+        {/* 우측: 유저 메뉴 */}
+        <nav className="flex items-center gap-1.5 md:gap-2 shrink-0">
           {user ? (
             <>
-              <span className="text-xs font-medium text-[#24292F] dark:text-[#CCCCCC]">
-                <strong className="text-[#005FB8] dark:text-[#007ACC] font-semibold">{user.name}</strong>님
-              </span>
+              <button
+                type="button"
+                onClick={() => navigate("/my")}
+                title="마이페이지로 이동"
+                className="text-xs font-medium text-[#24292F] hover:opacity-80 transition-opacity cursor-pointer whitespace-nowrap px-1 py-0.5 rounded"
+              >
+                <strong className="text-[var(--ar-accent)] font-semibold">{user.name}</strong>님
+              </button>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="text-xs font-medium text-[#57606A] dark:text-[#858585] hover:text-[#CF222E] dark:hover:text-[#F85149] transition-colors cursor-pointer"
+                className="inline-flex text-xs font-medium text-[#57606A] hover:text-[#CF222E] transition-colors cursor-pointer whitespace-nowrap px-1 py-0.5"
               >
                 로그아웃
               </button>
               <button 
                 type="button"
                 onClick={() => navigate("/my")}
-                className="text-xs font-semibold text-white bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] px-3 py-1 rounded transition-colors cursor-pointer"
+                className="hidden md:inline-flex text-xs font-semibold text-white bg-[var(--ar-accent)] hover:opacity-90 px-3 py-1 rounded transition-all cursor-pointer shadow-xs whitespace-nowrap"
               >
                 마이페이지
               </button>
@@ -159,10 +92,10 @@ const Header = () => {
               <button 
                 type="button"
                 onClick={() => navigate("/login")}
-                className={`text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer ${
+                className={`text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer whitespace-nowrap ${
                   isActive('/login')
-                    ? 'text-[#005FB8] dark:text-[#007ACC] font-bold'
-                    : 'text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC]'
+                    ? 'text-[var(--ar-accent)] font-bold'
+                    : 'text-[#57606A] hover:text-[#24292F]'
                 }`}
               >
                 로그인
@@ -170,7 +103,7 @@ const Header = () => {
               <button 
                 type="button"
                 onClick={() => navigate("/signup")}
-                className="text-xs font-semibold px-2.5 py-1 rounded bg-[#005FB8] dark:bg-[#007ACC] hover:bg-[#004C99] dark:hover:bg-[#0062A3] text-white transition-colors cursor-pointer"
+                className="hidden md:inline-flex text-xs font-semibold px-2.5 py-1 rounded bg-[var(--ar-accent)] hover:opacity-90 text-white transition-all cursor-pointer shadow-xs whitespace-nowrap"
               >
                 회원가입
               </button>
