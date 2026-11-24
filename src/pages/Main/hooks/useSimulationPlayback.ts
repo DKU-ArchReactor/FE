@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
-import { buildInstructionFlow, instructionPc, instructionFlowDuration, singleFlowDuration } from '../utils/instructionFlow';
 
-import { instructionAt } from '../utils/tutorAnalysis';
 
 interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;
@@ -60,7 +58,13 @@ export function useSimulationPlayback({
   } | null>(null);
 
   const timerRef = useRef<number | null>(null);
-  const singleClock = useRef<{ frame: CycleHistoryItem | null; duration: number; remaining: number; started: number | null } | null>(null);
+  const singleClock = useRef<{
+    cycle: number;
+    frame: CycleHistoryItem | null;
+    duration: number;
+    remaining: number;
+    started: number | null;
+  } | null>(null);
 
   const triggerPlaybackFeedback = (type: "play" | "pause" | "reset" | "trash" | "check") => {
     setPlaybackFeedback({ type, id: Date.now() });
@@ -218,14 +222,22 @@ export function useSimulationPlayback({
       });
       return matched ?? null;
     } else {
-      // Pipeline 모드: 실행 중인 주요 스테이지(EX, ID, IF 순)의 명령어 매칭 (stage_activity 우선)
-      const activeBuf =
-        currentData.stage_activity?.EX ||
-        currentData.stage_activity?.ID ||
-        currentData.stage_activity?.IF ||
-        currentData.buffers?.EX ||
-        currentData.buffers?.ID ||
-        currentData.buffers?.IF;
+      // Pipeline 모드: IF(현재 인출 중인 명령어)를 1순위로 보고, 비어있을 경우 ID -> EX -> MEM -> WB 순으로 탐색
+      const stages = ["IF", "ID", "EX", "MEM", "WB"] as const;
+      let activeBuf: { pc?: string; assembly?: string; source_line?: number | null; status?: string; flush_info?: { is_flushed?: boolean } } | null = null;
+
+      for (const st of stages) {
+        const candidate = currentData.stage_activity?.[st] ?? currentData.buffers?.[st];
+        if (!candidate) continue;
+        const status = (candidate.status || "").toLowerCase();
+        if (status === "empty" || status === "bubble" || status === "flush" || status === "flushed") continue;
+        if (candidate.flush_info?.is_flushed) continue;
+        const asm = (candidate.assembly || "").trim().toLowerCase();
+        if (!asm || asm === "bubble" || asm === "empty" || asm === "—") continue;
+        activeBuf = candidate;
+        break;
+      }
+
       if (!activeBuf) return null;
 
       const bufPc = (activeBuf.pc || "").trim().toLowerCase();
@@ -265,12 +277,7 @@ export function useSimulationPlayback({
     setPlaySpeed(3000);
   };
 
-  const singlePlaybackDelay = useMemo(() => {
-    if (!isSingleEngine) return singleFlowDuration(playSpeed);
-    const item = instructionAt(simulationData?.tutor, instructionPc(currentData) ?? undefined);
-    const flow = buildInstructionFlow(item, currentData, prevData, simulationData);
-    return instructionFlowDuration(flow, singleFlowDuration(playSpeed));
-  }, [isSingleEngine, currentData, prevData, simulationData, playSpeed]);
+  const singlePlaybackDelay = playSpeed;
   const singlePlaybackFrame = isSingleEngine ? currentCycle : 0;
 
   const singleFrame = isSingleEngine ? currentData : null;
@@ -282,17 +289,33 @@ export function useSimulationPlayback({
       return previous + 1;
     });
     if (isSingleEngine) {
-      if (!singleClock.current || singleClock.current.frame !== singleFrame)
-        singleClock.current = { frame: singleFrame, duration: singlePlaybackDelay, remaining: singlePlaybackDelay, started: null };
+      if (!singleClock.current || singleClock.current.cycle !== currentCycle || singleClock.current.frame !== singleFrame) {
+        singleClock.current = {
+          cycle: currentCycle,
+          frame: singleFrame,
+          duration: singlePlaybackDelay,
+          remaining: singlePlaybackDelay,
+          started: null,
+        };
+      }
       const clock = singleClock.current;
       if (clock.duration !== singlePlaybackDelay) {
         clock.remaining = clock.remaining * singlePlaybackDelay / clock.duration;
         clock.duration = singlePlaybackDelay;
       }
       if (!isPlaying) return;
-      onClearSelection();
+      if (singlePlaybackFrame >= totalCycles) {
+        setFinishedSingleFrame(singleFrame);
+        setIsPlaying(false);
+        return;
+      }
       clock.started = performance.now();
-      timerRef.current = window.setTimeout(() => { clock.remaining = 0; clock.started = null; if (singlePlaybackFrame >= totalCycles) setFinishedSingleFrame(singleFrame); advance(); }, clock.remaining);
+      timerRef.current = window.setTimeout(() => {
+        clock.remaining = 0;
+        clock.started = null;
+        if (singlePlaybackFrame >= totalCycles) setFinishedSingleFrame(singleFrame);
+        advance();
+      }, clock.remaining);
       return () => {
         if (timerRef.current !== null) clearTimeout(timerRef.current);
         if (clock.started !== null) {
@@ -303,10 +326,9 @@ export function useSimulationPlayback({
     }
     singleClock.current = null;
     if (!isPlaying) return;
-    onClearSelection();
     timerRef.current = window.setInterval(advance, playSpeed);
     return () => { if (timerRef.current !== null) clearInterval(timerRef.current); };
-  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, onClearSelection, singlePlaybackDelay, singlePlaybackFrame, singleFrame]);
+  }, [isPlaying, playSpeed, totalCycles, isSingleEngine, singlePlaybackDelay, singlePlaybackFrame, singleFrame, currentCycle]);
 
   const pauseForFlow = () => {
     // Manual flow controls detach from CPU playback. The next global Play starts
