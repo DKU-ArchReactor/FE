@@ -71,7 +71,7 @@ test('instruction values belong to that PC and stop at the selected history inde
     {history_index: 2, display_clock: 3, instruction_observations: [{pc: '0x10000', stage: 'EX', summary: 'future iteration'}]},
   ]};
   const html = renderToStaticMarkup(createElement(exports.TutorInstructionEvidence, {item, bundle, historyIndex: 1}));
-  assert.match(html.replace(/<[^>]*>/g, ''), /3 \+ 5 = 8/);
+  assert.match(html, />3<\/code> \+ <code[^>]*>5<\/code> = <code[^>]*>8/);
   assert.doesNotMatch(html, /future iteration|different PC/);
   const initial = renderToStaticMarkup(createElement(exports.TutorInstructionEvidence, {item, bundle, historyIndex: -1}));
   assert.doesNotMatch(initial, /3 \+ 5 = 8/);
