@@ -2,12 +2,28 @@ import { seedTutor } from "@/pages/Main/utils/tutorAnalysis";
 import apiConfig from "@/api/config";
 import type { SimulationRunRequest, SimulationResult, CycleHistoryItem } from "@/type/simulation";
 
+const isSameDict = (a?: Record<string, string>, b?: Record<string, string>): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const k = aKeys[i];
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+};
+
 const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
   if (!raw || !Array.isArray(raw.history)) {
     return raw;
   }
 
   const isSingleCycle = raw.simulator?.mode === "single" || raw.simulator?.pipeline_model === "single-cycle";
+
+  let lastMemSnapshot: Record<string, string> | undefined = undefined;
+  let lastRegisters: Record<string, string> | undefined = undefined;
 
   const normalizedHistory: CycleHistoryItem[] = raw.history.map((item) => {
     // 5-Stage Pipeline 모드 및 Single 모드 모두 실제 해당 사이클에 동작한 stage_activity를 기준으로 정규화
@@ -33,9 +49,25 @@ const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
       }
     }
 
+    // 메모리 및 레지스터 스냅샷 구조 공유(Structural Sharing): 동일한 값일 경우 이전 참조를 재사용하여 V8 힙 객체 폭증 방지
+    let global_result = item.global_result;
+    if (global_result) {
+      if (lastMemSnapshot && isSameDict(lastMemSnapshot, global_result.memory_snapshot)) {
+        global_result = { ...global_result, memory_snapshot: lastMemSnapshot };
+      } else {
+        lastMemSnapshot = global_result.memory_snapshot;
+      }
+      if (lastRegisters && isSameDict(lastRegisters, global_result.registers)) {
+        global_result = { ...global_result, registers: lastRegisters };
+      } else {
+        lastRegisters = global_result.registers;
+      }
+    }
+
     return {
       ...item,
       buffers: buffers ?? { IF: null, ID: null, EX: null, MEM: null, WB: null },
+      global_result: global_result ?? item.global_result,
     };
   });
 

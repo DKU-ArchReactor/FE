@@ -1,0 +1,33 @@
+.dev-tutor-flow{flex-shrink:0;border-bottom:1px solid var(--ar-border);background:var(--ar-header-bg)}
+.dev-tutor-flow-title{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;font-size:10px;color:var(--ar-text-muted)}
+.dev-tutor-flow-title button{font-size:10px;color:var(--ar-accent);cursor:pointer}
+.dev-tutor-flow-stages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.dev-tutor-flow-stages>button{min-width:0;padding:6px 10px;text-align:left;border-right:1px solid var(--ar-border);border-bottom:2px solid transparent;cursor:pointer}
+.dev-tutor-flow-stages>button:last-child{border-right:0}
+.dev-tutor-flow-stages>button>span{display:flex;align-items:baseline;gap:6px;color:var(--stage-color);font-size:12px;font-weight:700}
+.dev-tutor-flow-stages small{font-size:10px;font-weight:500;color:var(--ar-text-muted)}
+.dev-tutor-flow-stages code{display:block;font-size:11px;line-height:1.6;overflow-wrap:anywhere;margin-top:4px}
+.dev-tutor-flow-stages>button[aria-pressed=true]{border-bottom-color:var(--stage-color);background:var(--ar-panel-bg)}
+.dev-tutor-flow-stages>button:disabled{cursor:default}
+.dev-tutor-flow-stages [data-stage=IF]{--stage-color:#c43c4e}.dev-tutor-flow-stages [data-stage=ID]{--stage-color:#b6651f}.dev-tutor-flow-stages [data-stage=EX]{--stage-color:#25844d}.dev-tutor-flow-stages [data-stage=MEM]{--stage-color:#087eaa}.dev-tutor-flow-stages [data-stage=WB]{--stage-color:#8151b5}
+.dev-tutor-flow>.dev-tutor-detail-link{padding:4px 12px;font-size:11px}
+.pipeline-lesson{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.pipeline-lesson-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 14px;border-bottom:1px solid var(--ar-border);font-size:12px;flex-shrink:0}
+.pipeline-lesson-toolbar>strong{color:var(--ar-text-muted);font-size:11px}
+.pipeline-lesson-toolbar>button{color:var(--ar-accent);cursor:pointer;font-weight:650}
+.pipeline-lesson-reader.dev-tutor-detail-window{position:relative;inset:auto;flex:1;border-radius:0}
+.pipeline-lesson-reader .tutor-reader h3{font-size:16px}
+.pipeline-lesson-reader .tutor-reading-block>p{color:var(--ar-text-primary);font-size:14px;line-height:1.75}
+.pipeline-lesson>.dev-tutor-line-split{flex:1 1 0;height:auto;min-height:0}
+.pipeline-lesson .dev-tutor-flow-stages code{font-size:12px;font-weight:600}
+.pipeline-lesson>.dev-tutor-flow{display:flex;align-items:stretch;min-height:36px}
+.pipeline-overview-button{padding:6px 12px;font-size:11px;font-weight:650;color:var(--ar-accent);border-right:1px solid var(--ar-border);cursor:pointer;white-space:nowrap}
+.pipeline-lesson .dev-tutor-flow-stages{flex:1}
+.pipeline-lesson .dev-tutor-flow-stages>button{padding:6px 10px}
+.pipeline-lesson .dev-tutor-flow-stages code{display:none}
+.pipeline-lesson .dev-tutor-flow-stages>button>span{justify-content:center}
+.pipeline-lesson-reader .tutor-reader{padding-inline:54px}
+.pipeline-lesson-reader .tutor-reader>header{background:transparent;border-left:0;padding:3px 0 8px;margin-bottom:8px}
+.pipeline-lesson-reader .tutor-reading-block{padding:4px 0;margin-bottom:10px}
+.pipeline-lesson-reader .tutor-reader-arrows>button{width:28px}
+.pipeline-lesson-hint{font-size:11px;color:var(--ar-text-muted)}

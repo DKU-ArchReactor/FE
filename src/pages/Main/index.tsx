@@ -51,6 +51,7 @@ const MainPage: React.FC = () => {
 
   // 3. UI 및 작성 타겟 제어 ("c" vs "asm")
   const [sourceSelection, setSourceSelection] = useState<EditorSelection | null>(null);
+  const [tutorSelection,setTutorSelection]=useState<{kind:'c'|'asm';revision:number}>({kind:'asm',revision:0});
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
   const [isMobileCodeView, setIsMobileCodeView] = useState(true);
@@ -252,6 +253,8 @@ const MainPage: React.FC = () => {
       panelKey={panelKey}
       onCloseTutor={onCloseTutor}
       onSourceSelection={setSourceSelection}
+      tutorSelection={tutorSelection}
+      onTutorSelect={kind=>setTutorSelection(value=>({kind,revision:value.revision+1}))}
       simulationData={simSession.simulationData}
       currentData={playback.currentData}
       prevData={playback.prevData}
@@ -492,7 +495,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
           {/* 상단: C 소스 + ASM (모바일: 세로 1:1 배치 & 전체 높이 / md 이상: 가로 분할 & 비율 높이) */}
           <div
             className="flex flex-col w-full flex-1 md:flex-none h-full md:h-[var(--left-top-h)] min-h-0 overflow-hidden"
-            style={{ "--left-top-h": `${leftTopHeightPercent}%` } as React.CSSProperties}
+            style={{ "--left-top-h": `calc((100% - 6px) * ${leftTopHeightPercent / 100})` } as React.CSSProperties}
           >
             <div
               ref={leftTopContainerRef}
@@ -572,7 +575,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
           {/* 하단: 튜터 영역 (모바일 숨김) */}
           <div
             className="hidden md:flex w-full min-h-0 overflow-hidden flex-col p-[1.5px]"
-            style={{ height: `${100 - leftTopHeightPercent}%` }}
+            style={{ flex: 1 }}
           >
             {renderPanel("tutor")}
           </div>

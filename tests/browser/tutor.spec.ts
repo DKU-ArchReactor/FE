@@ -1,4 +1,4 @@
-import {test, expect} from '@playwright/test';
+import {test, expect, type Page} from '@playwright/test';
 
 test.beforeEach(async ({page}) => {
   // Unseeded runtime explanations must stay inside this isolated fixture server.
@@ -23,18 +23,19 @@ test('switching C lines does not cancel or restart pending ASM explanations', as
       kind: item.kind, category: 'test', title: '문맥', summary: `loaded ${item.text}`, detail: '',
     }))}});
   });
-  await page.goto('/tests/browser/tutor.html');
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
   try {
     await expect.poll(() => asmRequests).toBe(1);
+    const cLoaded=page.waitForResponse(response=>response.url().endsWith('/api/v1/tutor/explain')&&response.request().postDataJSON().items.some((item:{text:string})=>item.text==='return x;'));
     await page.getByRole('button', {name: 'select second C line'}).click();
-    await expect(page.getByText('loaded return x;', {exact: true})).toBeVisible();
+    await expect((await cLoaded).ok()).toBe(true);
     const received = page.waitForResponse(response => response.url().endsWith('/api/v1/tutor/explain')
       && response.request().postDataJSON().items.some((item: {kind: string}) => item.kind === 'crt'));
     release();
     await expect((await received).ok()).toBe(true);
     await page.getByRole('button', {name: 'select unmapped ASM'}).click();
-    await page.getByText('소스 위치와 실행 문맥', {exact: true}).click();
-    await expect(page.getByText('loaded nop', {exact: true})).toBeVisible();
+    await page.getByRole('button', {name:'자세히 보기',exact:true}).click();
+    expect(await readPages(page)).toContain('loaded nop');
     expect(asmRequests).toBe(1);
   } finally {
     release();
@@ -52,171 +53,149 @@ test('ASM errors survive a successful C explanation and remain manually retryabl
       kind: item.kind, category: 'test', title: '문맥', summary: `loaded ${item.text}`, detail: '',
     }))}});
   });
-  await page.goto('/tests/browser/tutor.html');
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
   await expect(page.getByRole('alert')).toBeVisible();
+  const cLoaded=page.waitForResponse(response=>response.url().endsWith('/api/v1/tutor/explain')&&response.request().postDataJSON().items.some((item:{text:string})=>item.text==='return x;'));
   await page.getByRole('button', {name: 'select second C line'}).click();
-  await expect(page.getByText('loaded return x;', {exact: true})).toBeVisible();
+  await expect((await cLoaded).ok()).toBe(true);
   await expect(page.getByRole('alert')).toBeVisible();
   await page.getByRole('button', {name: '다시 시도', exact: true}).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect(asmRequests).toBe(2);
 });
 
-test('closed CPI details are deferred and reopening uses the current history', async ({page}) => {
-  await page.goto('/tests/browser/tutor.html');
-  const summary = page.locator('details').filter({has: page.locator('summary', {hasText: 'CPI와 해저드 분석'})});
-  await expect(summary.locator(':scope > div')).toHaveCount(0);
-  await summary.locator(':scope > summary').click();
-  await expect(summary).toContainText('1 ÷ 1 = 1.00');
-  await summary.locator(':scope > summary').click();
-  await expect(summary.locator(':scope > div')).toHaveCount(0);
-  await page.getByRole('button', {name: 'follow next step'}).click();
-  await expect(summary.locator(':scope > div')).toHaveCount(0);
-  await summary.locator(':scope > summary').click();
-  await expect(summary).toContainText('2 ÷ 1 = 2.00');
-  await summary.getByText('주요 관찰 원인', {exact: true}).click();
-  await expect(summary.getByText('실행 이력에서 확인한 대기 원인', {exact: true})).toBeVisible();
-  await expect(summary).toHaveAttribute('open', '');
-});
 
-test('instruction detail rows have consistent spacing when closed and after toggling', async ({page}) => {
-  await page.goto('/tests/browser/tutor.html');
-  await page.getByRole('button', {name: 'select second ASM', exact: true}).click();
-  const details = page.locator('[data-asm-index="1"] .tutor-instruction-details');
-  await details.locator(':scope > summary').click();
-  const rows = details.locator(':scope > div > details > summary');
-  await expect(rows).toHaveCount(3);
-  const measure = () => rows.evaluateAll(elements => elements.map(element => {
-    const rect = element.getBoundingClientRect();
-    return {top: rect.top, bottom: rect.bottom, height: rect.height};
-  }));
-  const check = async () => {
-    const boxes = await measure();
-    expect(Math.max(...boxes.map(box => box.height)) - Math.min(...boxes.map(box => box.height))).toBeLessThanOrEqual(1);
-    for (let i = 1; i < boxes.length; i++) {
-      expect(boxes[i].top - boxes[i - 1].bottom).toBeLessThanOrEqual(1);
-    }
-  };
-  await check();
-  await rows.first().click();
-  await rows.first().click();
-  await check();
-  await page.setViewportSize({width: 390, height: 844});
-  await check();
+async function readPages(page:Page) {
+  const window=page.locator('.dev-tutor-detail-window').filter({visible:true}).last();
+  await expect(window.locator('.tutor-reading-block').first()).toBeVisible();
+  let text='';
+  for(let index=0;index<100;index++){
+    const viewport=window.locator('.tutor-reader-viewport');
+    await expect.poll(()=>viewport.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
+    expect(await viewport.evaluate(el=>el.scrollTop)).toBe(0);
+    text+=await window.locator('.tutor-reader').innerText();
+    const next=window.getByRole('button',{name:'다음 설명'});
+    if(!await next.count()||await next.isDisabled())break;
+    const before=await window.locator('.tutor-reader>header>span').textContent();
+    await next.click();
+    await expect(window.locator('.tutor-reader>header>span')).not.toHaveText(before!);
+  }
+  return text;
+}
+test('C and ASM are separated and their arrows navigate different scopes',async({page})=>{
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
+  const c=page.getByRole('complementary',{name:'선택한 C 줄 설명'});
+  const asm=page.getByRole('region',{name:'선택한 어셈블리 설명'});
+  await expect(c).toContainText('int x = 3;');
+  await expect(asm).toContainText('addi a0, zero, 3');
+  await expect(page.getByRole('button',{name:'이전 ASM',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'다음 ASM',exact:true}).click();
+  await expect(asm).toContainText('addi a1, a0, 1');
+  await expect(c).toContainText('int x = 3;');
+  await expect(page.getByRole('button',{name:'다음 ASM',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'다음 C 줄',exact:true}).click();
+  await expect(c).toContainText('return x;');
+  await expect(asm).toContainText('addi a2, a1, 1');
+  await expect(page.getByRole('button',{name:'이전 ASM',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'다음 ASM',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'이전 C 줄',exact:true}).click();
+  await expect(c).toContainText('int x = 3;');
+  await expect(asm).toContainText('addi a0, zero, 3');
 });
-
-test('CPI and instruction hazard analysis advance with history and exclude future records', async ({page}) => {
-  await page.goto('/tests/browser/tutor.html');
-  await page.getByText('CPI와 해저드 분석', {exact: true}).click();
-  await expect(page.getByText('실행 이력에서 확인한 대기 원인', {exact: true})).not.toBeVisible();
-  await page.getByRole('button', {name: 'follow next step'}).click();
-  const summary = page.locator('details').filter({has: page.locator('summary', {hasText: 'CPI와 해저드 분석'})});
-  await expect(summary).toContainText('2 ÷ 1 = 2.00');
-  await summary.getByText('주요 관찰 원인', {exact: true}).click();
-  await expect(summary.getByText('실행 이력에서 확인한 대기 원인', {exact: true})).toBeVisible();
-  await page.getByRole('button', {name: 'follow first step'}).click();
-  await expect(page.getByText('실행 이력에서 확인한 대기 원인', {exact: true})).not.toBeVisible();
+test('ASM detail stays on the right and C context remains visible while all content is paged',async({page})=>{
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
+  await page.getByRole('button',{name:'select second ASM'}).click();
+  const c=page.getByRole('complementary',{name:'선택한 C 줄 설명'});
+  const cText=await c.locator('.dev-tutor-c-reading>code').innerText();
+  await page.getByRole('button',{name:'자세히 보기',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(c).toBeVisible();
+  const text=await readPages(page);
+  expect(text).toContain('첫 번째 입력값을 가진 레지스터');
+  expect(text).toContain('즉치값은 명령어에 직접 적어 넣은 숫자');
+  expect(text).toContain('5000은 -2048~2047 범위를 벗어납니다.');
+  expect(text).toContain('PC 0x10004');
+  expect(await c.locator('.dev-tutor-c-reading>code').innerText()).toBe(cText);
+  await page.getByRole('button',{name:'기본 해설로'}).click();
+  await expect(page.getByRole('region',{name:'선택한 어셈블리 설명'})).toContainText('addi a1, a0, 1');
 });
-
-test('unmapped instructions show a short explanation and collapsed runtime context', async ({page}) => {
-  await page.goto('/tests/browser/tutor.html');
-  await page.getByRole('button', {name: 'select unmapped ASM'}).click();
-  const panel = page.getByRole('region', {name: '튜터 해설 패널'});
-  await expect(panel.getByText('소스 위치 미확인', {exact: true})).toBeVisible();
-  await expect(panel.getByText('상태를 유지합니다.', {exact: true})).toBeVisible();
-  const context = panel.locator('details').filter({has: page.locator('summary', {hasText: '소스 위치와 실행 문맥'})});
-  await expect(context).not.toHaveAttribute('open', '');
-  await context.locator('summary').click();
-  await expect(context).toHaveAttribute('open', '');
+test('CPI snapshots exclude future hazards and reopening reflects the selected clock',async({page})=>{
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
+  await page.getByRole('button',{name:'CPI와 해저드 분석',exact:true}).click();
+  expect(await readPages(page)).toContain('1 ÷ 1 = 1.00');
+  await page.getByRole('button',{name:'follow next step'}).click();
+  expect(await readPages(page)).not.toContain('실행 이력에서 확인한 대기 원인');
+  await page.getByRole('button',{name:'기본 해설로'}).click();
+  await page.getByRole('button',{name:'CPI와 해저드 분석',exact:true}).click();
+  const later=await readPages(page);
+  expect(later).toContain('2 ÷ 1 = 2.00');
+  expect(later).toContain('실행 이력에서 확인한 대기 원인');
 });
-
-test('selected C and direct ASM retain detailed instruction and cycle evidence', async ({page}) => {
-  const failures: string[] = [];
-  page.on('pageerror', error => failures.push(error.message));
-  await page.goto('/tests/browser/tutor.html');
-  const panel = page.getByRole('region', {name: '튜터 해설 패널'});
-  await expect(panel.getByText('매핑된 ASM:', {exact: true})).toBeVisible();
-  await expect(panel.getByText('값 준비 → 초기값 기록', {exact: true})).toBeVisible();
-  await expect(panel.getByText('a0 = zero + 3', {exact: true})).toBeVisible();
-  await expect(panel.getByText('제어 흐름 판단', {exact: true})).toBeVisible();
-  await page.getByRole('button', {name: 'switch target'}).click();
-  await expect(panel.getByText('선택한 ASM:', {exact: true})).toBeVisible();
-  await expect(panel.getByText('a0 = zero + 3', {exact: true})).toBeVisible();
-  await expect(panel.getByText('제어 흐름 판단', {exact: true})).toBeVisible();
-  await page.getByRole('button', {name: 'toggle selection'}).click();
-  await expect(panel.getByText('RISC-V 어셈블리 실행 분석', {exact: true})).toBeVisible();
-  await expect(panel.getByText('제어 흐름 판단', {exact: true})).toBeVisible();
-  expect(failures).toEqual([]);
+test('pipeline flow selects an ASM and detail reading does not stop playback',async({page})=>{
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
+  await page.getByRole('button',{name:'follow next step'}).click();
+  await page.getByRole('button',{name:'toggle pipeline focus'}).click();
+  const flow=page.getByLabel('현재 클록의 파이프라인 흐름');
+  await expect(flow.locator('[data-stage]')).toHaveCount(5);
+  await expect(flow.locator('[data-stage=IF]')).toContainText('비어 있음');
+  await flow.locator('[data-stage=EX]').click();
+  await expect(page.getByRole('region',{name:'선택한 어셈블리 설명'})).toContainText('addi a1, a0, 1');
+  await page.getByRole('button',{name:'global play'}).click();
+  await page.getByRole('button',{name:'자세히 보기',exact:true}).click();
+  await page.getByRole('button',{name:'follow first step'}).click();
+  await expect(page.getByTestId('playback-state')).toHaveText('playing');
+  await expect(page.getByRole('region',{name:'튜터 자세히 보기'}).locator('.dev-tutor-detail-bar')).toContainText('addi a1, a0, 1');
 });
-
-test('automatic playback focus follows successive instructions within the same C line in both modes', async ({page}) => {
-  await page.goto('/tests/browser/tutor.html');
-  const panel = page.getByRole('region', {name: '튜터 해설 패널'});
-  for (const stage of ['IF', 'EX']) {
-    if (stage === 'EX') await page.getByRole('button', {name: 'toggle pipeline focus'}).click();
-    await page.getByRole('button', {name: 'follow first step'}).click();
-    await expect(panel).toContainText(`${stage} · 실행 따라가기`);
-    await expect(panel.locator('[data-asm-index="0"]')).toContainText('현재 설명');
-    await page.getByRole('button', {name: 'follow next step'}).click();
-    await expect(panel.locator('[data-asm-index="1"]')).toContainText('현재 설명');
-    await expect(panel.locator('[data-asm-index="0"]')).not.toContainText('현재 설명');
-    const bounds = await panel.locator('[data-asm-index="1"]').evaluate(element => {
-      const body = element.closest('.overflow-y-auto')!;
-      return {top: element.getBoundingClientRect().top - body.getBoundingClientRect().top,
-        bottom: element.getBoundingClientRect().bottom - body.getBoundingClientRect().top, height: body.clientHeight};
-    });
-    expect(bounds.top).toBeGreaterThanOrEqual(0);
-    expect(bounds.bottom).toBeLessThanOrEqual(bounds.height + 1);
+test('resized pipeline panels keep navigation visible and all detailed text accessible',async({page})=>{
+  for(const pipeline of [false,true]){
+    await page.goto('/tests/browser/tutor.html?mode=pipeline');
+    if(pipeline){await page.getByRole('button',{name:'follow next step'}).click();await page.getByRole('button',{name:'toggle pipeline focus'}).click();}
+    else await page.getByRole('button',{name:'select second ASM'}).click();
+    await page.locator('.dev-tutor-host').first().evaluate(el=>Object.assign((el as HTMLElement).style,{flex:'none',height:'390px',maxWidth:'530px'}));
+    await expect(page.getByRole('button',{name:'자세히 보기',exact:true})).toBeVisible();
+    await expect(page.getByRole('button',{name:'다음 ASM',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'자세히 보기',exact:true}).click();
+    await page.evaluate(()=>document.documentElement.classList.add('dark'));
+    const text=await readPages(page);
+    expect(text).toContain('I형 산술 즉치값은 부호 있는 12비트');
+    expect(text).toContain('값입니다.');
+    const window=page.getByRole('region',{name:'튜터 자세히 보기'});
+    expect(await window.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+    await page.keyboard.press('Escape');
+    await expect(window).toHaveCount(0);
   }
 });
-
-test('contextual concepts reveal examples and answers with keyboard without mixing execution evidence', async ({page}) => {
-  await page.goto('/tests/browser/tutor.html');
-  await page.getByRole('button', {name: 'select second ASM'}).click();
-  await page.locator('[data-asm-index="1"]').getByText('자세히 보기', {exact: true}).click();
-  await page.getByText('관련 핵심 개념 · 1개', {exact: true}).click();
-  const concepts = page.getByRole('region', {name: '관련 RISC-V 핵심 개념'});
-  await expect(concepts).toContainText('현재 실행값과 별개');
-  const topic = concepts.locator('summary').filter({hasText: '즉치값은 명령어 안의 상수'});
-  await expect(concepts.getByText('학습 예제', {exact: true})).not.toBeVisible();
-  await topic.focus();
-  await topic.press('Enter');
-  await expect(concepts.getByText('즉치값은 명령어에 직접 적어 넣은 숫자입니다.', {exact: true})).toBeVisible();
-  await expect(concepts.getByText('I형 산술 즉치값은 부호 있는 12비트 값입니다.', {exact: true})).not.toBeVisible();
-  await concepts.getByText('원리와 주의사항 더 보기', {exact: true}).click();
-  await expect(concepts.getByText('I형 산술 즉치값은 부호 있는 12비트 값입니다.', {exact: true})).toBeVisible();
-  await expect(concepts.getByText('학습 예제', {exact: true})).toBeVisible();
-  await expect(concepts.getByText('5000은 -2048~2047 범위를 벗어납니다.', {exact: true})).toBeVisible();
-  await expect(concepts.getByRole('link', {name: /RISC-V 공식/})).toHaveAttribute('rel', 'noopener noreferrer');
-  await page.getByRole('region', {name: '튜터 해설 패널'}).evaluate(element => {element.style.maxWidth = '380px';});
-  const overflow = await concepts.evaluate(element => element.scrollWidth - element.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await expect(topic).toBeVisible();
+test('direct ASM has no C navigation and no-source instructions stay explicit',async({page})=>{
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
+  await page.getByRole('button',{name:'select unmapped ASM'}).click();
+  await expect(page.getByRole('complementary',{name:'선택한 C 줄 설명'})).toContainText('C 위치 미확인');
+  await expect(page.getByRole('region',{name:'선택한 어셈블리 설명'})).toContainText('nop');
+  await page.getByRole('button',{name:'switch target'}).click();
+  await expect(page.getByRole('button',{name:'다음 C 줄',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('region',{name:'선택한 어셈블리 설명'})).toContainText('nop');
 });
 
-test('a selected instruction stays compact while full detail remains available on demand', async ({page}) => {
-  await page.goto('/tests/browser/tutor.html');
-  await page.getByRole('button', {name: 'select second ASM'}).click();
-  const panel = page.getByRole('region', {name: '튜터 해설 패널'});
-  await expect(panel).toContainText('전체 ASM 3개 중 C 1줄에 연결된 2개를 모두 설명합니다.');
-  await expect(panel).toContainText('선택한 명령어는 이 그룹의 2번째입니다.');
-  await expect(panel.getByText('a0 = zero + 3', {exact: true})).toBeVisible();
-  await expect(panel.getByText('a1 = a0 + 1', {exact: true})).toBeVisible();
-  await expect(panel.getByText('첫 번째 입력값을 가진 레지스터', {exact: false})).not.toBeVisible();
-  const card = panel.locator('[data-asm-index="1"]');
-  const size = await card.evaluate(element => ({height: element.getBoundingClientRect().height, viewport: element.closest('.overflow-y-auto')!.clientHeight}));
-  expect(size.height).toBeLessThanOrEqual(size.viewport - 12);
-  const offset = await panel.locator('[data-asm-index="1"]').evaluate(element => {
-    const body = element.closest('.overflow-y-auto');
-    return element.getBoundingClientRect().top - body!.getBoundingClientRect().top;
-  });
-  expect(offset).toBeGreaterThanOrEqual(0);
-  expect(offset).toBeLessThanOrEqual(24);
-  await card.getByText('자세히 보기', {exact: true}).click();
-  await card.getByText('처리 순서와 항목별 역할', {exact: true}).click();
-  await expect(card.getByRole('region', {name: '명령어 한눈에 읽기'})).toContainText('명령어에 적힌 숫자 1');
-  await expect(card.getByText('같은 C 줄의 정적 레지스터 연결', {exact: true})).toBeVisible();
-  await card.getByText('매핑·레지스터 정보', {exact: true}).click();
-  await expect(card.getByText('PC 0x10004', {exact: true})).toBeVisible();
+test('C and ASM details stay inside their own sections and close independently',async({page})=>{
+  await page.goto('/tests/browser/tutor.html?mode=pipeline');
+  const asm=page.getByRole('region',{name:'선택한 어셈블리 설명'});
+  await page.getByRole('button',{name:'C 설명 자세히',exact:true}).click();
+  const cDetail=page.getByRole('region',{name:'C 줄 자세히 보기',exact:true});
+  await expect(cDetail).toBeVisible();
+  await expect(asm.locator('.dev-tutor-asm-code')).toBeVisible();
+  const cBox=await cDetail.boundingBox();
+  const asmBox=await asm.boundingBox();
+  expect(cBox!.x+cBox!.width).toBeLessThanOrEqual(asmBox!.x+1);
+  await page.getByRole('button',{name:'다음 ASM',exact:true}).click();
+  await expect(asm).toContainText('addi a1, a0, 1');
+  await expect(cDetail).toBeVisible();
+  await asm.getByRole('button',{name:'자세히 보기',exact:true}).click();
+  const asmDetail=page.getByRole('region',{name:'튜터 자세히 보기',exact:true});
+  await expect(asmDetail).toBeVisible();
+  await expect(cDetail).toBeVisible();
+  await cDetail.getByRole('button',{name:'기본 해설로'}).click();
+  await expect(cDetail).toHaveCount(0);
+  await expect(asmDetail).toBeVisible();
+  await expect(page.getByRole('complementary',{name:'선택한 C 줄 설명'})).toBeVisible();
+  await asmDetail.getByRole('button',{name:'기본 해설로'}).click();
+  await expect(asm.locator('.dev-tutor-asm-code')).toBeVisible();
 });

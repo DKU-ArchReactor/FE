@@ -5,6 +5,9 @@ import { analyzeCLine, fetchTutor } from '../utils/tutorAnalysis';
 import { TutorCycleEvidence } from './TutorEvidence';
 import './TutorTypography.css';
 import { tutorExecutionFocus } from '../utils/tutorFocus';
+import {TutorDetailHost} from './TutorDetailPages';
+import TutorPipelineLesson from './TutorPipelineLesson';
+import TutorLineSplit from './TutorLineSplit';
 import TutorPerformanceSummary from './TutorPerformanceSummary';
 import {
   TutorCrtCard,
@@ -13,6 +16,11 @@ import {
 } from './TutorSections';
 
 export interface TutorAreaProps {
+  followEnabled?: boolean;
+  onToggleFollow?: () => void;
+  selectionKind?:'c'|'asm';
+  selectionRevision?:number;
+  isPlaying?: boolean;
   simulationData: SimulationResult | null;
   currentCycleData: CycleHistoryItem | null;
   loadingMessage?: string | null;
@@ -49,6 +57,11 @@ function useTutorExplanations(items: Parameters<typeof fetchTutor>[0], retryVers
 }
 
 const TutorArea: React.FC<TutorAreaProps> = ({
+  followEnabled=true,
+  onToggleFollow,
+  isPlaying = false,
+  selectionKind='asm',
+  selectionRevision=0,
   simulationData,
   currentCycleData,
   loadingMessage,
@@ -89,9 +102,18 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const executionFocus = historyIndex != null && historyIndex >= 0
     ? tutorExecutionFocus(currentCycleData, effectiveRows, simulationData?.simulator.mode === 'single') : null;
   const currentActiveAsmIndex = executionFocus?.index ?? providedActiveAsmIndex;
-  const followsExecution = !isUserSelected && manualAsmIndex == null;
-  const selectedAsmIndex = followsExecution ? currentActiveAsmIndex : manualAsmIndex;
-  const selectedTranslationLine = followsExecution && selectedAsmIndex != null
+  const selectionScope = `${isUserSelected}:${manualAsmIndex}:${providedTranslationLine}:${activeTarget}`;
+  const [stageSelection,setStageSelection]=useState<{rows:MappedAssemblyRow[];scope:string;index:number}|null>(null);
+  const [wasPlaying,setWasPlaying]=useState(isPlaying);
+  const [singleIntent,setSingleIntent]=useState({run:simulationData,revision:selectionRevision,kind:'asm' as 'c'|'asm',version:0});
+  if(singleIntent.run!==simulationData)setSingleIntent({run:simulationData,revision:selectionRevision,kind:'asm',version:singleIntent.version+1});
+  else if(singleIntent.revision!==selectionRevision)setSingleIntent({...singleIntent,revision:selectionRevision,kind:selectionKind,version:singleIntent.version+1});
+  else if(!wasPlaying&&isPlaying)setSingleIntent({...singleIntent,kind:'asm',version:singleIntent.version+1});
+  if(wasPlaying!==isPlaying){setWasPlaying(isPlaying);if(isPlaying)setStageSelection(null);}
+  const stageIndex=stageSelection?.rows===effectiveRows&&stageSelection.scope===selectionScope?stageSelection.index:null;
+  const followsExecution = stageIndex==null && !isUserSelected && manualAsmIndex == null;
+  const selectedAsmIndex = stageIndex ?? (followsExecution ? currentActiveAsmIndex : manualAsmIndex);
+  const selectedTranslationLine = (followsExecution || stageIndex!=null || selectionKind==='asm' && activeTarget==='asm') && selectedAsmIndex != null
     ? effectiveRows[selectedAsmIndex]?.sourceLine ?? null : providedTranslationLine;
 
   const selectedRow = useMemo(() => {
@@ -104,6 +126,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const isCrtSelected = Boolean(
     selectedRow && (selectedRow.sourceLine === null || selectedRow.isRuntime)
   );
+  const splitView = isCompiled && (activeTarget !== 'asm' || selectedRow != null);
 
   const mappedAsmForSelectedLine = useMemo(() => {
     if (!selectedTranslationLine || selectedTranslationLine <= 0) return [];
@@ -159,7 +182,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const tutorBodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const body = tutorBodyRef.current;
-    if (!body || (!followsExecution && !isUserSelected && activeTarget !== 'asm')) return;
+    if (!body || (!followsExecution && !isUserSelected && activeTarget !== 'asm' && stageIndex==null)) return;
     if (selectedAsmIndex == null) {
       body.scrollTo({top: 0});
       return;
@@ -171,7 +194,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     } else if (followsExecution) {
       body.scrollTo({top: 0});
     }
-  }, [selectedAsmIndex, selectedTranslationLine, isUserSelected, activeTarget, loadingMessage, followsExecution]);
+  }, [selectedAsmIndex, selectedTranslationLine, isUserSelected, activeTarget, loadingMessage, followsExecution, stageIndex]);
 
   if (loadingMessage) {
     return (
@@ -183,7 +206,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   }
 
   return (
-    <section
+    <TutorDetailHost><section
       className="ar-tutor @container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="튜터 해설 패널"
     >
@@ -194,6 +217,10 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           </h3>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button type="button" role="switch" aria-checked={followEnabled} aria-label="실행 따라가기" onClick={onToggleFollow} className="tutor-follow-switch">
+            <span className="tutor-follow-track"><span/></span>
+            <span>실행 따라가기</span><span className="tutor-follow-status">{followEnabled?'ON':'OFF'}</span>
+          </button>
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
             {followsExecution && executionFocus ? `${executionFocus.stage} · 실행 따라가기` : activeTarget === "asm" ? "ASM INSTRUCTION" : "INSTRUCTION"}
           </span>
@@ -209,23 +236,22 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           )}
         </div>
       </header>
-
-      <div ref={tutorBodyRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4 select-text [scrollbar-gutter:stable]">
-        {explanationError && (
-          <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)]">
-            <span>해설을 불러오지 못했습니다.</span>
-            <button className="rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-1 font-medium focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]" onClick={() => setRetryVersion(x => x + 1)}>
-              다시 시도
-            </button>
-          </div>
-        )}
-        {simulationData && !simulationData.tutor && (
-          <p role="status" className="rounded-md border border-[var(--ar-border)] bg-[var(--ar-header-bg)] p-3 text-xs leading-6 text-[var(--ar-text-muted)]">
-            상세 실행 해설이 제공되지 않았습니다. 현재는 기본 명령어 설명을 표시합니다.
-          </p>
-        )}
-
-        {!isCompiled ? (
+      {/* 튜터 메인 본문 영역 */}
+      <div ref={tutorBodyRef} className={`min-h-0 flex-1 overflow-y-auto p-4 space-y-4 select-text [scrollbar-gutter:stable] ${splitView?'dev-tutor-line-body':''}`}>
+        {explanationError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)]">
+          <span>해설을 불러오지 못했습니다.</span>
+          <button className="rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-1 font-medium focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]" onClick={() => setRetryVersion(x => x + 1)}>다시 시도</button>
+        </div>}
+        {simulationData && !simulationData.tutor && <p role="status" className="rounded-md border border-[var(--ar-border)] bg-[var(--ar-header-bg)] p-3 text-xs leading-6 text-[var(--ar-text-muted)]">
+          상세 실행 해설이 제공되지 않았습니다. 현재는 기본 명령어 설명을 표시합니다.
+        </p>}
+        {/* ========================================================= */}
+        {/* 컴파일/어셈블 전: 대기 화면 표시 (유효성 검증 완료 전 튜터 비활성화) */}
+        {/* ========================================================= */}
+        {!isSingleMode && simulationData ? <TutorPipelineLesson cycle={currentCycleData} simulation={simulationData} rows={effectiveRows} source={cLines} historyIndex={historyIndex} selectedIndex={selectedAsmIndex} sourceLine={selectedTranslationLine} selectionKind={selectionKind} selectionRevision={selectionRevision}/>:splitView && simulationData ? <TutorLineSplit rows={effectiveRows} source={cLines} line={isCrtSelected?null:selectedTranslationLine} selectedIndex={selectedAsmIndex}
+          singleScreen={isSingleMode} requestedView={singleIntent.kind} selectionKey={singleIntent.version}
+          simulation={simulationData} historyIndex={historyIndex} hasC={activeTarget!=='asm'}
+          onSelect={index=>setStageSelection({rows:effectiveRows,scope:selectionScope,index})}/>: !isCompiled ? (
           <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42] my-auto">
             <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
               💡
@@ -275,11 +301,25 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             simulationData={simulationData}
           />
         )}
-        <TutorCycleEvidence bundle={simulationData?.tutor} historyIndex={historyIndex} />
-        <TutorPerformanceSummary bundle={simulationData?.tutor} historyIndex={historyIndex} />
+        {!splitView && <TutorCycleEvidence bundle={simulationData?.tutor} historyIndex={historyIndex} />}
+        {!splitView && <TutorPerformanceSummary bundle={simulationData?.tutor} historyIndex={historyIndex} />}
       </div>
-    </section>
+    </section></TutorDetailHost>
   );
 };
 
-export default React.memo(TutorArea);
+function FollowingTutor(props:TutorAreaProps){
+  const [frozen,setFrozen]=useState<TutorAreaProps|null>(null);
+  const [resume,setResume]=useState<{revision:number|undefined;epoch:number}|null>(null);
+  const enabled=frozen===null;
+  const live=resume&&resume.revision===props.selectionRevision
+    ? {...props,isUserSelected:false,selectedAsmIndex:null,selectedTranslationLine:null,selectionKind:'asm' as const}
+    : props;
+  const shown=enabled?live:{...frozen,selectionKind:props.selectionKind,selectionRevision:props.selectionRevision,selectedAsmIndex:props.selectedAsmIndex,selectedTranslationLine:props.selectedTranslationLine,isUserSelected:props.isUserSelected,isPlaying:false};
+  return <TutorArea {...shown} key={resume?.epoch??0} followEnabled={enabled} onToggleFollow={()=>{
+    if(enabled)setFrozen(live);
+    else{setFrozen(null);setResume({revision:props.selectionRevision,epoch:(resume?.epoch??0)+1});}
+  }}/>;
+}
+
+export default React.memo(FollowingTutor);
