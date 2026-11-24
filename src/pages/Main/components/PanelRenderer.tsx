@@ -254,6 +254,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           activeTarget={editorTarget}
           mode={simulationMode}
           onClose={onCloseTutor}
+          onSelectLine={onSelectTranslationLine}
+          onJumpToCycle={onJumpToCycle}
+          onPausePlayback={onPausePlayback}
         />
       );
 
@@ -277,6 +280,9 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           simulationData={simulationData}
           loadingMessage={loadingMessage}
           mode="pipeline"
+          isPlaying={isPlaying}
+          playSpeed={playSpeed}
+          currentCycle={currentCycle}
         />
       );
 

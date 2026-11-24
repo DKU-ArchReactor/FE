@@ -132,6 +132,7 @@ const EX_M_TO_EXMEM_LEN = getPathTotalLength(EX_M_TO_EXMEM_PTS); // 342px
 const EX_WB_TO_EXMEM_LEN = getPathTotalLength(EX_WB_TO_EXMEM_PTS); // 342px
 const EX_IMM_TO_BRANCH_LEN = getPathTotalLength(EX_IMM_TO_BRANCH_PTS); // 177px
 const EX_PC_TO_BRANCH_LEN = getPathTotalLength(EX_PC_TO_BRANCH_PTS); // 226px
+const EX_BRANCH_LOOPBACK_LEN = getPathTotalLength(EX_BRANCH_LOOPBACK_PTS); // 1839px
 
 // MEM 경로 길이
 const MEM_ADDR_TO_DMEM_LEN = getPathTotalLength(MEM_ADDR_TO_DMEM_PTS); // 58px
@@ -267,7 +268,7 @@ function getAluOpSymbol(op: string): string {
   if (isLoad(op) || isStore(op)) return '+ (Addr)';
   if (isBranch(op)) return '== (Cmp)';
   if (op === 'lui' || op === 'auipc') return 'imm';
-  return 'ALU';
+  return '';
 }
 
 function computeAluDisplayVal(
@@ -295,7 +296,7 @@ function computeAluDisplayVal(
     return `0x${(addr >>> 0).toString(16)}`;
   }
 
-  // 2) Branch condition evaluation
+  // 2) Branch condition evaluation: 깔끔하고 직관적인 Zero 플래그 표현
   if (isBranch(op)) {
     let conditionMet = false;
     if (op === 'beq') conditionMet = (v1 === v2);
@@ -304,7 +305,7 @@ function computeAluDisplayVal(
     else if (op === 'bge') conditionMet = (v1 >= v2);
     else if (op === 'bltu') conditionMet = ((v1 >>> 0) < (v2 >>> 0));
     else if (op === 'bgeu') conditionMet = ((v1 >>> 0) >= (v2 >>> 0));
-    return conditionMet ? 'Zero: 1 (EQ/T)' : 'Zero: 0 (NE/NT)';
+    return conditionMet ? 'Zero: 1 (T)' : 'Zero: 0 (NT)';
   }
 
   // 3) Arithmetic & Logic
@@ -536,6 +537,9 @@ interface PipelineVisualizerProps {
   simulationData?: SimulationResult | null;
   loadingMessage?: string | null;
   mode?: "single" | "pipeline";
+  playSpeed?: number;
+  isPlaying?: boolean;
+  currentCycle?: number;
 }
 
 const MASTER_WIDTH = 1240;
@@ -548,12 +552,13 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   loadingMessage,
   mode = "pipeline",
   lessonContext,
+  playSpeed,
 }) => {
   // [모든 훅은 React Rules of Hooks에 따라 조건문이나 조기 반환보다 먼저 최상단에서 무조건 실행]
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [animProgress, setAnimProgress] = useState<number>(0);
   const [isSubstepLooping, setIsSubstepLooping] = useState<boolean>(true);
-  const flowDuration = lessonContext?.flowDurationMs ?? 3000;
+  const flowDuration = lessonContext?.flowDurationMs ?? playSpeed ?? 3000;
   const progressRef = React.useRef<number>(0);
   const prevDataRef = React.useRef(currentData);
 
@@ -723,8 +728,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
   const ifStep2Len = Math.max(
     ifImemToIfIdActive ? IMEM_TO_IFID_LEN : 0,
-    ifPlus4LoopbackActive ? PLUS4_LOOPBACK_LEN : 0,
-    branchLoopbackActive ? 905 : 0
+    ifPlus4LoopbackActive ? PLUS4_LOOPBACK_LEN : 0
   ) || PLUS4_LOOPBACK_LEN;
 
   const ifStep3Len = ifPcMuxToPcActive ? MUX_TO_PC_LEN : 26;
@@ -735,12 +739,17 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const ifEndHold = 0.06;
   const ifTotalDriveBudget = 1.0 - (ifPause1 + ifPause2 + ifEndHold); // 0.82
 
-  const ifMinStep3Drive = Math.max(0.08, ifTotalDriveBudget * (ifStep3Len / (ifStep1Len + ifStep2Len + ifStep3Len)));
-  const ifDrive12Budget = ifTotalDriveBudget - ifMinStep3Drive;
+  // 선 길이 비례 배분 + 가시성 바닥값 (기존 0.08과 0.06의 중간 0.07 보장)
+  const ifStepSum = ifStep1Len + ifStep2Len + ifStep3Len;
+  const ifRawDrive1 = ifStepSum > 0 ? ifTotalDriveBudget * (ifStep1Len / ifStepSum) : 0.20;
+  const ifRawDrive2 = ifStepSum > 0 ? ifTotalDriveBudget * (ifStep2Len / ifStepSum) : 0.54;
+  const ifRawDrive3 = ifTotalDriveBudget - ifRawDrive1 - ifRawDrive2;
+
+  const ifDrive3 = Math.max(0.07, ifRawDrive3);
+  const ifRem12 = ifTotalDriveBudget - ifDrive3;
   const ifLen12 = ifStep1Len + ifStep2Len;
-  const ifDrive1 = ifLen12 > 0 ? ifDrive12Budget * (ifStep1Len / ifLen12) : 0.20;
-  const ifDrive2 = ifLen12 > 0 ? ifDrive12Budget * (ifStep2Len / ifLen12) : 0.54;
-  const ifDrive3 = ifMinStep3Drive;
+  const ifDrive1 = ifLen12 > 0 ? ifRem12 * (ifStep1Len / ifLen12) : 0.20;
+  const ifDrive2 = ifRem12 - ifDrive1;
 
   const ifStep1Start = 0.0;
   const ifStep1End = ifDrive1;
@@ -783,10 +792,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const idEndHold = 0.08; // ID/EX latch hold
   const idTotalDriveBudget = 1.0 - (idPause + idEndHold); // 0.84
 
-  // Step 2 최소 가시성 0.28 보장, 나머지 Step 1 비례 배분
-  const idMinStep2Drive = Math.max(0.28, idTotalDriveBudget * (idStep2Len / (idStep1Len + idStep2Len)));
-  const idDrive1 = idTotalDriveBudget - idMinStep2Drive;
-  const idDrive2 = idMinStep2Drive;
+  // Step 1 및 Step 2 선 길이 비례 배분 (기존 0.28과 0.12의 중간 0.20 보장)
+  const idLenSum = idStep1Len + idStep2Len;
+  const idMinStep2 = Math.max(0.20, idLenSum > 0 ? idTotalDriveBudget * (idStep2Len / idLenSum) : 0.20);
+  const idDrive2 = idMinStep2;
+  const idDrive1 = idTotalDriveBudget - idDrive2;
 
   const idStep1Start = 0.0;
   const idStep1End = idDrive1;
@@ -821,17 +831,23 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
   // ALU는 단순 선분이 아닌 32-bit 전가산기/로직 연산이므로 적정 가중치(45px) 부여 (과도한 늘어짐 방지)
   const exStep2Len = (exAluSrcToAluActive ? EX_MUX_TO_ALU_LEN : 36) + 45;
-  const exStep3Len = (exAluToExMemActive || (isExActive && isBranch(exOp))) ? EX_ALU_TO_EXMEM_LEN : 39;
+  const exStep3Len = Math.max(
+    exAluToExMemActive ? EX_ALU_TO_EXMEM_LEN : 0,
+    exBranchAddActive ? EX_BRANCH_LOOPBACK_LEN : 0
+  ) || EX_ALU_TO_EXMEM_LEN;
 
   const exPause1 = 0.05; // ALUSrc MUX 선택 대기
   const exPause2 = 0.05; // ALU 연산 완료 및 출력 안정화
   const exEndHold = 0.06; // EX/MEM 래치 유지
   const exTotalDriveBudget = 1.0 - (exPause1 + exPause2 + exEndHold); // 0.84
 
-  // 동적 가중치 기반 균형 드라이브 분배 (Step 1 진입 ~0.38, Step 2 연산 ~0.22, Step 3 결과 전달 ~0.24)
+  // 선 길이 비례 드라이브 분배 + 균형 잡힌 가시성 바닥값 (기존 0.28/0.18과 0.16/0.08의 중간: Step 1 min 0.22, Step 2 min 0.13)
   const exStepSum = exStep1Len + exStep2Len + exStep3Len;
-  const exDrive1 = exStepSum > 0 ? Math.min(0.42, Math.max(0.32, exTotalDriveBudget * (exStep1Len / exStepSum))) : 0.38;
-  const exDrive2 = exStepSum > 0 ? Math.min(0.28, Math.max(0.18, exTotalDriveBudget * (exStep2Len / exStepSum))) : 0.22;
+  const exRawDrive1 = exStepSum > 0 ? exTotalDriveBudget * (exStep1Len / exStepSum) : 0.38;
+  const exRawDrive2 = exStepSum > 0 ? exTotalDriveBudget * (exStep2Len / exStepSum) : 0.22;
+
+  const exDrive1 = Math.max(0.22, exRawDrive1);
+  const exDrive2 = Math.max(0.13, exRawDrive2);
   const exDrive3 = exTotalDriveBudget - exDrive1 - exDrive2;
 
   const exStep1Start = 0.0;
@@ -845,26 +861,25 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const exStep2State = getSynchronizedSubstepProgress(animProgress, exStep2Start, exStep2End, false, exPause2);
   const exStep3State = getSynchronizedSubstepProgress(animProgress, exStep3Start, exStep3End, true);
 
-  // A는 Step 1에서 이동 후, Step 2 동안 ALU 좌측 입력 포트에 안정적으로 체류하다가 Step 3 시작 시 페이드아웃
+  // A는 Step 1 시작(exStep1Start)에 MUX 입력선들과 동시 출발하여,
+  // Step 2 종료(exStep2End) 시점에 MUX ➔ ALU B선과 동시에 ALU 입력 포트에 도착
   const exRd1State = getSynchronizedSubstepProgress(
     animProgress,
     exStep1Start,
-    exStep1End,
+    exStep2End,
     false,
-    exStep2End - exStep1End + exPause2
+    exPause2
   );
   // WData(Store)는 Step 1에서 EX/MEM 버퍼까지 이동 후 사이클 끝까지 Latch 유지
   const exRd2MemState = getSynchronizedSubstepProgress(animProgress, exStep1Start, exStep1End, true);
 
   // Branch Loopback: Branch Add 출력 ➔ PC MUX 루프백 1839px 외곽 회랑 주행
-  // Step 2 시작부터 0.92까지 충분한 시간 동안 여유롭고 부드럽게 주행 후 PC MUX에 도착 유지
-  const branchLoopbackState = exBranchAddActive
-    ? getSynchronizedSubstepProgress(animProgress, exStep2Start, 0.92, true)
-    : null;
+  // Step 2에서 Branch Add 연산 완료 후 Step 3(동일 스텝선들과 동시 출발)에 PC MUX로 전달 및 도착 유지
+  const branchLoopbackState = exBranchAddActive ? exStep3State : null;
 
-  // M / WB 제어 신호 전달: Step 1에서 하강하며, M과 WB 칩이 겹치지 않도록 미세 시차 부여
-  const exMCtrlState = getSynchronizedSubstepProgress(animProgress, exStep1Start, exStep1End * 0.92, false, 0.04);
-  const exWbCtrlState = getSynchronizedSubstepProgress(animProgress, exStep1Start + 0.04, exStep1End, false, 0.04);
+  // M / WB 제어 신호 전달: Step 1에서 하강하여 도착 (Step 1 동기화 규격 준수)
+  const exMCtrlState = exStep1State;
+  const exWbCtrlState = exStep1State;
 
   const exRd1Point = exRd1State ? interpolatePathPoints(EX_RD1_TO_ALU_PTS, exRd1State.progress) : null;
   const exRd2MuxPoint = exStep1State ? interpolatePathPoints(EX_RD2_TO_MUX_PTS, exStep1State.progress) : null;
@@ -909,7 +924,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
   const memStep1State = getSynchronizedSubstepProgress(animProgress, memStep1Start, memStep1End, false, memPause);
   const memStep2State = getSynchronizedSubstepProgress(animProgress, memStep2Start, memStep2End, true);
-  const memWbCtrlState = getSynchronizedSubstepProgress(animProgress, memStep1Start, memStep1End, false, 0.04);
+  const memWbCtrlState = memStep1State;
 
   const memBypassPoint = memBypassState ? interpolatePathPoints(MEM_BYPASS_PTS, memBypassState.progress) : null;
   const memAddrPoint = memStep1State ? interpolatePathPoints(MEM_ADDR_TO_DMEM_PTS, memStep1State.progress) : null;
@@ -933,9 +948,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const wbTotalDriveBudget = 1.0 - (wbPause + wbEndHold); // 0.86
 
   const wbLenSum = wbStep1Len + wbStep2Len;
-  // Step 2(1345px)가 Step 1(259px)보다 훨씬 길기 때문에 물리적 거리 비율로 엄밀 분배
-  // 최소 가시성을 위해 Step 1에 최소 0.14 보장
-  const wbDrive1 = Math.max(0.14, wbLenSum > 0 ? wbTotalDriveBudget * (wbStep1Len / wbLenSum) : 0.14);
+  const wbDrive1 = Math.max(0.11, wbLenSum > 0 ? wbTotalDriveBudget * (wbStep1Len / wbLenSum) : 0.11);
   const wbDrive2 = wbTotalDriveBudget - wbDrive1;
 
   const wbStep1Start = 0.0;
@@ -950,6 +963,24 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const wbDmemToMuxPoint = wbStep1State ? interpolatePathPoints(WB_DMEM_TO_MUX_PTS, wbStep1State.progress) : null;
   const wbCtrlToMuxPoint = wbStep1State ? interpolatePathPoints(WB_CTRL_TO_MUX_PTS, wbStep1State.progress) : null;
   const wbFeedbackPoint = wbStep2State ? interpolatePathPoints(WB_FEEDBACK_PTS, wbStep2State.progress) : null;
+
+  // =========================================================================
+  // [파이프라인 버퍼 래치 판정: 클록 엣지 도착 동기화]
+  // 해당 버퍼로 향하는 신호가 안착 지점에 도달(progress >= 0.85)하거나,
+  // 다운스트림 스테이지가 이미 해당 명령어를 처리 중인 경우(이전 클록 엣지에서 래치되어 유지)
+  // =========================================================================
+  const isIfIdLatched = isIdActive || (isIfActive && (imemToIfIdState?.progress ?? 0) >= 0.85);
+  const isAddr1Latched = isIdActive || (ifPcToIfIdActive && (pcToAddrState?.progress ?? 0) >= 0.85);
+
+  const isIdExLatched = isExActive || (isIdActive && (idStep2State?.progress ?? 0) >= 0.85);
+  const isAddr2Latched = isExActive || (idPcToIdExActive && (idStep2State?.progress ?? 0) >= 0.85);
+  const isSignal1Latched = isExActive || (idControlUnitActive && (idStep2State?.progress ?? 0) >= 0.85);
+
+  const isExMemLatched = isMemActive || (isExActive && (exStep3State?.progress ?? 0) >= 0.85);
+  const isSignal2Latched = isMemActive || ((exMToExMemActive || exWbToExMemActive) && (exStep3State?.progress ?? 0) >= 0.85);
+
+  const isMemWbLatched = isWbActive || (isMemActive && (memStep2State?.progress ?? 0) >= 0.85);
+  const isSignal3Latched = isWbActive || (memWbToMemWbActive && (memStep2State?.progress ?? 0) >= 0.85);
 
   // 스테이지별 피연산자 및 실시간 값 매핑
   const regMap = currentData?.global_result?.registers || {};
@@ -999,7 +1030,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const wbParsed = parseInstructionDetails(wbInst);
   const wbRdName = wbParsed.rd || '';
   const wbRdKey = resolveRegKey(wbRdName);
-  const wbVal = wbRdKey && regMap[wbRdKey] !== undefined ? `${wbRdName}=${formatRegVal(regMap[wbRdKey])}` : (wbRdName || 'write');
+  const wbVal = wbRdKey && regMap[wbRdKey] !== undefined ? `${wbRdName}: ${formatRegVal(regMap[wbRdKey])}` : (wbRdName || 'write');
 
   // 칩 주행과 100% 실시간 동기화되는 와이어 굵기/투명도 헬퍼
   // - 칩이 주행 중일 때: strokeWidth 4.0 (점선 3.6), opacity 1.0 (선명하게 굵어짐)
@@ -1248,9 +1279,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               </title>
             </g>
 
-            {/* 처음으로 돌아가기 (정지 및 리셋) 원형 버튼 (네모 아이콘) */}
+            {/* 처음으로 돌아가기 (정지 및 리셋) 원형 버튼 (네모 아이콘: 평소 연한회색 #94A3B8 -> 호버/클릭 시 진한회색 #64748B) */}
             <g
-              className="select-none cursor-pointer transition-opacity hover:opacity-80"
+              className="group select-none cursor-pointer transition-opacity"
               onClick={handleResetToStart}
             >
               <circle
@@ -1268,8 +1299,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 width="12"
                 height="12"
                 rx="2.5"
-                fill="#64748B"
-                className="pointer-events-none transition-colors duration-150"
+                className="pointer-events-none fill-[#94A3B8] transition-colors duration-150 group-hover:fill-[#64748B] group-active:fill-[#475569]"
               />
               <title>처음으로 돌아가기 (정지 및 리셋)</title>
             </g>
@@ -1721,19 +1751,21 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 width="560"
                 height="26"
                 rx="6"
-                fill={isIfActive ? "#FEF9C3" : "#F1F5F9"}
-                stroke={isIfActive ? "#EAB308" : "#94A3B8"}
+                fill={isIfIdLatched ? "#FEF9C3" : "#F1F5F9"}
+                stroke={isIfIdLatched ? "#EAB308" : "#94A3B8"}
                 strokeWidth="2.8"
+                style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }}
               />
               <text
                 x="390"
                 y="298"
                 dominantBaseline="central"
-                fill={isIfActive ? "#A16207" : "#94A3B8"}
+                fill={isIfIdLatched ? "#A16207" : "#94A3B8"}
                 fontSize="18"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
+                style={{ transition: "fill 0.25s ease" }}
               >
                 IF / ID BUFFER
               </text>
@@ -1745,19 +1777,21 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 width="46"
                 height="26"
                 rx="6"
-                fill={ifPcToIfIdActive ? "#FEF9C3" : "#F1F5F9"}
-                stroke={ifPcToIfIdActive ? "#EAB308" : "#94A3B8"}
+                fill={isAddr1Latched ? "#FEF9C3" : "#F1F5F9"}
+                stroke={isAddr1Latched ? "#EAB308" : "#94A3B8"}
                 strokeWidth="2.8"
+                style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }}
               />
               <text
                 x="701"
                 y="298"
                 dominantBaseline="central"
-                fill={ifPcToIfIdActive ? "#A16207" : "#94A3B8"}
+                fill={isAddr1Latched ? "#A16207" : "#94A3B8"}
                 fontSize="16"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
+                style={{ transition: "fill 0.25s ease" }}
               >
                 Addr
               </text>
@@ -2045,19 +2079,21 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 width="560"
                 height="26"
                 rx="6"
-                fill={isIdActive ? "#FEF9C3" : "#F1F5F9"}
-                stroke={isIdActive ? "#EAB308" : "#94A3B8"}
+                fill={isIdExLatched ? "#FEF9C3" : "#F1F5F9"}
+                stroke={isIdExLatched ? "#EAB308" : "#94A3B8"}
                 strokeWidth="2.8"
+                style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }}
               />
               <text
                 x="390"
                 y="553"
                 dominantBaseline="central"
-                fill={isIdActive ? "#A16207" : "#94A3B8"}
+                fill={isIdExLatched ? "#A16207" : "#94A3B8"}
                 fontSize="18"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
+                style={{ transition: "fill 0.25s ease" }}
               >
                 ID / EX BUFFER
               </text>
@@ -2069,19 +2105,21 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 width="46"
                 height="26"
                 rx="6"
-                fill={idPcToIdExActive ? "#FEF9C3" : "#F1F5F9"}
-                stroke={idPcToIdExActive ? "#EAB308" : "#94A3B8"}
+                fill={isAddr2Latched ? "#FEF9C3" : "#F1F5F9"}
+                stroke={isAddr2Latched ? "#EAB308" : "#94A3B8"}
                 strokeWidth="2.8"
+                style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }}
               />
               <text
                 x="701"
                 y="553"
                 dominantBaseline="central"
-                fill={idPcToIdExActive ? "#A16207" : "#94A3B8"}
+                fill={isAddr2Latched ? "#A16207" : "#94A3B8"}
                 fontSize="16"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
+                style={{ transition: "fill 0.25s ease" }}
               >
                 Addr
               </text>
@@ -2095,8 +2133,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   height="26"
                   rx="6"
                   fill="#F1F5F9"
-                  stroke="#94A3B8"
+                  stroke={isSignal1Latched ? "#EAB308" : "#94A3B8"}
                   strokeWidth="2.8"
+                  style={{ transition: "stroke 0.25s ease" }}
                 />
                 <line x1="778" y1="540" x2="778" y2="566" stroke="#94A3B8" strokeWidth="1" />
                 <line x1="824" y1="540" x2="824" y2="566" stroke="#94A3B8" strokeWidth="1" />
@@ -2108,17 +2147,19 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   width="44"
                   height="24"
                   rx="5"
-                  fill={isIdActive ? "#F0FDF4" : "transparent"}
+                  fill={isSignal1Latched ? "#F0FDF4" : "transparent"}
+                  style={{ transition: "fill 0.25s ease" }}
                 />
                 <text
                   x="755"
                   y="553"
                   dominantBaseline="central"
-                  fill={isIdActive ? "#15803D" : "#94A3B8"}
+                  fill={isSignal1Latched ? "#15803D" : "#94A3B8"}
                   fontSize="18"
                   fontWeight="bold"
                   fontFamily="sans-serif"
                   textAnchor="middle"
+                  style={{ transition: "fill 0.25s ease" }}
                 >
                   EX
                 </text>
@@ -2130,17 +2171,19 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   width="44"
                   height="24"
                   rx="5"
-                  fill={isIdActive ? "#F0F9FF" : "transparent"}
+                  fill={isSignal1Latched ? "#F0F9FF" : "transparent"}
+                  style={{ transition: "fill 0.25s ease" }}
                 />
                 <text
                   x="801"
                   y="553"
                   dominantBaseline="central"
-                  fill={isIdActive ? "#0369A1" : "#94A3B8"}
+                  fill={isSignal1Latched ? "#0369A1" : "#94A3B8"}
                   fontSize="18"
                   fontWeight="bold"
                   fontFamily="sans-serif"
                   textAnchor="middle"
+                  style={{ transition: "fill 0.25s ease" }}
                 >
                   M
                 </text>
@@ -2152,17 +2195,19 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   width="44"
                   height="24"
                   rx="5"
-                  fill={isIdActive ? "#F5F3FF" : "transparent"}
+                  fill={isSignal1Latched ? "#F5F3FF" : "transparent"}
+                  style={{ transition: "fill 0.25s ease" }}
                 />
                 <text
                   x="847"
                   y="553"
                   dominantBaseline="central"
-                  fill={isIdActive ? "#6D28D9" : "#94A3B8"}
+                  fill={isSignal1Latched ? "#6D28D9" : "#94A3B8"}
                   fontSize="18"
                   fontWeight="bold"
                   fontFamily="sans-serif"
                   textAnchor="middle"
+                  style={{ transition: "fill 0.25s ease" }}
                 >
                   WB
                 </text>
@@ -2350,7 +2395,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 >
                   ALU
                 </text>
-                {isExActive && exOp && (
+                {isExActive && exOp && getAluOpSymbol(exOp) && (
                   <text
                     x="310"
                     y="840"
@@ -2439,19 +2484,21 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 width="660"
                 height="26"
                 rx="6"
-                fill={isExActive ? "#FEF9C3" : "#F1F5F9"}
-                stroke={isExActive ? "#EAB308" : "#94A3B8"}
+                fill={isExMemLatched ? "#FEF9C3" : "#F1F5F9"}
+                stroke={isExMemLatched ? "#EAB308" : "#94A3B8"}
                 strokeWidth="2.8"
+                style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }}
               />
               <text
                 x="440"
                 y="923"
                 dominantBaseline="central"
-                fill={isExActive ? "#A16207" : "#94A3B8"}
+                fill={isExMemLatched ? "#A16207" : "#94A3B8"}
                 fontSize="18"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
+                style={{ transition: "fill 0.25s ease" }}
               >
                 EX / MEM BUFFER
               </text>
@@ -2465,8 +2512,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   height="26"
                   rx="6"
                   fill="#F1F5F9"
-                  stroke="#94A3B8"
+                  stroke={isSignal2Latched ? "#EAB308" : "#94A3B8"}
                   strokeWidth="2.8"
+                  style={{ transition: "stroke 0.25s ease" }}
                 />
                 <line x1="824" y1="910" x2="824" y2="936" stroke="#94A3B8" strokeWidth="1" />
 
@@ -2477,17 +2525,19 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   width="44"
                   height="24"
                   rx="5"
-                  fill={isExActive ? "#F0F9FF" : "transparent"}
+                  fill={isSignal2Latched ? "#F0F9FF" : "transparent"}
+                  style={{ transition: "fill 0.25s ease" }}
                 />
                 <text
                   x="801"
                   y="923"
                   dominantBaseline="central"
-                  fill={isExActive ? "#0369A1" : "#94A3B8"}
+                  fill={isSignal2Latched ? "#0369A1" : "#94A3B8"}
                   fontSize="18"
                   fontWeight="bold"
                   fontFamily="sans-serif"
                   textAnchor="middle"
+                  style={{ transition: "fill 0.25s ease" }}
                 >
                   M
                 </text>
@@ -2499,17 +2549,19 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   width="44"
                   height="24"
                   rx="5"
-                  fill={isExActive ? "#F5F3FF" : "transparent"}
+                  fill={isSignal2Latched ? "#F5F3FF" : "transparent"}
+                  style={{ transition: "fill 0.25s ease" }}
                 />
                 <text
                   x="847"
                   y="923"
                   dominantBaseline="central"
-                  fill={isExActive ? "#6D28D9" : "#94A3B8"}
+                  fill={isSignal2Latched ? "#6D28D9" : "#94A3B8"}
                   fontSize="18"
                   fontWeight="bold"
                   fontFamily="sans-serif"
                   textAnchor="middle"
+                  style={{ transition: "fill 0.25s ease" }}
                 >
                   WB
                 </text>
@@ -2640,19 +2692,21 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 width="706"
                 height="26"
                 rx="6"
-                fill={isMemActive ? "#FEF9C3" : "#F1F5F9"}
-                stroke={isMemActive ? "#EAB308" : "#94A3B8"}
+                fill={isMemWbLatched ? "#FEF9C3" : "#F1F5F9"}
+                stroke={isMemWbLatched ? "#EAB308" : "#94A3B8"}
                 strokeWidth="2.8"
+                style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }}
               />
               <text
                 x="463"
                 y="1169"
                 dominantBaseline="central"
-                fill={isMemActive ? "#A16207" : "#94A3B8"}
+                fill={isMemWbLatched ? "#A16207" : "#94A3B8"}
                 fontSize="18"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
+                style={{ transition: "fill 0.25s ease" }}
               >
                 MEM / WB BUFFER
               </text>
@@ -2665,19 +2719,21 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   width="46"
                   height="26"
                   rx="6"
-                  fill={isMemActive ? "#F5F3FF" : "#F1F5F9"}
-                  stroke={isMemActive ? "#8B5CF6" : "#94A3B8"}
+                  fill={isSignal3Latched ? "#F5F3FF" : "#F1F5F9"}
+                  stroke={isSignal3Latched ? "#8B5CF6" : "#94A3B8"}
                   strokeWidth="2.8"
+                  style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }}
                 />
                 <text
                   x="847"
                   y="1169"
                   dominantBaseline="central"
-                  fill={isMemActive ? "#6D28D9" : "#94A3B8"}
+                  fill={isSignal3Latched ? "#6D28D9" : "#94A3B8"}
                   fontSize="18"
                   fontWeight="bold"
                   fontFamily="sans-serif"
                   textAnchor="middle"
+                  style={{ transition: "fill 0.25s ease" }}
                 >
                   WB
                 </text>
@@ -2763,18 +2819,18 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               {/* ============================================================ */}
               {/* Step 1: PC 주소 출력 */}
               {ifPcToImemActive && pcToImemPoint && pcToImemState && (
-                <FloatingChip x={pcToImemPoint.x} y={pcToImemPoint.y} text={ifPcDec} stroke="#EF4444" title={`PC 주소 (10진수): ${ifPcDec}`} opacity={pcToImemState.opacity} />
+                <FloatingChip x={pcToImemPoint.x} y={pcToImemPoint.y} text={`PC: ${ifPcDec}`} stroke="#EF4444" title={`PC 주소 (10진수): ${ifPcDec}`} opacity={pcToImemState.opacity} />
               )}
               {ifPcToPlus4Active && pcToPlus4Point && pcToPlus4State && (
-                <FloatingChip x={pcToPlus4Point.x} y={pcToPlus4Point.y} text={ifPcDec} stroke="#EF4444" title={`PC 주소 (10진수): ${ifPcDec}`} opacity={pcToPlus4State.opacity} />
+                <FloatingChip x={pcToPlus4Point.x} y={pcToPlus4Point.y} text={`PC: ${ifPcDec}`} stroke="#EF4444" title={`PC 주소 (10진수): ${ifPcDec}`} opacity={pcToPlus4State.opacity} />
               )}
               {ifPcToIfIdActive && pcToAddrPoint && pcToAddrState && (
-                <FloatingChip x={pcToAddrPoint.x} y={pcToAddrPoint.y} text={ifPcDec} stroke="#EF4444" title={`보존되는 PC 주소 (10진수): ${ifPcDec}`} opacity={pcToAddrState.opacity} />
+                <FloatingChip x={pcToAddrPoint.x} y={pcToAddrPoint.y} text={`PC: ${ifPcDec}`} stroke="#EF4444" title={`보존되는 PC 주소 (10진수): ${ifPcDec}`} opacity={pcToAddrState.opacity} />
               )}
 
               {/* Step 2: IM 명령어 인출 & +4 루프백 */}
               {ifPlus4LoopbackActive && plus4LoopbackPoint && plus4LoopbackState && (
-                <FloatingChip x={plus4LoopbackPoint.x} y={plus4LoopbackPoint.y} text={ifPcPlus4Dec} stroke="#EF4444" title={`PC + 4 (10진수): ${ifPcPlus4Dec}`} opacity={plus4LoopbackState.opacity} />
+                <FloatingChip x={plus4LoopbackPoint.x} y={plus4LoopbackPoint.y} text={`+4: ${ifPcPlus4Dec}`} stroke="#EF4444" title={`PC + 4 (10진수): ${ifPcPlus4Dec}`} opacity={plus4LoopbackState.opacity} />
               )}
               {ifImemToIfIdActive && imemToIfIdPoint && imemToIfIdState && (
                 <FloatingChip x={imemToIfIdPoint.x} y={imemToIfIdPoint.y} text={ifInst || '—'} stroke="#EF4444" title={`인출된 명령어: ${ifInst}`} opacity={imemToIfIdState.opacity} />
@@ -2782,7 +2838,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
               {/* Step 3: PC MUX 결정 */}
               {ifPcMuxToPcActive && muxToPcPoint && muxToPcState && (
-                <FloatingChip x={muxToPcPoint.x} y={muxToPcPoint.y} text={branchLoopbackActive ? `Target: ${exBranchTargetVal}` : ifPcPlus4Dec} stroke="#EF4444" title={`다음 PC 입력: ${branchLoopbackActive ? `Branch Target (${exBranchTargetVal})` : ifPcPlus4Dec}`} opacity={muxToPcState.opacity} />
+                <FloatingChip x={muxToPcPoint.x} y={muxToPcPoint.y} text={branchLoopbackActive ? `Target: ${exBranchTargetVal}` : `Next: ${ifPcPlus4Dec}`} stroke="#EF4444" title={`다음 PC 입력: ${branchLoopbackActive ? `Branch Target (${exBranchTargetVal})` : ifPcPlus4Dec}`} opacity={muxToPcState.opacity} />
               )}
 
               {/* ============================================================ */}
@@ -2793,7 +2849,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 <FloatingChip x={idIfIdToRegsPoint.x} y={idIfIdToRegsPoint.y} text={idRs1Name ? `${idRs1Name}, ${idRs2Name}` : 'regs'} stroke="#EA580C" title={`레지스터 주소 필드: ${idRs1Name}, ${idRs2Name}`} opacity={idStep1State.opacity} />
               )}
               {idToImmGenActive && idIfIdToImmPoint && idStep1State && (
-                <FloatingChip x={idIfIdToImmPoint.x} y={idIfIdToImmPoint.y} text={idImmVal || 'imm'} stroke="#EA580C" title={`즉시값 인코딩 필드: ${idImmVal}`} opacity={idStep1State.opacity} />
+                <FloatingChip x={idIfIdToImmPoint.x} y={idIfIdToImmPoint.y} text={`imm: ${idImmVal}`} stroke="#EA580C" title={`즉시값 인코딩 필드: ${idImmVal}`} opacity={idStep1State.opacity} />
               )}
               {idControlUnitActive && idIfIdToCuPoint && idStep1State && (
                 <FloatingChip x={idIfIdToCuPoint.x} y={idIfIdToCuPoint.y} text="ctrl" stroke="#EA580C" title="제어 장치 디코딩 필드" opacity={idStep1State.opacity} />
@@ -2807,7 +2863,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 <FloatingChip x={idRd2Point.x} y={idRd2Point.y} text={idRd2Val} stroke="#EA580C" title={`Read Data 2: ${idRd2Val}`} opacity={idStep2State.opacity} />
               )}
               {idImmToIdExActive && idImmPoint && idStep2State && (
-                <FloatingChip x={idImmPoint.x} y={idImmPoint.y} text={idImmVal} stroke="#EA580C" title={`생성된 32-bit 즉시값: ${idImmVal}`} opacity={idStep2State.opacity} />
+                <FloatingChip x={idImmPoint.x} y={idImmPoint.y} text={`imm: ${idImmVal}`} stroke="#EA580C" title={`생성된 32-bit 즉시값: ${idImmVal}`} opacity={idStep2State.opacity} />
               )}
               {idPcToIdExActive && idPcPoint && idStep2State && (
                 <FloatingChip x={idPcPoint.x} y={idPcPoint.y} text={`PC: ${idPcDec}`} stroke="#EA580C" title={`파이프라인 전달 PC: ${idPcDec}`} opacity={idStep2State.opacity} />
@@ -2895,7 +2951,14 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
               {/* Step 3 (0.70 ~ 1.00): ALU 연산 결과 및 분기 성공 타겟 PC 전달 */}
               {(exAluToExMemActive || (isExActive && isBranch(exOp))) && exAluToExMemPoint && exStep3State && (
-                <FloatingChip x={exAluToExMemPoint.x} y={exAluToExMemPoint.y} text={`ALU: ${exAluResVal}`} stroke="#16A34A" title={`ALU 연산/판정 결과: ${exAluResVal}`} opacity={exStep3State.opacity} />
+                <FloatingChip
+                  x={exAluToExMemPoint.x}
+                  y={exAluToExMemPoint.y}
+                  text={isBranch(exOp) ? exAluResVal : `ALU: ${exAluResVal}`}
+                  stroke="#16A34A"
+                  title={`ALU 연산/판정 결과: ${exAluResVal}`}
+                  opacity={exStep3State.opacity}
+                />
               )}
               {/* Branch Add 출력 ➔ PC MUX 루프백 칩 (성립/미성립 모두 주행) */}
               {exBranchAddActive && exBranchLoopbackPoint && branchLoopbackState && (

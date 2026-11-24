@@ -8,6 +8,7 @@ import { tutorExecutionFocus } from '../utils/tutorFocus';
 import {TutorDetailHost} from './TutorDetailPages';
 import TutorPipelineLesson from './TutorPipelineLesson';
 import TutorLineSplit from './TutorLineSplit';
+import TutorSingleMode from './TutorSingleMode';
 import TutorPerformanceSummary from './TutorPerformanceSummary';
 import {
   TutorCrtCard,
@@ -36,6 +37,9 @@ export interface TutorAreaProps {
   activeTarget?: "c" | "asm";
   mode?: "single" | "pipeline";
   onClose?: () => void;
+  onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
+  onJumpToCycle?: (cycle: number) => void;
+  onPausePlayback?: () => void;
 }
 
 // Static ASM requests and the selected C line have independent cancellation/retry lifetimes.
@@ -75,6 +79,9 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   activeTarget = "c",
   mode = "pipeline",
   onClose,
+  onSelectLine,
+  onJumpToCycle,
+  onPausePlayback,
 }) => {
   const isCompiled = Boolean(simulationData);
   const isSingleMode = mode === "single" || simulationData?.simulator?.mode === "single";
@@ -215,6 +222,11 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             ARCHREACTOR TUTOR
           </h3>
+          {isSingleMode && (
+            <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[var(--ar-mode-single)]/15 text-[var(--ar-mode-single)] border border-[var(--ar-mode-single)]/30">
+              SINGLE
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button type="button" role="switch" aria-checked={followEnabled} aria-label="실행 따라가기" onClick={onToggleFollow} className="tutor-follow-switch">
@@ -237,21 +249,68 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         </div>
       </header>
       {/* 튜터 메인 본문 영역 */}
-      <div ref={tutorBodyRef} className={`min-h-0 flex-1 overflow-y-auto p-4 space-y-4 select-text [scrollbar-gutter:stable] ${splitView?'dev-tutor-line-body':''}`}>
-        {explanationError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)]">
+      <div ref={tutorBodyRef} className={`min-h-0 flex-1 overflow-y-auto select-text [scrollbar-gutter:stable] ${isSingleMode ? 'p-0! overflow-hidden! flex flex-col' : splitView ? 'p-4 space-y-4 dev-tutor-line-body' : 'p-4 space-y-4'}`}>
+        {explanationError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)] m-3">
           <span>해설을 불러오지 못했습니다.</span>
           <button className="rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-1 font-medium focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]" onClick={() => setRetryVersion(x => x + 1)}>다시 시도</button>
         </div>}
-        {simulationData && !simulationData.tutor && <p role="status" className="rounded-md border border-[var(--ar-border)] bg-[var(--ar-header-bg)] p-3 text-xs leading-6 text-[var(--ar-text-muted)]">
+        {simulationData && !simulationData.tutor && <p role="status" className="rounded-md border border-[var(--ar-border)] bg-[var(--ar-header-bg)] p-3 text-xs leading-6 text-[var(--ar-text-muted)] m-3">
           상세 실행 해설이 제공되지 않았습니다. 현재는 기본 명령어 설명을 표시합니다.
         </p>}
         {/* ========================================================= */}
         {/* 컴파일/어셈블 전: 대기 화면 표시 (유효성 검증 완료 전 튜터 비활성화) */}
         {/* ========================================================= */}
-        {!isSingleMode && simulationData ? <TutorPipelineLesson cycle={currentCycleData} simulation={simulationData} rows={effectiveRows} source={cLines} historyIndex={historyIndex} selectedIndex={selectedAsmIndex} sourceLine={selectedTranslationLine} selectionKind={selectionKind} selectionRevision={selectionRevision}/>:splitView && simulationData ? <TutorLineSplit rows={effectiveRows} source={cLines} line={isCrtSelected?null:selectedTranslationLine} selectedIndex={selectedAsmIndex}
-          singleScreen={isSingleMode} requestedView={singleIntent.kind} selectionKey={singleIntent.version}
-          simulation={simulationData} historyIndex={historyIndex} hasC={activeTarget!=='asm'}
-          onSelect={index=>setStageSelection({rows:effectiveRows,scope:selectionScope,index})}/>: !isCompiled ? (
+        {!isSingleMode && simulationData ? (
+          <TutorPipelineLesson
+            cycle={currentCycleData}
+            simulation={simulationData}
+            rows={effectiveRows}
+            source={cLines}
+            historyIndex={historyIndex}
+            selectedIndex={selectedAsmIndex}
+            sourceLine={selectedTranslationLine}
+            selectionKind={selectionKind}
+            selectionRevision={selectionRevision}
+          />
+        ) : isSingleMode && simulationData ? (
+          <TutorSingleMode
+            rows={effectiveRows}
+            source={cLines}
+            line={isCrtSelected ? null : selectedTranslationLine}
+            selectedIndex={selectedAsmIndex}
+            simulation={simulationData}
+            currentCycleData={currentCycleData}
+            historyIndex={historyIndex}
+            hasC={activeTarget !== 'asm'}
+            requestedView={singleIntent.kind}
+            selectionKey={singleIntent.version}
+            isPlaying={isPlaying}
+            onSelect={index => {
+              setStageSelection({ rows: effectiveRows, scope: selectionScope, index });
+              const row = effectiveRows[index];
+              if (row) {
+                onSelectLine?.(row.sourceLine, index);
+              }
+            }}
+            onSelectLine={onSelectLine}
+            onJumpToCycle={onJumpToCycle}
+            onPausePlayback={onPausePlayback}
+          />
+        ) : splitView && simulationData ? (
+          <TutorLineSplit
+            rows={effectiveRows}
+            source={cLines}
+            line={isCrtSelected ? null : selectedTranslationLine}
+            selectedIndex={selectedAsmIndex}
+            singleScreen={isSingleMode}
+            requestedView={singleIntent.kind}
+            selectionKey={singleIntent.version}
+            simulation={simulationData}
+            historyIndex={historyIndex}
+            hasC={activeTarget !== 'asm'}
+            onSelect={index => setStageSelection({ rows: effectiveRows, scope: selectionScope, index })}
+          />
+        ) : !isCompiled ? (
           <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] dark:bg-[#1E1E1E] rounded-md border border-dashed border-[#D0D7DE] dark:border-[#3E3E42] my-auto">
             <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#252526] border border-[#E5E5E5] dark:border-[#333333] flex items-center justify-center text-[#57606A] dark:text-[#858585] mb-3 text-lg shadow-2xs">
               💡

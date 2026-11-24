@@ -148,30 +148,25 @@ export function useSimulationPlayback({
     };
   }, [simulationData, historyList.length]);
 
-  const activeCycleIndex = currentCycle > 0 ? currentCycle - 1 : 0;
+  const activeCycleIndex = Math.min(currentCycle, Math.max(0, historyList.length - 1));
 
   const currentData: CycleHistoryItem | null =
-    currentCycle === 0
-      ? initialResetData
-      : (historyList[Math.min(currentCycle - 1, historyList.length - 1)] ?? null);
+    historyList.length === 0
+      ? null
+      : (historyList[activeCycleIndex] ?? null);
 
   const prevData: CycleHistoryItem | null =
     currentCycle === 0
-      ? null
-      : currentCycle === 1
-        ? initialResetData
-        : (historyList[Math.min(currentCycle - 2, historyList.length - 1)] ?? null);
+      ? initialResetData
+      : (historyList[Math.min(currentCycle - 1, historyList.length - 1)] ?? null);
 
   // Single 모드 또는 Pipeline 모드에서 현재 활성 실행 중인 어셈블리 행 계산
   const currentActiveRow = (() => {
     if (!currentData || !mappedAssemblyRows.length) return null;
 
-    // Cycle 0: 실행 전 초기 대기 상태이므로 실행 포커스 없음
-    if (currentCycle === 0) return null;
-
     if (isSingleEngine) {
-      // Step 1일 때 historyList[0], Step 2일 때 historyList[1], ...
-      const stepIdx = Math.min(currentCycle - 1, historyList.length - 1);
+      // Step 0일 때 historyList[0], Step 1일 때 historyList[1], ...
+      const stepIdx = Math.min(currentCycle, historyList.length - 1);
       const stepData = historyList[stepIdx];
       if (!stepData) return null;
 
@@ -257,11 +252,11 @@ export function useSimulationPlayback({
   };
 
   const singlePlaybackDelay = useMemo(() => {
-    if (!isSingleEngine || !currentCycle) return singleFlowDuration(playSpeed);
+    if (!isSingleEngine) return singleFlowDuration(playSpeed);
     const item = instructionAt(simulationData?.tutor, instructionPc(currentData) ?? undefined);
     const flow = buildInstructionFlow(item, currentData, prevData, simulationData);
     return instructionFlowDuration(flow, singleFlowDuration(playSpeed));
-  }, [isSingleEngine, currentCycle, currentData, prevData, simulationData, playSpeed]);
+  }, [isSingleEngine, currentData, prevData, simulationData, playSpeed]);
   const singlePlaybackFrame = isSingleEngine ? currentCycle : 0;
 
   const singleFrame = isSingleEngine ? currentData : null;
@@ -340,11 +335,10 @@ export function useSimulationPlayback({
     setFinishedSingleFrame(null);
 
     if (currentPos >= maxPos && (!isSingleEngine || (!isPlaying && singleClock.current?.remaining === 0))) {
-      setCurrentCycle(isSingleEngine && maxPos > 0 ? 1 : 0);
+      setCurrentCycle(0);
       setIsPlaying(true);
       triggerPlaybackFeedback("play");
     } else {
-      if (isSingleEngine && !isPlaying && currentPos === 0 && maxPos > 0) setCurrentCycle(1);
       setIsPlaying((prev) => {
         const nextState = !prev;
         triggerPlaybackFeedback(nextState ? "play" : "pause");
@@ -364,7 +358,7 @@ export function useSimulationPlayback({
   const handleResetAndPlay = () => {
     setFinishedSingleFrame(null);
     onClearSelection();
-    setCurrentCycle(isSingleEngine && totalCycles > 0 ? 1 : 0);
+    setCurrentCycle(0);
     setIsPlaying(true);
     triggerPlaybackFeedback("play");
   };
