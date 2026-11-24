@@ -280,6 +280,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           playSpeed={playSpeed}
           currentCycle={currentCycle}
           playbackRevision={playbackRevision}
+          onPausePlayback={onPausePlayback}
         />
       );
 

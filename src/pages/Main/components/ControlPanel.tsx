@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import type { SimulationResult } from "@/type/simulation";
+import { timelineSync } from '../utils/timelineSync';
 
 interface ControlPanelProps {
   currentCycle: number;
@@ -61,6 +62,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const trackRef = useRef<HTMLDivElement>(null);
   const fillBarRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
+
+  // timelineSync를 통한 내부/외부 시뮬레이션 타임라인 실시간 동기화
+  useEffect(() => {
+    const unsubscribe = timelineSync.subscribe((prog, cycle) => {
+      if (maxCycle <= 0) return;
+      const base = cycle <= 0 ? 0 : Math.max(0, cycle - 1);
+      const continuousPos = base + prog;
+      const pct = Math.min(100, Math.max(0, (continuousPos / maxCycle) * 100));
+      if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
+      if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
+    });
+    return unsubscribe;
+  }, [maxCycle]);
 
   // currentCycle 또는 maxCycle 변경 시 즉시 위치 동기화 (수동 조작 / 일시정지)
   useEffect(() => {

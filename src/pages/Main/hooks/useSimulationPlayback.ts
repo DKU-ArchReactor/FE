@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
+import { timelineSync } from "../utils/timelineSync";
 
 
 interface UseSimulationPlaybackProps {
@@ -405,6 +406,7 @@ export function useSimulationPlayback({
     setIsStandby(true);
     onClearSelection();
     setCurrentCycle(0);
+    timelineSync.setProgress(0, 0);
     setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("reset");
   };
@@ -436,6 +438,7 @@ export function useSimulationPlayback({
       setIsStandby(false);
     }
     setCurrentCycle(val);
+    timelineSync.setProgress(val, 0);
   };
 
   return {
