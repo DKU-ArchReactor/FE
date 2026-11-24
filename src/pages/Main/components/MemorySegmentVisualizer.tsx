@@ -144,17 +144,17 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-2 md:px-3 py-1.5 md:py-2">
         {/* 2. 최상단 시작 주소 헤더 바 (일체형 꺾인 브래킷 ┌─── 주소 ───┐ 형태) */}
-        <div className="relative shrink-0 mt-2 mb-1 select-none border-t border-l border-r border-[#D0D7DE] dark:border-[#3E3E42] h-4 flex items-center justify-between px-1.5">
+        <div className="relative shrink-0 mt-2 mb-1 select-none border-t border-l border-r border-[#D0D7DE] h-4 flex items-center justify-between px-1.5">
           {/* 좌측 HIGH 라벨 (하단 baseline이 꺾인 선의 끝 y축과 일치) */}
-          <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] dark:text-[#6E7681] leading-none self-end pb-0.5">
+          <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] leading-none self-end pb-0.5">
             HIGH
           </span>
 
           {/* 상단 가로선 정중앙에 얹히는 주소 텍스트 뱃지 */}
-          <div className="absolute left-1/2 -top-[7px] -translate-x-1/2 bg-white dark:bg-[#1E1E1E] px-1.5 md:px-2 text-[9px] md:text-[10px] text-[#57606A] dark:text-[#858585] font-mono leading-none z-10 whitespace-nowrap">
+          <div className="absolute left-1/2 -top-[7px] -translate-x-1/2 bg-white px-1.5 md:px-2 text-[9px] md:text-[10px] text-[#57606A] font-mono leading-none z-10 whitespace-nowrap">
             <span
               title="Hex: 0x7FFFEFFC (High Address Top)"
-              className="font-semibold cursor-help hover:text-[#005FB8] dark:hover:text-[#79C0FF] transition-colors"
+              className="font-semibold cursor-help hover:text-[#005FB8] transition-colors"
             >
               {formatAddressDecimal('0x7FFFEFFC')}
             </span>
@@ -186,7 +186,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                     {seg.shape === 'down-arrow' ? ' ▼' : seg.shape === 'up-arrow' ? ' ▲' : ''}
                   </span>
                   {isEmptySegment && (
-                    <span className="md:hidden text-slate-300 dark:text-slate-600 text-[10px] font-sans ml-2">
+                    <span className="md:hidden text-slate-300 text-[10px] font-sans ml-2">
                       비어 있음
                     </span>
                   )}
@@ -229,57 +229,57 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                   }`}
                 >
                   {isReserved ? (
-                    <div className="flex flex-col gap-0.5 px-2 py-1 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400">
+                    <div className="flex flex-col gap-0.5 px-2 py-1 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 text-slate-500">
                       <div className="flex items-center justify-between flex-wrap gap-1">
-                        <span className="font-mono text-slate-500 dark:text-slate-400 font-semibold text-[9.5px] md:text-[10.5px]">
+                        <span className="font-mono text-slate-500 font-semibold text-[9.5px] md:text-[10.5px]">
                           0 ~ 65,535
                         </span>
-                        <span className="text-[8.5px] md:text-[9px] font-mono text-slate-400 dark:text-slate-500">64KB</span>
+                        <span className="text-[8.5px] md:text-[9px] font-mono text-slate-400">64KB</span>
                       </div>
-                      <span className="font-sans text-[8.5px] md:text-[9.5px] text-slate-400 dark:text-slate-500 leading-tight">
+                      <span className="font-sans text-[8.5px] md:text-[9.5px] text-slate-400 leading-tight">
                         NULL Pointer Guard (접근 금지 보호 구역)
                       </span>
                     </div>
                   ) : isCode ? (
                     <div className={`flex flex-col gap-1 md:gap-1.5 py-0.5 ${isUserCodeExpanded ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
                       {/* 1. 사용자 프로그램 메인 코드 통합 블록 (펼쳤을 때 세로 영역을 유연하게 차지하며 내부 스크롤 보장) */}
-                      <div className={`rounded-lg border border-amber-300 dark:border-amber-900/60 bg-[#FFFDF7] dark:bg-[#1E1D1A] p-1 md:p-1.5 shadow-2xs flex flex-col gap-1 ${
+                      <div className={`rounded-lg border border-amber-300 bg-[#FFFDF7] p-1 md:p-1.5 shadow-2xs flex flex-col gap-1 ${
                         isUserCodeExpanded ? 'flex-1 min-h-0 overflow-hidden' : ''
                       }`}>
                         {/* 1층: 타이틀 & 명령어 개수 뱃지 & 토글 버튼 */}
                         <div className="flex items-center justify-between flex-wrap gap-1 text-[9.5px] md:text-[10px] shrink-0">
                           <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
-                            <span className="font-semibold text-amber-900 dark:text-amber-300 font-sans truncate">
+                            <span className="font-semibold text-amber-900 font-sans truncate">
                               User Program (main)
                             </span>
-                            <span className="text-[8.5px] md:text-[9px] px-1 py-0.2 rounded font-sans font-bold bg-amber-200 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 shrink-0">
+                            <span className="text-[8.5px] md:text-[9px] px-1 py-0.2 rounded font-sans font-bold bg-amber-200 text-amber-800 shrink-0">
                               {userRange.count > 0 ? `${userRange.count} instrs` : '대기'}
                             </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => setIsUserCodeExpanded(!isUserCodeExpanded)}
-                            className="text-[9px] md:text-[9.5px] font-medium text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 bg-amber-100/90 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/70 px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0"
+                            className="text-[9px] md:text-[9.5px] font-medium text-amber-700 hover:text-amber-900 bg-amber-100/90 hover:bg-amber-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0"
                           >
                             {isUserCodeExpanded ? '닫기 ▼' : '열기 ▲'}
                           </button>
                         </div>
 
                         {/* 2층: 주소 범위 & Current PC */}
-                        <div className="flex items-center justify-between flex-wrap gap-1 text-[9px] md:text-[9.5px] border-t border-amber-200/60 dark:border-amber-900/40 pt-1 shrink-0 font-mono">
+                        <div className="flex items-center justify-between flex-wrap gap-1 text-[9px] md:text-[9.5px] border-t border-amber-200/60 pt-1 shrink-0 font-mono">
                           <span
                             title={
                               userRange.start && userRange.end
                                 ? `Hex: ${normalizeHex(userRange.start)} ~ ${normalizeHex(userRange.end)}`
                                 : undefined
                             }
-                            className="text-amber-950 dark:text-amber-200 font-semibold tracking-tight cursor-help"
+                            className="text-amber-950 font-semibold tracking-tight cursor-help"
                           >
                             {userRange.start && userRange.end
                               ? `${formatAddressDecimal(userRange.start)} ~ ${formatAddressDecimal(userRange.end)}`
                               : '— ~ —'}
                           </span>
-                          <span className="text-amber-900 dark:text-amber-300 font-bold shrink-0">
+                          <span className="text-amber-900 font-bold shrink-0">
                             PC {currentPc ? formatAddressDecimal(currentPc) : '—'}
                           </span>
                         </div>
@@ -288,10 +288,10 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                         {isUserCodeExpanded && (
                           <div
                             ref={userCodeScrollRef}
-                            className="mt-0.5 border border-amber-200/80 dark:border-amber-900/50 rounded bg-white dark:bg-[#141414] p-0.5 pb-1 divide-y divide-amber-100/60 dark:divide-amber-900/30 flex-1 min-h-0 overflow-y-auto custom-scrollbar"
+                            className="mt-0.5 border border-amber-200/80 rounded bg-white p-0.5 pb-1 divide-y divide-amber-100/60 flex-1 min-h-0 overflow-y-auto custom-scrollbar"
                           >
                             {userInstructions.length === 0 ? (
-                              <div className="text-[10px] text-amber-800/60 dark:text-amber-400/60 font-sans italic py-2 text-center">
+                              <div className="text-[10px] text-amber-800/60 font-sans italic py-2 text-center">
                                 컴파일 후 명령어가 로드됩니다.
                               </div>
                             ) : (
@@ -302,16 +302,16 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                                   className={`flex flex-col md:flex-row md:items-center justify-between px-1.5 py-0.5 rounded text-[9.5px] md:text-[10px] font-mono shrink-0 transition-colors ${
                                     item.isChanged
                                       ? 'bg-amber-500 text-white font-bold shadow-xs'
-                                      : 'text-slate-700 dark:text-slate-300 hover:bg-amber-50/60 dark:hover:bg-amber-950/30'
+                                      : 'text-slate-700 hover:bg-amber-50/60'
                                   }`}
                                 >
                                   <div className="flex items-center gap-1 min-w-0">
                                     {item.isChanged && <span className="text-[8px] animate-pulse">▶</span>}
-                                    <span className={item.isChanged ? 'text-white' : 'text-slate-500 dark:text-slate-400'}>
+                                    <span className={item.isChanged ? 'text-white' : 'text-slate-500'}>
                                       {formatAddressDecimal(item.address)}
                                     </span>
                                   </div>
-                                  <span className={`font-semibold break-all md:truncate md:ml-2 ${item.isChanged ? 'text-amber-100' : 'text-indigo-900 dark:text-indigo-300'}`}>
+                                  <span className={`font-semibold break-all md:truncate md:ml-2 ${item.isChanged ? 'text-amber-100' : 'text-indigo-900'}`}>
                                     {item.decText}
                                   </span>
                                 </div>
@@ -328,15 +328,15 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                             ? `Hex: ${normalizeHex(startupRange.start)} ~ ${normalizeHex(startupRange.end)} (${startupRange.bytes} Bytes)`
                             : undefined
                         }
-                        className="flex items-center justify-between flex-wrap gap-1 px-2 py-1 rounded border border-dashed border-slate-300 dark:border-slate-700 bg-slate-100/80 dark:bg-[#1A1D23] shrink-0 text-[9px] md:text-[9.5px] cursor-help"
+                        className="flex items-center justify-between flex-wrap gap-1 px-2 py-1 rounded border border-dashed border-slate-300 bg-slate-100/80 shrink-0 text-[9px] md:text-[9.5px] cursor-help"
                       >
-                        <div className="flex items-center gap-1 md:gap-1.5 min-w-0 text-slate-600 dark:text-slate-400">
-                          <span className="font-sans font-medium text-slate-600 dark:text-slate-300">_start</span>
-                          <span className="font-mono text-[8.5px] md:text-[9px] text-slate-400 dark:text-slate-500">
+                        <div className="flex items-center gap-1 md:gap-1.5 min-w-0 text-slate-600">
+                          <span className="font-sans font-medium text-slate-600">_start</span>
+                          <span className="font-mono text-[8.5px] md:text-[9px] text-slate-400">
                             ({startupRange.start && startupRange.end ? `${formatAddressDecimal(startupRange.start)}~` : '—'})
                           </span>
                         </div>
-                        <span className="text-[8.5px] md:text-[9px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
+                        <span className="text-[8.5px] md:text-[9px] font-mono text-slate-400 shrink-0">
                           {startupRange.bytes > 0 ? `${startupRange.bytes}B` : '—B'}
                         </span>
                       </div>
@@ -350,29 +350,29 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                       const isPulsing = pulsingAddresses.has(item.address.toLowerCase());
                       
                       // 세그먼트별 시그니처 배경 점멸 색상 매핑
-                      let pulsingBgClass = 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold';
+                      let pulsingBgClass = 'bg-slate-200 text-slate-900 font-bold';
                       if (seg.key === 'stack') {
-                        pulsingBgClass = 'bg-violet-100 dark:bg-violet-950/80 text-violet-950 dark:text-violet-100 font-bold';
+                        pulsingBgClass = 'bg-violet-100 text-violet-950 font-bold';
                       } else if (seg.key === 'heap') {
-                        pulsingBgClass = 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-950 dark:text-emerald-100 font-bold';
+                        pulsingBgClass = 'bg-emerald-100 text-emerald-950 font-bold';
                       } else if (seg.key === 'bss') {
-                        pulsingBgClass = 'bg-sky-100 dark:bg-sky-950/80 text-sky-950 dark:text-sky-100 font-bold';
+                        pulsingBgClass = 'bg-sky-100 text-sky-950 font-bold';
                       } else if (seg.key === 'data') {
-                        pulsingBgClass = 'bg-blue-100 dark:bg-blue-950/80 text-blue-950 dark:text-blue-100 font-bold';
+                        pulsingBgClass = 'bg-blue-100 text-blue-950 font-bold';
                       }
 
                       return (
                         <div
                           key={item.address}
-                          className={`flex flex-col md:flex-row md:items-center px-1.5 md:px-2 py-1 border-b border-[#F0F2F5] dark:border-[#2D3139] last:border-b-0 transition-colors duration-300 ease-out shrink-0 ${
+                          className={`flex flex-col md:flex-row md:items-center px-1.5 md:px-2 py-1 border-b border-[#F0F2F5] last:border-b-0 transition-colors duration-300 ease-out shrink-0 ${
                             isPulsing
                               ? pulsingBgClass
-                              : 'bg-transparent hover:bg-[#F6F8FA] dark:hover:bg-[#2A2D2E] text-[#24292F] dark:text-[#CCCCCC]'
+                              : 'bg-transparent hover:bg-[#F6F8FA] text-[#24292F]'
                           }`}
                         >
                           {/* 1열 & 2열: addr: 라벨 + 주소 (모바일: 상단 전폭 / md 이상: 좌측 65%) */}
                           <div className="w-full md:w-[65%] shrink-0 flex items-center gap-1 min-w-0 md:pr-1">
-                            <span className="text-[9px] md:text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                            <span className="text-[9px] md:text-[9.5px] font-mono text-[#8C959F] select-none shrink-0">
                               addr:
                             </span>
                             <span
@@ -380,13 +380,13 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                               className={`text-[10.5px] md:text-[11.5px] font-mono font-semibold cursor-help whitespace-nowrap ${
                                 isPulsing
                                   ? 'text-inherit font-bold'
-                                  : 'text-[#24292F] dark:text-[#CCCCCC]'
+                                  : 'text-[#24292F]'
                               }`}
                             >
                               {formatAddressDecimal(item.address)}
                             </span>
                             {item.label && (
-                              <span className="text-[8px] px-1 py-0.2 rounded font-sans font-bold bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 shrink-0">
+                              <span className="text-[8px] px-1 py-0.2 rounded font-sans font-bold bg-violet-100 text-violet-700 shrink-0">
                                 {item.label}
                               </span>
                             )}
@@ -394,7 +394,7 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
 
                           {/* 3열 & 4열: val: 라벨 + 값 (모바일: 하단 전폭 / md 이상: 우측 35%) */}
                           <div className="w-full md:w-[35%] shrink-0 flex items-center gap-1 min-w-0">
-                            <span className="text-[9px] md:text-[9.5px] font-mono text-[#8C959F] dark:text-[#6E7681] select-none shrink-0">
+                            <span className="text-[9px] md:text-[9.5px] font-mono text-[#8C959F] select-none shrink-0">
                               val:
                             </span>
                             <span
@@ -402,8 +402,8 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
                                 isPulsing
                                   ? 'text-inherit font-black'
                                   : isCode
-                                  ? 'text-indigo-950 dark:text-[#9CDCFE] font-bold'
-                                  : 'text-[#1F2328] dark:text-[#CCCCCC] font-bold'
+                                  ? 'text-indigo-950 font-bold'
+                                  : 'text-[#1F2328] font-bold'
                               }`}
                             >
                               {item.decText}
@@ -420,16 +420,16 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
               {dividerHex && index < SEGMENT_DEFS.length - 1 && (
                 <div className="relative flex items-center justify-center my-1 shrink-0">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-dashed border-[#D0D7DE] dark:border-[#3E3E42]" />
+                    <div className="w-full border-t border-dashed border-[#D0D7DE]" />
                   </div>
-                  <div className="relative flex items-center bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono z-10">
+                  <div className="relative flex items-center bg-white px-2 text-[10px] text-[#57606A] font-mono z-10">
                     <span
                       title={
                         dividerHex === '—'
                           ? '컴파일 후 확정되는 경계 주소'
                           : `Hex: ${normalizeHex(dividerHex)}`
                       }
-                      className="font-semibold text-[#57606A] dark:text-[#858585] cursor-help"
+                      className="font-semibold text-[#57606A] cursor-help"
                     >
                       {dividerHex === '—' ? '—' : formatAddressDecimal(dividerHex)}
                     </span>
@@ -442,17 +442,17 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
       </div>
 
       {/* 4. 최하단 메모리 끝 경계선 (일체형 꺾인 브래킷 └─── 주소 ───┘ 형태) */}
-      <div className="relative shrink-0 mt-1 mb-2 select-none border-b border-l border-r border-[#D0D7DE] dark:border-[#3E3E42] h-4 flex items-center justify-between px-1.5">
+      <div className="relative shrink-0 mt-1 mb-2 select-none border-b border-l border-r border-[#D0D7DE] h-4 flex items-center justify-between px-1.5">
         {/* 좌측 LOW 라벨 (상단이 꺾인 선의 시작 y축과 일치) */}
-        <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] dark:text-[#6E7681] leading-none self-start pt-0.5">
+        <span className="text-[9px] font-mono tracking-wider font-semibold text-[#8C959F] leading-none self-start pt-0.5">
           LOW
         </span>
 
         {/* 하단 가로선 정중앙에 얹히는 주소 텍스트 뱃지 */}
-        <div className="absolute left-1/2 -bottom-[7px] -translate-x-1/2 bg-white dark:bg-[#1E1E1E] px-2 text-[10px] text-[#57606A] dark:text-[#858585] font-mono leading-none z-10">
+        <div className="absolute left-1/2 -bottom-[7px] -translate-x-1/2 bg-white px-2 text-[10px] text-[#57606A] font-mono leading-none z-10">
           <span
             title="Hex: 0x00000000 (Low Address Origin)"
-            className="font-semibold cursor-help hover:text-[#005FB8] dark:hover:text-[#79C0FF] transition-colors"
+            className="font-semibold cursor-help hover:text-[#005FB8] transition-colors"
           >
             0
           </span>

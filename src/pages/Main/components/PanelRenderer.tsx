@@ -33,6 +33,8 @@ interface PanelRendererProps {
   playSpeed: number;
   onPausePlayback?: () => void;
   isPlaying?: boolean;
+  playMode?: "continuous" | "singleCycle";
+  isStandby?: boolean;
   singlePlaybackFinished?: boolean;
   playbackRevision?: number;
   loadingMessage: string | null;
@@ -69,6 +71,8 @@ interface PanelRendererProps {
   onCustomAssemblyChange: (val: string) => void;
   onSimulateAssembly: () => void;
   onResetCustomAssembly: () => void;
+  onStepBack?: () => void;
+  onStepForward?: () => void;
   onJumpToCycle: (cycle: number) => void;
 
   // 저장된 파일 목록 상태
@@ -89,11 +93,12 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   playSpeed,
   onPausePlayback,
   isPlaying,
+  playMode = "continuous",
+  isStandby,
   singlePlaybackFinished,
   playbackRevision,
   loadingMessage,
   simulationMode,
-  isSingleEngine,
   currentActiveRow,
   mappedAssemblyRows,
   activeExecutionCLine,
@@ -123,6 +128,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   onCustomAssemblyChange,
   onSimulateAssembly,
   onResetCustomAssembly,
+  onStepBack,
+  onStepForward,
   onJumpToCycle,
 
   savedFiles,
@@ -211,10 +218,8 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           playbackCycle={currentCycle}
           mode={simulationMode}
           currentActiveStep={
-            isSingleEngine
-              ? currentActiveRow
-                ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : null
+            currentActiveRow
+              ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
               : null
           }
           activeTarget={editorTarget}
@@ -244,16 +249,19 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           selectedTranslationLine={editorTarget === "asm" ? translationSelectedLine : effectiveSelectedLine}
           selectedAsmIndex={translationSelectedAsmIndex}
           currentActiveAsmIndex={
-            isSingleEngine
-              ? currentActiveRow
-                ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
-                : null
+            currentActiveRow
+              ? mappedAssemblyRows.findIndex((r) => r === currentActiveRow)
               : null
           }
           isUserSelected={translationSelectedLine !== null || translationSelectedAsmIndex !== null}
           activeTarget={editorTarget}
           mode={simulationMode}
           onClose={onCloseTutor}
+          onSelectLine={onSelectTranslationLine}
+          onPausePlayback={onPausePlayback}
+          onStepBack={onStepBack}
+          onStepForward={onStepForward}
+          onJumpToCycle={onJumpToCycle}
         />
       );
 
@@ -277,6 +285,12 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           simulationData={simulationData}
           loadingMessage={loadingMessage}
           mode="pipeline"
+          isPlaying={isPlaying}
+          playMode={playMode}
+          playSpeed={playSpeed}
+          currentCycle={currentCycle}
+          playbackRevision={playbackRevision}
+          onPausePlayback={onPausePlayback}
         />
       );
 
@@ -311,6 +325,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           mappedRows={mappedAssemblyRows}
           mode={simulationMode}
           loadingMessage={loadingMessage}
+          isStandby={isStandby}
         />
       );
 

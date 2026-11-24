@@ -92,6 +92,7 @@ export const writesReg = (op: string) =>
 
 export function computePipelineWireState(currentData: CycleHistoryItem | null, isSingle: boolean) {
   const buffers = currentData?.buffers;
+  const activity = currentData?.stage_activity;
   const cycle_events = currentData?.cycle_events;
   const clock = currentData?.clock;
   const isStall = Boolean(!isSingle && cycle_events?.stall?.has_stall);
@@ -99,20 +100,20 @@ export function computePipelineWireState(currentData: CycleHistoryItem | null, i
   const isBranchFlush = Boolean(!isSingle && cycle_events?.control_hazard?.has_flush);
 
   const singleCycleInst = isSingle
-    ? buffers?.IF?.assembly || currentData?.stage_activity?.IF?.assembly || currentData?.if_stage?.assembly || "—"
+    ? buffers?.IF?.assembly || activity?.IF?.assembly || currentData?.if_stage?.assembly || "—"
     : null;
 
-  const ifRaw = isSingle ? singleCycleInst || "—" : buffers?.IF?.assembly || "—";
-  const idRaw = isSingle ? singleCycleInst || "—" : buffers?.ID?.assembly || "—";
-  const exRaw = isSingle ? singleCycleInst || "—" : buffers?.EX?.assembly || "—";
-  const memRaw = isSingle ? singleCycleInst || "—" : buffers?.MEM?.assembly || "—";
-  const wbRaw = isSingle ? singleCycleInst || "—" : buffers?.WB?.assembly || "—";
+  const ifRaw = isSingle ? singleCycleInst || "—" : activity?.IF?.assembly || buffers?.IF?.assembly || "—";
+  const idRaw = isSingle ? singleCycleInst || "—" : activity?.ID?.assembly || buffers?.ID?.assembly || "—";
+  const exRaw = isSingle ? singleCycleInst || "—" : activity?.EX?.assembly || buffers?.EX?.assembly || "—";
+  const memRaw = isSingle ? singleCycleInst || "—" : activity?.MEM?.assembly || buffers?.MEM?.assembly || "—";
+  const wbRaw = isSingle ? singleCycleInst || "—" : activity?.WB?.assembly || buffers?.WB?.assembly || "—";
 
-  const ifInst = normalizeStageInst(ifRaw, isSingle ? undefined : buffers?.IF?.status);
-  const idInst = normalizeStageInst(idRaw, isSingle ? undefined : buffers?.ID?.status);
-  const exInst = normalizeStageInst(exRaw, isSingle ? undefined : buffers?.EX?.status);
-  const memInst = normalizeStageInst(memRaw, isSingle ? undefined : buffers?.MEM?.status);
-  const wbInst = normalizeStageInst(wbRaw, isSingle ? undefined : buffers?.WB?.status);
+  const ifInst = normalizeStageInst(ifRaw, isSingle ? undefined : (activity?.IF?.status || buffers?.IF?.status));
+  const idInst = normalizeStageInst(idRaw, isSingle ? undefined : (activity?.ID?.status || buffers?.ID?.status));
+  const exInst = normalizeStageInst(exRaw, isSingle ? undefined : (activity?.EX?.status || buffers?.EX?.status));
+  const memInst = normalizeStageInst(memRaw, isSingle ? undefined : (activity?.MEM?.status || buffers?.MEM?.status));
+  const wbInst = normalizeStageInst(wbRaw, isSingle ? undefined : (activity?.WB?.status || buffers?.WB?.status));
 
   const isIfActive = ifInst !== "—" && ifInst !== "bubble" && ifInst !== "empty";
   const isIdActive = idInst !== "—" && idInst !== "bubble" && idInst !== "empty";

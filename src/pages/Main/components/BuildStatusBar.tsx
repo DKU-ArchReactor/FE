@@ -37,7 +37,7 @@ export default function BuildStatusBar({ result, busy, hasSimulation }: {
       <button type="button" disabled={!result} onClick={() => setOpen(v => !v)} aria-expanded={open}
         className="ml-auto rounded border border-[var(--ar-border)] px-3 py-1 disabled:opacity-40">빌드 로그 {open ? '닫기' : '보기'}</button>
     </div>
-    {result?.analysis_error && <p role="status" className="mt-2 text-amber-700 dark:text-amber-300">컴파일은 완료됐지만 명령어 미리보기를 만들지 못했습니다. 실행 결과의 매핑은 별도로 확인할 수 있습니다.</p>}
+    {result?.analysis_error && <p role="status" className="mt-2 text-amber-700">컴파일은 완료됐지만 명령어 미리보기를 만들지 못했습니다. 실행 결과의 매핑은 별도로 확인할 수 있습니다.</p>}
     {result?.analysis && !result.analysis.mapping_available && <p className="mt-2 text-[var(--ar-text-muted)]">대응하는 C 소스 줄 정보가 없습니다. 최적화로 제거된 줄이나 시작 코드는 연결되지 않을 수 있습니다.</p>}
     {open && result && <div className="mt-2 rounded border border-[var(--ar-border)] p-3">
       {result.build_id ? <button type="button" disabled={loading} onClick={loadLog} className="mb-2 text-blue-600 disabled:opacity-50">{loading ? '불러오는 중…' : '저장된 로그 다시 불러오기'}</button>

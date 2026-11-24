@@ -71,6 +71,116 @@ const normalizeSimulationResult = (raw: SimulationResult): SimulationResult => {
     };
   });
 
+  // 5-Stage Pipeline 모드에서 스톨 사이클 정규화:
+  // 백엔드가 해저드를 감지한 직전 사이클 i에 stall 이벤트를 기록했을 경우,
+  // 실제 파이프라인 정체(Stall Penalty: EX에 bubble이 주입되고 ID가 제자리에 정지됨)가
+  // 발생한 실제 지연 사이클인 i+1 사이클로 stall 이벤트를 정확하게 동기화합니다.
+  if (!isSingleCycle) {
+    for (let i = 0; i < normalizedHistory.length - 1; i++) {
+      const cur = normalizedHistory[i];
+      const nxt = normalizedHistory[i + 1];
+
+      const curStall = cur.cycle_events?.stall;
+      const curEx = cur.buffers?.EX;
+      const nxtEx = nxt.buffers?.EX;
+      const curId = cur.buffers?.ID;
+      const nxtId = nxt.buffers?.ID;
+
+      const isCurExReal = Boolean(
+        curEx &&
+        curEx.assembly &&
+        curEx.assembly !== "bubble" &&
+        curEx.assembly !== "—" &&
+        curEx.assembly !== "empty" &&
+        curEx.status !== "empty"
+      );
+      const isNxtExBubble = Boolean(
+        !nxtEx ||
+        nxtEx.assembly === "bubble" ||
+        nxtEx.assembly === "—" ||
+        nxtEx.status === "stalled" ||
+        nxtEx.status === "bubble" ||
+        nxtEx.status === "empty"
+      );
+      const isIdHeld = Boolean(
+        curId &&
+        nxtId &&
+        (curId.assembly === nxtId.assembly || (curId.pc && curId.pc === nxtId.pc))
+      );
+
+      if (curStall?.has_stall && isCurExReal && isNxtExBubble && isIdHeld) {
+        // 실제 스톨이 발생한 사이클은 i+1번째 사이클
+        nxt.cycle_events = {
+          ...nxt.cycle_events,
+          stall: {
+            ...curStall,
+            has_stall: true,
+          },
+        };
+        if (nxt.buffers?.ID) {
+          nxt.buffers.ID = {
+            ...nxt.buffers.ID,
+            status: "stalled",
+          };
+        }
+        if (nxt.buffers?.IF) {
+          nxt.buffers.IF = {
+            ...nxt.buffers.IF,
+            status: "stalled",
+          };
+        }
+        if (nxt.stage_activity?.ID) {
+          nxt.stage_activity.ID = {
+            ...nxt.stage_activity.ID,
+            status: "stalled",
+          };
+        }
+        if (nxt.stage_activity?.IF) {
+          nxt.stage_activity.IF = {
+            ...nxt.stage_activity.IF,
+            status: "stalled",
+          };
+        }
+
+        // i번째 사이클은 아직 모든 스테이지가 정상 동작 중이므로 stall 플래그 해제
+        cur.cycle_events = {
+          ...cur.cycle_events,
+          stall: {
+            has_stall: false,
+            stage: null,
+            assembly: null,
+            stall_reason: null,
+            stall_desc: null,
+          },
+        };
+        if (cur.buffers?.ID && cur.buffers.ID.status === "stalled") {
+          cur.buffers.ID = {
+            ...cur.buffers.ID,
+            status: "normal",
+          };
+        }
+        if (cur.buffers?.IF && cur.buffers.IF.status === "stalled") {
+          cur.buffers.IF = {
+            ...cur.buffers.IF,
+            status: "normal",
+          };
+        }
+        if (cur.stage_activity?.ID && cur.stage_activity.ID.status === "stalled") {
+          cur.stage_activity.ID = {
+            ...cur.stage_activity.ID,
+            status: "normal",
+          };
+        }
+        if (cur.stage_activity?.IF && cur.stage_activity.IF.status === "stalled") {
+          cur.stage_activity.IF = {
+            ...cur.stage_activity.IF,
+            status: "normal",
+          };
+        }
+      }
+    }
+  }
+
   return {
     ...raw,
     history: normalizedHistory,

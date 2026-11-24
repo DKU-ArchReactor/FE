@@ -142,7 +142,7 @@ export default function InstructionLesson({
         )}
       </div>
       <SingleInstructionFlow
-        key={`${row.pc}-${flow.historyIndex}-${context?.playbackRevision ?? 0}`}
+        key={`${row.pc}-${flow.historyIndex}-${currentData?.clock ?? 0}-${context?.playbackRevision ?? 0}`}
         flow={flow}
         duration={context?.flowDurationMs}
         onPause={context?.onPausePlayback}

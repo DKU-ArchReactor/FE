@@ -146,7 +146,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                                   resizingPair?.secIdx === secIdx &&
                                   resizingPair?.slotIdx === slotIdx
                                     ? "h-16 bg-[var(--ar-accent)] shadow-sm"
-                                    : "h-8 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:h-14 group-hover:bg-[var(--ar-accent)]"
+                                    : "h-8 bg-[#D0D7DE] group-hover:h-14 group-hover:bg-[var(--ar-accent)]"
                                 }`}
                               />
                             </div>
@@ -198,7 +198,7 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                               resizingRowSlot?.secIdx === secIdx &&
                               resizingRowSlot?.slotIdx === slotIdx
                                 ? "w-24 bg-[var(--ar-accent)] shadow-sm"
-                                : "w-10 bg-[#D0D7DE] dark:bg-[#3E3E42] group-hover:w-20 group-hover:bg-[var(--ar-accent)]"
+                                : "w-10 bg-[#D0D7DE] group-hover:w-20 group-hover:bg-[var(--ar-accent)]"
                             }`}
                           />
                         </div>

@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import type { SimulationResult } from "@/type/simulation";
+import { timelineSync } from '../utils/timelineSync';
 
 interface ControlPanelProps {
   currentCycle: number;
@@ -11,6 +12,8 @@ interface ControlPanelProps {
   onTogglePlay: () => void;
   onReset: () => void;
   onResetAndPlay?: () => void;
+  onPlayCurrentCycle?: () => void;
+  isCyclePlaying?: boolean;
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
@@ -34,6 +37,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onTogglePlay,
   onReset,
   onResetAndPlay,
+  onPlayCurrentCycle,
+  isCyclePlaying = false,
   onJumpToCycle,
   onChangeSpeed,
   isReady = true,
@@ -62,45 +67,66 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const fillBarRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
 
-  // currentCycle 또는 maxCycle 변경 시 즉시 위치 동기화 (수동 조작 / 일시정지)
+  // 현재 연속 진행 위치(0 ~ maxCycle)를 유지하는 ref (PAUSE 시 제자리 정지, PLAY 시 제자리 재개)
+  const continuousPosRef = useRef<number>(currentCycle > 0 ? currentCycle : 0);
+  const prevCycleRef = useRef<number>(currentCycle);
+
+  // timelineSync를 통한 내부/외부 시뮬레이션 타임라인 실시간 동기화
   useEffect(() => {
-    if (!isPlaying) {
-      const pct = maxCycle > 0 ? Math.min(100, Math.max(0, (currentCycle / maxCycle) * 100)) : 0;
+    const unsubscribe = timelineSync.subscribe((prog, cycle) => {
+      if (maxCycle <= 0) return;
+      const base = cycle <= 0 ? 0 : Math.max(0, cycle - 1);
+      const continuousPos = base + prog;
+      continuousPosRef.current = continuousPos;
+      const pct = Math.min(100, Math.max(0, (continuousPos / maxCycle) * 100));
       if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
       if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
+    });
+    return unsubscribe;
+  }, [maxCycle]);
+
+  // 사용자가 수동으로 스텝 이동/점프/리셋했을 때만 위치 동기화 (재생/일시정지 토글 시에는 제자리 유지하여 스냅 점프 방지)
+  useEffect(() => {
+    if (prevCycleRef.current !== currentCycle) {
+      prevCycleRef.current = currentCycle;
+      if (!isPlaying) {
+        const base = currentCycle <= 0 ? 0 : currentCycle;
+        continuousPosRef.current = base;
+        const pct = maxCycle > 0 ? Math.min(100, Math.max(0, (base / maxCycle) * 100)) : 0;
+        if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
+        if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
+      }
     }
   }, [currentCycle, maxCycle, isPlaying]);
 
-  // 재생 중일 때 매 프레임(60fps/120fps) GPU 합성으로 부드럽게 연속 이동
+  // Single-Cycle 모드 전용 연속 이동 (Pipeline 모드는 PipelineVisualizer의 60fps timelineSync가 직접 주도)
   useEffect(() => {
-    if (!isPlaying || maxCycle <= 0) return;
+    if (!isPlaying || !isSingle || maxCycle <= 0) return;
 
     let animId: number;
     let lastTime = performance.now();
-    let currentPos = currentCycle;
 
     const tick = (now: number) => {
       const delta = now - lastTime;
       lastTime = now;
 
-      // playSpeed(ms) 동안 1사이클 전진
-      currentPos += delta / playSpeed;
-      if (currentPos > maxCycle) currentPos = maxCycle;
+      continuousPosRef.current += delta / playSpeed;
+      if (continuousPosRef.current > maxCycle) continuousPosRef.current = maxCycle;
 
-      const pct = (currentPos / maxCycle) * 100;
+      const pct = (continuousPosRef.current / maxCycle) * 100;
       if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
       if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
 
-      if (currentPos < maxCycle) {
+      if (continuousPosRef.current < maxCycle) {
         animId = requestAnimationFrame(tick);
       }
     };
 
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, [isPlaying, playSpeed, maxCycle, currentCycle]);
+  }, [isPlaying, isSingle, playSpeed, maxCycle]);
 
-  const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (currentCycle / maxCycle) * 100)) : 0;
+  const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (continuousPosRef.current / maxCycle) * 100)) : 0;
 
   return (
     <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3 md:px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
@@ -114,16 +140,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
             <button
               type="button"
-              disabled={isCompiling}
+              disabled={isCompiling || isCyclePlaying}
               onClick={() => onChangeEditorTarget?.("c")}
-              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : "C 소스 코드 작성 모드"}
+              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : isCyclePlaying ? "1회 재생 중에는 변경할 수 없습니다" : "C 소스 코드 작성 모드"}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
-                isCompiling ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                isCompiling || isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
               } ${
                 editorTarget === "c"
                   ? isSingle
-                    ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
-                    : "bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED] text-white border-[#7C3AED] dark:border-[#8B5CF6] shadow-xs"
+                    ? "bg-[#005FB8] hover:bg-[#004C99] text-white border-[#005FB8] shadow-xs"
+                    : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-[#7C3AED] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -131,16 +157,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
             <button
               type="button"
-              disabled={isCompiling}
+              disabled={isCompiling || isCyclePlaying}
               onClick={() => onChangeEditorTarget?.("asm")}
-              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : "어셈블리(ASM) 직접 작성 모드"}
+              title={isCompiling ? "컴파일 중에는 작성 모드를 변경할 수 없습니다" : isCyclePlaying ? "1회 재생 중에는 변경할 수 없습니다" : "어셈블리(ASM) 직접 작성 모드"}
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
-                isCompiling ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                isCompiling || isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
               } ${
                 editorTarget === "asm"
                   ? isSingle
-                    ? "bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3] text-white border-[#005FB8] dark:border-[#007ACC] shadow-xs"
-                    : "bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED] text-white border-[#7C3AED] dark:border-[#8B5CF6] shadow-xs"
+                    ? "bg-[#005FB8] hover:bg-[#004C99] text-white border-[#005FB8] shadow-xs"
+                    : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-[#7C3AED] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
               }`}
             >
@@ -157,8 +183,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="inline-flex p-0.5 rounded-full bg-[var(--ar-header-bg)] border border-[var(--ar-border)] shrink-0">
             <button
               type="button"
+              disabled={isCyclePlaying}
               onClick={() => onChangeSimulationMode?.("single")}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
+                isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              } ${
                 isSingle
                   ? "bg-[var(--ar-mode-single)] hover:bg-[var(--ar-mode-single-hover)] text-white border-[var(--ar-mode-single)] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
@@ -168,8 +197,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
             <button
               type="button"
+              disabled={isCyclePlaying}
               onClick={() => onChangeSimulationMode?.("pipeline")}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 cursor-pointer ${
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold border transition-all duration-150 ${
+                isCyclePlaying ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              } ${
                 !isSingle
                   ? "bg-[var(--ar-mode-pipeline)] hover:bg-[var(--ar-mode-pipeline-hover)] text-white border-[var(--ar-mode-pipeline)] shadow-xs"
                   : "border-transparent text-[var(--ar-text-muted)] hover:text-[var(--ar-text-primary)]"
@@ -181,21 +213,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* [스텝 / 사이클 정보] */}
-        <div className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[#24292F] dark:text-[#CCCCCC] ml-0.5 w-[84px]">
-          <span className="text-[10px] text-[#57606A] dark:text-[#858585] uppercase tracking-wider font-medium shrink-0 w-10 text-right">
+        <div className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[#24292F] ml-0.5 w-[84px]">
+          <span className="text-[10px] text-[#57606A] uppercase tracking-wider font-medium shrink-0 w-10 text-right">
             {isSingle ? "Step:" : "Cycle:"}
           </span>
           <div className="flex items-baseline gap-0.5 font-mono tabular-nums">
             <span
               className={`text-base font-bold transition-colors ${
                 isSingle
-                  ? "text-[#005FB8] dark:text-[#DCDCAA]"
-                  : "text-[#7C3AED] dark:text-[#C084FC]"
+                  ? "text-[#005FB8]"
+                  : "text-[#7C3AED]"
               }`}
             >
               {currentCycle}
             </span>
-            <span className="text-[10px] text-[#8C959F] dark:text-[#6E7681]">
+            <span className="text-[10px] text-[#8C959F]">
               /{maxCycle}
             </span>
           </div>
@@ -211,7 +243,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 return (
                   <div
                     key={`tick-${tick}`}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[2.5px] h-[2.5px] bg-[#94A3B8] dark:bg-[#64748B] rounded-full"
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[2.5px] h-[2.5px] bg-[#94A3B8] rounded-full"
                     style={{ left: `${tickPos}%` }}
                   />
                 );
@@ -219,14 +251,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
 
             {/* 배경 트랙 */}
-            <div ref={trackRef} className="absolute inset-x-0 h-1.5 bg-[#E2E8F0] dark:bg-[#2D333B] rounded-full overflow-hidden">
+            <div ref={trackRef} className="absolute inset-x-0 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
               {/* 채워진 진행 바 (DOM 직접 조작으로 리렌더링 없이 부드럽게 연속 슬라이딩) */}
               <div
                 ref={fillBarRef}
                 className={`h-full rounded-full ${
                   isSingle
-                    ? "bg-[#005FB8] dark:bg-[#007ACC]"
-                    : "bg-[#7C3AED] dark:bg-[#8B5CF6]"
+                    ? "bg-[#005FB8]"
+                    : "bg-[#7C3AED]"
                 }`}
                 style={{
                   width: `${initialPct}%`,
@@ -244,10 +276,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 }}
               >
                 <div
-                  className={`w-3.5 h-3.5 rounded-full shadow-md border-2 border-white dark:border-[#1E1E1E] ${
+                  className={`w-3.5 h-3.5 rounded-full shadow-md border-2 border-white ${
                     isSingle
-                      ? "bg-[#005FB8] dark:bg-[#388BFD]"
-                      : "bg-[#7C3AED] dark:bg-[#A855F7]"
+                      ? "bg-[#005FB8]"
+                      : "bg-[#7C3AED]"
                   }`}
                 />
               </div>
@@ -258,16 +290,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               type="range"
               min={0}
               max={maxCycle}
-              disabled={!isReady || totalCycles <= 1}
+              disabled={!isReady || totalCycles <= 1 || isCyclePlaying}
               value={currentCycle}
               onChange={(e) => onJumpToCycle(Number(e.target.value))}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed disabled:pointer-events-none z-30"
-              title={`현재 위치: ${currentCycle}/${maxCycle}`}
+              title={isCyclePlaying ? "1회 재생 진행 중..." : `현재 위치: ${currentCycle}/${maxCycle}`}
             />
           </div>
 
           {!isReady && (
-            <div className="hidden sm:flex items-center gap-1 shrink-0 px-2 py-0.5 rounded bg-[#F6F8FA] dark:bg-[#1E1E1E] border border-[#D0D7DE] dark:border-[#3E3E42] text-[#57606A] dark:text-[#858585] text-[10px]">
+            <div className="hidden sm:flex items-center gap-1 shrink-0 px-2 py-0.5 rounded bg-[#F6F8FA] border border-[#D0D7DE] text-[#57606A] text-[10px]">
               <span>💡</span>
               <span>C 코드 작성 후 <strong>[컴파일]</strong>을 누르면 시뮬레이터가 동작합니다</span>
             </div>
@@ -276,38 +308,46 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* 2. VS Code 디버그 액션 툴바 (Control Buttons - 모바일 숨김) */}
-      <div className="hidden md:flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] dark:bg-[#333333] p-0.5 rounded border border-[#D0D7DE] dark:border-[#3E3E42]">
+      <div className="hidden md:flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] p-0.5 rounded border border-[#D0D7DE]">
         {/* 1) 초기화 버튼 (정사각형 정지/리셋 아이콘) */}
         <button
           onClick={onReset}
-          disabled={!isReady || currentCycle === 0}
-          title="처음으로 초기화 (Reset / Stop)"
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          disabled={!isReady || currentCycle === 0 || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : "처음으로 초기화 (Reset / Stop)"}
+          className="p-1 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
             <rect x="5" y="5" width="14" height="14" rx="2" />
           </svg>
         </button>
 
-        {/* 2) 처음부터 다시시작 버튼 (회전 리로드 아이콘) */}
+        {/* 2) 현재 사이클 1회 재생 버튼 (1-Cycle Play) */}
         <button
           type="button"
-          onClick={onResetAndPlay}
-          disabled={!isReady || totalCycles <= 1}
-          title="처음부터 다시시작 (Restart / Reset & Play)"
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          onClick={onPlayCurrentCycle ?? onResetAndPlay}
+          disabled={!isReady || totalCycles <= 0 || isCyclePlaying}
+          title={
+            isCyclePlaying
+              ? "현재 사이클 1회 재생 중..."
+              : "현재 사이클 1회 재생 (Play Current Cycle)"
+          }
+          className={`p-1 rounded transition-colors cursor-pointer disabled:cursor-not-allowed ${
+            isCyclePlaying
+              ? "text-[#10B981] bg-[#ECFDF5] font-bold ring-1 ring-[#10B981]/50"
+              : "text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:pointer-events-none"
+          }`}
         >
           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
           </svg>
         </button>
 
         {/* 3) 이전 스텝/사이클 버튼 */}
         <button
           onClick={onStepBack}
-          disabled={!isReady || currentCycle <= 0}
-          title={isSingle ? "이전 스텝 (Step Back)" : "이전 사이클 (Cycle Back)"}
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          disabled={!isReady || currentCycle <= 0 || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : isSingle ? "이전 스텝 (Step Back)" : "이전 사이클 (Cycle Back)"}
+          className="p-1 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -317,18 +357,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* 4) 재생 / 일시정지 (PLAY / PAUSE) 버튼 */}
         <button
           onClick={onTogglePlay}
-          disabled={!isReady || totalCycles <= 1}
-          title={isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
+          disabled={!isReady || totalCycles <= 1 || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : isPlaying ? "일시정지 (Pause)" : "재생 (Play)"}
           className={`w-[76px] shrink-0 justify-center py-0.5 rounded text-[11px] font-bold text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
-            isPlaying 
-              ? 'bg-[#D97706] hover:bg-[#B45309] dark:bg-[#E5B567] dark:hover:bg-[#D4A355] text-white dark:text-black font-extrabold' 
+            isPlaying && !isCyclePlaying 
+              ? 'bg-[#D97706] hover:bg-[#B45309] text-white font-extrabold' 
               : isSingle
-              ? 'bg-[#005FB8] hover:bg-[#004C99] dark:bg-[#007ACC] dark:hover:bg-[#0062A3]'
-              : 'bg-[#7C3AED] hover:bg-[#6D28D9] dark:bg-[#8B5CF6] dark:hover:bg-[#7C3AED]'
+              ? 'bg-[#005FB8] hover:bg-[#004C99]'
+              : 'bg-[#7C3AED] hover:bg-[#6D28D9]'
           }`}
         >
           <span className="w-2.5 h-2.5 flex items-center justify-center shrink-0">
-            {isPlaying ? (
+            {isPlaying && !isCyclePlaying ? (
               <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                 <rect x="5" y="4" width="4" height="16" rx="1" />
                 <rect x="15" y="4" width="4" height="16" rx="1" />
@@ -339,15 +379,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </svg>
             )}
           </span>
-          <span className="w-10 text-center tracking-wide">{isPlaying ? "PAUSE" : "PLAY"}</span>
+          <span className="w-10 text-center tracking-wide">{isPlaying && !isCyclePlaying ? "PAUSE" : "PLAY"}</span>
         </button>
 
         {/* 5) 다음 스텝/사이클 버튼 */}
         <button
           onClick={onStepForward}
-          disabled={!isReady || currentCycle >= maxCycle}
-          title={isSingle ? "다음 스텝 실행 (Step Forward)" : "다음 사이클 진행 (Cycle Forward)"}
-          className="p-1 rounded text-[#57606A] dark:text-[#CCCCCC] hover:text-[#24292F] dark:hover:text-white hover:bg-[#E5E7EB] dark:hover:bg-[#454545] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
+          disabled={!isReady || currentCycle >= maxCycle || isCyclePlaying}
+          title={isCyclePlaying ? "1회 재생 진행 중..." : isSingle ? "다음 스텝 실행 (Step Forward)" : "다음 사이클 진행 (Cycle Forward)"}
+          className="p-1 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -356,7 +396,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* 3. 속도 조절 (모바일 숨김) */}
-      <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] dark:border-[#3E3E42] pl-2 text-[10px]">
+      <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] pl-2 text-[10px]">
         {[
           { label: "0.5x", speed: 6000 },
           { label: "1.0x", speed: 3000 },
@@ -369,14 +409,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
               key={label}
               type="button"
-              disabled={!isReady}
+              disabled={!isReady || isCyclePlaying}
               onClick={() => onChangeSpeed(speed)}
               className={`px-1.5 py-0.5 rounded transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none ${
                 isSelected
                   ? isSingle
-                    ? "bg-[#005FB8] dark:bg-[#007ACC] text-white font-bold"
-                    : "bg-[#7C3AED] dark:bg-[#8B5CF6] text-white font-bold"
-                  : "text-[#57606A] dark:text-[#858585] hover:text-[#24292F] dark:hover:text-[#CCCCCC] hover:bg-[#EAEAEA] dark:hover:bg-[#333333]"
+                    ? "bg-[#005FB8] text-white font-bold"
+                    : "bg-[#7C3AED] text-white font-bold"
+                  : "text-[#57606A] hover:text-[#24292F] hover:bg-[#EAEAEA]"
               }`}
             >
               {label}

@@ -225,10 +225,10 @@ export function transferMotion(transfer:InstructionTransfer,path?:string) {
 }
 // Keep short connections readable, but cap long returns instead of making one
 // instruction take tens of seconds. The CPU playback uses this same schedule.
-export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,pace:number) {
+export function transferTimeline(transfers:InstructionTransfer[],paths:Record<string,string>,pace:number,targetDuration?:number) {
   const base=singleTransferDuration(pace)*.81;
   let start=0;
-  return transfers.map(transfer=>{
+  const raw=transfers.map(transfer=>{
     const motion=transferMotion(transfer,paths[transfer.id]);
     const minimum=base*(transfer.id==='decode-immediate'?1.1:1);
     const lead=motion.route?minimum*.05:0;
@@ -238,9 +238,23 @@ export function transferTimeline(transfers:InstructionTransfer[],paths:Record<st
     start+=duration;
     return entry;
   });
+  if (!targetDuration || targetDuration <= 0) return raw;
+  const rawTotal = start;
+  if (rawTotal <= 0) return raw;
+  const scale = targetDuration / rawTotal;
+  let curStart = 0;
+  return raw.map(entry => {
+    const dur = entry.duration * scale;
+    const lead = entry.lead * scale;
+    const travel = entry.travel * scale;
+    const res = { ...entry, start: curStart, duration: dur, lead, travel };
+    curStart += dur;
+    return res;
+  });
 }
-export function instructionFlowDuration(flow:ReturnType<typeof buildInstructionFlow>,pace:number) {
-  return transferTimeline(instructionTransfers(flow),instructionPaths(flow),pace).reduce((sum,entry)=>sum+entry.duration,0);
+export function instructionFlowDuration(flow:ReturnType<typeof buildInstructionFlow>,pace:number,targetDuration?:number) {
+  if (targetDuration && targetDuration > 0) return targetDuration;
+  return transferTimeline(instructionTransfers(flow),instructionPaths(flow),pace,targetDuration).reduce((sum,entry)=>sum+entry.duration,0);
 }
 export function instructionTransfers(flow: ReturnType<typeof buildInstructionFlow>): InstructionTransfer[] {
   const result: InstructionTransfer[] = [
