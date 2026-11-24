@@ -16,6 +16,7 @@ interface MultiCycleDiagramProps {
   mappedRows?: MappedAssemblyRow[];
   mode?: 'single' | 'pipeline';
   loadingMessage?: string | null;
+  isStandby?: boolean;
 }
 
 const COL_WIDTH = 40;
@@ -34,6 +35,7 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
   mappedRows = [],
   mode,
   loadingMessage,
+  isStandby,
 }) => {
   const history = simulationData?.history ?? EMPTY_HISTORY;
   const totalCycles = history.length;
@@ -77,8 +79,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
       activeHeader: 'bg-purple-600 text-white',
     };
 
-  // Single-Cycle 및 Pipeline 모드 공통: Cycle k는 Ck+1(열 인덱스 k)를 활성 실행 중인 열로 하이라이트
-  const activeCycleCol = history.length > 0 ? Math.min(currentCycle, history.length - 1) : -1;
+  // Single-Cycle 및 Pipeline 모드 공통: Cycle k는 Ck+1(열 인덱스 k)를 활성 실행 중인 열로 하이라이트 (초기 대기 상태일 때는 하이라이트 해제)
+  const activeCycleCol = (isStandby || history.length === 0) ? -1 : Math.min(currentCycle, history.length - 1);
 
   const {
     leftScrollRef,

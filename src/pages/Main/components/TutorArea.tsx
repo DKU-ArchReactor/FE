@@ -17,8 +17,6 @@ import {
 } from './TutorSections';
 
 export interface TutorAreaProps {
-  followEnabled?: boolean;
-  onToggleFollow?: () => void;
   selectionKind?: 'c' | 'asm';
   selectionRevision?: number;
   isPlaying?: boolean;
@@ -60,8 +58,6 @@ function useTutorExplanations(items: Parameters<typeof fetchTutor>[0], retryVers
 }
 
 const TutorArea: React.FC<TutorAreaProps> = ({
-  followEnabled = true,
-  onToggleFollow,
   isPlaying = false,
   selectionKind = 'asm',
   selectionRevision = 0,
@@ -227,10 +223,6 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button type="button" role="switch" aria-checked={followEnabled} aria-label="실행 따라가기" onClick={onToggleFollow} className="tutor-follow-switch">
-            <span className="tutor-follow-track"><span /></span>
-            <span>실행 따라가기</span><span className="tutor-follow-status">{followEnabled ? 'ON' : 'OFF'}</span>
-          </button>
           <span className="text-[10px] text-[var(--ar-text-muted)] font-mono truncate">
             {followsExecution && executionFocus ? `${executionFocus.stage} · 실행 따라가기` : activeTarget === "asm" ? "ASM INSTRUCTION" : "INSTRUCTION"}
           </span>
@@ -283,6 +275,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             requestedView={singleIntent.kind}
             selectionKey={singleIntent.version}
             isPlaying={isPlaying}
+            isUserSelected={isUserSelected}
             onSelect={index => {
               setStageSelection({ rows: effectiveRows, scope: selectionScope, index });
             }}
@@ -360,18 +353,4 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   );
 };
 
-function FollowingTutor(props: TutorAreaProps) {
-  const [frozen, setFrozen] = useState<TutorAreaProps | null>(null);
-  const [resume, setResume] = useState<{ revision: number | undefined; epoch: number } | null>(null);
-  const enabled = frozen === null;
-  const live = resume && resume.revision === props.selectionRevision
-    ? { ...props, isUserSelected: false, selectedAsmIndex: null, selectedTranslationLine: null, selectionKind: 'asm' as const }
-    : props;
-  const shown = enabled ? live : { ...frozen, selectionKind: props.selectionKind, selectionRevision: props.selectionRevision, selectedAsmIndex: props.selectedAsmIndex, selectedTranslationLine: props.selectedTranslationLine, isUserSelected: props.isUserSelected, isPlaying: false };
-  return <TutorArea {...shown} key={resume?.epoch ?? 0} followEnabled={enabled} onToggleFollow={() => {
-    if (enabled) setFrozen(live);
-    else { setFrozen(null); setResume({ revision: props.selectionRevision, epoch: (resume?.epoch ?? 0) + 1 }); }
-  }} />;
-}
-
-export default React.memo(FollowingTutor);
+export default React.memo(TutorArea);

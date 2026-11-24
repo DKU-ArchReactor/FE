@@ -22,6 +22,7 @@ export interface TutorSingleModeProps {
   requestedView?: 'c' | 'asm';
   selectionKey?: number;
   isPlaying?: boolean;
+  isUserSelected?: boolean;
   onSelect: (index: number) => void;
   onSelectLine?: (line: number | null, asmIndex?: number | null) => void;
   onPausePlayback?: () => void;
@@ -41,6 +42,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   requestedView = 'asm',
   selectionKey = 0,
   isPlaying = false,
+  isUserSelected = false,
   onSelect,
   onSelectLine,
   onPausePlayback,
@@ -221,7 +223,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
         {/* ========================================================= */}
         {/* 중앙 카드 본체 (1번 구조: 헤더 한 줄에 태그 + 서류철 탭 + 진행도 결합) */}
         {/* ========================================================= */}
-        <div className="tutor-single-card">
+        <div className="tutor-single-card" data-mode={isUserSelected ? 'selected' : 'executing'}>
           {view === 'c' ? (
             /* ==================== C 코드 카드 ==================== */
             <>
@@ -230,6 +232,10 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                 <div className="tutor-header-left">
                   <span className="tutor-single-tag">
                     {line != null ? `C : L${line}` : 'C 코드'}
+                  </span>
+                  <span className={`tutor-mode-badge ${isUserSelected ? 'selected' : 'executing'}`}>
+                    <span className="tutor-mode-dot" />
+                    <span>{isUserSelected ? '선택됨' : '실행 중'}</span>
                   </span>
                   {cAnalysis && (
                     <span className="tutor-single-badge">{cAnalysis.type}</span>
@@ -256,6 +262,19 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                 </div>
 
                 <div className="tutor-header-right">
+                  {isUserSelected && (
+                    <button
+                      type="button"
+                      className="tutor-return-exec-btn"
+                      title="현재 실행 중인 위치로 돌아가기"
+                      onClick={() => onSelectLine?.(null, null)}
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-2.5 h-2.5">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                      <span>실행 위치로</span>
+                    </button>
+                  )}
                   <span className="tutor-single-counter">
                     {group.length > 0 ? `연결된 ASM ${group.length}개` : '매핑된 ASM 없음'}
                   </span>
@@ -330,6 +349,10 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                   <span className="tutor-single-tag">
                     {currentRow ? `ASM : L${currentRow.index + 1}` : 'ASM'}
                   </span>
+                  <span className={`tutor-mode-badge ${isUserSelected ? 'selected' : 'executing'}`}>
+                    <span className="tutor-mode-dot" />
+                    <span>{isUserSelected ? '선택됨' : '실행 중'}</span>
+                  </span>
                   {instruction && (
                     <span className="tutor-single-badge">{instruction.action}</span>
                   )}
@@ -358,6 +381,19 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                 </div>
 
                 <div className="tutor-header-right">
+                  {isUserSelected && (
+                    <button
+                      type="button"
+                      className="tutor-return-exec-btn"
+                      title="현재 실행 중인 위치로 돌아가기"
+                      onClick={() => onSelectLine?.(null, null)}
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-2.5 h-2.5">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                      <span>실행 위치로</span>
+                    </button>
+                  )}
                   <span className="tutor-single-counter">
                     {group.length ? `${position + 1} / ${group.length}` : '0 / 0'}
                   </span>

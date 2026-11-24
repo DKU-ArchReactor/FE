@@ -155,14 +155,110 @@
   background: var(--ar-panel-bg);
   border: 1px solid var(--ar-border);
   border-radius: 12px;
-  box-shadow: 0 3px 14px -3px rgba(0, 0, 0, 0.07);
   overflow: hidden;
   box-sizing: border-box;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
-html.dark .tutor-single-card {
-  box-shadow: 0 4px 18px -4px rgba(0, 0, 0, 0.35);
+/* 1. 실행 중인 상태: 초록색(에메랄드 🟢) 그림자 & 테두리 글로우 */
+.tutor-single-card[data-mode="executing"] {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 22px -2px rgba(16, 185, 129, 0.24), 0 0 0 1px rgba(16, 185, 129, 0.28);
+}
+
+html.dark .tutor-single-card[data-mode="executing"] {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 26px -2px rgba(16, 185, 129, 0.35), 0 0 0 1px rgba(52, 211, 153, 0.4);
+}
+
+/* 2. 사용자가 선택한 상태: 파란색(블루 🔵) 그림자 & 테두리 글로우 */
+.tutor-single-card[data-mode="selected"] {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 22px -2px rgba(59, 130, 246, 0.24), 0 0 0 1px rgba(59, 130, 246, 0.28);
+}
+
+html.dark .tutor-single-card[data-mode="selected"] {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 4px 26px -2px rgba(59, 130, 246, 0.35), 0 0 0 1px rgba(96, 165, 250, 0.4);
+}
+
+/* 실행/선택 상태 뱃지 (● 실행 중 / ● 선택됨) */
+.tutor-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7.5px;
+  border-radius: 9999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  user-select: none;
+}
+
+.tutor-mode-dot {
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tutor-mode-badge.executing {
+  background: color-mix(in srgb, #10B981 12%, transparent);
+  color: #059669;
+  border: 1px solid color-mix(in srgb, #10B981 28%, transparent);
+}
+
+html.dark .tutor-mode-badge.executing {
+  color: #34D399;
+}
+
+.tutor-mode-badge.executing .tutor-mode-dot {
+  background: #10B981;
+  box-shadow: 0 0 6px #10B981;
+}
+
+.tutor-mode-badge.selected {
+  background: color-mix(in srgb, #3B82F6 12%, transparent);
+  color: #2563EB;
+  border: 1px solid color-mix(in srgb, #3B82F6 28%, transparent);
+}
+
+html.dark .tutor-mode-badge.selected {
+  color: #60A5FA;
+}
+
+.tutor-mode-badge.selected .tutor-mode-dot {
+  background: #3B82F6;
+  box-shadow: 0 0 6px #3B82F6;
+}
+
+/* 실행 위치로 복귀 버튼 */
+.tutor-return-exec-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin-right: 6px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 650;
+  background: color-mix(in srgb, #10B981 10%, var(--ar-panel-bg));
+  color: #059669;
+  border: 1px solid color-mix(in srgb, #10B981 30%, var(--ar-border));
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+html.dark .tutor-return-exec-btn {
+  color: #34D399;
+}
+
+.tutor-return-exec-btn:hover {
+  background: color-mix(in srgb, #10B981 20%, var(--ar-panel-bg));
+  border-color: #10B981;
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px -1px rgba(16, 185, 129, 0.3);
 }
 
 /* ======================================================== */

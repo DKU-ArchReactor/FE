@@ -750,7 +750,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   } = computePipelineWireState(currentData, isSingle);
 
   // 10진수 PC 주소값 계산
-  const ifPcStr = buffers?.IF?.pc || currentData?.global_result?.current_pc;
+  const ifPcStr = currentData?.stage_activity?.IF?.pc || buffers?.IF?.pc || currentData?.global_result?.current_pc;
   const ifPcNum = numericPc(ifPcStr);
   const ifPcDec = Number.isFinite(ifPcNum) ? String(ifPcNum) : (ifPcStr || "0");
   const ifPcPlus4Dec = Number.isFinite(ifPcNum) ? String(ifPcNum + 4) : "";
@@ -1035,11 +1035,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const idRd2Val = idRs2Key && regMap[idRs2Key] !== undefined ? `${idRs2Name}: ${formatRegVal(regMap[idRs2Key])}` : (idRs2Name || 'rs2');
   const idImmVal = usesImm(idOp) ? (idParsed.imm || 'imm') : 'imm';
 
-  const idPcStr = buffers?.ID?.pc;
+  const idPcStr = currentData?.stage_activity?.ID?.pc || buffers?.ID?.pc;
   const idPcNum = numericPc(idPcStr);
   const idPcDec = Number.isFinite(idPcNum) ? String(idPcNum) : (idPcStr || (Number.isFinite(ifPcNum) && ifPcNum !== null ? String(ifPcNum - 4) : "0"));
 
-  const exPcStr = buffers?.EX?.pc;
+  const exPcStr = currentData?.stage_activity?.EX?.pc || buffers?.EX?.pc;
   const exPcNum = numericPc(exPcStr) ?? 0;
   const exPcDec = Number.isFinite(exPcNum) ? String(exPcNum) : (exPcStr || "0");
 

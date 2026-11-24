@@ -33,6 +33,7 @@ interface PanelRendererProps {
   playSpeed: number;
   onPausePlayback?: () => void;
   isPlaying?: boolean;
+  isStandby?: boolean;
   singlePlaybackFinished?: boolean;
   playbackRevision?: number;
   loadingMessage: string | null;
@@ -89,6 +90,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   playSpeed,
   onPausePlayback,
   isPlaying,
+  isStandby,
   singlePlaybackFinished,
   playbackRevision,
   loadingMessage,
@@ -317,6 +319,7 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
           mappedRows={mappedAssemblyRows}
           mode={simulationMode}
           loadingMessage={loadingMessage}
+          isStandby={isStandby}
         />
       );
 

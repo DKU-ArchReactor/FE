@@ -27,6 +27,7 @@ export function useSimulationPlayback({
   const isSimulationReady = historyList.length > 0;
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isStandby, setIsStandby] = useState<boolean>(true);
   const [playSpeed, setPlaySpeed] = useState<number>(3000);
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
@@ -39,6 +40,10 @@ export function useSimulationPlayback({
       return { ...prev, [editorTarget]: nextVal };
     });
   };
+
+  useEffect(() => {
+    setIsStandby(true);
+  }, [simulationData]);
 
   if (prevTarget !== editorTarget) {
     setPrevTarget(editorTarget);
@@ -153,7 +158,9 @@ export function useSimulationPlayback({
   const currentData: CycleHistoryItem | null =
     historyList.length === 0
       ? null
-      : (historyList[activeCycleIndex] ?? null);
+      : isStandby
+        ? initialResetData
+        : (historyList[activeCycleIndex] ?? null);
 
   const prevData: CycleHistoryItem | null =
     currentCycle === 0
@@ -162,7 +169,7 @@ export function useSimulationPlayback({
 
   // Single 모드 또는 Pipeline 모드에서 현재 활성 실행 중인 어셈블리 행 계산
   const currentActiveRow = (() => {
-    if (!currentData || !mappedAssemblyRows.length) return null;
+    if (isStandby || !currentData || !mappedAssemblyRows.length) return null;
 
     if (isSingleEngine) {
       // Step 0일 때 historyList[0], Step 1일 때 historyList[1], ...
@@ -211,8 +218,14 @@ export function useSimulationPlayback({
       });
       return matched ?? null;
     } else {
-      // Pipeline 모드: 실행 중인 주요 스테이지(EX 또는 IF)의 명령어 매칭
-      const activeBuf = currentData.buffers?.EX || currentData.buffers?.ID || currentData.buffers?.IF;
+      // Pipeline 모드: 실행 중인 주요 스테이지(EX, ID, IF 순)의 명령어 매칭 (stage_activity 우선)
+      const activeBuf =
+        currentData.stage_activity?.EX ||
+        currentData.stage_activity?.ID ||
+        currentData.stage_activity?.IF ||
+        currentData.buffers?.EX ||
+        currentData.buffers?.ID ||
+        currentData.buffers?.IF;
       if (!activeBuf) return null;
 
       const bufPc = (activeBuf.pc || "").trim().toLowerCase();
@@ -240,13 +253,14 @@ export function useSimulationPlayback({
     }
   })();
 
-  const activeExecutionCLine = currentActiveRow?.sourceLine ?? null;
+  const activeExecutionCLine = isStandby ? null : (currentActiveRow?.sourceLine ?? null);
   const effectiveSelectedLine =
     editorTarget === "asm" ? null : (translationSelectedLine ?? activeExecutionCLine);
 
   const handleSimulationComplete = () => {
     setFinishedSingleFrame(null);
     setIsPlaying(false);
+    setIsStandby(true);
     setCurrentCycle(0);
     setPlaySpeed(3000);
   };
@@ -312,7 +326,13 @@ export function useSimulationPlayback({
     });
     onClearSelection();
     setPlaybackRevision((v) => v + 1);
-    setCurrentCycle((prev) => Math.max(0, prev - 1));
+    setCurrentCycle((prev) => {
+      const next = Math.max(0, prev - 1);
+      if (next === 0) {
+        setIsStandby(true);
+      }
+      return next;
+    });
   };
 
   const handleStepForward = () => {
@@ -325,6 +345,7 @@ export function useSimulationPlayback({
     });
     onClearSelection();
     setPlaybackRevision((v) => v + 1);
+    setIsStandby(false);
     const maxLimit = totalCycles;
     setCurrentCycle((prev) => Math.min(maxLimit, prev + 1));
   };
@@ -338,6 +359,7 @@ export function useSimulationPlayback({
 
     if (currentPos >= maxPos && (!isSingleEngine || (!isPlaying && singleClock.current?.remaining === 0))) {
       setCurrentCycle(0);
+      setIsStandby(false);
       setIsPlaying(true);
       setPlaybackRevision((v) => v + 1);
       triggerPlaybackFeedback("play");
@@ -345,6 +367,7 @@ export function useSimulationPlayback({
       const nextState = !isPlaying;
       setIsPlaying(nextState);
       if (nextState) {
+        setIsStandby(false);
         setPlaybackRevision((v) => v + 1);
       }
       triggerPlaybackFeedback(nextState ? "play" : "pause");
@@ -354,6 +377,7 @@ export function useSimulationPlayback({
   const handleReset = () => {
     setFinishedSingleFrame(null);
     setIsPlaying(false);
+    setIsStandby(true);
     onClearSelection();
     setCurrentCycle(0);
     setPlaybackRevision((v) => v + 1);
@@ -364,6 +388,7 @@ export function useSimulationPlayback({
     setFinishedSingleFrame(null);
     onClearSelection();
     setCurrentCycle(0);
+    setIsStandby(false);
     setIsPlaying(true);
     setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("play");
@@ -380,6 +405,7 @@ export function useSimulationPlayback({
       return false;
     });
     onClearSelection();
+    setIsStandby(false);
     setCurrentCycle(val);
   };
 
@@ -388,6 +414,7 @@ export function useSimulationPlayback({
     setCurrentCycle,
     isPlaying,
     setIsPlaying,
+    isStandby,
     playSpeed,
     setPlaySpeed,
     totalCycles,
