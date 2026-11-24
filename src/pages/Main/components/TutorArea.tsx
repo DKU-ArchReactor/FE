@@ -85,6 +85,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   onJumpToCycle,
 }) => {
   const isCompiled = Boolean(simulationData);
+  const [pipelineHeader, setPipelineHeader] = useState<HTMLDivElement | null>(null);
   const isSingleMode = mode === "single" || simulationData?.simulator?.mode === "single";
 
   const cLines = useMemo(() => {
@@ -222,12 +223,13 @@ const TutorArea: React.FC<TutorAreaProps> = ({
       className="ar-tutor @container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="튜터 해설 패널"
     >
-      <header className="h-8 shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 border-l-emerald-500">
+      <header className="relative h-8 shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 border-l-emerald-500">
         <div className="flex items-center gap-1.5 min-w-0">
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             ARCHREACTOR TUTOR
           </h3>
         </div>
+        {!isSingleMode && simulationData && <div ref={setPipelineHeader} className="tutor-pipeline-header-controls"/>}
         <div className="flex items-center gap-2 shrink-0">
           {isUserSelected && (
             <button
@@ -277,6 +279,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             sourceLine={selectedTranslationLine}
             selectionKind={selectionKind}
             selectionRevision={selectionRevision}
+            isUserSelected={isUserSelected}
+            headerTarget={pipelineHeader}
           />
         ) : isSingleMode && simulationData ? (
           shouldShowSingleCard ? (
