@@ -565,7 +565,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const flowDuration = lessonContext?.flowDurationMs ?? playSpeed ?? 3000;
   const progressRef = React.useRef<number>(0);
   const prevDataRef = React.useRef(currentData);
-  const prevIsPlayingRef = React.useRef(isPlaying ?? false);
 
   // 뷰포트 교차 감지: 회로도가 화면 밖(다른 탭/뷰포트)으로 슬라이드되면 RAF 애니메이션을 일시 정지하여 CPU 낭비 방지
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -596,18 +595,15 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   }, [currentData]);
 
   // 2. 시뮬레이션 바(상단 ControlPanel)에서 Play 버튼을 누르면:
-  // 사이클 바를 즉시 중지(0으로 리셋)한 후 처음부터(0.0) 동기화하여 재생
+  // 사이클 바가 중간 어디를 돌고 있었든 즉시 처음(0.0)부터 동기화하여 재생
+  // (시뮬레이션 바가 일시정지되더라도 사이클 바를 강제로 멈추지 않고 현재 사이클 서브스텝을 계속 관찰할 수 있도록 유지)
   useEffect(() => {
     if (isPlaying) {
       progressRef.current = 0;
       setAnimProgress(0);
       setIsSubstepLooping(true);
       setAnimResetId((prev) => prev + 1);
-    } else if (prevIsPlayingRef.current && !isPlaying) {
-      // 시뮬레이션 바 일시정지 시: 사이클 바도 현재 위치에서 일시정지
-      setIsSubstepLooping(false);
     }
-    prevIsPlayingRef.current = isPlaying ?? false;
   }, [isPlaying, playbackRevision]);
 
   // 처음으로 돌아가기 (정지 및 0으로 리셋)
