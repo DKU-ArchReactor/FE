@@ -6,7 +6,6 @@ import type { MappedAssemblyRow } from "../utils/translationCompile";
 import {
   analyzeCLine,
   analyzeAsmInstruction,
-  analyzeCrtInstruction,
   instructionAt,
 } from "../utils/tutorAnalysis";
 import { TutorInstructionEvidence, TutorText } from "./TutorEvidence";
@@ -18,7 +17,13 @@ export const TutorCrtCard: React.FC<{
   simulationData: SimulationResult | null;
   historyIndex?: number;
 }> = ({ selectedRow, selectedAsmIndex, simulationData, historyIndex }) => {
-  const crtInfo = analyzeCrtInstruction(selectedRow.text, selectedRow.pc);
+  const crtInfo = {
+    instructionDetail: analyzeAsmInstruction(selectedRow.text, instructionAt(simulationData?.tutor, selectedRow.pc)?.explanation),
+    title: '연결된 C 줄 없음',
+    role: 'C 코드와의 연결 정보',
+    summary: '이 명령어와 연결된 C 줄 정보가 없습니다. 프로그램 실행을 돕는 코드이거나, C 줄 정보가 포함되지 않은 코드일 수 있습니다.',
+    detail: 'C 줄 정보가 없어도 명령어의 동작과 실제 실행 결과를 확인할 수 있습니다. C 줄 정보가 없다는 이유만으로 초기화나 main 호출을 수행하는 코드라고 판단하지 않습니다.',
+  };
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-xl border border-slate-300 bg-slate-50/70 p-3.5 flex flex-col gap-3 shadow-2xs">
@@ -394,8 +399,7 @@ export const TutorCycleOverviewSection: React.FC<{
             }
 
             const context = instructionAt(simulationData?.tutor, ifBuf?.pc);
-            const isCrtCycle = context?.mapping_status === "unmapped";
-            const crtAnalysis = isCrtCycle ? analyzeCrtInstruction(ifInst, ifBuf?.pc) : null;
+            const isUnmappedCycle = context?.mapping_status === "unmapped";
             const ifAnalysis = analyzeAsmInstruction(ifInst, context?.explanation);
             return (
               <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
@@ -404,7 +408,7 @@ export const TutorCycleOverviewSection: React.FC<{
                     <span className="font-bold text-indigo-700 font-sans">
                       [IF 인출 단계] {tutorDecimalText(ifInst)}
                     </span>
-                    {isCrtCycle && (
+                    {isUnmappedCycle && (
                       <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium bg-[#F0F0F0] text-[#8C959F] whitespace-nowrap shrink-0">
                         소스 위치 미확인
                       </span>
@@ -417,7 +421,7 @@ export const TutorCycleOverviewSection: React.FC<{
                   )}
                 </div>
                 <p className="text-[13px] text-[var(--ar-text-muted)] leading-7">
-                  {tutorDecimalText(crtAnalysis ? `${crtAnalysis.role}: ${crtAnalysis.summary}` : ifAnalysis.explanation)}
+                  {tutorDecimalText(ifAnalysis.explanation)}
                 </p>
               </div>
             );

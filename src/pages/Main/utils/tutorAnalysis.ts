@@ -12,6 +12,8 @@ export interface TutorInstruction {
   pc?: string; source_line?: number | null; source_file?: string | null;
   raw_instruction?: string | null;
   source_column?: number | null; function?: string | null;
+  source_context?: 'user_source' | 'startup_source' | 'external_source' | 'unknown';
+  external_source_line?: number | null;
   mapping_status?: 'mapped' | 'unmapped'; mapping_basis?: string;
   retire_count?: number; observed_in_history?: boolean;
   teaching?: {

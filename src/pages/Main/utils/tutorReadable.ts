@@ -52,7 +52,7 @@ export function explainStall(cycle:CycleHistoryItem|null,stage:string){
   const waiting=event?.assembly;
   const ex=cycle?.stage_activity?.EX??cycle?.buffers.EX;
   const prefix=stage==='IF'?'ID 단계의 명령어가 다음 단계로 갈 수 없어, 새 명령어를 받는 IF 단계도 함께 막힙니다. ':'';
-  if(reason==='load_use')return {
+  if(reason && ['load_use','load_use_hazard','data_hazard_load_use'].includes(reason))return {
     cause:prefix+`${ex?.assembly?`앞선 메모리 읽기 명령어 «${ex.assembly}»가 가져올 값`:'앞선 메모리 읽기 명령어가 가져올 값'}을 ${waiting?`«${waiting}» 명령어`:'뒤따르는 명령어'}가 입력으로 필요로 합니다. 아직 메모리 읽기가 끝나지 않아 계산에 사용할 새 값이 준비되지 않았습니다.`,
     solution:'새 명령어를 가져오는 IF와 해독하는 ID를 1클록 멈추고, PC(다음에 가져올 명령어의 주소)도 그대로 둡니다. 연산하는 EX에는 빈 작업인 버블을 넣습니다. 앞선 메모리 읽기가 끝나 값이 준비되면 대기하던 명령어가 진행합니다.',
   };
@@ -98,9 +98,18 @@ export function explainBubble(origin:CycleEvents|null|undefined){
   return {cause:null,solution:null};
 }
 
+export function isForwardingTarget(event:CycleEvents['forwarding']|undefined,stage:string,assembly:string|null|undefined){
+  return Boolean(event?.has_forwarded && stage===(event.stage??'EX') && assembly && event.assembly?.replace(/\s/g,'')===assembly.replace(/\s/g,''));
+}
+
 export function explainForwarding(info:CycleEvents['forwarding']['forwarding_info']|null){
   if(!info)return '앞선 명령어가 계산한 값을 필요한 입력으로 직접 전달합니다. 레지스터에 저장한 뒤 다시 읽을 때까지 기다리지 않습니다.';
-  const from=info.forwarded_from.map(value=>value==='EX/MEM'?'앞선 명령어가 연산을 마치고 결과를 보관하는 곳(EX/MEM)':value==='MEM/WB'?'메모리 접근을 마치고 레지스터에 기록할 결과를 보관하는 곳(MEM/WB)':`${value} 경로`);
-  const to=info.forwarded_to.map(value=>value==='rs1'?'현재 명령어의 첫 번째 입력값(rs1)':value==='rs2'?'현재 명령어의 두 번째 입력값(rs2)':`${value} 입력`);
-  return `${from.length?from.join(', '):'앞선 명령어의 결과'}에서 값을 가져와 ${to.length?to.join(', '):'현재 명령어의 입력'}으로 바로 사용합니다.${info.target_register.length?` 여기서 필요한 값은 ${info.target_register.join(', ')} 레지스터의 새 값입니다.`:''} 레지스터에 저장한 뒤 다시 읽을 때까지 기다리지 않으므로, 이 값 전달 때문에 멈출 필요가 없습니다.`;
+  const transfers=info.forwarded_to.map((target,index)=>{
+    const origin=info.forwarded_from[index];
+    const from=origin==='EX/MEM'?'앞선 명령어가 연산을 마치고 보관한 결과(EX/MEM)':origin==='MEM/WB'?'앞선 명령어가 레지스터에 기록하려고 준비한 결과(MEM/WB)':'앞선 명령어가 준비한 결과';
+    const to=target==='rs1'?'첫 번째 입력':target==='rs2'?'두 번째 입력':'필요한 입력';
+    const register=info.target_register[index];
+    return `${register?`${tutorRegisterName(register)}의 새 값이 필요한 ${to}`:to}으로 ${from}를 직접 전달합니다.`;
+  });
+  return `${transfers.length?transfers.join('\n'):'앞선 명령어의 결과를 현재 명령어의 입력으로 직접 전달합니다.'}\n레지스터에 저장한 뒤 다시 읽을 때까지 기다리지 않고 새 값으로 계산합니다. 포워딩은 이 값의 전달을 해결하며, 다른 이유로 대기가 필요한지는 별도로 판단합니다.`;
 }

@@ -35,7 +35,7 @@ export function extractAssemblyFromSimulation(
           pc,
           text: item.assembly || "",
           sourceLine: sLine,
-          isRuntime: sLine === null,
+          isRuntime: false,
         };
       });
   }
@@ -59,7 +59,7 @@ export function extractAssemblyFromSimulation(
       pc: ifBuf.pc,
       text: ifBuf.assembly,
       sourceLine: sLine,
-      isRuntime: sLine === null,
+      isRuntime: false,
     });
   }
 
@@ -244,7 +244,7 @@ export function mapAssembly(assembly: string, sourceLineCount: number): MappedAs
       mapped.push({
         sourceLine: sourceLine,
         text: line,
-        isRuntime: sourceLine === null,
+        isRuntime: false,
       });
     }
   }
