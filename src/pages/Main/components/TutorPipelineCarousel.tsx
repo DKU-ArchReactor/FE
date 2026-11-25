@@ -24,7 +24,6 @@ export type PipelineSituation = {
   instruction?: TutorInstruction;
 };
 
-const stageNames = {IF:'명령어 인출', ID:'명령어 해독', EX:'연산·조건 판단', MEM:'메모리 접근', WB:'완료·필요 시 레지스터 기록'};
 const tabs = [{id:'desc', label:'이번 사이클'}, {id:'logic', label:'동작 원리'}] as const;
 type Tab = typeof tabs[number]['id'];
 
@@ -73,7 +72,7 @@ function StageWork({card}:{card:PipelineSituation}) {
     WB:/^(sb|sh|sw|beq|bne|blt|bge|bltu|bgeu)\b/i.test(card.asm ?? '') ? '이 명령어는 일반 레지스터에 결과를 기록하지 않습니다.' : '기록 대상이 있는 명령어는 결과를 레지스터에 반영합니다.',
   })[card.stage];
   return <div className="tutor-single-observed">
-    <div className="tutor-single-observed-title"><span>{stageWorkTitle(card)}</span><span className="tutor-pipeline-stage-name">{card.stage}</span></div>
+    <div className="tutor-single-observed-title"><span>{stageWorkTitle(card)}</span></div>
     <p className="tutor-single-observed-content"><TutorText text={text}/></p>
   </div>;
 }
@@ -103,23 +102,23 @@ function SituationCard({card, active}:{card:PipelineSituation;active:boolean}) {
     <div className="tutor-single-card-header">
       <div className="tutor-header-left">
         <span className="tutor-single-tag" title={card.bubble ? '취소되기 전 명령어' : undefined}>{card.asmLine ? `ASM: L${card.asmLine}` : 'ASM'}</span>
+        {active && (
+          <span className="tutor-mode-badge executing">
+            <span className="tutor-mode-dot" />
+            <span>실행 중</span>
+          </span>
+        )}
         <StageBadge badge={card.badge}/>
         <span className="tutor-single-badge">{card.status}</span>
       </div>
       <div className="tutor-header-tabs" role={active ? 'tablist' : undefined} aria-label={active ? '상황 설명 종류' : undefined}>
-        {active ? tabs.map((value, index) => <button type="button" key={value.id} role="tab" id={`${id}-${value.id}`} aria-selected={tab === value.id} aria-controls={`${id}-panel`} tabIndex={tab === value.id ? 0 : -1} className={`tutor-folder-tab${tab === value.id ? ' active' : ''}`}
-          onClick={()=>setTab(value.id)} onKeyDown={event=>{
-            if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
-            event.preventDefault();
-            const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + tabs.length) % tabs.length;
-            setTab(tabs[next].id);
-            document.getElementById(`${id}-${tabs[next].id}`)?.focus();
-          }}>{value.label}</button>) : <span className="tutor-folder-tab active">이번 사이클</span>}
+        {active ? tabs.map((value) => <button type="button" key={value.id} role="tab" id={`${id}-${value.id}`} aria-selected={tab === value.id} aria-controls={`${id}-panel`} tabIndex={tab === value.id ? 0 : -1} className={`tutor-folder-tab${tab === value.id ? ' active' : ''}`}
+          onClick={()=>setTab(value.id)}>{value.label}</button>) : <span className="tutor-folder-tab active">이번 사이클</span>}
       </div>
     </div>
     <div className="tutor-single-card-body" id={active ? `${id}-panel` : undefined} role={active ? 'tabpanel' : undefined} aria-labelledby={active ? `${id}-${tab}` : undefined} key={tab} tabIndex={active ? 0 : -1}>
       {(!active || tab === 'desc') ? <>
-        <div className="tutor-single-code-box tutor-pipeline-instruction"><code>{tutorDecimalText(card.asm ?? '실행 명령어 정보 없음')}</code><div className="tutor-pipeline-code-meta"><span className="tutor-pipeline-stage-name">{stageNames[card.stage]}</span>{active && card.c && <button className="tutor-pipeline-source-link" type="button" onClick={()=>setTab('logic')}>C: L{card.line} 연결</button>}</div></div>
+        <div className="tutor-single-code-box tutor-pipeline-instruction"><code>{tutorDecimalText(card.asm ?? '실행 명령어 정보 없음')}</code>{active && card.c && <div className="tutor-pipeline-code-meta"><button className="tutor-pipeline-source-link" type="button" onClick={()=>setTab('logic')}>C: L{card.line} 연결</button></div>}</div>
         {shortMeaning && <div className="tutor-single-meaning"><span className="tutor-single-meaning-arrow" aria-hidden="true">→</span><p className="tutor-single-meaning-text"><TutorText text={shortMeaning}/></p></div>}
         {active && (hasHazard ? <HazardExplanation card={card}/> : <StageWork card={card}/>)}
       </> : <>
@@ -136,15 +135,12 @@ function SituationCard({card, active}:{card:PipelineSituation;active:boolean}) {
 
 export default function TutorPipelineCarousel({cards,index,historyIndex,isUserSelected,unmatched,onSelect,headerTarget}:{cards:PipelineSituation[];index:number;historyIndex?:number;isUserSelected:boolean;unmatched:boolean;onSelect:(index:number)=>void;headerTarget?:HTMLElement|null}) {
   const controls = cards.length > 0 ? <PipelineContext cards={cards} index={index} historyIndex={historyIndex} unmatched={unmatched} onSelect={onSelect}/> : null;
-  return <section className="tutor-single-container tutor-cycle-cards" data-mode={isUserSelected ? 'selected' : 'executing'} data-stage={cards[index]?.stage} data-situation={cards[index]?.badge} aria-label="사이클 상황 카드" tabIndex={0} onKeyDown={event=>{
-    if(event.target !== event.currentTarget) return;
-    if(event.key === 'ArrowLeft' || event.key === 'ArrowRight') {event.preventDefault(); onSelect(Math.max(0,Math.min(cards.length - 1,index + (event.key === 'ArrowLeft' ? -1 : 1))));}
-  }}>
+  return <section className="tutor-single-container tutor-cycle-cards" data-mode={isUserSelected ? 'selected' : 'executing'} data-stage={cards[index]?.stage} data-situation={cards[index]?.badge} aria-label="사이클 상황 카드">
     {headerTarget ? createPortal(controls,headerTarget) : headerTarget === undefined && controls ? <div className="tutor-pipeline-context-slot">{controls}</div> : null}
     {cards.length ? <div className="tutor-pipeline-viewport"><div className="tutor-pipeline-track" data-multi={cards.length > 1} style={{transform:cards.length > 1 ? `translateX(calc(var(--pipeline-peek) - ${index} * (100% - 2 * var(--pipeline-peek) + var(--pipeline-gap))))` : 'none'}}>
       {cards.map((card, position)=>{
         const active = position === index;
-        return <div key={`${historyIndex}-${card.id}-${card.stage}`} className="tutor-pipeline-slide" data-active={active} role={active ? undefined : 'button'} tabIndex={active ? undefined : 0} aria-label={active ? undefined : `${card.stage} · ${card.status} 카드 보기`} onClick={active ? undefined : ()=>onSelect(position)} onKeyDown={active ? undefined : event=>{if(event.key === 'Enter' || event.key === ' ') {event.preventDefault();onSelect(position);}}}>
+        return <div key={`${historyIndex}-${card.id}-${card.stage}`} className="tutor-pipeline-slide" data-active={active} role={active ? undefined : 'button'} tabIndex={active ? undefined : 0} aria-label={active ? undefined : `${card.stage} · ${card.status} 카드 보기`} onClick={active ? undefined : ()=>onSelect(position)}>
           <div className="tutor-pipeline-slide-content" inert={!active} aria-hidden={!active}><SituationCard card={card} active={active}/></div>
         </div>;
       })}

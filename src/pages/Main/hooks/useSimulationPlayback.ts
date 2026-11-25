@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
-import { timelineSync } from "../utils/timelineSync";
+import { timelineSync, isMidCycleProgress } from "../utils/timelineSync";
 
 
 interface UseSimulationPlaybackProps {
@@ -27,7 +27,7 @@ export function useSimulationPlayback({
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playMode, setPlayMode] = useState<"continuous" | "singleCycle">("continuous");
-  const [playSpeed, setPlaySpeed] = useState<number>(3000);
+  const [playSpeed, setPlaySpeed] = useState<number>(5000);
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
 
@@ -311,10 +311,11 @@ export function useSimulationPlayback({
       [`${editorTarget}:single`]: { cycle: 0, isStandby: true },
       [`${editorTarget}:pipeline`]: { cycle: 0, isStandby: true },
     }));
-    setPlaySpeed(3000);
+    setPlaySpeed(5000);
     if (playbackClock.current) {
       playbackClock.current = null;
     }
+    timelineSync.snapProgress(0, 0);
     setPlaybackRevision((v) => v + 1);
   };
 
@@ -329,11 +330,11 @@ export function useSimulationPlayback({
       "asm:single": { cycle: 0, isStandby: true },
       "asm:pipeline": { cycle: 0, isStandby: true },
     });
-    setPlaySpeed(3000);
+    setPlaySpeed(5000);
     if (playbackClock.current) {
       playbackClock.current = null;
     }
-    timelineSync.setProgress(0, 0);
+    timelineSync.snapProgress(0, 0);
     setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("reset");
   };
@@ -341,6 +342,22 @@ export function useSimulationPlayback({
   const singlePlaybackDelay = playSpeed;
   const singlePlaybackFrame = isSingleEngine ? currentCycle : 0;
   const singleFrame = isSingleEngine ? currentData : null;
+
+  const [timelineAtEnd, setTimelineAtEnd] = useState<boolean>(false);
+
+  // 마지막 사이클이라도 ] 완료점 전((N-1, N])이라면 > 스텝 버튼을 활성화할 수 있도록 종료 여부만 추적
+  useEffect(() => {
+    const syncEndState = (prog: number, syncCycle: number) => {
+      const nextAtEnd =
+        totalCycles <= 0 ||
+        (currentCycle >= totalCycles &&
+          !isMidCycleProgress(currentCycle, syncCycle, prog));
+      setTimelineAtEnd((prev) => (prev === nextAtEnd ? prev : nextAtEnd));
+    };
+    const currentSync = timelineSync.getProgress();
+    syncEndState(currentSync.progress, currentSync.cycle);
+    return timelineSync.subscribe(syncEndState);
+  }, [currentCycle, totalCycles]);
 
   // 공통 시뮬레이션 타이머: SingleEngine 및 Pipeline 모드 모두 정지된 잔여 시간(remaining)을 추적하여
   // PAUSE 시 제자리 정지, PLAY 시 제자리 재개 동작을 보장합니다.
@@ -351,6 +368,23 @@ export function useSimulationPlayback({
     });
 
     if (!isSimulationReady) return;
+
+    // 정지(PAUSE/스텝/점프) 상태에서는 완료된 ] 위치에 새 full remaining을 덮어쓰지 않고,
+    // 중간 정지 중인 기존 clock의 배속 비율만 보정합니다.
+    if (!isPlaying) {
+      if (
+        playbackClock.current &&
+        playbackClock.current.cycle === currentCycle &&
+        playbackClock.current.frame === currentData &&
+        playbackClock.current.duration !== playSpeed
+      ) {
+        playbackClock.current.remaining =
+          (playbackClock.current.remaining * playSpeed) /
+          playbackClock.current.duration;
+        playbackClock.current.duration = playSpeed;
+      }
+      return;
+    }
 
     if (!playbackClock.current || playbackClock.current.cycle !== currentCycle || playbackClock.current.frame !== currentData) {
       playbackClock.current = {
@@ -368,10 +402,9 @@ export function useSimulationPlayback({
       clock.duration = playSpeed;
     }
 
-    if (!isPlaying) return;
-
     if (currentCycle >= totalCycles && clock.remaining <= 0) {
       if (isSingleEngine) setFinishedSingleFrame(currentData);
+      timelineSync.snapProgress(currentCycle, 1);
       setIsPlaying(false);
       return;
     }
@@ -386,12 +419,13 @@ export function useSimulationPlayback({
 
       if (playMode === "singleCycle") {
         // 1회 재생 완료 시 해당 사이클 ] 위치에서 일시정지 (PAUSE 상태로 전환)
+        timelineSync.snapProgress(currentCycle, 1);
         setIsPlaying(false);
         setPlayMode("continuous");
-        timelineSync.setProgress(currentCycle, 1);
       } else {
         // 연속 재생 시 다음 사이클로 전진
         if (currentCycle >= totalCycles) {
+          timelineSync.snapProgress(currentCycle, 1);
           setIsPlaying(false);
         } else {
           advance();
@@ -419,6 +453,7 @@ export function useSimulationPlayback({
 
   const handleStepBack = () => {
     if (isPlaying && playMode === "singleCycle") return;
+    const next = Math.max(0, currentCycle - 1);
     setFinishedSingleFrame(null);
     playbackClock.current = null;
     setPlayMode("continuous");
@@ -430,18 +465,15 @@ export function useSimulationPlayback({
     });
     onClearSelection();
     setPlaybackRevision((v) => v + 1);
-    setCurrentCycle((prev) => {
-      const next = Math.max(0, prev - 1);
-      if (next === 0) {
-        setIsStandby(true);
-      }
-      timelineSync.setProgress(next, next === 0 ? 0 : 1);
-      return next;
-    });
+    setIsStandby(next === 0);
+    setCurrentCycle(next);
+    timelineSync.snapProgress(next, next === 0 ? 0 : 1);
   };
 
   const handleStepForward = () => {
     if (isPlaying && playMode === "singleCycle") return;
+    const sync = timelineSync.getProgress();
+    const isMidCycle = isMidCycleProgress(currentCycle, sync.cycle, sync.progress);
     setFinishedSingleFrame(null);
     playbackClock.current = null;
     setPlayMode("continuous");
@@ -454,12 +486,14 @@ export function useSimulationPlayback({
     onClearSelection();
     setPlaybackRevision((v) => v + 1);
     setIsStandby(false);
-    const maxLimit = totalCycles;
-    setCurrentCycle((prev) => {
-      const next = Math.min(maxLimit, prev + 1);
-      timelineSync.setProgress(next, next === 0 ? 0 : 1);
-      return next;
-    });
+    if (isMidCycle) {
+      // (~] 구간 진행 중 오른쪽 버튼 클릭 시 현재 사이클의 ] 위치로 이동해 정지
+      timelineSync.snapProgress(currentCycle, 1);
+      return;
+    }
+    const next = Math.min(totalCycles, currentCycle + 1);
+    setCurrentCycle(next);
+    timelineSync.snapProgress(next, next === 0 ? 0 : 1);
   };
 
   // 1회 재생 버튼 핸들러: 무조건 ( 로 이동하여 ] 까지 1회 재생 후 ] 에서 PAUSE
@@ -488,7 +522,7 @@ export function useSimulationPlayback({
       remaining: playSpeed,
       started: null,
     };
-    timelineSync.setProgress(targetCycle, 0);
+    timelineSync.snapProgress(targetCycle, 0);
 
     setIsPlaying(true);
     setPlaybackRevision((v) => v + 1);
@@ -552,7 +586,7 @@ export function useSimulationPlayback({
       playbackClock.current.remaining = playSpeed;
       playbackClock.current.started = null;
     }
-    timelineSync.setProgress(0, 0);
+    timelineSync.snapProgress(0, 0);
     setPlaybackRevision((v) => v + 1);
     triggerPlaybackFeedback("reset");
   };
@@ -593,7 +627,7 @@ export function useSimulationPlayback({
       setIsStandby(false);
     }
     setCurrentCycle(val);
-    timelineSync.setProgress(val, val === 0 ? 0 : 1);
+    timelineSync.snapProgress(val, val === 0 ? 0 : 1);
   };
 
   return {
@@ -621,6 +655,7 @@ export function useSimulationPlayback({
     effectiveSelectedLine,
     playMode,
     isCyclePlaying: isPlaying && playMode === "singleCycle",
+    isAtTimelineEnd: timelineAtEnd,
     handlePlayCurrentCycle,
     handleSimulationComplete,
     handleStepBack,

@@ -2,46 +2,30 @@ import React, { useState, useEffect } from 'react';
 import type { CycleHistoryItem, SimulationResult } from '@/type/simulation';
 import SingleCycleDatapath from './SingleCycleDatapath';
 import type { InstructionLessonContext } from './InstructionLesson';
-import { timelineSync } from '../utils/timelineSync';
+import { timelineSync, TIMELINE_END_THRESHOLD } from '../utils/timelineSync';
 import { numericPc } from '../utils/instructionFlow';
 import {
   computePipelineWireState,
   isBranch,
   isLoad,
   isStore,
-  isITypeAlu,
-  isRType,
-  isLui,
-  isAuipc,
-  isBubbleOrNop,
   usesImm,
   writesReg,
 } from '../utils/pipelineWireState';
+import {
+  parseSvgPathPoints,
+  getPathTotalLength,
+  interpolatePathPoints,
+  getSynchronizedSubstepProgress,
+  parseInstructionDetails,
+  resolveRegKey,
+  formatRegVal,
+  getAluOpSymbol,
+  computeAluDisplayVal,
+  getIdControlSignals,
+} from '../utils/datapathAnimation';
+import { FloatingChip } from './FloatingChip';
 import './PipelineVisualizer.css';
-
-// SVG 경로(M, L, H, V)를 안전하게 파싱하여 진행률(0~1)에 따른 좌표를 산출하는 보간 헬퍼
-function parseSvgPathPoints(pathStr: string): { x: number; y: number }[] {
-  const points: { x: number; y: number }[] = [];
-  const regex = /([MLHV])\s*([^MLHV]+)/gi;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(pathStr)) !== null) {
-    const cmd = match[1].toUpperCase();
-    const nums = match[2].trim().split(/[\s,]+/).map(Number);
-    const prev = points[points.length - 1] || { x: 0, y: 0 };
-    if (cmd === "M" || cmd === "L") {
-      for (let i = 0; i < nums.length; i += 2) {
-        if (!isNaN(nums[i]) && !isNaN(nums[i + 1])) {
-          points.push({ x: nums[i], y: nums[i + 1] });
-        }
-      }
-    } else if (cmd === "H") {
-      nums.forEach((x) => { if (!isNaN(x)) points.push({ x, y: prev.y }); });
-    } else if (cmd === "V") {
-      nums.forEach((y) => { if (!isNaN(y)) points.push({ x: prev.x, y }); });
-    }
-  }
-  return points;
-}
 
 // IF 주요 선분 경로 사전 파싱 (불필요한 useMemo 제거 및 모듈 레벨 정적 캐싱)
 const PC_TO_IMEM_PTS = parseSvgPathPoints("M 380,136 L 380,174");
@@ -53,55 +37,44 @@ const MUX_TO_PC_PTS = parseSvgPathPoints("M 380,52 L 380,78");
 
 // ID 단계 경로
 const ID_IFID_TO_REGS_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 295,336 L 295,366");
-const ID_IFID_TO_IMM_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 578,336 L 578,366");
+const ID_IFID_TO_IMM_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 627,336 L 627,366");
 const ID_IFID_TO_CU_PTS = parseSvgPathPoints("M 380,311 L 380,336 L 801,336 L 801,366");
 const ID_RD1_TO_IDEX_PTS = parseSvgPathPoints("M 225,480 L 225,538");
 const ID_RD2_TO_IDEX_PTS = parseSvgPathPoints("M 365,480 L 365,538");
-const ID_IMM_TO_IDEX_PTS = parseSvgPathPoints("M 578,482 L 578,538");
+const ID_IMM_TO_IDEX_PTS = parseSvgPathPoints("M 627,482 L 627,538");
 const ID_PC_TO_IDEX_PTS = parseSvgPathPoints("M 701,311 L 701,538");
 
 // EX 단계 경로
 const EX_RD1_TO_ALU_PTS = parseSvgPathPoints("M 225,566 L 225,739");
 const EX_RD2_TO_MUX_PTS = parseSvgPathPoints("M 365,566 L 365,663");
 const EX_RD2_TO_EXMEM_PTS = parseSvgPathPoints("M 365,566 L 365,595 L 480,595 L 480,908");
-const EX_IMM_TO_MUX_PTS = parseSvgPathPoints("M 578,566 L 578,630 L 425,630 L 425,663");
+const EX_IMM_TO_MUX_PTS = parseSvgPathPoints("M 627,566 L 627,630 L 425,630 L 425,663");
 const EX_MUX_TO_ALU_PTS = parseSvgPathPoints("M 395,703 L 395,739");
 const EX_ALU_TO_EXMEM_PTS = parseSvgPathPoints("M 310,869 L 310,908");
-const EX_IMM_TO_BRANCH_PTS = parseSvgPathPoints("M 578,566 L 578,743");
-const EX_PC_TO_BRANCH_PTS = parseSvgPathPoints("M 701,566 L 701,720 L 652,720 L 652,743");
-const EX_BRANCH_LOOPBACK_PTS = parseSvgPathPoints("M 615,808 L 615,845 L 905,845 L 905,-50 L 350,-50 L 350,12");
+const EX_IMM_TO_BRANCH_PTS = parseSvgPathPoints("M 627,566 L 627,743");
+const EX_PC_TO_BRANCH_PTS = parseSvgPathPoints("M 701,566 L 701,743");
+const EX_BRANCH_LOOPBACK_PTS = parseSvgPathPoints("M 664,808 L 664,845 L 905,845 L 905,-50 L 350,-50 L 350,12");
 
 // MEM 단계 경로
 const MEM_BYPASS_PTS = parseSvgPathPoints("M 310,936 L 310,965 L 225,965 L 225,1154");
 const MEM_ADDR_TO_DMEM_PTS = parseSvgPathPoints("M 310,936 L 310,994");
 const MEM_DATA_TO_DMEM_PTS = parseSvgPathPoints("M 480,936 L 480,994");
-const MEM_DMEM_TO_MEMWB_PTS = parseSvgPathPoints("M 470,1106 L 470,1154");
+const MEM_DMEM_TO_MEMWB_PTS = parseSvgPathPoints("M 480,1106 L 480,1154");
 
 // WB 단계 경로
-const WB_ALU_TO_MUX_PTS = parseSvgPathPoints("M 225,1182 L 225,1218 L 410,1218 L 410,1256");
-const WB_DMEM_TO_MUX_PTS = parseSvgPathPoints("M 470,1182 L 470,1256");
-const WB_FEEDBACK_PTS = parseSvgPathPoints("M 440,1296 L 440,1315 L 85,1315 L 85,424 L 180,424");
+const WB_ALU_TO_MUX_PTS = parseSvgPathPoints("M 225,1182 L 225,1218 L 420,1218 L 420,1256");
+const WB_DMEM_TO_MUX_PTS = parseSvgPathPoints("M 480,1182 L 480,1256");
+const WB_FEEDBACK_PTS = parseSvgPathPoints("M 450,1296 L 450,1315 L 85,1315 L 85,424 L 180,424");
 
 // 제어 신호(Control Signal) 경로
 const ID_CU_TO_IDEX_PTS = parseSvgPathPoints("M 801,482 L 801,538");
+const ID_CU_TO_PC_MUX_PTS = parseSvgPathPoints("M 845,424 L 940,424 L 940,33 L 430,33");
 const EX_CTRL_TO_MUX_PTS = parseSvgPathPoints("M 755,566 L 755,684 L 445,684");
 const EX_M_TO_EXMEM_PTS = parseSvgPathPoints("M 801,566 L 801,908");
 const EX_WB_TO_EXMEM_PTS = parseSvgPathPoints("M 847,566 L 847,908");
-const MEM_CTRL_TO_DMEM_PTS = parseSvgPathPoints("M 801,936 L 801,1051 L 550,1051");
+const MEM_CTRL_TO_DMEM_PTS = parseSvgPathPoints("M 801,936 L 801,1051 L 520,1051");
 const MEM_WB_TO_MEMWB_PTS = parseSvgPathPoints("M 847,936 L 847,1154");
 const WB_CTRL_TO_MUX_PTS = parseSvgPathPoints("M 847,1182 L 847,1277 L 490,1277");
-
-// SVG 경로 물리적 픽셀 총 길이 계산 헬퍼
-function getPathTotalLength(points: { x: number; y: number }[]): number {
-  if (!points || points.length < 2) return 0;
-  let total = 0;
-  for (let i = 0; i < points.length - 1; i++) {
-    const dx = points[i + 1].x - points[i].x;
-    const dy = points[i + 1].y - points[i].y;
-    total += Math.sqrt(dx * dx + dy * dy);
-  }
-  return total;
-}
 
 // IF 경로 길이
 const PC_TO_IMEM_LEN = getPathTotalLength(PC_TO_IMEM_PTS); // 38px
@@ -148,389 +121,6 @@ const WB_DMEM_TO_MUX_LEN = getPathTotalLength(WB_DMEM_TO_MUX_PTS); // 74px
 const WB_FEEDBACK_LEN = getPathTotalLength(WB_FEEDBACK_PTS); // 1345px
 const WB_CTRL_TO_MUX_LEN = getPathTotalLength(WB_CTRL_TO_MUX_PTS); // 452px
 
-// 명령어 피연산자 및 레지스터 값 추출 헬퍼
-interface ParsedInstruction {
-  op: string;
-  rd: string | null;
-  rs1: string | null;
-  rs2: string | null;
-  imm: string | null;
-}
-
-function parseInstructionDetails(assembly: string | null | undefined): ParsedInstruction {
-  if (!assembly || isBubbleOrNop(assembly)) return { op: '', rd: null, rs1: null, rs2: null, imm: null };
-  const trimmed = assembly.trim();
-  const spaceIdx = trimmed.search(/\s/);
-  if (spaceIdx === -1) {
-    return { op: trimmed.toLowerCase(), rd: null, rs1: null, rs2: null, imm: null };
-  }
-  const op = trimmed.slice(0, spaceIdx).toLowerCase();
-  const args = trimmed.slice(spaceIdx).split(',').map(s => s.trim()).filter(Boolean);
-
-  const parseOffsetBase = (str: string) => {
-    const match = str.match(/^([+-]?\w+)?\s*\(\s*(\w+)\s*\)$/);
-    if (match) {
-      return { offset: match[1] || '0', base: match[2] };
-    }
-    return { offset: null, base: str };
-  };
-
-  // 1) Stores: sw rs2, offset(rs1)
-  if (isStore(op)) {
-    const rs2 = args[0] || null;
-    const { offset, base } = args[1] ? parseOffsetBase(args[1]) : { offset: null, base: null };
-    return { op, rd: null, rs1: base, rs2, imm: offset };
-  }
-
-  // 2) Loads: lw rd, offset(rs1)
-  if (isLoad(op)) {
-    const rd = args[0] || null;
-    const { offset, base } = args[1] ? parseOffsetBase(args[1]) : { offset: null, base: null };
-    return { op, rd, rs1: base, rs2: null, imm: offset };
-  }
-
-  // 3) Branches: beq rs1, rs2, offset
-  if (isBranch(op)) {
-    return { op, rd: null, rs1: args[0] || null, rs2: args[1] || null, imm: args[2] || null };
-  }
-
-  // 4) Upper Immediates: lui rd, imm / auipc rd, imm
-  if (isLui(op) || isAuipc(op)) {
-    return { op, rd: args[0] || null, rs1: null, rs2: null, imm: args[1] || null };
-  }
-
-  // 5) Jump: jal rd, offset OR jal offset
-  if (op === 'jal') {
-    if (args.length === 1) {
-      return { op, rd: 'ra', rs1: null, rs2: null, imm: args[0] };
-    }
-    return { op, rd: args[0] || 'ra', rs1: null, rs2: null, imm: args[1] || null };
-  }
-
-  // 6) Jump: jalr rd, offset(rs1) OR jalr rs1
-  if (op === 'jalr') {
-    if (args.length === 1) {
-      const { base } = parseOffsetBase(args[0]);
-      return { op, rd: 'ra', rs1: base, rs2: null, imm: '0' };
-    }
-    const rd = args[0] || 'ra';
-    const { offset, base } = parseOffsetBase(args[1] || '');
-    return { op, rd, rs1: base, rs2: null, imm: offset || '0' };
-  }
-
-  // 7) I-type ALU: addi rd, rs1, imm
-  if (isITypeAlu(op)) {
-    return { op, rd: args[0] || null, rs1: args[1] || null, rs2: null, imm: args[2] || null };
-  }
-
-  // 8) R-type & default: add rd, rs1, rs2
-  return {
-    op,
-    rd: args[0] || null,
-    rs1: args[1] || null,
-    rs2: args[2] || null,
-    imm: null
-  };
-}
-
-function resolveRegKey(name: string | null | undefined): string | null {
-  if (!name) return null;
-  const clean = name.replace(/[^\w]/g, '').toLowerCase();
-  if (/^x\d+$/.test(clean)) return clean;
-  const ABI_MAP: Record<string, string> = {
-    zero: 'x0', ra: 'x1', sp: 'x2', gp: 'x3', tp: 'x4',
-    t0: 'x5', t1: 'x6', t2: 'x7', s0: 'x8', fp: 'x8', s1: 'x9',
-    a0: 'x10', a1: 'x11', a2: 'x12', a3: 'x13', a4: 'x14', a5: 'x15', a6: 'x16', a7: 'x17',
-    s2: 'x18', s3: 'x19', s4: 'x20', s5: 'x21', s6: 'x22', s7: 'x23', s8: 'x24', s9: 'x25',
-    s10: 'x26', s11: 'x27', t3: 'x28', t4: 'x29', t5: 'x30', t6: 'x31'
-  };
-  return ABI_MAP[clean] || null;
-}
-
-function formatRegVal(valHex: string | undefined): string {
-  if (!valHex) return '0';
-  const num = Number.parseInt(valHex, 16);
-  if (Number.isFinite(num)) {
-    return String(num << 0);
-  }
-  return valHex;
-}
-
-function getAluOpSymbol(op: string): string {
-  if (op === 'add' || op === 'addi') return '+';
-  if (op === 'sub') return '−';
-  if (op === 'and' || op === 'andi') return '&';
-  if (op === 'or' || op === 'ori') return '|';
-  if (op === 'xor' || op === 'xori') return '^';
-  if (op === 'sll' || op === 'slli') return '<<';
-  if (op === 'srl' || op === 'srli') return '>>>';
-  if (op === 'sra' || op === 'srai') return '>>';
-  if (op === 'slt' || op === 'slti' || op === 'sltu' || op === 'sltiu') return '<';
-  if (isLoad(op) || isStore(op)) return '+ (Addr)';
-  if (isBranch(op)) return '== (Cmp)';
-  if (op === 'lui' || op === 'auipc') return 'imm';
-  return '';
-}
-
-function computeAluDisplayVal(
-  parsed: ParsedInstruction,
-  regMap: Record<string, string>,
-  pc: number = 0
-): string {
-  const { op, rd, rs1, rs2, imm } = parsed;
-  const rs1Key = rs1 ? resolveRegKey(rs1) : null;
-  const rs2Key = rs2 ? resolveRegKey(rs2) : null;
-
-  const v1 = rs1Key && regMap[rs1Key] ? Number.parseInt(regMap[rs1Key], 16) || 0 : 0;
-  const v2 = rs2Key && regMap[rs2Key] ? Number.parseInt(regMap[rs2Key], 16) || 0 : 0;
-
-  let immNum = 0;
-  if (imm) {
-    immNum = imm.startsWith('0x') || imm.startsWith('0X')
-      ? Number.parseInt(imm, 16) || 0
-      : Number.parseInt(imm, 10) || 0;
-  }
-
-  // 1) Memory Load / Store: Effective address computation = Base (rs1) + Offset (imm)
-  if (isLoad(op) || isStore(op)) {
-    const addr = (v1 + immNum) | 0;
-    return `0x${(addr >>> 0).toString(16)}`;
-  }
-
-  // 2) Branch condition evaluation: 깔끔하고 직관적인 Zero 플래그 표현
-  if (isBranch(op)) {
-    let conditionMet = false;
-    if (op === 'beq') conditionMet = (v1 === v2);
-    else if (op === 'bne') conditionMet = (v1 !== v2);
-    else if (op === 'blt') conditionMet = (v1 < v2);
-    else if (op === 'bge') conditionMet = (v1 >= v2);
-    else if (op === 'bltu') conditionMet = ((v1 >>> 0) < (v2 >>> 0));
-    else if (op === 'bgeu') conditionMet = ((v1 >>> 0) >= (v2 >>> 0));
-    return conditionMet ? 'Zero: 1 (T)' : 'Zero: 0 (NT)';
-  }
-
-  // 3) Arithmetic & Logic
-  const b = usesImm(op) ? immNum : v2;
-  if (op === 'add' || op === 'addi') return String((v1 + b) | 0);
-  if (op === 'sub') return String((v1 - b) | 0);
-  if (op === 'and' || op === 'andi') return String(v1 & b);
-  if (op === 'or' || op === 'ori') return String(v1 | b);
-  if (op === 'xor' || op === 'xori') return String(v1 ^ b);
-  if (op === 'sll' || op === 'slli') return String((v1 << (b & 0x1f)) | 0);
-  if (op === 'srl' || op === 'srli') return String(v1 >>> (b & 0x1f));
-  if (op === 'sra' || op === 'srai') return String(v1 >> (b & 0x1f));
-  if (op === 'slt' || op === 'slti') return String(v1 < b ? 1 : 0);
-  if (op === 'sltu' || op === 'sltiu') return String((v1 >>> 0) < (b >>> 0) ? 1 : 0);
-  if (op === 'lui') return `0x${((immNum << 12) >>> 0).toString(16)}`;
-  if (op === 'auipc') return `0x${((pc + (immNum << 12)) >>> 0).toString(16)}`;
-  if (op === 'jal' || op === 'jalr') return String((pc + 4) | 0);
-
-  if (rd) return `${rd}`;
-  return 'res';
-}
-
-function getIdControlSignals(op: string): string[] {
-  if (!op || isBubbleOrNop(op)) return [];
-
-  // 1) Load: lw, lh, lb, lhu, lbu
-  if (isLoad(op)) {
-    return [
-      "ALUSrc: 1",
-      "MemRead: 1",
-      "RegWrite: 1"
-    ];
-  }
-
-  // 2) Store: sw, sh, sb
-  if (isStore(op)) {
-    return [
-      "ALUSrc: 1",
-      "MemWrite: 1"
-    ];
-  }
-
-  // 3) Branch: beq, bne, blt, bge, etc.
-  if (isBranch(op)) {
-    return [
-      "ALUSrc: 0",
-      "Branch: 1"
-    ];
-  }
-
-  // 4) I-type ALU: addi, andi, ori, xori, slti, slli, srli, srai
-  if (isITypeAlu(op)) {
-    return [
-      "ALUSrc: 1",
-      "RegWrite: 1"
-    ];
-  }
-
-  // 5) R-type: add, sub, and, or, xor, sll, srl, sra, slt, etc.
-  if (isRType(op)) {
-    return [
-      "ALUSrc: 0",
-      "RegWrite: 1"
-    ];
-  }
-
-  // 6) lui / auipc
-  if (isLui(op) || isAuipc(op)) {
-    return [
-      "ALUSrc: 1",
-      "RegWrite: 1"
-    ];
-  }
-
-  // 7) Jumps: jal, jalr
-  if (op === "jal" || op === "jalr") {
-    return [
-      "Branch: 1",
-      "RegWrite: 1"
-    ];
-  }
-
-  // Default fallback if writes register
-  if (writesReg(op)) {
-    return [
-      usesImm(op) ? "ALUSrc: 1" : "ALUSrc: 0",
-      "RegWrite: 1"
-    ];
-  }
-
-  return ["Ctrl: Active"];
-}
-
-const FloatingChip: React.FC<{
-  x: number;
-  y: number;
-  text?: string;
-  lines?: string[];
-  stroke: string;
-  title: string;
-  opacity?: number;
-  fontSize?: number;
-}> = ({ x, y, text, lines, stroke, title, opacity = 1.0, fontSize }) => {
-  const displayLines = lines && lines.length > 0 ? lines : [text || ''];
-  const maxLineLen = Math.max(...displayLines.map(l => l.length));
-  const isMulti = displayLines.length > 1;
-  const effectiveFontSize = fontSize ?? (isMulti ? 14 : 16);
-  const chipWidth = Math.max(isMulti ? 88 : 68, maxLineLen * (isMulti ? 9.0 : 9.8) + (isMulti ? 28 : 32));
-  const chipHeight = isMulti ? displayLines.length * 19 + 14 : 30;
-  const rx = isMulti ? 10 : 15;
-
-  return (
-    <g
-      className="cursor-pointer pointer-events-auto"
-      style={{ opacity, transition: "opacity 0.08s ease-out" }}
-    >
-      <rect
-        x={x - chipWidth / 2}
-        y={y - chipHeight / 2}
-        width={chipWidth}
-        height={chipHeight}
-        rx={rx}
-        fill="#1E293B"
-        stroke={stroke}
-        strokeWidth="2.2"
-        filter="url(#token-glow)"
-      />
-      {displayLines.map((line, idx) => {
-        const lineOffset = isMulti ? (idx - (displayLines.length - 1) / 2) * 18 : 0;
-        return (
-          <text
-            key={idx}
-            x={x}
-            y={y + lineOffset}
-            dominantBaseline="central"
-            textAnchor="middle"
-            fill="#FFFFFF"
-            fontSize={effectiveFontSize}
-            fontWeight="bold"
-            fontFamily="D2Coding, monospace"
-          >
-            {line}
-          </text>
-        );
-      })}
-      <title>{title}</title>
-    </g>
-  );
-};
-
-
-function interpolatePathPoints(points: { x: number; y: number }[], progress: number): { x: number; y: number } | null {
-  if (!points || points.length === 0) return null;
-  if (points.length === 1) return points[0];
-  const lengths: number[] = [];
-  let total = 0;
-  for (let i = 0; i < points.length - 1; i++) {
-    const dx = points[i + 1].x - points[i].x;
-    const dy = points[i + 1].y - points[i].y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    lengths.push(dist);
-    total += dist;
-  }
-  if (total === 0) return points[0];
-  const target = Math.max(0, Math.min(1, progress)) * total;
-  let acc = 0;
-  for (let i = 0; i < lengths.length; i++) {
-    if (target <= acc + lengths[i] || i === lengths.length - 1) {
-      const segLen = lengths[i];
-      const ratio = segLen > 0 ? (target - acc) / segLen : 0;
-      return {
-        x: points[i].x + (points[i + 1].x - points[i].x) * ratio,
-        y: points[i].y + (points[i + 1].y - points[i].y) * ratio,
-      };
-    }
-    acc += lengths[i];
-  }
-  return points[points.length - 1];
-}
-
-// 1사이클 진행률(0~1) 내에서 스텝 하위 시간 구간([start, end]) 동안 주행하고,
-// 도착 후 소자 처리 및 안착 여유 시간(holdDuration) 동안 머무른 뒤 부드럽게 다음 스텝으로 전달하는 헬퍼
-function getSynchronizedSubstepProgress(
-  globalProgress: number,
-  start: number,
-  end: number,
-  persistAfterArrival: boolean = false,
-  holdDuration: number = 0
-): { progress: number; opacity: number } | null {
-  if (globalProgress < start) {
-    return null; // 아직 시작 전: 미표시
-  }
-
-  const stepDuration = end - start;
-  if (stepDuration <= 0) return null;
-
-  // 1) 아직 스텝 종료 전 (이동 중: 선 길이에 비례한 속도로 주행하여 정확히 end 시점에 동시 도착)
-  if (globalProgress <= end) {
-    const ratio = Math.max(0, Math.min(1, (globalProgress - start) / stepDuration));
-    const fadeInWindow = 0.05;
-    const opacity = ratio < fadeInWindow ? ratio / fadeInWindow : 1.0;
-    return { progress: ratio, opacity };
-  }
-
-  // 2) 스텝 종료 이후 - 영구 유지(persist)인 경우 클록 종료(1.0)까지 유지
-  if (persistAfterArrival) {
-    return { progress: 1.0, opacity: 1.0 };
-  }
-
-  // 3) 도착 후 소자 안착 및 처리 지연 여유 시간 (holdDuration 동안 위치 1.0 및 투명도 1.0 고정)
-  if (globalProgress <= end + holdDuration) {
-    return { progress: 1.0, opacity: 1.0 };
-  }
-
-  // 4) 여유 시간 종료 직후 0.03 구간 동안 빠르게 페이드아웃 후 다음 단계로 매끄럽게 전달
-  const fadeDuration = 0.03;
-  const fadeEnd = end + holdDuration + fadeDuration;
-  if (globalProgress <= fadeEnd) {
-    const fadeRatio = (globalProgress - (end + holdDuration)) / fadeDuration;
-    return { progress: 1.0, opacity: Math.max(0, 1 - fadeRatio) };
-  }
-  return null; // 완전 소멸
-}
-
 interface PipelineVisualizerProps {
   lessonContext?: InstructionLessonContext;
   currentData: CycleHistoryItem | null;
@@ -564,16 +154,20 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   onPausePlayback: _onPausePlayback,
 }) => {
   // [모든 훅은 React Rules of Hooks에 따라 조건문이나 조기 반환보다 먼저 최상단에서 무조건 실행]
-  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [zoomLevel] = useState<number>(1.0);
   const [animProgress, setAnimProgress] = useState<number>(0);
   const [isSubstepPlaying, setIsSubstepPlaying] = useState<boolean>(true);
-  const flowDuration = lessonContext?.flowDurationMs ?? playSpeed ?? 3000;
+  const flowDuration = lessonContext?.flowDurationMs ?? playSpeed ?? 5000;
   const progressRef = React.useRef<number>(0);
   const startTimeRef = React.useRef<number>(performance.now());
   const pausedProgressRef = React.useRef<number>(0);
   const prevDataRef = React.useRef(currentData);
   const prevCycleRef = React.useRef(currentCycle);
   const prevFlowDurationRef = React.useRef(flowDuration);
+  const prevPlayStateRef = React.useRef({
+    isPlaying: Boolean(isPlaying),
+    playbackRevision,
+  });
 
   // 뷰포트 컨테이너 ref
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -605,46 +199,67 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   // 제자리 일시정지 및 제자리 재개 동작 수행
   // 단, playMode가 singleCycle(1회 재생)인 경우 무조건 ( 에서 시작하여 ] 에서 정지
   useEffect(() => {
+    const prevPlay = prevPlayStateRef.current;
+    prevPlayStateRef.current = { isPlaying: Boolean(isPlaying), playbackRevision };
+
     if (isPlaying) {
-      if (playMode === "singleCycle") {
-        // 1회 재생은 무조건 ( 부터 시작하여 ] 까지 주행
-        startTimeRef.current = performance.now();
-        progressRef.current = 0;
-        pausedProgressRef.current = 0;
-        setAnimProgress(0);
-        timelineSync.setProgress(currentCycle ?? 0, 0);
-      } else if (pausedProgressRef.current > 0 && pausedProgressRef.current < 0.98) {
-        // 연속 재생: 중간에 PAUSE로 정지했던 위치가 있으면 제자리에서 재개
-        startTimeRef.current = performance.now() - pausedProgressRef.current * flowDuration;
-        progressRef.current = pausedProgressRef.current;
-        setAnimProgress(pausedProgressRef.current);
-      } else {
-        // 사이클 처음부터 재생 (이미 완료되었거나 0인 경우)
-        startTimeRef.current = performance.now();
-        progressRef.current = 0;
-        pausedProgressRef.current = 0;
-        setAnimProgress(0);
-        timelineSync.setProgress(currentCycle ?? 0, 0);
+      const triggerChanged =
+        !prevPlay.isPlaying || prevPlay.playbackRevision !== playbackRevision;
+      if (triggerChanged) {
+        if (playMode === "singleCycle") {
+          // 1회 재생은 무조건 ( 부터 시작하여 ] 까지 주행
+          startTimeRef.current = performance.now();
+          progressRef.current = 0;
+          pausedProgressRef.current = 0;
+          setAnimProgress(0);
+          timelineSync.setProgress(currentCycle ?? 0, 0);
+        } else if (pausedProgressRef.current > 0 && pausedProgressRef.current < TIMELINE_END_THRESHOLD) {
+          // 연속 재생: 중간에 PAUSE로 정지했던 위치가 있으면 제자리에서 재개
+          startTimeRef.current = performance.now() - pausedProgressRef.current * flowDuration;
+          progressRef.current = pausedProgressRef.current;
+          setAnimProgress(pausedProgressRef.current);
+        } else {
+          // 사이클 처음부터 재생 (이미 완료되었거나 0인 경우)
+          startTimeRef.current = performance.now();
+          progressRef.current = 0;
+          pausedProgressRef.current = 0;
+          setAnimProgress(0);
+          timelineSync.setProgress(currentCycle ?? 0, 0);
+        }
       }
       setIsSubstepPlaying(true);
     } else {
-      // 일시정지: 0.98 이상이면 1.0(완료)으로 정규화하여 0.998 미세 프리즈 방지
-      const cur = progressRef.current;
-      pausedProgressRef.current = cur >= 0.98 ? 1.0 : cur;
+      // 일시정지: StepForward로 ] 위치에 스냅된 경우 화면도 1.0으로 즉시 동기화
+      const sync = timelineSync.getProgress();
+      const snappedToEnd =
+        sync.cycle === (currentCycle ?? 0) && sync.progress >= TIMELINE_END_THRESHOLD;
+      if (snappedToEnd) {
+        progressRef.current = 1;
+        pausedProgressRef.current = 1;
+        setAnimProgress(1);
+      } else {
+        const cur = progressRef.current;
+        pausedProgressRef.current = cur >= TIMELINE_END_THRESHOLD ? 1.0 : cur;
+      }
       setIsSubstepPlaying(false);
     }
   }, [isPlaying, playbackRevision, playMode, flowDuration, currentCycle]);
 
   useEffect(() => {
-    if (!isSubstepPlaying) {
+    if (!isPlaying || !isSubstepPlaying) {
       return;
     }
 
+    const startEpoch = timelineSync.getEpoch();
     let frameId: number;
     let lastTick = 0;
     const minFrameInterval = 16; // 60 FPS 상한 제한
 
     const loop = (now: number) => {
+      // 스텝 이동/점프 등 수동 스냅 이후 cleanup 전 잔여 프레임이 덮어쓰지 않도록 즉시 중단
+      if (timelineSync.getEpoch() !== startEpoch) {
+        return;
+      }
       frameId = requestAnimationFrame(loop);
       if (document.hidden) return;
       if (now - lastTick < minFrameInterval) return;
@@ -665,7 +280,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isSubstepPlaying, flowDuration, currentCycle]);
+  }, [isPlaying, isSubstepPlaying, playbackRevision, flowDuration, currentCycle]);
 
   const isSingle = mode === "single";
 
@@ -856,6 +471,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const idRd2Point = idStep2State ? interpolatePathPoints(ID_RD2_TO_IDEX_PTS, idStep2State.progress) : null;
   const idImmPoint = idStep2State ? interpolatePathPoints(ID_IMM_TO_IDEX_PTS, idStep2State.progress) : null;
   const idCuToIdExPoint = idStep2State ? interpolatePathPoints(ID_CU_TO_IDEX_PTS, idStep2State.progress) : null;
+  const idCuToPcMuxPoint = idStep2State ? interpolatePathPoints(ID_CU_TO_PC_MUX_PTS, idStep2State.progress) : null;
   const idPcPoint = idStep2State ? interpolatePathPoints(ID_PC_TO_IDEX_PTS, idStep2State.progress) : null;
 
   // 3. EX STAGE (3 Steps: MUX/소자 진입 ➔ MUX 선택 및 ALU 연산 ➔ EX/MEM 전달)
@@ -1115,9 +731,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
   const cycleEvents = currentData?.cycle_events;
 
   // 줌 조절
-  const handleZoomIn = () => setZoomLevel((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)));
-  const handleZoomOut = () => setZoomLevel((prev) => Math.max(0.5, +(prev - 0.15).toFixed(2)));
-  const handleZoomReset = () => setZoomLevel(1.0);
+
 
   // 5개 스테이지 카드 렌더링 헬퍼 (스타일 B: 2열 우측 테두리에 플로팅 태그 오버레이)
   const renderStageCard = (
@@ -1288,36 +902,6 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             {isSingle ? "SINGLE-CYCLE DATAPATH" : "PIPELINE DATAPATH"}
           </h3>
-          <span className="text-[10px] text-[var(--ar-text-muted)] font-mono shrink-0 tabular-nums">
-            ({isSingle ? `STEP:${clock ?? "—"}` : `CYCLE:${clock ?? "—"}`})
-          </span>
-        </div>
-
-        {/* 줌 컨트롤 */}
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center bg-[#F6F8FA] dark:bg-[#252526] border border-[#D0D7DE] dark:border-[#3E3E42] rounded px-1 py-0.5 text-[#57606A] dark:text-[#CCCCCC] text-[10px]">
-            <button
-              onClick={handleZoomOut}
-              className="px-1 hover:text-[#005FB8] dark:hover:text-[#007ACC] font-bold cursor-pointer"
-              title="축소"
-            >
-              −
-            </button>
-            <button
-              onClick={handleZoomReset}
-              className="px-1 font-mono font-semibold hover:text-[#005FB8] dark:hover:text-[#007ACC] cursor-pointer"
-              title="100% (세로 맞춤)"
-            >
-              {Math.round(zoomLevel * 100)}%
-            </button>
-            <button
-              onClick={handleZoomIn}
-              className="px-1 hover:text-[#005FB8] dark:hover:text-[#007ACC] font-bold cursor-pointer"
-              title="확대"
-            >
-              +
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1542,7 +1126,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
               {/* Branch Target Address ➔ PC MUX 입력 1 (포트 1: EX Branch Add ➔ 우측 외곽 회랑 x=905 ➔ 상단 x=350 직하강) */}
               <path
-                d="M 615,808 L 615,845 L 905,845 L 905,-50 L 350,-50 L 350,12"
+                d="M 664,808 L 664,845 L 905,845 L 905,-50 L 350,-50 L 350,12"
                 fill="none"
                 stroke={exBranchAddActive ? "#16A34A" : inactiveStroke}
                 strokeDasharray={branchLoopbackActive ? undefined : "6 3"}
@@ -1664,7 +1248,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               />
               {/* IF/ID BUFFER ➔ Imm Gen 분기 버스 */}
               <path
-                d="M 380,336 L 578,336 L 578,366"
+                d="M 380,336 L 627,336 L 627,366"
                 fill="none"
                 stroke={idToImmGenActive ? "#EA580C" : inactiveStroke}
                 {...syncWireProps(idToImmGenActive, idStep1State)}
@@ -1753,9 +1337,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 </text>
               )}
 
-              {/* 부품 4: Imm Gen (세로형 타원 rx=44, ry=58, cx=578, cy=424) */}
+              {/* 부품 4: Imm Gen (세로형 타원 rx=44, ry=58, cx=627, cy=424) */}
               <ellipse
-                cx="578"
+                cx="627"
                 cy="424"
                 rx="44"
                 ry="58"
@@ -1765,7 +1349,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.8"
               />
               <text
-                x="578"
+                x="627"
                 y="412"
                 dominantBaseline="central"
                 fill={idToImmGenActive ? "#C2410C" : "#94A3B8"}
@@ -1777,7 +1361,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 Imm
               </text>
               <text
-                x="578"
+                x="627"
                 y="436"
                 dominantBaseline="central"
                 fill={idToImmGenActive ? "#C2410C" : "#94A3B8"}
@@ -1848,9 +1432,9 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               />
               {/* 3) Imm */}
               <line
-                x1="578"
+                x1="627"
                 y1="482"
-                x2="578"
+                x2="627"
                 y2="538"
                 stroke={idImmToIdExActive ? "#EA580C" : inactiveStroke}
                 {...syncWireProps(idImmToIdExActive, idStep2State)}
@@ -1912,6 +1496,16 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeDasharray="6 3"
                 className="wire-dashed-flowing"
                 {...staticWireProps(idControlUnitActive)}
+                markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
+              />
+              {/* 6) Control Unit 우측 ➔ IF PC MUX 우측면 중간(430, 33) 제어선 (PCSrc) */}
+              <path
+                d="M 845,424 L 940,424 L 940,33 L 430,33"
+                fill="none"
+                stroke={idControlUnitActive ? "#EA580C" : inactiveStroke}
+                strokeDasharray="6 3"
+                className="wire-dashed-flowing"
+                {...syncWireProps(idControlUnitActive, idStep2State, true)}
                 markerEnd={idControlUnitActive ? "url(#m-arr-orange)" : inactiveMarker}
               />
 
@@ -2146,25 +1740,25 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 }}
               />
 
-              {/* 3) Imm Trunk (X = 578, Y = 566 -> 630) */}
+              {/* 3) Imm Trunk (X = 627, Y = 566 -> 630) */}
               <line
-                x1="578"
+                x1="627"
                 y1="566"
-                x2="578"
+                x2="627"
                 y2="630"
                 stroke={exImmTrunkActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exImmTrunkActive, exStep1State)}
               />
               {/* Imm ➔ ALUSrc MUX 우측 입력(X = 425, Y = 663) 분기 */}
               <path
-                d="M 578,630 L 425,630 L 425,663"
+                d="M 627,630 L 425,630 L 425,663"
                 fill="none"
                 stroke={exImmToAluSrcActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exImmToAluSrcActive, exStep1State)}
                 markerEnd={exImmToAluSrcActive ? "url(#m-arr-green)" : inactiveMarker}
               />
               <circle
-                cx="578"
+                cx="627"
                 cy="630"
                 r={exImmToAluSrcActive && exStep1State && exStep1State.progress < 1.0 ? 5.5 : 3.5}
                 fill={exImmToAluSrcActive ? "#16A34A" : inactiveStroke}
@@ -2257,27 +1851,27 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 )}
               </g>
 
-              {/* 우측 Branch Adder (center 615: 좌측 포트 x=578, 우측 포트 x=652 수직 직하강) */}
-              {/* Branch Add 입력 1: Imm (좌측 포트 x=578, y=630 -> 743 수직 직하강) */}
+              {/* 우측 Branch Adder (center 664: 좌측 포트 x=627, 우측 포트 x=701 수직 직하강) */}
+              {/* Branch Add 입력 1: Imm (좌측 포트 x=627, y=630 -> 743 수직 직하강) */}
               <line
-                x1="578"
+                x1="627"
                 y1="630"
-                x2="578"
+                x2="627"
                 y2="743"
                 stroke={exImmToBranchAddActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exImmToBranchAddActive, exStep1State)}
                 markerEnd={exImmToBranchAddActive ? "url(#m-arr-green)" : inactiveMarker}
               />
-              {/* Branch Add 입력 2: PC (우측 포트 x=701 수직 직하강 ➔ x=652 포트 인입) */}
+              {/* Branch Add 입력 2: PC (우측 포트 x=701 수직 직하강) */}
               <path
-                d="M 701,566 L 701,720 L 652,720 L 652,743"
+                d="M 701,566 L 701,743"
                 fill="none"
                 stroke={exPcToBranchAddActive ? "#16A34A" : inactiveStroke}
                 {...syncWireProps(exPcToBranchAddActive, exStep1State)}
                 markerEnd={exPcToBranchAddActive ? "url(#m-arr-green)" : inactiveMarker}
               />
               <polygon
-                points="550,745 680,745 650,808 580,808"
+                points="599,745 729,745 699,808 629,808"
                 className={boxStepClass(exBranchAddActive, 2)}
                 fill={exBranchAddActive ? "#F0FDF4" : "#F8FAFC"}
                 stroke={exBranchAddActive ? "#16A34A" : "#94A3B8"}
@@ -2285,7 +1879,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeLinejoin="round"
               />
               <text
-                x="615"
+                x="664"
                 y="765"
                 dominantBaseline="central"
                 fill={exBranchAddActive ? "#15803D" : "#94A3B8"}
@@ -2297,7 +1891,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 Branch
               </text>
               <text
-                x="615"
+                x="664"
                 y="789"
                 dominantBaseline="central"
                 fill={exBranchAddActive ? "#15803D" : "#94A3B8"}
@@ -2415,7 +2009,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
               {/* MEM 제어선: EX/MEM M셀 ➔ Data Memory 우측면 중간 인입 */}
               <path
-                d="M 801,936 L 801,1051 L 550,1051"
+                d="M 801,936 L 801,1051 L 520,1051"
                 fill="none"
                 stroke={memAluToDmemAddrActive ? "#0284C7" : inactiveStroke}
                 strokeDasharray="6 3"
@@ -2492,11 +2086,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 markerEnd={memWriteDataActive ? "url(#m-arr-blue)" : inactiveMarker}
               />
 
-              {/* 부품 7: Data Memory (미니멀 라운드 박스, x=270, width=280, y=996..1106, center=410) */}
+              {/* 부품 7: Data Memory (미니멀 라운드 박스, x=270, width=250, y=996..1106, center=395) */}
               <rect
                 x="270"
                 y="996"
-                width="280"
+                width="250"
                 height="110"
                 rx="8"
                 className={boxStepClass(memAluToDmemAddrActive, 1)}
@@ -2505,7 +2099,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.8"
               />
               <text
-                x="410"
+                x="395"
                 y="1051"
                 dominantBaseline="central"
                 fill={memAluToDmemAddrActive ? "#0369A1" : "#94A3B8"}
@@ -2517,11 +2111,11 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 Data Memory
               </text>
 
-              {/* Data Memory 출력 ➔ MEM/WB BUFFER (X = 470) */}
+              {/* Data Memory 출력 ➔ MEM/WB BUFFER (X = 480) */}
               <line
-                x1="470"
+                x1="480"
                 y1="1106"
-                x2="470"
+                x2="480"
                 y2="1154"
                 stroke={memDmemReadDataActive ? "#0284C7" : inactiveStroke}
                 {...syncWireProps(memDmemReadDataActive, memStep2State)}
@@ -2587,7 +2181,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
               {/* WB 제어선: MEM/WB WB셀 ➔ WB MUX 우측면 인입 */}
               <path
-                d="M 847,1182 L 847,1277 L 490,1277"
+                d="M 847,1182 L 847,1277 L 500,1277"
                 fill="none"
                 stroke={wbAluBypassActive || wbDmemReadDataActive ? "#8B5CF6" : inactiveStroke}
                 strokeDasharray="6 3"
@@ -2599,29 +2193,29 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               {/* ============================================================ */}
               {/* [STAGE 5] WRITE-BACK (WB) : Y = 1182 ~ 1350                  */}
               {/* ============================================================ */}
-              {/* 1) ALU Result Bypass ➔ WB MUX 좌측 입력 (X = 225 -> 410) */}
+              {/* 1) ALU Result Bypass ➔ WB MUX 좌측 입력 (X = 225 -> 420) */}
               <path
-                d="M 225,1182 L 225,1218 L 410,1218 L 410,1256"
+                d="M 225,1182 L 225,1218 L 420,1218 L 420,1256"
                 fill="none"
                 stroke={wbAluBypassActive ? "#8B5CF6" : inactiveStroke}
                 {...syncWireProps(wbAluBypassActive, wbStep1State)}
                 markerEnd={wbAluBypassActive ? "url(#m-arr-purple)" : inactiveMarker}
               />
 
-              {/* 2) Data Memory Read Data ➔ WB MUX 우측 입력 (X = 470 직선 직하강) */}
+              {/* 2) Data Memory Read Data ➔ WB MUX 우측 입력 (X = 480 직선 직하강) */}
               <line
-                x1="470"
+                x1="480"
                 y1="1182"
-                x2="470"
+                x2="480"
                 y2="1256"
                 stroke={wbDmemReadDataActive ? "#8B5CF6" : inactiveStroke}
                 {...syncWireProps(wbDmemReadDataActive, wbStep1State)}
                 markerEnd={wbDmemReadDataActive ? "url(#m-arr-purple)" : inactiveMarker}
               />
 
-              {/* 부품 8: WB MUX (알약형 / Stadium Capsule: x=390, y=1258, w=100, h=38, rx=19, center 440) */}
+              {/* 부품 8: WB MUX (알약형 / Stadium Capsule: x=400, y=1258, w=100, h=38, rx=19, center 450) */}
               <rect
-                x="390"
+                x="400"
                 y="1258"
                 width="100"
                 height="38"
@@ -2633,7 +2227,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.8"
               />
               <text
-                x="440"
+                x="450"
                 y="1277"
                 dominantBaseline="central"
                 fill={wbAluBypassActive || wbDmemReadDataActive ? "#6D28D9" : "#94A3B8"}
@@ -2649,7 +2243,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
               {/* ★ 역방향 피드백 버스 (WB MUX ➔ ID RegFile Write Data In)     */}
               {/* ============================================================ */}
               <path
-                d="M 440,1296 L 440,1315 L 85,1315 L 85,424 L 180,424"
+                d="M 450,1296 L 450,1315 L 85,1315 L 85,424 L 180,424"
                 fill="none"
                 stroke={wbReverseFeedbackActive ? "#8B5CF6" : inactiveStroke}
                 {...syncWireProps(wbReverseFeedbackActive, wbStep2State)}
@@ -2722,6 +2316,16 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                   lines={getIdControlSignals(idOp)}
                   stroke="#EA580C"
                   title={`제어 신호 패킷: ${getIdControlSignals(idOp).join(', ')}`}
+                  opacity={idStep2State.opacity}
+                />
+              )}
+              {idControlUnitActive && idCuToPcMuxPoint && idStep2State && (
+                <FloatingChip
+                  x={idCuToPcMuxPoint.x}
+                  y={idCuToPcMuxPoint.y}
+                  text={`PCSrc: ${branchLoopbackActive ? 1 : 0}`}
+                  stroke="#EA580C"
+                  title={`PC MUX 선택 신호: PCSrc = ${branchLoopbackActive ? 1 : 0}`}
                   opacity={idStep2State.opacity}
                 />
               )}

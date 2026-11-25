@@ -30,13 +30,26 @@ ret
   },
   {
     title: "메모리 로드 및 스토어 (Load & Store)",
-    desc: "스택 포인터(sp)를 활용한 lw, sw 메모리 데이터 전송",
+    desc: "lw 직후 결과 사용(Load-Use 해저드)과 sw 메모리 전송",
     code: `addi sp, sp, -16
 addi t0, zero, 42
 sw   t0, 8(sp)
-lw   a0, 8(sp)
+lw   t1, 8(sp)
+addi a0, t1, 1
 addi sp, sp, 16
 ret
+`,
+  },
+  {
+    title: "함수 호출과 복귀 (Jump & Return)",
+    desc: "jal 점프(복귀 주소 저장)와 jalr 레지스터 기준 복귀",
+    code: `addi a0, zero, 5
+jal  t0, add_ten
+addi a0, a0, 1
+ret
+add_ten:
+addi a0, a0, 10
+jalr zero, t0, 0
 `,
   },
 ];

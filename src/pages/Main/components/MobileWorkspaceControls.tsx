@@ -17,6 +17,7 @@ interface MobileWorkspaceControlsProps {
   onResetAndPlay?: () => void;
   onPlayCurrentCycle?: () => void;
   isCyclePlaying?: boolean;
+  isAtTimelineEnd?: boolean;
   onStepBack: () => void;
   onTogglePlay: () => void;
   onStepForward: () => void;
@@ -44,6 +45,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
     onResetAndPlay,
     onPlayCurrentCycle,
     isCyclePlaying = false,
+    isAtTimelineEnd,
     onStepBack,
     onTogglePlay,
     onStepForward,
@@ -90,11 +92,11 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
 
             <div className="flex items-center gap-0.5 shrink-0 text-[9.5px]">
               {[
-                { label: "0.5x", speed: 6000 },
-                { label: "1.0x", speed: 3000 },
-                { label: "1.5x", speed: 2000 },
-                { label: "2.0x", speed: 1500 },
-                { label: "3.0x", speed: 1000 },
+                { label: "0.5x", speed: 10000 },
+                { label: "1.0x", speed: 5000 },
+                { label: "1.5x", speed: 3333 },
+                { label: "2.0x", speed: 2500 },
+                { label: "5.0x", speed: 1000 },
               ].map(({ label, speed }) => {
                 const isSelected = Math.abs(playSpeed - speed) < 50;
                 return (
@@ -147,8 +149,19 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
                   : "text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:pointer-events-none"
               }`}
             >
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.1}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                <path d="M18.2 3.4v3.4h-3.4" />
+                <path d="M10.6 10.3 12.2 8.8v6.4" />
+                <path d="M10.5 15.2h3.2" />
               </svg>
             </button>
 
@@ -195,7 +208,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             <button
               type="button"
               onClick={onStepForward}
-              disabled={!isSimulationReady || currentCycle >= maxCycle || isCyclePlaying}
+              disabled={!isSimulationReady || (isAtTimelineEnd ?? currentCycle >= maxCycle) || isCyclePlaying}
               title={isCyclePlaying ? "1회 재생 진행 중..." : "한 단계 실행 (Step Over / Forward)"}
               className="p-1.5 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
             >

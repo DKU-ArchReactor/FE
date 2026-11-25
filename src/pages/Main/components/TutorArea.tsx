@@ -216,17 +216,17 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   }
 
   return (
-    <TutorDetailHost scrollable={isSingleMode}><section
+    <TutorDetailHost scrollable={isSingleMode || isUserSelected}><section
       className="ar-tutor @container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="튜터 해설 패널"
     >
-      <header className="relative h-8 shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 border-l-emerald-500">
+      <header className={`relative h-8 shrink-0 flex items-center justify-between border-b border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3.5 min-w-0 border-l-2 ${isUserSelected ? 'border-l-[var(--ar-accent)]' : 'border-l-emerald-500'}`}>
         <div className="flex items-center gap-1.5 min-w-0">
           <h3 className="font-sans text-[11px] font-semibold text-[var(--ar-text-primary)] uppercase tracking-wide whitespace-nowrap">
             ARCHREACTOR TUTOR
           </h3>
         </div>
-        {!isSingleMode && simulationData && <div ref={setPipelineHeader} className="tutor-pipeline-header-controls"/>}
+        {!isSingleMode && !isUserSelected && simulationData && <div ref={setPipelineHeader} className="tutor-pipeline-header-controls"/>}
         <div className="flex items-center gap-2 shrink-0">
           {isSingleMode && isUserSelected && (
             <button
@@ -254,7 +254,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         </div>
       </header>
       {/* 튜터 메인 본문 영역 */}
-      <div ref={tutorBodyRef} className={`min-h-0 flex-1 overflow-y-auto select-text [scrollbar-gutter:stable] ${isSingleMode ? 'p-0! overflow-hidden! flex flex-col' : splitView ? 'p-4 space-y-4 dev-tutor-line-body' : 'p-4 space-y-4'}`}>
+      <div ref={tutorBodyRef} className={`min-h-0 flex-1 overflow-y-auto select-text [scrollbar-gutter:stable] ${(isSingleMode || isUserSelected) ? 'p-0! overflow-hidden! flex flex-col' : !isCompiled ? 'p-0 flex flex-col' : splitView ? 'p-4 space-y-4 dev-tutor-line-body' : 'p-4 space-y-4'}`}>
         {explanationError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ar-border)] p-3 text-xs leading-6 text-[var(--ar-text-primary)] m-3">
           <span>해설을 불러오지 못했습니다.</span>
           <button className="rounded border border-[var(--ar-border)] bg-[var(--ar-header-bg)] px-3 py-1 font-medium focus-visible:outline-2 focus-visible:outline-[var(--ar-accent)]" onClick={() => setRetryVersion(x => x + 1)}>다시 시도</button>
@@ -265,7 +265,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         {/* ========================================================= */}
         {/* 컴파일/어셈블 전: 대기 화면 표시 (유효성 검증 완료 전 튜터 비활성화) */}
         {/* ========================================================= */}
-        {!isSingleMode && simulationData ? (
+        {!isSingleMode && !isUserSelected && simulationData ? (
           <TutorPipelineLesson
             cycle={currentCycleData}
             simulation={simulationData}
@@ -276,10 +276,10 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             sourceLine={selectedTranslationLine}
             selectionKind={selectionKind}
             selectionRevision={selectionRevision}
-            isUserSelected={isUserSelected}
+            isUserSelected={false}
             headerTarget={pipelineHeader}
           />
-        ) : isSingleMode && simulationData ? (
+        ) : (isSingleMode || isUserSelected) && simulationData ? (
           shouldShowSingleCard ? (
             <TutorSingleMode
               rows={effectiveRows}
@@ -335,7 +335,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             onSelect={index => setStageSelection({ rows: effectiveRows, scope: selectionScope, index })}
           />
         ) : !isCompiled ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8] rounded-md border border-dashed border-[#D0D7DE] my-auto">
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#F8F8F8]">
             <div className="w-10 h-10 rounded-lg bg-white border border-[#E5E5E5] flex items-center justify-center text-[#57606A] mb-3 text-lg shadow-2xs">
               💡
             </div>

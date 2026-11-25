@@ -12,8 +12,10 @@ import "./TutorTypography.css";
 
 export interface InstructionLessonContext {
   isPlaying?: boolean;
+  playMode?: "continuous" | "singleCycle";
   playbackFinished?: boolean;
   playbackRevision?: number;
+  currentCycle?: number;
   flowDurationMs?: number;
   onPausePlayback?: () => void;
   source?: string;
@@ -66,43 +68,18 @@ export default function InstructionLesson({
     () => buildInstructionFlow(item, currentData, prevData, simulationData),
     [item, currentData, prevData, simulationData],
   );
-  const occurrences = useMemo(
-    () =>
-      row
-        ? (simulationData?.history.flatMap((frame, index) =>
-            numericPc(instructionPc(frame)) === numericPc(row.pc)
-              ? [index]
-              : [],
-          ) ?? [])
-        : [],
-    [row, simulationData?.history],
-  );
-  const target =
-    occurrences.find((index) => index >= flow.historyIndex) ??
-    occurrences[occurrences.length - 1];
   if (!simulationData || !row || !item) {
     const emptyFlow = buildInstructionFlow(undefined, null, null, null);
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-[var(--ar-text-primary)]">
-        <div
-          className="flex h-14 min-h-14 shrink-0 items-center justify-between gap-x-3 border-b border-[var(--ar-border)] px-3 py-2"
-          data-current-instruction="true"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-medium text-[var(--ar-text-muted)]">
-              명령어 · —
-            </p>
-            <h3 className="truncate font-mono text-base font-bold text-[var(--ar-text-muted)]">
-              —
-            </h3>
-          </div>
-          <span className="shrink-0 whitespace-nowrap text-[10px] text-[var(--ar-text-muted)]">
-            CORE clock —
-          </span>
-        </div>
         <SingleInstructionFlow
           flow={emptyFlow}
+          duration={context?.flowDurationMs}
           isPlaying={false}
+          isCompiled={Boolean(simulationData)}
+          playMode={context?.playMode}
+          currentCycle={context?.currentCycle ?? currentData?.clock ?? 0}
+          playbackRevision={context?.playbackRevision}
           playbackFinished={true}
         />
       </div>
@@ -110,43 +87,16 @@ export default function InstructionLesson({
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-[var(--ar-text-primary)]">
-      <div
-        className="flex h-14 min-h-14 shrink-0 items-center justify-between gap-x-3 border-b border-[var(--ar-border)] px-3 py-2"
-        data-current-instruction="true"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium text-[var(--ar-text-muted)]">
-            {flow.actual ? "현재 명령어" : "선택 명령어"} · {row.pc}
-            {row.sourceLine != null ? ` · C L${row.sourceLine}` : ""}
-          </p>
-          <h3
-            title={row.text}
-            className="truncate font-mono text-base font-bold"
-          >
-            {row.text}
-          </h3>
-        </div>
-        <span className="shrink-0 whitespace-nowrap text-[10px] text-[var(--ar-text-muted)]">
-          {flow.actual
-            ? `CORE clock ${currentData?.clock}`
-            : "선택 명령어 · 실행값 미표시"}
-        </span>
-        {!flow.actual && target != null && context?.onJumpToCycle && (
-          <button
-            type="button"
-            className="rounded bg-[var(--ar-accent)] px-2 py-1 text-[11px] text-white"
-            onClick={() => context.onJumpToCycle?.(target + 1)}
-          >
-            이 명령어의 실행 시점으로 이동
-          </button>
-        )}
-      </div>
       <SingleInstructionFlow
-        key={`${row.pc}-${flow.historyIndex}-${currentData?.clock ?? 0}-${context?.playbackRevision ?? 0}`}
         flow={flow}
+        instructionText={row.text}
         duration={context?.flowDurationMs}
         onPause={context?.onPausePlayback}
         isPlaying={context?.isPlaying}
+        isCompiled={true}
+        playMode={context?.playMode}
+        currentCycle={context?.currentCycle ?? currentData?.clock}
+        playbackRevision={context?.playbackRevision}
         playbackFinished={flow.actual && context?.playbackFinished}
         executionStatus={
           flow.actual && flow.historyIndex === simulationData.history.length - 1

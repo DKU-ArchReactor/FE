@@ -458,6 +458,7 @@ const handleMobileViewportSelect = (index: number) => {
             onResetAndPlay={playback.handleResetAndPlay}
             onPlayCurrentCycle={playback.handlePlayCurrentCycle}
             isCyclePlaying={playback.isCyclePlaying}
+            isAtTimelineEnd={playback.isAtTimelineEnd}
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
             isReady={useTutorialDemo ? true : playback.isSimulationReady}
@@ -804,6 +805,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
         onResetAndPlay={playback.handleResetAndPlay}
         onPlayCurrentCycle={playback.handlePlayCurrentCycle}
         isCyclePlaying={playback.isCyclePlaying}
+        isAtTimelineEnd={playback.isAtTimelineEnd}
         onStepBack={playback.handleStepBack}
         onTogglePlay={playback.handleTogglePlay}
         onStepForward={playback.handleStepForward}

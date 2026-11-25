@@ -9,17 +9,17 @@ export const COLORS = {
 };
 
 export const BOXES: Record<TransferUnit, Box> = {
-  pc: { x: 55, y: 175, w: 190, h: 120 },
-  decoder: { x: 335, y: 175, w: 490, h: 180 },
-  registers: { x: 35, y: 390, w: 280, h: 210 },
-  immediate: { x: 415, y: 390, w: 190, h: 125 },
-  cu: { x: 690, y: 390, w: 270, h: 180 },
-  "operand-mux": { x: 375, y: 625, w: 300, h: 100 },
-  alu: { x: 710, y: 625, w: 300, h: 205 },
-  mux: { x: 375, y: 865, w: 300, h: 100 },
-  "pc-select": { x: 55, y: 865, w: 240, h: 180 },
-  "instruction-memory": { x: 1200, y: 230, w: 320, h: 210 },
-  memory: { x: 1200, y: 705, w: 320, h: 210 },
+  pc: { x: 183, y: 510, w: 110, h: 110 },
+  decoder: { x: 360, y: 175, w: 340, h: 170 },
+  registers: { x: 397, y: 510, w: 110, h: 270 },
+  immediate: { x: 397, y: 865, w: 110, h: 110 },
+  cu: { x: 397, y: 200, w: 110, h: 110 },
+  "operand-mux": { x: 611, y: 680, w: 54, h: 130 },
+  alu: { x: 769, y: 510, w: 160, h: 270 },
+  mux: { x: 611, y: 320, w: 54, h: 120 },
+  "pc-select": { x: 40, y: 850, w: 240, h: 170 },
+  "instruction-memory": { x: 150, y: 1188, w: 390, h: 137 },
+  memory: { x: 597, y: 1188, w: 413, h: 137 },
 };
 
 export const TITLES: Record<TransferUnit, string> = {
