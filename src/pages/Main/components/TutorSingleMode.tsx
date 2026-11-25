@@ -90,8 +90,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   }, [group, selectedIndex]);
 
   const currentRow = group[position] ?? null;
-  const prevRow = position > 0 ? group[position - 1] : null;
-  const nextRow = position < group.length - 1 ? group[position + 1] : null;
   const firstAsmRow = group[0] ?? null;
   const targetAsmRow = currentRow ?? firstAsmRow;
 
@@ -220,38 +218,12 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
     }
   }, [hasC, line, isPlaying, onPausePlayback, selectionKey, isUserSelected, onSelectLine, currentRow]);
 
-  // 키보드 좌우(이전/다음 ASM), 상하(C 롤업/드릴다운) 탐색 핸들러
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (view === 'asm') {
-        if (e.key === 'ArrowLeft' && prevRow) {
-          e.preventDefault();
-          handleNavigateAsm(prevRow, 'prev');
-        } else if (e.key === 'ArrowRight' && nextRow) {
-          e.preventDefault();
-          handleNavigateAsm(nextRow, 'next');
-        } else if (e.key === 'ArrowUp' && hasC && line != null) {
-          e.preventDefault();
-          handleRollUpToC();
-        }
-      } else if (view === 'c') {
-        if (e.key === 'ArrowDown' && targetAsmRow) {
-          e.preventDefault();
-          handleDrillDownToAsm();
-        }
-      }
-    },
-    [view, prevRow, nextRow, hasC, line, handleNavigateAsm, handleRollUpToC, targetAsmRow, handleDrillDownToAsm]
-  );
-
   return (
     <div
       className="tutor-single-container"
       data-view={view}
       data-has-c={showCSection}
-      aria-label="싱글사이클 튜터 네비게이션"
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
+      aria-label="명령어 튜터 네비게이션"
     >
       <div className="tutor-single-vertical-viewport">
         <div
@@ -470,16 +442,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                       : `다음 명령어 사이클로 전진 (L${row.index + 1})`
                   }
                   onClick={isActive ? undefined : () => handleNavigateAsm(row, idx < position ? 'prev' : 'next')}
-                  onKeyDown={
-                    isActive
-                      ? undefined
-                      : (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleNavigateAsm(row, idx < position ? 'prev' : 'next');
-                          }
-                        }
-                  }
                 >
                   <div
                     className="tutor-single-card"

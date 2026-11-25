@@ -14,6 +14,7 @@ interface ControlPanelProps {
   onResetAndPlay?: () => void;
   onPlayCurrentCycle?: () => void;
   isCyclePlaying?: boolean;
+  isAtTimelineEnd?: boolean;
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
@@ -39,6 +40,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onResetAndPlay,
   onPlayCurrentCycle,
   isCyclePlaying = false,
+  isAtTimelineEnd,
   onJumpToCycle,
   onChangeSpeed,
   isReady = true,
@@ -98,33 +100,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       }
     }
   }, [currentCycle, maxCycle, isPlaying]);
-
-  // Single-Cycle 모드 전용 연속 이동 (Pipeline 모드는 PipelineVisualizer의 60fps timelineSync가 직접 주도)
-  useEffect(() => {
-    if (!isPlaying || !isSingle || maxCycle <= 0) return;
-
-    let animId: number;
-    let lastTime = performance.now();
-
-    const tick = (now: number) => {
-      const delta = now - lastTime;
-      lastTime = now;
-
-      continuousPosRef.current += delta / playSpeed;
-      if (continuousPosRef.current > maxCycle) continuousPosRef.current = maxCycle;
-
-      const pct = (continuousPosRef.current / maxCycle) * 100;
-      if (fillBarRef.current) fillBarRef.current.style.width = `${pct}%`;
-      if (indicatorRef.current) indicatorRef.current.style.left = `${pct}%`;
-
-      if (continuousPosRef.current < maxCycle) {
-        animId = requestAnimationFrame(tick);
-      }
-    };
-
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
-  }, [isPlaying, isSingle, playSpeed, maxCycle]);
 
   const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (continuousPosRef.current / maxCycle) * 100)) : 0;
 
@@ -337,8 +312,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               : "text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:pointer-events-none"
           }`}
         >
-          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+            <path d="M18.2 3.4v3.4h-3.4" />
+            <path d="M10.6 10.3 12.2 8.8v6.4" />
+            <path d="M10.5 15.2h3.2" />
           </svg>
         </button>
 
@@ -385,7 +371,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* 5) 다음 스텝/사이클 버튼 */}
         <button
           onClick={onStepForward}
-          disabled={!isReady || currentCycle >= maxCycle || isCyclePlaying}
+          disabled={!isReady || (isAtTimelineEnd ?? currentCycle >= maxCycle) || isCyclePlaying}
           title={isCyclePlaying ? "1회 재생 진행 중..." : isSingle ? "다음 스텝 실행 (Step Forward)" : "다음 사이클 진행 (Cycle Forward)"}
           className="p-1 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
         >
@@ -398,11 +384,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       {/* 3. 속도 조절 (모바일 숨김) */}
       <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] pl-2 text-[10px]">
         {[
-          { label: "0.5x", speed: 6000 },
-          { label: "1.0x", speed: 3000 },
-          { label: "1.5x", speed: 2000 },
-          { label: "2.0x", speed: 1500 },
-          { label: "3.0x", speed: 1000 },
+          { label: "0.5x", speed: 10000 },
+          { label: "1.0x", speed: 5000 },
+          { label: "1.5x", speed: 3333 },
+          { label: "2.0x", speed: 2500 },
+          { label: "5.0x", speed: 1000 },
         ].map(({ label, speed }) => {
           const isSelected = Math.abs(playSpeed - speed) < 50;
           return (

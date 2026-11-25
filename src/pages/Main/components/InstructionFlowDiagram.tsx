@@ -1,91 +1,195 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  displayValue,
   numericPc,
-  registerLabel,
-  instructionFields,
-  immediateField,
-  instructionPaths,
-  pointOnTransfer,
-  transferMotion,
-  instructionTransfers,
   type TransferUnit,
-  type InstructionTransfer,
   type buildInstructionFlow,
 } from "../utils/instructionFlow";
-import { aluLesson } from "../utils/hardwareLesson";
+import { BOXES, ROLES, TITLES } from "../utils/instructionFlowLayout";
 import {
-  AUXILIARY_CONNECTIONS,
-  BOXES,
-  COLORS,
-  ROLES,
-  TITLES,
-  WIRES,
-  type Box,
-} from "../utils/instructionFlowLayout";
+  computeAluDisplayVal,
+  formatRegVal,
+  getPathTotalLength,
+  getSynchronizedSubstepProgress,
+  interpolatePathPoints,
+  parseInstructionDetails,
+  parseSvgPathPoints,
+  resolveRegKey,
+  type SubstepAnimState,
+} from "../utils/datapathAnimation";
+import {
+  isAuipc,
+  isBranch,
+  isBubbleOrNop,
+  isLoad,
+  isLui,
+  isStore,
+  usesImm,
+  usesRs1,
+  usesRs2,
+  writesReg,
+} from "../utils/pipelineWireState";
+import { FloatingChip } from "./FloatingChip";
 import type { SimulationResult } from "@/type/simulation";
 
 type Flow = ReturnType<typeof buildInstructionFlow>;
-const short = (value?: string | null) => displayValue(value).split(" · ")[0];
+
+// ============================================================================
+// 싱글 사이클 데이터패스 배선 경로 (SVG 좌표계와 1:1 일치, 모듈 레벨 사전 파싱)
+// ============================================================================
+const SC_PC_TO_IMEM_D = "M 183 565 H 100 V 1256 H 150";
+const SC_PC_TO_PLUS4_D = "M 183 565 H 100 V 920 H 238 V 780";
+const SC_PLUS4_TO_PC_D = "M 238 740 V 620";
+
+const SC_IMEM_TO_CU_D = "M 345 1188 V 255 H 397";
+const SC_IMEM_TO_REGS_D = "M 345 1188 V 645 H 397";
+const SC_IMEM_TO_IMM_D = "M 345 1188 V 920 H 397";
+
+const SC_REGS_TO_ALU_D = "M 507 564 H 767";
+const SC_REGS_TO_OP_MUX_D = "M 507 726 H 611";
+const SC_IMM_TO_OP_MUX_D = "M 507 920 H 559 V 770 H 611";
+const SC_OP_MUX_TO_ALU_D = "M 665 745 H 767";
+
+const SC_ALU_TO_DMEM_D = "M 929 645 H 977 V 1188";
+const SC_ALU_TO_WB_MUX_D = "M 929 645 H 977 V 410 H 665";
+const SC_DMEM_TO_WB_MUX_D = "M 1010 1256 H 1055 V 350 H 665";
+const SC_WB_MUX_TO_REGS_D = "M 611 380 H 480 V 510";
+
+const SC_CU_TO_REGS_D = "M 452 310 V 350 H 425 V 510";
+const SC_CU_TO_WB_MUX_D = "M 507 255 H 638 V 320";
+const SC_CU_TO_OP_MUX_D = "M 507 255 H 700 V 490 H 638 V 680";
+const SC_CU_TO_DMEM_D = "M 507 255 H 734 V 1188";
+const SC_CU_TO_ALU_D = "M 507 255 H 849 V 526";
+
+const SC_PC_TO_IMEM_PTS = parseSvgPathPoints(SC_PC_TO_IMEM_D);
+const SC_PC_TO_PLUS4_PTS = parseSvgPathPoints(SC_PC_TO_PLUS4_D);
+const SC_PLUS4_TO_PC_PTS = parseSvgPathPoints(SC_PLUS4_TO_PC_D);
+const SC_IMEM_TO_CU_PTS = parseSvgPathPoints(SC_IMEM_TO_CU_D);
+const SC_IMEM_TO_REGS_PTS = parseSvgPathPoints(SC_IMEM_TO_REGS_D);
+const SC_IMEM_TO_IMM_PTS = parseSvgPathPoints(SC_IMEM_TO_IMM_D);
+const SC_REGS_TO_ALU_PTS = parseSvgPathPoints(SC_REGS_TO_ALU_D);
+const SC_REGS_TO_OP_MUX_PTS = parseSvgPathPoints(SC_REGS_TO_OP_MUX_D);
+const SC_IMM_TO_OP_MUX_PTS = parseSvgPathPoints(SC_IMM_TO_OP_MUX_D);
+const SC_OP_MUX_TO_ALU_PTS = parseSvgPathPoints(SC_OP_MUX_TO_ALU_D);
+const SC_ALU_TO_DMEM_PTS = parseSvgPathPoints(SC_ALU_TO_DMEM_D);
+const SC_ALU_TO_WB_MUX_PTS = parseSvgPathPoints(SC_ALU_TO_WB_MUX_D);
+const SC_DMEM_TO_WB_MUX_PTS = parseSvgPathPoints(SC_DMEM_TO_WB_MUX_D);
+const SC_WB_MUX_TO_REGS_PTS = parseSvgPathPoints(SC_WB_MUX_TO_REGS_D);
+
+const SC_CU_TO_REGS_PTS = parseSvgPathPoints(SC_CU_TO_REGS_D);
+const SC_CU_TO_WB_MUX_PTS = parseSvgPathPoints(SC_CU_TO_WB_MUX_D);
+const SC_CU_TO_OP_MUX_PTS = parseSvgPathPoints(SC_CU_TO_OP_MUX_D);
+const SC_CU_TO_DMEM_PTS = parseSvgPathPoints(SC_CU_TO_DMEM_D);
+const SC_CU_TO_ALU_PTS = parseSvgPathPoints(SC_CU_TO_ALU_D);
+
+const SC_PC_TO_IMEM_LEN = getPathTotalLength(SC_PC_TO_IMEM_PTS);
+const SC_PC_TO_PLUS4_LEN = getPathTotalLength(SC_PC_TO_PLUS4_PTS);
+const SC_PLUS4_TO_PC_LEN = getPathTotalLength(SC_PLUS4_TO_PC_PTS);
+const SC_IMEM_TO_CU_LEN = getPathTotalLength(SC_IMEM_TO_CU_PTS);
+const SC_IMEM_TO_REGS_LEN = getPathTotalLength(SC_IMEM_TO_REGS_PTS);
+const SC_IMEM_TO_IMM_LEN = getPathTotalLength(SC_IMEM_TO_IMM_PTS);
+const SC_REGS_TO_ALU_LEN = getPathTotalLength(SC_REGS_TO_ALU_PTS);
+const SC_REGS_TO_OP_MUX_LEN = getPathTotalLength(SC_REGS_TO_OP_MUX_PTS);
+const SC_IMM_TO_OP_MUX_LEN = getPathTotalLength(SC_IMM_TO_OP_MUX_PTS);
+const SC_OP_MUX_TO_ALU_LEN = getPathTotalLength(SC_OP_MUX_TO_ALU_PTS);
+const SC_ALU_TO_DMEM_LEN = getPathTotalLength(SC_ALU_TO_DMEM_PTS);
+const SC_ALU_TO_WB_MUX_LEN = getPathTotalLength(SC_ALU_TO_WB_MUX_PTS);
+const SC_DMEM_TO_WB_MUX_LEN = getPathTotalLength(SC_DMEM_TO_WB_MUX_PTS);
+const SC_WB_MUX_TO_REGS_LEN = getPathTotalLength(SC_WB_MUX_TO_REGS_PTS);
+
+const SC_CU_TO_REGS_LEN = getPathTotalLength(SC_CU_TO_REGS_PTS);
+const SC_CU_TO_WB_MUX_LEN = getPathTotalLength(SC_CU_TO_WB_MUX_PTS);
+const SC_CU_TO_OP_MUX_LEN = getPathTotalLength(SC_CU_TO_OP_MUX_PTS);
+const SC_CU_TO_ALU_LEN = getPathTotalLength(SC_CU_TO_ALU_PTS);
+
+interface StepSlotSpec {
+  id: "if1" | "id1" | "ex1" | "ex2" | "mem" | "wbLoad" | "wbReg";
+  len: number;
+  pauseAfter: number;
+}
+
+interface ScheduledStepWindow {
+  start: number;
+  end: number;
+  pauseAfter: number;
+  persist: boolean;
+}
+
+/**
+ * 활성 스텝들의 최장 선분 길이에 비례하여 1사이클 [0, 1] 내 주행 구간과 휴지 시간을 배분한다.
+ */
+function buildSingleCycleSchedule(
+  steps: StepSlotSpec[],
+  endHold = 0.06,
+): Record<string, ScheduledStepWindow> {
+  const active = steps.filter((s) => s.len > 0);
+  if (active.length === 0) return {};
+
+  const totalPause =
+    active.slice(0, -1).reduce((sum, s) => sum + s.pauseAfter, 0) + endHold;
+  const driveBudget = Math.max(0.2, 1.0 - totalPause);
+  const minFloor = Math.min(0.08, driveBudget / active.length);
+  const remBudget = Math.max(0, driveBudget - minFloor * active.length);
+  const lenSum = active.reduce((sum, s) => sum + s.len, 0);
+
+  const result: Record<string, ScheduledStepWindow> = {};
+  let cursor = 0;
+  active.forEach((step, idx) => {
+    const isLast = idx === active.length - 1;
+    const drive = minFloor + (lenSum > 0 ? remBudget * (step.len / lenSum) : 0);
+    const pause = isLast ? 0 : step.pauseAfter;
+    result[step.id] = {
+      start: cursor,
+      end: cursor + drive,
+      pauseAfter: pause,
+      persist: isLast,
+    };
+    cursor += drive + pause;
+  });
+  return result;
+}
+
+function formatScalarValue(raw: string | null | undefined, fallback = "0"): string {
+  if (!raw) return fallback;
+  if (/^-?0x[\da-f]+$/i.test(raw.trim())) {
+    return formatRegVal(raw.trim());
+  }
+  return raw;
+}
+
+function formatHexAddr(raw: string | null | undefined, fallback = "0x0"): string {
+  if (!raw) return fallback;
+  const trimmed = raw.trim();
+  if (/^0x[\da-f]+$/i.test(trimmed)) {
+    const parsed = Number.parseInt(trimmed, 16);
+    return Number.isFinite(parsed) ? `0x${(parsed >>> 0).toString(16)}` : trimmed;
+  }
+  const num = Number.parseInt(trimmed, 10);
+  return Number.isFinite(num) ? `0x${(num >>> 0).toString(16)}` : trimmed;
+}
 
 export default function InstructionFlowDiagram({
   flow,
-  transfer,
-  progress,
-  index,
-  count,
-  arrived,
-  onUnit,
-  onInspect,
-  finished = false,
-  completionLabel,
-  executionStatus,
+  instructionText,
+  animProgress = 0,
+  isActiveCycle = false,
+  isCompiled = false,
 }: {
   flow: Flow;
-  transfer: InstructionTransfer;
-  progress: number;
-  index: number;
-  count: number;
-  arrived: string[];
-  onUnit: (unit: TransferUnit) => void;
-  onInspect: (unit: "alu" | "pc-select" | "decoder") => void;
-  finished?: boolean;
-  completionLabel?: string;
+  instructionText?: string;
+  animProgress?: number;
+  isActiveCycle?: boolean;
+  isCompiled?: boolean;
   executionStatus?: SimulationResult["execution_status"];
 }) {
   const id = useId().replace(/:/g, "");
   const area = useRef<HTMLDivElement>(null);
-  const lesson = aluLesson(flow);
-  const selectUnit = (unit: TransferUnit) => {
-    onUnit(unit);
-    if (unit === "alu" || unit === "pc-select" || unit === "decoder")
-      onInspect(unit);
-  };
-  const [{ compact, verticalScale }, setCanvas] = useState({
+  const [{ compact }, setCanvas] = useState({
     compact: false,
     verticalScale: 1,
   });
-  const sy = (value: number) => value * verticalScale;
-  const usedPaths = useMemo(
-    () =>
-      new Set(
-        instructionTransfers(flow).map((t) => {
-          if (t.id === "input-a")
-            return flow.pcRelative ? "input-a-pc" : "input-a-register";
-          if (t.id === "input-b")
-            return flow.usesImmediate
-              ? "input-b-immediate"
-              : "input-b-register";
-          if (t.id === "result-to-mux")
-            return flow.jump ? "result-link" : "result-alu";
-          return t.id;
-        }),
-      ),
-    [flow],
-  );
-  const showWire = (key: string) =>
-    usedPaths.has(key) && !AUXILIARY_CONNECTIONS.has(key);
+  const sy = (value: number) => value;
+
   useLayoutEffect(() => {
     const element = area.current;
     if (!element) return;
@@ -96,12 +200,12 @@ export default function InstructionFlowDiagram({
         1.35,
         Math.max(
           1,
-          (height * (compact ? 1470 : 1830)) / (width * (compact ? 1298 : 970)),
+          (height * (compact ? 1470 : 1830)) / (width * (compact ? 1368 : 1040)),
         ),
       );
       setCanvas((previous) =>
         previous.compact === compact &&
-        Math.abs(previous.verticalScale - verticalScale) < 0.001
+          Math.abs(previous.verticalScale - verticalScale) < 0.001
           ? previous
           : { compact, verticalScale },
       );
@@ -114,855 +218,991 @@ export default function InstructionFlowDiagram({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const baseBoxes = compact
-    ? {
-        ...BOXES,
-        "instruction-memory": {
-          ...BOXES["instruction-memory"],
-          x: 55,
-          y: 1165,
-          w: 330,
-        },
-        memory: { ...BOXES.memory, x: 675, y: 1165, w: 330 },
-      }
-    : BOXES;
-  const boxes = Object.fromEntries(
-    Object.entries(baseBoxes).map(([key, box]) => [
-      key,
-      { ...box, y: sy(box.y), h: sy(box.h) },
-    ]),
-  ) as Record<TransferUnit, Box>;
-  const paths = useMemo(
-    () => instructionPaths(flow, 1, compact, verticalScale),
-    [flow, compact, verticalScale],
+
+  // ============================================================================
+  // 1. 명령어 해석 및 단계별 와이어 활성 판정
+  // ============================================================================
+  const parsed = parseInstructionDetails(instructionText);
+  const op = (parsed.op || flow.op || "").toLowerCase();
+  const hasRealInst = Boolean(
+    isActiveCycle && flow.actual && op && !isBubbleOrNop(instructionText),
   );
-  const path = paths[transfer.id];
-  const motion = useMemo(
-    () => transferMotion(transfer, path),
-    [transfer, path],
-  );
-  const point =
-    !finished && motion.route
-      ? pointOnTransfer(
-          motion.route,
-          progress,
-          motion.startPadding,
-          motion.endPadding,
-        )
-      : undefined;
-  const packet = point
-    ? { x: point.x - motion.width / 2, y: point.y - 23, w: motion.width, h: 46 }
-    : undefined;
-  const color = finished ? "var(--ar-text-muted)" : COLORS[transfer.kind];
-  // One gentle emphasis per transfer, driven by the same pausable playback clock.
-  const emphasis = Math.sin(Math.PI * progress) ** 2;
-  const reached = (key: string) =>
-    arrived.includes(key) ||
-    (transfer.id === key && (finished || progress >= 0.95));
-  const decoded = instructionFields(flow.raw);
-  const baseName =
-    decoded?.rs1 == null
-      ? undefined
-      : registerLabel(`x${decoded.rs1}`).split(" ")[0];
-  const storeName =
-    decoded?.rs2 == null
-      ? undefined
-      : registerLabel(`x${decoded.rs2}`).split(" ")[0];
-  const offset = flow.immediate ?? decoded?.immediate;
-  const addressFormula = `${baseName ?? "rs1"} ${offset == null ? "+ imm" : offset < 0 ? `− ${Math.abs(offset)}` : `+ ${offset}`}`;
-  const detailText =
-    transfer.id === "decode-immediate"
-      ? `${immediateField(flow.raw)?.format ?? ""}형 즉치 필드를 전달하고, Imm Gen에서 비트를 조합·확장합니다.`
-      : (flow.load || flow.store) && transfer.id === "memory-address"
-        ? `ALU가 ${addressFormula}로 계산한 주소를 Address Bus로 보냅니다.`
-        : flow.store && transfer.id === "store-data"
-          ? `${storeName ?? "rs2"}의 하위 ${flow.width}비트를 Data Bus로 보냅니다. CU가 메모리 쓰기를 제어합니다.`
-          : transfer.id === "calculate" && !flow.jump && !flow.system
-            ? flow.load || flow.store
-              ? `ALU의 가산기가 ${addressFormula}를 계산해 메모리 접근 주소를 만듭니다.`
-              : lesson.category === "pass"
-                ? "상위 즉치값을 결과의 상위 20비트에 놓고 하위 12비트를 0으로 채웁니다."
-                : flow.branch
-                  ? `ALU가 두 입력을 ${lesson.operator} 조건으로 비교합니다. 비교 결과는 다음 PC 선택에 사용됩니다.`
-                  : `CU가 ${flow.op.toUpperCase()} 연산을 선택합니다. ALU는 두 입력에 ${lesson.operator} 연산을 적용하고 32비트 결과를 출력합니다.`
-            : transfer.id === "read-control"
-              ? "명령어의 rs1·rs2 필드가 읽을 레지스터 번호를 지정합니다. 레지스터 파일은 선택된 번호의 값을 출력합니다."
-              : transfer.id === "decode-control"
-                ? `해독 회로가 opcode·funct 필드를 해석합니다. CU는 ${flow.op.toUpperCase()}에 필요한 연산과 레지스터·메모리 제어 신호를 선택합니다.`
-                : transfer.detail;
-  const specialEncoding =
-    decoded && ["1110011", "0001111"].includes(decoded.opcode);
-  const signal = (value?: boolean) =>
-    value == null ? "미제공" : value ? "1" : "0";
-  const hasWrite = flow.writes.length > 0 && !flow.store;
-  const pcPlusFour = Number.isFinite(numericPc(flow.pc))
-    ? `0x${((numericPc(flow.pc) + 4) >>> 0).toString(16).padStart(8, "0")}`
-    : "미제공";
-  const nextRule =
-    flow.op === "jalr"
-      ? "(rs1 + imm) & ~1"
-      : flow.op === "jal"
-        ? "PC + imm"
-        : flow.branch
-          ? flow.taken == null
-            ? "분기 판정 미제공"
-            : flow.taken
-              ? "분기: PC + imm"
-              : "불성립: PC + 4"
-          : "순차: PC + 4";
-  const lines: Record<TransferUnit, string[]> = {
-    pc: [
-      (finished && flow.completed ? flow.nextPc : flow.pc)?.replace(
-        /^0x0+(?=[\da-f])/i,
-        "0x",
-      ) ?? "미제공",
-    ],
-    decoder: [flow.raw ?? "기계어 미제공"],
-    cu: [
-      `ALU: ${flow.system ? "사용 안 함" : flow.load || flow.store ? "ADD · 주소 계산" : flow.op.toUpperCase()}`,
-      `기록 ${signal(flow.controlSignals?.reg_write)}`,
-      `읽기 ${signal(flow.controlSignals?.mem_read)} · 쓰기 ${signal(flow.controlSignals?.mem_write)}`,
-    ],
-    registers: [
-      ...flow.registerInputs.map(
-        (input) =>
-          `${registerLabel(input.name).split(" ")[0]}: ${short(input.value)}`,
+
+  const isLoadOp = hasRealInst && (flow.load || isLoad(op));
+  const isStoreOp = hasRealInst && (flow.store || isStore(op));
+  const isMemOp = isLoadOp || isStoreOp;
+  const isBranchOp = hasRealInst && (flow.branch || isBranch(op));
+  const isJumpOp = hasRealInst && (flow.jump || op === "jal" || op === "jalr");
+  const isSysOp = hasRealInst && (flow.system || op === "ecall");
+  const hasImmOp = hasRealInst && (flow.usesImmediate || usesImm(op));
+  const readsRs1Op = hasRealInst && usesRs1(op);
+  const readsRs2Op = hasRealInst && usesRs2(op);
+  const writesRegOp = hasRealInst && (flow.writes.length > 0 || writesReg(op));
+  const usesAluOp = hasRealInst && !isSysOp && !isLui(op) && op !== "jal";
+  const usesPcAluBypassOp = hasRealInst && (isLui(op) || op === "jal");
+
+  const readsRegsInId =
+    hasRealInst && (readsRs1Op || readsRs2Op || writesRegOp);
+  const needsEx1Step =
+    hasRealInst &&
+    (usesAluOp || usesPcAluBypassOp || isMemOp || writesRegOp);
+  const needsEx2Step = usesAluOp;
+  const needsMemStep =
+    isMemOp || writesRegOp || isBranchOp;
+  const needsWbLoadStep = isLoadOp;
+  const needsWbRegStep = writesRegOp;
+
+  // ============================================================================
+  // 2. 최장 길이 비례 + 휴지 시간 포함 동적 타임라인 산출 (5초 1사이클 내 완료)
+  // ============================================================================
+  const schedule = buildSingleCycleSchedule([
+    {
+      id: "if1",
+      len: Math.max(SC_PC_TO_IMEM_LEN, SC_PC_TO_PLUS4_LEN),
+      pauseAfter: 0.04,
+    },
+    {
+      id: "id1",
+      len: Math.max(
+        SC_PLUS4_TO_PC_LEN,
+        SC_IMEM_TO_CU_LEN,
+        readsRegsInId ? SC_IMEM_TO_REGS_LEN : 0,
+        hasImmOp ? SC_IMEM_TO_IMM_LEN : 0,
       ),
-      hasWrite
-        ? reached("writeback")
-          ? `${flow.writes[0]} ← ${short(flow.writeValue)}`
-          : `기록 대상 ${flow.writes[0]} · 대기`
-        : decoded?.rd === 0
-          ? "x0 쓰기는 버림 · 항상 0"
-          : "레지스터 값 유지",
-    ],
-    immediate: [
-      flow.usesImmediate || flow.branch
-        ? reached("decode-immediate")
-          ? flow.amount != null
-            ? `shamt ${flow.amount}비트`
-            : String(flow.immediate ?? "미제공")
-          : "해독 대기"
-        : "사용 안 함",
-    ],
-    "operand-mux": [
-      flow.usesImmediate
-        ? "즉치값 선택"
-        : flow.registerInputs.length > 1
-          ? "rs2 값 선택"
-          : "사용 안 함",
-      reached("input-b")
-        ? short(
-            flow.amount == null || !flow.usesImmediate
-              ? flow.input2
-              : String(flow.amount),
+      pauseAfter: 0.05,
+    },
+    {
+      id: "ex1",
+      len: needsEx1Step
+        ? Math.max(
+            usesAluOp ? SC_CU_TO_OP_MUX_LEN : 0,
+            usesAluOp ? SC_CU_TO_ALU_LEN : 0,
+            writesRegOp ? SC_CU_TO_REGS_LEN : 0,
+            writesRegOp ? SC_CU_TO_WB_MUX_LEN : 0,
+            readsRs2Op ? SC_REGS_TO_OP_MUX_LEN : 0,
+            hasImmOp && usesAluOp ? SC_IMM_TO_OP_MUX_LEN : 0,
+            readsRs1Op && usesAluOp ? SC_REGS_TO_ALU_LEN : 0,
+            220,
           )
-        : "입력 대기",
-    ],
-    alu: flow.jump
-      ? ["ALU 사용 안 함", "PC 회로에서 주소 계산"]
-      : flow.system
-        ? ["환경 요청", "ALU 사용 안 함"]
-        : [
-            `A ${!flow.pcRelative && !flow.registerInputs.length ? short(flow.input1) : reached("input-a") ? short(flow.input1) : "← " + (flow.pcRelative ? "PC" : "레지스터")}`,
-            `${lesson.operator} ${reached("mux-to-alu") ? (flow.amount == null ? short(flow.input2) : `${flow.amount}비트 이동`) : "B ← 입력 MUX"}`,
-            flow.branch
-              ? `비교 ${reached("calculate") ? (flow.taken == null ? "미제공" : flow.taken ? "성립" : "불성립") : "대기"}`
-              : `= ${reached("calculate") ? short(flow.result) : "결과 대기"}`,
-          ],
-    mux: [
-      hasWrite
-        ? flow.load
-          ? "메모리 값 선택"
-          : flow.jump
-            ? "PC + 4 선택"
-            : "연산 결과 선택"
-        : "사용 안 함",
-      reached("load-data") || reached("result-to-mux")
-        ? short(flow.writeValue)
-        : "전달 대기",
-    ],
-    "pc-select": [
-      nextRule,
-      `+4 ${pcPlusFour.replace(/^0x0+(?=[\da-f])/i, "0x")}`,
-      `다음 ${reached("next-pc") ? (flow.nextPc?.replace(/^0x0+(?=[\da-f])/i, "0x") ?? "미제공") : "선택 대기"}`,
-    ],
-    "instruction-memory": [
-      `주소 ${flow.pc ?? "미제공"}`,
-      flow.raw ?? "기계어 미제공",
-    ],
-    memory:
-      flow.load || flow.store
-        ? [
-            `주소 ${reached("memory-address") ? (flow.address ?? "미제공") : "전달 대기"}`,
-            `${flow.width / 8}바이트 ${flow.load ? "읽기" : "쓰기"}`,
-            reached("load-data") ||
-            reached("store-data") ||
-            reached("discard-load")
-              ? short(flow.memoryValue)
-              : "값 대기",
-            flow.error
-              ? "접근 오류"
-              : flow.load && flow.width < 32
-                ? /^(lb|lh)$/.test(flow.op)
-                  ? "부호 확장 → 32비트"
-                  : "0 확장 → 32비트"
-                : "",
-          ]
-        : ["이번 명령은 사용 안 함"],
+        : 0,
+      pauseAfter: needsEx2Step ? 0.04 : 0.04,
+    },
+    {
+      id: "ex2",
+      len: needsEx2Step ? Math.max(SC_OP_MUX_TO_ALU_LEN + 110, 220) : 0,
+      pauseAfter: 0.05,
+    },
+    {
+      id: "mem",
+      len: needsMemStep
+        ? isMemOp
+          ? SC_ALU_TO_DMEM_LEN
+          : writesRegOp
+            ? SC_ALU_TO_WB_MUX_LEN
+            : 200
+        : 0,
+      pauseAfter: isLoadOp ? 0.06 : writesRegOp ? 0.04 : 0,
+    },
+    {
+      id: "wbLoad",
+      len: needsWbLoadStep ? SC_DMEM_TO_WB_MUX_LEN : 0,
+      pauseAfter: 0.04,
+    },
+    {
+      id: "wbReg",
+      len: needsWbRegStep ? SC_WB_MUX_TO_REGS_LEN : 0,
+      pauseAfter: 0,
+    },
+  ]);
+
+  const stepState = (key: StepSlotSpec["id"]): SubstepAnimState | null => {
+    if (!hasRealInst) return null;
+    const w = schedule[key];
+    if (!w) return null;
+    return getSynchronizedSubstepProgress(
+      animProgress,
+      w.start,
+      w.end,
+      w.persist,
+      w.pauseAfter,
+    );
   };
+
+  const if1State = stepState("if1");
+  const id1State = stepState("id1");
+  const ex1State = stepState("ex1");
+  const ex2State = stepState("ex2");
+  const memState = stepState("mem");
+  const wbLoadState = stepState("wbLoad");
+  const wbRegState = stepState("wbReg");
+
+  // ALU 입력 A(rs1): ex1 시작과 동시에 출발해 ex2(Operand MUX -> ALU) 종료 시점에 동시 도착
+  const exAluAState =
+    hasRealInst && readsRs1Op && usesAluOp && schedule.ex1 && schedule.ex2
+      ? getSynchronizedSubstepProgress(
+          animProgress,
+          schedule.ex1.start,
+          schedule.ex2.end,
+          schedule.ex2.persist,
+          schedule.ex2.pauseAfter,
+        )
+      : null;
+
+  // DMEM 제어 신호(MemRead/MemWrite): ex1 시작 -> ex2 종료 시점까지 하강 후 DMEM 도착 유지
+  const ctrlDmemState =
+    hasRealInst && isMemOp && schedule.ex1 && (schedule.ex2 || schedule.ex1)
+      ? getSynchronizedSubstepProgress(
+          animProgress,
+          schedule.ex1.start,
+          (schedule.ex2 ?? schedule.ex1).end,
+          false,
+          (schedule.mem?.end ?? 1) - (schedule.ex2 ?? schedule.ex1).end,
+        )
+      : null;
+
+  // ============================================================================
+  // 3. 파이프라인 동일 실시간 데이터·제어 값 매핑
+  // ============================================================================
+  const pcNum = numericPc(flow.pc);
+  const pcDec = Number.isFinite(pcNum) ? String(pcNum) : (flow.pc || "0");
+  const pcPlus4Dec = Number.isFinite(pcNum) ? String(pcNum + 4) : "4";
+  const nextPcNum = numericPc(flow.nextPc);
+  const nextPcDec = Number.isFinite(nextPcNum) ? String(nextPcNum) : pcPlus4Dec;
+
+  const rs1Name = parsed.rs1 || "";
+  const rs2Name = parsed.rs2 || "";
+  const rdName = parsed.rd || (flow.writes[0] ?? "");
+  const immText =
+    parsed.imm ??
+    (flow.amount != null
+      ? String(flow.amount)
+      : flow.immediate != null
+        ? String(flow.immediate)
+        : "0");
+
+  const regFieldsParts = [
+    rs1Name || null,
+    rs2Name || null,
+    rdName && !rs1Name && !rs2Name ? rdName : null,
+  ].filter(Boolean);
+  const regFieldsLabel =
+    regFieldsParts.length > 0 ? regFieldsParts.join(", ") : "regs";
+
+  const regMap: Record<string, string> = {};
+  for (const r of flow.registerInputs) {
+    if (r.name && r.value != null) {
+      regMap[r.name] = r.value;
+      const key = resolveRegKey(r.name);
+      if (key) regMap[key] = r.value;
+    }
+  }
+  const fallbackAluVal = computeAluDisplayVal(
+    parsed,
+    regMap,
+    Number.isFinite(pcNum) ? pcNum : 0,
+  );
+
+  const aVal = flow.input1
+    ? formatScalarValue(flow.input1)
+    : rs1Name && resolveRegKey(rs1Name) && regMap[resolveRegKey(rs1Name)!]
+      ? formatRegVal(regMap[resolveRegKey(rs1Name)!])
+      : isAuipc(op)
+        ? pcDec
+        : rs1Name || "A";
+
+  const bRegVal = flow.input2
+    ? formatScalarValue(flow.input2)
+    : rs2Name && resolveRegKey(rs2Name) && regMap[resolveRegKey(rs2Name)!]
+      ? formatRegVal(regMap[resolveRegKey(rs2Name)!])
+      : rs2Name || "B";
+
+  const aluBVal = hasImmOp
+    ? immText
+    : bRegVal;
+
+  const aluResText = flow.result
+    ? formatScalarValue(flow.result)
+    : fallbackAluVal;
+
+  const addrText = formatHexAddr(flow.address ?? flow.result, fallbackAluVal);
+  const memValText = formatScalarValue(flow.memoryValue, "0");
+  const wbValText = flow.writeValue
+    ? formatScalarValue(flow.writeValue)
+    : isJumpOp
+      ? pcPlus4Dec
+      : aluResText;
+
+  const branchChipText =
+    flow.taken != null
+      ? flow.taken
+        ? "Zero: 1 (T)"
+        : "Zero: 0 (NT)"
+      : fallbackAluVal;
+
+  // ============================================================================
+  // 4. 활성 칩 좌표 보간 및 와이어 동기화 스타일
+  // ============================================================================
+  const syncWireProps = (
+    active: boolean,
+    state: SubstepAnimState | null | undefined,
+    isDashed = false,
+  ) => {
+    const isDriving = Boolean(
+      active && state && state.progress < 1.0 && state.opacity > 0.05,
+    );
+    const strokeWidth = isDriving ? (isDashed ? 3.4 : 4.0) : 2.6;
+    const opacity = active ? (isDriving ? 1.0 : 0.4) : 0;
+    return {
+      strokeWidth,
+      style: {
+        opacity,
+        transition: "stroke-width 0.15s ease-out, opacity 0.2s ease-out",
+      },
+    };
+  };
+
+  const pt = (pts: { x: number; y: number }[], st: SubstepAnimState | null) =>
+    st ? interpolatePathPoints(pts, st.progress) : null;
+
+  const pcToImemPt = pt(SC_PC_TO_IMEM_PTS, if1State);
+  const pcToPlus4Pt = pt(SC_PC_TO_PLUS4_PTS, if1State);
+  const plus4ToPcPt = pt(SC_PLUS4_TO_PC_PTS, id1State);
+  const imemToCuPt = pt(SC_IMEM_TO_CU_PTS, id1State);
+  const imemToRegsPt = readsRegsInId ? pt(SC_IMEM_TO_REGS_PTS, id1State) : null;
+  const imemToImmPt = hasImmOp ? pt(SC_IMEM_TO_IMM_PTS, id1State) : null;
+
+  const regsToAluPt = pt(SC_REGS_TO_ALU_PTS, exAluAState);
+  const regsToOpMuxPt = readsRs2Op ? pt(SC_REGS_TO_OP_MUX_PTS, ex1State) : null;
+  const immToOpMuxPt =
+    hasImmOp && usesAluOp ? pt(SC_IMM_TO_OP_MUX_PTS, ex1State) : null;
+  const cuToOpMuxPt = usesAluOp ? pt(SC_CU_TO_OP_MUX_PTS, ex1State) : null;
+  const cuToDmemPt = pt(SC_CU_TO_DMEM_PTS, ctrlDmemState);
+  const cuToWbMuxPt = writesRegOp ? pt(SC_CU_TO_WB_MUX_PTS, ex1State) : null;
+
+  const opMuxToAluPt = usesAluOp ? pt(SC_OP_MUX_TO_ALU_PTS, ex2State) : null;
+
+  const aluToDmemPt = isMemOp ? pt(SC_ALU_TO_DMEM_PTS, memState) : null;
+  const aluToWbMuxPt =
+    !isMemOp && writesRegOp ? pt(SC_ALU_TO_WB_MUX_PTS, memState) : null;
+
+  const dmemToWbMuxPt = isLoadOp ? pt(SC_DMEM_TO_WB_MUX_PTS, wbLoadState) : null;
+  const wbMuxToRegsPt = writesRegOp ? pt(SC_WB_MUX_TO_REGS_PTS, wbRegState) : null;
+
+  // 명령어 유형별 1색 통일 팔레트
+  const instColor = !hasRealInst
+    ? { stroke: "#94A3B8", text: "#94A3B8", fill: "#F8FAFC" }
+    : isLoadOp
+      ? { stroke: "#059669", text: "#047857", fill: "#ECFDF5" }
+      : isStoreOp
+        ? { stroke: "#D97706", text: "#B45309", fill: "#FFFBEB" }
+        : isBranchOp
+          ? { stroke: "#7C3AED", text: "#6D28D9", fill: "#F5F3FF" }
+          : isJumpOp
+            ? { stroke: "#DB2777", text: "#BE185D", fill: "#FDF2F8" }
+            : isSysOp
+              ? { stroke: "#6366F1", text: "#4F46E5", fill: "#EEF2FF" }
+              : { stroke: "#0284C7", text: "#0369A1", fill: "#F0F9FF" };
+
+  // 입력 도착(휴지 시작, in.end) ~ 출력 도착 직전(out.end)까지 요소와 출력선을 함께 강조
+  const inSpan = (start?: number, end?: number, isSink = false) =>
+    hasRealInst &&
+    start != null &&
+    end != null &&
+    animProgress >= start &&
+    (isSink ? animProgress <= 1 : animProgress < end);
+
+  const isPcPlus4Active = inSpan(schedule.if1?.end, schedule.id1?.end);
+
+  const isUnitActive = (unit: TransferUnit): boolean => {
+    if (!hasRealInst) return false;
+    switch (unit) {
+      case "pc":
+        return (
+          inSpan(schedule.if1?.start, schedule.if1?.end) ||
+          inSpan(schedule.id1?.end, 1, true)
+        );
+      case "instruction-memory":
+        return inSpan(schedule.if1?.end, schedule.id1?.end);
+      case "cu": {
+        const cuOutEnd = isMemOp
+          ? (schedule.ex2 ?? schedule.ex1)?.end
+          : schedule.ex1?.end;
+        return cuOutEnd != null
+          ? inSpan(schedule.id1?.end, cuOutEnd)
+          : inSpan(schedule.id1?.end, 1, true);
+      }
+      case "immediate":
+        return (
+          hasImmOp &&
+          inSpan(schedule.id1?.end, schedule.ex1?.end ?? 1, !schedule.ex1)
+        );
+      case "registers": {
+        const readOutEnd =
+          readsRs1Op && usesAluOp && schedule.ex2
+            ? schedule.ex2.end
+            : schedule.ex1?.end;
+        const readingActive =
+          readsRegsInId &&
+          (readsRs1Op || readsRs2Op) &&
+          inSpan(schedule.id1?.end, readOutEnd ?? 1, !readOutEnd);
+        const writingActive =
+          writesRegOp && inSpan(schedule.wbReg?.end, 1, true);
+        return readingActive || writingActive;
+      }
+      case "operand-mux":
+        return usesAluOp && inSpan(schedule.ex1?.end, schedule.ex2?.end);
+      case "alu": {
+        if (!usesAluOp && !isBranchOp) return false;
+        const aluInEnd = schedule.ex2?.end ?? schedule.ex1?.end;
+        if (isBranchOp && !isMemOp && !writesRegOp) {
+          return inSpan(aluInEnd, 1, true);
+        }
+        return inSpan(aluInEnd, schedule.mem?.end ?? 1, !schedule.mem);
+      }
+      case "memory":
+        if (!isMemOp) return false;
+        return isLoadOp
+          ? inSpan(schedule.mem?.end, schedule.wbLoad?.end)
+          : inSpan(schedule.mem?.end, 1, true);
+      case "mux": {
+        if (!writesRegOp) return false;
+        const muxInEnd = isLoadOp ? schedule.wbLoad?.end : schedule.mem?.end;
+        return inSpan(muxInEnd, schedule.wbReg?.end);
+      }
+      default:
+        return false;
+    }
+  };
+
+  // 회로 소자 렌더러 (입력 도착~출력 도착 구간 동안 명령어 색으로 점등)
   const node = (unit: TransferUnit) => {
-    const b = boxes[unit],
-      active =
-        !finished && (transfer.source === unit || transfer.target === unit);
-    const status = !active
-      ? ""
-      : transfer.source === unit && transfer.target === unit
-        ? unit === "alu"
-          ? flow.load || flow.store
-            ? "주소 계산"
-            : flow.branch
-              ? "조건 비교"
-              : `${flow.op.toUpperCase()} 연산`
-          : unit === "pc-select"
-            ? "주소 선택"
-            : flow.system
-              ? "환경 요청"
-              : "읽기 확인"
-        : transfer.id === "memory-address" && unit === "alu"
-          ? "주소 전달"
-          : transfer.id === "memory-address" && unit === "memory"
-            ? "주소 수신"
-            : transfer.source === unit
-              ? "출발"
-              : transfer.target === unit
-                ? "도착"
-                : "";
+    const b = BOXES[unit];
     const mux = unit === "mux" || unit === "operand-mux";
-    const statusWidth = Math.max(58, [...status].length * 18 + 20);
-    const stroke = active ? color : "var(--ar-flow-device-border)";
-    const textColor = active
-      ? `var(--ar-flow-${transfer.kind}-text)`
-      : "var(--ar-flow-idle-text)";
-    const shape = mux
-      ? `M${b.x} ${b.y}H${b.x + b.w}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}Z`
-      : unit === "alu"
-        ? `M${b.x} ${b.y}H${b.x + b.w / 2 - 25}L${b.x + b.w / 2} ${b.y + sy(15)}L${b.x + b.w / 2 + 25} ${b.y}H${b.x + b.w}L${b.x + b.w - 24} ${b.y + b.h}H${b.x + 24}Z`
-        : unit === "cu"
-          ? `M${b.x + 18} ${b.y}H${b.x + b.w - 18}L${b.x + b.w} ${b.y + sy(18)}V${b.y + b.h - sy(18)}L${b.x + b.w - 18} ${b.y + b.h}H${b.x + 18}L${b.x} ${b.y + b.h - sy(18)}V${b.y + sy(18)}Z`
-          : undefined;
-    const fill = active
-      ? `color-mix(in srgb, ${color} 6%, var(--ar-flow-device-bg))`
-      : "var(--ar-flow-device-bg)";
+    const active = isUnitActive(unit);
+    const stroke = active ? instColor.stroke : "#94A3B8";
+    const textColor = active ? instColor.text : "#94A3B8";
+    const shape =
+      unit === "alu"
+        ? `M${b.x - 4} ${b.y - sy(4)}V${b.y + b.h / 2 - b.h * 0.15}L${b.x - 4 + b.w * 0.24} ${b.y + b.h / 2}L${b.x - 4} ${b.y + b.h / 2 + b.h * 0.15}V${b.y + b.h + sy(4)}L${b.x + b.w + 4} ${b.y + b.h + sy(4) - b.h * 0.13}V${b.y - sy(4) + b.h * 0.13}Z`
+        : undefined;
+    const fill = active ? instColor.fill : "#F8FAFC";
     return (
       <g
         key={unit}
-        role="button"
-        tabIndex={0}
-        aria-label={`${TITLES[unit]} 역할과 동작 보기`}
+        aria-label={`${TITLES[unit]} (${ROLES[unit]})`}
         data-flow-node={unit}
-        data-flow-active={active}
+        data-flow-active={active ? "true" : "false"}
         data-x={b.x}
         data-y={b.y}
         data-width={b.w}
         data-height={b.h}
-        data-hardware-shape={
-          mux
-            ? "mux"
-            : unit === "alu"
-              ? "alu"
-              : unit === "registers"
-                ? "register-file"
-                : "chip"
-        }
-        onClick={() => selectUnit(unit)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            selectUnit(unit);
-          }
-        }}
-        className="cursor-pointer outline-none focus-visible:drop-shadow-md"
       >
-        <title>
-          {TITLES[unit]}: {ROLES[unit]}. {lines[unit].join(". ")}
-        </title>
-        {unit === "registers" && (
-          <rect
-            x={b.x + 5}
-            y={b.y - sy(5)}
-            width={b.w}
-            height={b.h}
-            rx="8"
-            fill="var(--ar-flow-device-bg)"
-            stroke={stroke}
-          />
-        )}
+        <title>{`${TITLES[unit]}: ${ROLES[unit]}`}</title>
         {shape ? (
           <path
             data-device-surface="true"
-            className={active ? "flow-device-active" : undefined}
             d={shape}
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.6 + emphasis * 3 : 2.2}
-            strokeOpacity={active ? 0.5 + emphasis * 0.5 : 1}
+            strokeWidth={2.8}
+            strokeLinejoin="round"
           />
         ) : (
           <rect
             data-device-surface="true"
-            className={active ? "flow-device-active" : undefined}
             x={b.x}
             y={b.y}
             width={b.w}
             height={b.h}
-            rx="8"
+            rx={
+              mux || unit === "cu" || unit === "immediate"
+                ? Math.min(b.w, b.h) / 2
+                : 8
+            }
+            ry={
+              mux || unit === "cu" || unit === "immediate"
+                ? Math.min(b.w, b.h) / 2
+                : undefined
+            }
             fill={fill}
             stroke={stroke}
-            strokeWidth={active ? 2.6 + emphasis * 3 : 2.2}
-            strokeOpacity={active ? 0.5 + emphasis * 0.5 : 1}
-          />
-        )}
-        {[
-          "cu",
-          "decoder",
-          "memory",
-          "instruction-memory",
-          "immediate",
-        ].includes(unit) && (
-          <g
-            aria-hidden="true"
-            stroke={stroke}
-            strokeWidth="1.5"
-            opacity=".65"
-            data-hardware-pins="true"
-          >
-            {[0.32, 0.5, 0.68].map((position) => (
-              <path
-                key={position}
-                d={`M${b.x - 7} ${b.y + b.h * position}h7M${b.x + b.w} ${b.y + b.h * position}h7`}
-              />
-            ))}
-          </g>
-        )}
-        {(unit === "memory" || unit === "instruction-memory") && (
-          <rect
-            x={b.x + 6}
-            y={b.y + sy(6)}
-            width={b.w - 12}
-            height={b.h - sy(12)}
-            rx="4"
-            fill="none"
-            stroke={stroke}
-            strokeOpacity=".4"
-            data-memory-bank="true"
+            strokeWidth={2.8}
+            strokeLinejoin="round"
           />
         )}
         <text
           x={b.x + b.w / 2}
-          y={b.y + sy(unit === "alu" ? 53 : mux ? 33 : 40)}
+          y={b.y + b.h / 2}
+          dominantBaseline="central"
           textAnchor="middle"
-          fontSize={mux ? 26 : 30}
-          fontWeight={active ? 800 : 700}
+          fontFamily="sans-serif"
+          fontSize={18}
+          fontWeight="bold"
           fill={textColor}
         >
-          {TITLES[unit]}
+          {(unit === "cu" || unit === "immediate") &&
+          TITLES[unit].includes(" ")
+            ? TITLES[unit].split(" ").map((word, idx, arr) => (
+                <tspan
+                  key={word}
+                  x={b.x + b.w / 2}
+                  dy={idx === 0 ? `${-(arr.length - 1) * 0.55}em` : "1.15em"}
+                >
+                  {word}
+                </tspan>
+              ))
+            : TITLES[unit]}
         </text>
-        {status && (
-          <g data-device-status={status}>
-            <rect
-              x={b.x + b.w - statusWidth}
-              y={b.y - sy(24)}
-              width={statusWidth}
-              height={sy(28)}
-              rx="5"
-              fill="var(--ar-flow-token-bg)"
-            />
-            <text
-              x={b.x + b.w - statusWidth / 2}
-              y={b.y - sy(4)}
-              textAnchor="middle"
-              fontSize="18"
-              fontWeight="750"
-              fill="white"
-            >
-              {status}
-            </text>
-          </g>
-        )}
-        {!mux && (
-          <text
-            x={b.x + b.w / 2}
-            y={b.y + sy(unit === "alu" ? 82 : 66)}
-            textAnchor="middle"
-            fontSize={unit === "alu" ? 24 : 22}
-            fontWeight={unit === "alu" ? 800 : 400}
-            fill={textColor}
-          >
-            {unit === "alu"
-              ? flow.jump || flow.system
-                ? "연산 경로 비활성"
-                : flow.load || flow.store
-                  ? `ADD · ${addressFormula}`
-                  : lesson.category === "adder"
-                    ? `${flow.op.toUpperCase()} · 가산기`
-                    : `${flow.op.toUpperCase()} · ${lesson.operator}`
-              : unit === "pc" && finished && flow.completed
-                ? "다음 명령어 주소"
-                : unit === "registers" && flow.store
-                  ? "읽은 값을 메모리에 저장"
-                  : ROLES[unit]}
-          </text>
-        )}
-        {unit === "registers" && (
-          <text
-            data-register-width="true"
-            x={b.x + b.w / 2}
-            y={b.y + sy(91)}
-            textAnchor="middle"
-            fontSize="18"
-            fontWeight="700"
-            fill={textColor}
-          >
-            32 × 32비트 · x0 = 0
-          </text>
-        )}
-        {unit === "alu" && !flow.jump && !flow.system && (
-          <rect
-            x={b.x + 26}
-            y={b.y + sy(163)}
-            width={b.w - 52}
-            height={sy(34)}
-            rx="6"
-            fill="var(--ar-flow-result-bg)"
-          />
-        )}
-        {lines[unit].filter(Boolean).map((line, i) => {
-          const baseline =
-            b.y +
-            sy(
-              (unit === "registers"
-                ? 126
-                : unit === "alu"
-                  ? 127
-                  : mux
-                    ? 57
-                    : 107) +
-                i * 29,
-            );
-          const overlap =
-            packet &&
-            packet.x < b.x + b.w &&
-            packet.x + packet.w > b.x &&
-            packet.y < baseline + 4 &&
-            packet.y + packet.h > baseline - 16;
-          return (
-            <text
-              key={i}
-              data-alu-equation={
-                unit === "alu" && !flow.jump && !flow.system ? i : undefined
-              }
-              x={b.x + b.w / 2}
-              y={baseline}
-              textAnchor="middle"
-              fontSize={
-                unit === "cu" || unit === "pc-select"
-                  ? 24
-                  : mux
-                    ? i === 0
-                      ? 22
-                      : 28
-                    : unit === "registers"
-                      ? i === lines[unit].length - 1
-                        ? 22
-                        : 28
-                      : unit === "alu"
-                        ? 28
-                        : unit === "memory" || unit === "instruction-memory"
-                          ? 25
-                          : 30
-              }
-              fontWeight={unit === "alu" && i === 2 ? 800 : 650}
-              opacity={overlap ? 0 : 1}
-              fill={textColor}
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {line}
-            </text>
-          );
-        })}
-        {unit === "decoder" && (
-          <g data-instruction-fields="true">
-            <text
-              x={b.x + b.w / 2}
-              y={b.y + sy(140)}
-              textAnchor="middle"
-              fontSize="24"
-              fontWeight="700"
-              fill={textColor}
-            >
-              {decoded
-                ? `${decoded.format}\uD615 \u00b7 opcode ${decoded.opcode}`
-                : "\uAE30\uACC4\uC5B4 \uBBF8\uC81C\uACF5"}
-            </text>
-            <text
-              x={b.x + b.w / 2}
-              y={b.y + sy(166)}
-              textAnchor="middle"
-              fontSize="23"
-              fontWeight="700"
-              fill={textColor}
-            >
-              {specialEncoding
-                ? "SYSTEM / FENCE"
-                : decoded
-                  ? [
-                      decoded.rd == null ? "" : `rd x${decoded.rd}`,
-                      decoded.rs1 == null ? "" : `rs1 x${decoded.rs1}`,
-                      decoded.rs2 == null ? "" : `rs2 x${decoded.rs2}`,
-                      decoded.shamt != null
-                        ? `shamt ${decoded.shamt}`
-                        : decoded.immediate == null
-                          ? ""
-                          : `imm ${decoded.immediate}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : "필드 정보 미제공"}
-            </text>
-          </g>
-        )}
       </g>
     );
   };
+
   return (
     <div
       className="ar-single-flow flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden"
-      style={
-        {
-          "--ar-flow-token-bg": `var(--ar-flow-${transfer.kind}-token)`,
-        } as CSSProperties
-      }
+      style={{} as CSSProperties}
     >
-      <div
-        className="mx-3 mb-2 shrink-0 rounded-lg border-l-4 bg-[var(--ar-header-bg)] px-3 py-2.5"
-        style={{ borderLeftColor: color }}
-        aria-label="현재 장치 동작"
-        data-transfer={transfer.id}
-      >
-        <p className="text-sm font-bold text-[var(--ar-text-primary)]">
-          {finished
-            ? completionLabel
-            : `${index + 1} / ${count} · ${transfer.title}`}
-        </p>
-        <p
-          className="mt-1 break-words font-mono text-sm font-semibold"
-          style={{ color }}
-          data-transfer-value="true"
-        >
-          {finished && flow.completed
-            ? `실행 PC ${flow.pc ?? "미제공"} → 다음 PC ${flow.nextPc ?? "미제공"}`
-            : transfer.value == null
-              ? "미제공"
-              : transfer.kind === "address" ||
-                  transfer.id === "fetch-instruction" ||
-                  transfer.id === "decode-immediate"
-                ? transfer.value
-                : displayValue(transfer.value)}
-        </p>
-        <p
-          className="mt-1 text-[13px] leading-relaxed text-[var(--ar-text-secondary)]"
-          data-operation-description="true"
-        >
-          {finished
-            ? flow.completed
-              ? "레지스터와 메모리의 실행 결과를 유지합니다. 다시 보기로 이 명령어의 처리 과정을 확인할 수 있습니다."
-              : "설명 재생이 끝났습니다. 확인되지 않은 실행 결과는 표시하지 않습니다."
-            : detailText}
-        </p>
-        {finished && executionStatus && (
-          <p
-            className="mt-1 text-xs font-semibold"
-            data-execution-status={executionStatus}
-          >
-            {executionStatus === "COMPLETED"
-              ? "프로그램 실행 완료 · 서버 확인"
-              : executionStatus === "CYCLE_LIMIT"
-                ? "최대 클록 수 도달 · 실행 중단"
-                : "시뮬레이션 오류 · 실행 중단"}
-          </p>
-        )}
-      </div>
       <div ref={area} className="min-h-0 flex-1 overflow-hidden">
         <svg
-          viewBox={
-            compact
-              ? `-210 ${sy(110)} 1470 ${sy(1298)}`
-              : `-210 ${sy(110)} 1830 ${sy(970)}`
-          }
-          preserveAspectRatio="xMidYMin meet"
+          viewBox="-40 40 1240 1400"
+          preserveAspectRatio="xMidYMid meet"
           className="ar-single-flow-diagram block h-full w-full font-sans"
           role="group"
-          aria-label="CPU 내부 장치와 메모리·버스의 싱글 사이클 구조"
+          aria-label="CPU 내부 장치와 메모리의 싱글 사이클 구조"
           data-layout="hardware-architecture"
           data-layout-compact={compact}
         >
           <defs>
-            {Object.entries(COLORS).map(([kind, stroke]) => (
-              <marker
-                key={kind}
-                id={`${id}-${kind}`}
-                viewBox="0 0 10 10"
-                refX="8.5"
-                refY="5"
-                markerWidth="5"
-                markerHeight="5"
-                orient="auto"
-              >
-                <path d="M0 1.2L9 5L0 8.8Z" fill={stroke} />
-              </marker>
-            ))}
             <marker
               id={`${id}-inactive`}
               viewBox="0 0 10 10"
               refX="8.5"
               refY="5"
-              markerWidth="5"
-              markerHeight="5"
+              markerUnits="userSpaceOnUse"
+              markerWidth="12"
+              markerHeight="12"
               orient="auto"
             >
-              <path d="M0 1.2L9 5L0 8.8Z" fill="var(--ar-flow-wire)" />
+              <path d="M0 1.2L9 5L0 8.8Z" fill="#94A3B8" />
             </marker>
+            <marker
+              id={`${id}-arr-inst`}
+              viewBox="0 0 10 10"
+              refX="8.5"
+              refY="5"
+              markerUnits="userSpaceOnUse"
+              markerWidth="12"
+              markerHeight="12"
+              orient="auto"
+            >
+              <path d="M0 1.2L9 5L0 8.8Z" fill={instColor.stroke} />
+            </marker>
+            <filter
+              id="token-glow"
+              x="-50%"
+              y="-50%"
+              width="200%"
+              height="200%"
+            >
+              <feDropShadow
+                dx="0"
+                dy="1.5"
+                stdDeviation="2"
+                floodColor="#EF4444"
+                floodOpacity="0.45"
+              />
+            </filter>
           </defs>
+
+          {instructionText && (
+            <g data-current-instruction="true">
+              <rect
+                x="-10"
+                y={sy(48)}
+                width={Math.max(220, instructionText.length * 17 + 56)}
+                height={sy(54)}
+                rx="10"
+                fill="var(--ar-header-bg)"
+                stroke={hasRealInst ? instColor.stroke : "var(--ar-border)"}
+                strokeWidth="2.5"
+              />
+              <circle
+                cx="12"
+                cy={sy(75)}
+                r="6"
+                fill={hasRealInst ? instColor.stroke : "var(--ar-mode-single)"}
+              />
+              <text
+                x="30"
+                y={sy(84)}
+                fontSize="26"
+                fontWeight="700"
+                className="font-mono"
+                fill="var(--ar-text-primary)"
+              >
+                {instructionText}
+              </text>
+            </g>
+          )}
+
+          {/* CPU / MEMORY 영역 */}
           <rect
-            x="-110"
+            x="130"
             y={sy(130)}
-            width="1176"
-            height={sy(920)}
+            width="900"
+            height={sy(900)}
             rx="24"
-            fill="var(--ar-flow-region-bg)"
-            stroke="var(--ar-flow-region-border)"
-            strokeWidth="3.5"
+            fill="#059669"
+            fillOpacity={0.18}
+            stroke="none"
             data-hardware-region="cpu"
           />
-          <g
-            data-cpu-package="true"
-            aria-hidden="true"
-            stroke="var(--ar-flow-region-border)"
-            strokeWidth="2"
-          >
-            {Array.from({ length: 12 }, (_, i) => (
-              <path
-                key={i}
-                d={`M${-40 + i * 90} ${sy(118)}v${sy(12)}M${-40 + i * 90} ${sy(1050)}v${sy(12)}M-122 ${sy(205 + i * 68)}h12M1066 ${sy(205 + i * 68)}h12`}
-              />
-            ))}
-          </g>
-          <rect
-            x="-100"
-            y={sy(135)}
-            width="300"
-            height={sy(32)}
-            rx="4"
-            fill="var(--ar-flow-region-heading-bg)"
-          />
           <text
-            x="-90"
-            y={sy(157)}
+            x="150"
+            y={sy(162)}
+            dominantBaseline="central"
             fontSize="26"
             fontWeight="800"
             fill="var(--ar-text-primary)"
           >
-            CPU · 내부 회로
+            CPU
           </text>
           <rect
-            x={compact ? 16 : 1180}
-            y={sy(compact ? 1120 : 130)}
-            width={compact ? 1050 : 365}
-            height={sy(compact ? 285 : 920)}
+            x="130"
+            y={sy(1135)}
+            width="900"
+            height={sy(210)}
             rx="16"
-            fill="var(--ar-flow-region-bg)"
-            stroke="var(--ar-flow-region-border)"
-            strokeWidth="3.5"
+            fill="#D97706"
+            fillOpacity={0.18}
+            stroke="none"
             data-hardware-region="memory"
           />
-          <rect
-            x={compact ? 25 : 1190}
-            y={sy(compact ? 1127 : 137)}
-            width={compact ? 350 : 345}
-            height={sy(32)}
-            rx="4"
-            fill="var(--ar-flow-region-heading-bg)"
-          />
           <text
-            x={compact ? 35 : 1200}
-            y={sy(compact ? 1147 : 157)}
+            x="150"
+            y={sy(1162)}
+            dominantBaseline="central"
             fontSize="24"
             fontWeight="800"
             fill="var(--ar-text-primary)"
           >
-            Memory · CPU 외부
+            MEMORY
           </text>
-          {WIRES.map((wire) => (
+
+          {/* 1. 정적 데이터패스 배선 골격 (컴파일 즉시 투명화) */}
+          <g
+            data-datapath-wires="true"
+            fill="none"
+            stroke="#94A3B8"
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              opacity: isCompiled ? 0 : 1,
+              transition: "opacity 0.2s ease-out",
+            }}
+          >
+            <path d={SC_PC_TO_IMEM_D} markerEnd={`url(#${id}-inactive)`} />
+            <path
+              d="M 100 920 H 238 V 780"
+              markerEnd={`url(#${id}-inactive)`}
+            />
+            <path d={SC_PLUS4_TO_PC_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_IMEM_TO_CU_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_IMEM_TO_REGS_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_IMEM_TO_IMM_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_REGS_TO_ALU_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_REGS_TO_OP_MUX_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_IMM_TO_OP_MUX_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_OP_MUX_TO_ALU_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_ALU_TO_DMEM_D} markerEnd={`url(#${id}-inactive)`} />
+            <path
+              d="M 977 645 V 410 H 665"
+              markerEnd={`url(#${id}-inactive)`}
+            />
+            <path d={SC_DMEM_TO_WB_MUX_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_WB_MUX_TO_REGS_D} markerEnd={`url(#${id}-inactive)`} />
+          </g>
+
+          {/* 2. 정적 제어 시그널 배선 골격 (컴파일 즉시 투명화) */}
+          <g
+            data-control-wires="true"
+            fill="none"
+            stroke="#64748B"
+            strokeWidth={1.8}
+            strokeDasharray="6 4"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              opacity: isCompiled ? 0 : 1,
+              transition: "opacity 0.2s ease-out",
+            }}
+          >
+            <path d={SC_CU_TO_WB_MUX_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_CU_TO_OP_MUX_D} markerEnd={`url(#${id}-inactive)`} />
+            <path d={SC_CU_TO_DMEM_D} markerEnd={`url(#${id}-inactive)`} />
+          </g>
+
+          {/* 3. 활성 단계 동기화 배선 오버레이 (파이프라인 동일 규격) */}
+          {hasRealInst && (
             <g
-              key={wire.key}
-              data-circuit-wire={wire.key}
-              data-memory-connection={wire.system || undefined}
-              data-wire-visible={showWire(wire.key)}
-              opacity={showWire(wire.key) ? 1 : 0}
-              aria-hidden="true"
+              data-active-wires="true"
+              fill="none"
+              strokeLinejoin="round"
+              strokeLinecap="round"
             >
+              {/* IF Stage */}
               <path
-                d={paths[wire.key]}
-                fill="none"
-                stroke="var(--ar-flow-wire)"
-                strokeWidth={wire.system ? 2.8 : 2}
-                strokeDasharray={wire.kind === "control" ? "6 5" : undefined}
-                strokeLinejoin="round"
-                markerEnd={`url(#${id}-inactive)`}
-              />
-            </g>
-          ))}
-          {!finished && path && (
-            <g data-flow-route={transfer.id} data-active="true">
-              <path
-                d={path}
-                fill="none"
-                stroke="var(--ar-panel-bg)"
-                strokeWidth="6"
-                strokeLinejoin="round"
+                d={SC_PC_TO_IMEM_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(true, if1State)}
               />
               <path
-                d={path}
-                fill="none"
-                stroke={color}
-                strokeOpacity=".2"
-                strokeWidth="2.8"
-                strokeLinejoin="round"
+                d={SC_PC_TO_PLUS4_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(true, if1State)}
               />
               <path
-                className="flow-arrow-stream"
-                data-flow-stream="true"
-                d={path}
-                fill="none"
-                stroke={color}
-                strokeWidth={3.2 + emphasis * 0.6}
-                strokeOpacity={0.75 + emphasis * 0.25}
-                strokeDasharray={transfer.kind === "control" ? "12 10" : "16 10"}
-                strokeDashoffset={-progress * (transfer.kind === "control" ? 88 : 104)}
-                strokeLinejoin="round"
-                markerEnd={`url(#${id}-${transfer.kind})`}
+                d={SC_PLUS4_TO_PC_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(true, id1State)}
+              />
+
+              {/* ID Stage */}
+              <path
+                d={SC_IMEM_TO_CU_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(true, id1State)}
+              />
+              <path
+                d={SC_IMEM_TO_REGS_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(readsRegsInId, id1State)}
+              />
+              <path
+                d={SC_IMEM_TO_IMM_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(hasImmOp, id1State)}
+              />
+
+              {/* EX Stage & Control */}
+              <path
+                d={SC_REGS_TO_ALU_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(readsRs1Op && usesAluOp, exAluAState)}
+              />
+              <path
+                d={SC_REGS_TO_OP_MUX_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(readsRs2Op, ex1State)}
+              />
+              <path
+                d={SC_IMM_TO_OP_MUX_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(hasImmOp && usesAluOp, ex1State)}
+              />
+              <path
+                d={SC_OP_MUX_TO_ALU_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(usesAluOp, ex2State)}
+              />
+
+              <path
+                d={SC_CU_TO_OP_MUX_D}
+                stroke={instColor.stroke}
+                strokeDasharray="6 4"
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(usesAluOp, ex1State, true)}
+              />
+              <path
+                d={SC_CU_TO_DMEM_D}
+                stroke={instColor.stroke}
+                strokeDasharray="6 4"
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(isMemOp, ctrlDmemState, true)}
+              />
+              <path
+                d={SC_CU_TO_WB_MUX_D}
+                stroke={instColor.stroke}
+                strokeDasharray="6 4"
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(writesRegOp, ex1State, true)}
+              />
+
+              {/* MEM / WB Stages */}
+              <path
+                d={SC_ALU_TO_DMEM_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(isMemOp, memState)}
+              />
+              <path
+                d={SC_ALU_TO_WB_MUX_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(!isMemOp && writesRegOp, memState)}
+              />
+              <path
+                d={SC_DMEM_TO_WB_MUX_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(isLoadOp, wbLoadState)}
+              />
+              <path
+                d={SC_WB_MUX_TO_REGS_D}
+                stroke={instColor.stroke}
+                markerEnd={`url(#${id}-arr-inst)`}
+                {...syncWireProps(writesRegOp, wbRegState)}
               />
             </g>
           )}
-          {(Object.keys(BOXES) as TransferUnit[]).map(node)}
+
+          {/* 4. 회로 소자 */}
+          {(Object.keys(BOXES) as TransferUnit[])
+            .filter((u) => u !== "pc-select" && u !== "decoder")
+            .map(node)}
           <g
-            data-bus-legend="true"
-            aria-label="현재 전송의 주소·데이터·제어 종류"
+            data-pc-plus4="true"
+            data-flow-active={isPcPlus4Active ? "true" : "false"}
+            aria-label="PC + 4 가산기"
           >
+            <polygon
+              points={`213,${sy(740)} 263,${sy(740)} 283,${sy(780)} 193,${sy(780)}`}
+              fill={isPcPlus4Active ? instColor.fill : "#F8FAFC"}
+              stroke={isPcPlus4Active ? instColor.stroke : "#94A3B8"}
+              strokeWidth={2.8}
+              strokeLinejoin="round"
+            />
             <text
-              x={compact ? 35 : 1220}
-              y={sy(compact ? 1080 : 515)}
-              fontSize="25"
-              fontWeight="800"
-              fill="var(--ar-text-primary)"
+              x={238}
+              y={sy(760)}
+              dominantBaseline="central"
+              textAnchor="middle"
+              fontFamily="sans-serif"
+              fontSize={18}
+              fontWeight="bold"
+              fill={isPcPlus4Active ? instColor.text : "#94A3B8"}
             >
-              전송 신호·버스 구분
+              + 4
             </text>
-            {(["address", "data", "control"] as const).map((kind, i) => {
-              const busActive = Boolean(
-                !finished && path && transfer.kind === kind,
-              );
-              return (
-                <g
-                  key={kind}
-                  data-system-bus-label={kind}
-                  data-bus-active={busActive}
-                >
-                  {busActive && (
-                    <rect
-                      x={compact ? 25 + i * 340 : 1195}
-                      y={sy(compact ? 1084 : 535 + i * 46)}
-                      width={330}
-                      height={sy(34)}
-                      rx="4"
-                      fill={`color-mix(in srgb, ${COLORS[kind]} 8%, var(--ar-panel-bg))`}
-                    />
-                  )}
-                  <path
-                    d={
-                      compact
-                        ? `M${35 + i * 340} ${sy(1100)}h28`
-                        : `M1205 ${sy(550 + i * 46)}H1240`
-                    }
-                    stroke={busActive ? COLORS[kind] : "var(--ar-flow-wire)"}
-                    strokeWidth={busActive ? 7 : kind === "control" ? 4 : 6}
-                    strokeDasharray={kind === "control" ? "5 4" : undefined}
-                  />
-                  <text
-                    x={compact ? 75 + i * 340 : 1255}
-                    y={sy(compact ? 1106 : 557 + i * 46)}
-                    fontSize="26"
-                    fontWeight={busActive ? 800 : 600}
-                    fill={busActive ? COLORS[kind] : "var(--ar-text-muted)"}
-                  >
-                    {kind === "address"
-                      ? "Address Bus"
-                      : kind === "data"
-                        ? "Data Bus"
-                        : "Control Bus"}
-                  </text>
-                </g>
-              );
-            })}
           </g>
 
-          {point && packet && (
-            <g className="flow-token">
-              <g
-                className={
-                  transfer.kind === "control"
-                    ? "flow-control-word flow-packet"
-                    : "flow-data-word flow-packet"
-                }
-                data-label-kind={transfer.kind}
-                data-moving-value={motion.value}
-                data-packet-x={point.x}
-                data-packet-y={point.y}
-                aria-label={`이동 중인 ${transfer.kind === "control" ? "선택·제어 정보" : "값"} ${motion.value}`}
-              >
-                <rect
-                  data-flow-marker="true"
-                  x={packet.x}
-                  y={packet.y}
-                  width={packet.w}
-                  height={packet.h}
-                  rx="6"
-                  fill={
-                    transfer.kind === "control"
-                      ? "var(--ar-panel-bg)"
-                      : "var(--ar-flow-token-bg)"
-                  }
-                  stroke={
-                    transfer.kind === "control" ? color : "var(--ar-panel-bg)"
-                  }
-                  strokeWidth="1.8"
-                  strokeDasharray={
-                    transfer.kind === "control" ? "5 3" : undefined
-                  }
+          {/* 5. 최상단 이동 데이터·제어 칩 레이어 (파이프라인 FloatingChip 동일 디자인) */}
+          {hasRealInst && (
+            <g data-flow-chips="true">
+              {/* Step 1: IF */}
+              {pcToImemPt && if1State && (
+                <FloatingChip
+                  x={pcToImemPt.x}
+                  y={pcToImemPt.y}
+                  text={`PC: ${pcDec}`}
+                  stroke={instColor.stroke}
+                  title={`PC 주소: ${pcDec}`}
+                  opacity={if1State.opacity}
                 />
-                <text
-                  x={point.x}
-                  y={point.y + 10}
-                  textAnchor="middle"
-                  fontSize="32"
-                  fontWeight="750"
-                  className="font-mono"
-                  fill={transfer.kind === "control" ? color : "#fff"}
-                >
-                  {motion.value}
-                </text>
-              </g>
+              )}
+              {pcToPlus4Pt && if1State && (
+                <FloatingChip
+                  x={pcToPlus4Pt.x}
+                  y={pcToPlus4Pt.y}
+                  text={`PC: ${pcDec}`}
+                  stroke={instColor.stroke}
+                  title={`PC + 4 입력: ${pcDec}`}
+                  opacity={if1State.opacity}
+                />
+              )}
+
+              {/* Step 2: ID (+4 루프백 및 명령어 분배) */}
+              {plus4ToPcPt && id1State && (
+                <FloatingChip
+                  x={plus4ToPcPt.x}
+                  y={plus4ToPcPt.y}
+                  text={
+                    flow.taken || isJumpOp
+                      ? `Next: ${nextPcDec}`
+                      : `+4: ${pcPlus4Dec}`
+                  }
+                  stroke={instColor.stroke}
+                  title={`다음 PC: ${flow.taken || isJumpOp ? nextPcDec : pcPlus4Dec}`}
+                  opacity={id1State.opacity}
+                />
+              )}
+              {imemToCuPt && id1State && (
+                <FloatingChip
+                  x={imemToCuPt.x}
+                  y={imemToCuPt.y}
+                  text={op || instructionText || "—"}
+                  stroke={instColor.stroke}
+                  title={`명령어 디코드: ${instructionText || op}`}
+                  opacity={id1State.opacity}
+                />
+              )}
+              {imemToRegsPt && id1State && (
+                <FloatingChip
+                  x={imemToRegsPt.x}
+                  y={imemToRegsPt.y}
+                  text={regFieldsLabel}
+                  stroke={instColor.stroke}
+                  title={`레지스터 필드: ${regFieldsLabel}`}
+                  opacity={id1State.opacity}
+                />
+              )}
+              {imemToImmPt && id1State && (
+                <FloatingChip
+                  x={imemToImmPt.x}
+                  y={imemToImmPt.y}
+                  text={`imm: ${immText}`}
+                  stroke={instColor.stroke}
+                  title={`즉치수 필드: ${immText}`}
+                  opacity={id1State.opacity}
+                />
+              )}
+
+              {/* Step 3: EX-1 피연산자 및 제어 신호 */}
+              {regsToAluPt && exAluAState && (
+                <FloatingChip
+                  x={regsToAluPt.x}
+                  y={regsToAluPt.y}
+                  text={`A: ${aVal}`}
+                  stroke={instColor.stroke}
+                  title={`ALU 입력 A: ${aVal}`}
+                  opacity={exAluAState.opacity}
+                />
+              )}
+              {regsToOpMuxPt && ex1State && (
+                <FloatingChip
+                  x={regsToOpMuxPt.x}
+                  y={regsToOpMuxPt.y}
+                  text={`B: ${bRegVal}`}
+                  stroke={instColor.stroke}
+                  title={`MUX 레지스터 입력: ${bRegVal}`}
+                  opacity={ex1State.opacity}
+                />
+              )}
+              {immToOpMuxPt && ex1State && (
+                <FloatingChip
+                  x={immToOpMuxPt.x}
+                  y={immToOpMuxPt.y}
+                  text={`imm: ${immText}`}
+                  stroke={instColor.stroke}
+                  title={`MUX 즉치수 입력: ${immText}`}
+                  opacity={ex1State.opacity}
+                />
+              )}
+              {cuToOpMuxPt && ex1State && (
+                <FloatingChip
+                  x={cuToOpMuxPt.x}
+                  y={cuToOpMuxPt.y}
+                  text={hasImmOp ? "ALUSrc: 1" : "ALUSrc: 0"}
+                  stroke={instColor.stroke}
+                  title={`ALUSrc 제어 신호: ${hasImmOp ? "1 (즉치수)" : "0 (레지스터)"}`}
+                  opacity={ex1State.opacity}
+                />
+              )}
+              {cuToDmemPt && ctrlDmemState && (
+                <FloatingChip
+                  x={cuToDmemPt.x}
+                  y={cuToDmemPt.y}
+                  text={isLoadOp ? "MemRead: 1" : "MemWrite: 1"}
+                  stroke={instColor.stroke}
+                  title={isLoadOp ? "MemRead: 1" : "MemWrite: 1"}
+                  opacity={ctrlDmemState.opacity}
+                />
+              )}
+              {cuToWbMuxPt && ex1State && (
+                <FloatingChip
+                  x={cuToWbMuxPt.x}
+                  y={cuToWbMuxPt.y}
+                  text={isLoadOp ? "MemtoReg: 1" : "MemtoReg: 0"}
+                  stroke={instColor.stroke}
+                  title={`MemtoReg 제어 신호: ${isLoadOp ? 1 : 0}`}
+                  opacity={ex1State.opacity}
+                />
+              )}
+
+              {/* Step 4: EX-2 Operand MUX -> ALU */}
+              {opMuxToAluPt && ex2State && (
+                <FloatingChip
+                  x={opMuxToAluPt.x}
+                  y={opMuxToAluPt.y}
+                  text={`B: ${aluBVal}`}
+                  stroke={instColor.stroke}
+                  title={`선택된 ALU 입력 B: ${aluBVal}`}
+                  opacity={ex2State.opacity}
+                />
+              )}
+
+              {/* Step 5: MEM / ALU 출력 */}
+              {aluToDmemPt && memState && (
+                <FloatingChip
+                  x={aluToDmemPt.x}
+                  y={aluToDmemPt.y}
+                  lines={
+                    isStoreOp
+                      ? [`Addr: ${addrText}`, `WData: ${memValText}`]
+                      : [`Addr: ${addrText}`]
+                  }
+                  stroke={instColor.stroke}
+                  title={
+                    isStoreOp
+                      ? `메모리 쓰기 주소 ${addrText}, 데이터 ${memValText}`
+                      : `메모리 읽기 주소 ${addrText}`
+                  }
+                  opacity={memState.opacity}
+                />
+              )}
+              {aluToWbMuxPt && memState && (
+                <FloatingChip
+                  x={aluToWbMuxPt.x}
+                  y={aluToWbMuxPt.y}
+                  text={isJumpOp ? `PC+4: ${pcPlus4Dec}` : `ALU: ${aluResText}`}
+                  stroke={instColor.stroke}
+                  title={`연산 결과: ${isJumpOp ? pcPlus4Dec : aluResText}`}
+                  opacity={memState.opacity}
+                />
+              )}
+              {isBranchOp && memState && (
+                <FloatingChip
+                  x={929}
+                  y={645}
+                  text={branchChipText}
+                  stroke={instColor.stroke}
+                  title={`분기 판정 결과: ${branchChipText}`}
+                  opacity={memState.opacity}
+                />
+              )}
+
+              {/* Step 6: WB (Load 읽기 복귀 & 레지스터 쓰기) */}
+              {dmemToWbMuxPt && wbLoadState && (
+                <FloatingChip
+                  x={dmemToWbMuxPt.x}
+                  y={dmemToWbMuxPt.y}
+                  text={`RData: ${memValText}`}
+                  stroke={instColor.stroke}
+                  title={`메모리 읽기 값: ${memValText}`}
+                  opacity={wbLoadState.opacity}
+                />
+              )}
+              {wbMuxToRegsPt && wbRegState && (
+                <FloatingChip
+                  x={wbMuxToRegsPt.x}
+                  y={wbMuxToRegsPt.y}
+                  text={rdName ? `${rdName}: ${wbValText}` : wbValText}
+                  stroke={instColor.stroke}
+                  title={`레지스터 기록: ${rdName ? `${rdName} = ${wbValText}` : wbValText}`}
+                  opacity={wbRegState.opacity}
+                />
+              )}
             </g>
           )}
         </svg>

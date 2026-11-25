@@ -30,14 +30,15 @@ const C_TEMPLATES = [
   },
   {
     title: "배열과 메모리 접근 (Array & Memory)",
-    desc: "전역 배열 메모리로부터 값을 로드하여 연산",
+    desc: "전역 배열 메모리에서 값을 로드·연산 후 다시 저장",
     fileName: "memory.c",
     code: `volatile int values[2] = {12, 30};
 
 int main(void) {
     int first = values[0];
     int second = values[1];
-    return first + second;
+    values[1] = first + second;
+    return values[1];
 }
 `,
   },
@@ -46,8 +47,8 @@ int main(void) {
     desc: "if-else 조건 분기에 따른 분기 명령어 생성 과정",
     fileName: "condition.c",
     code: `int main(void) {
-    int a = 10;
-    int b = 20;
+    volatile int a = 10;
+    volatile int b = 20;
     int max;
     if (a > b) {
         max = a;

@@ -1,231 +1,198 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  instructionTransfers,
-  instructionPaths,
-  transferTimeline,
-  type TransferUnit,
-  type buildInstructionFlow,
-} from "../utils/instructionFlow";
+import { useEffect, useRef, useState } from "react";
+import type { buildInstructionFlow } from "../utils/instructionFlow";
+import { timelineSync, TIMELINE_END_THRESHOLD } from "../utils/timelineSync";
 import InstructionFlowDiagram from "./InstructionFlowDiagram";
-import InstructionHardwareDetail from "./InstructionHardwareDetail";
 import "./SingleInstructionFlow.css";
 import type { SimulationResult } from "@/type/simulation";
 
 export default function SingleInstructionFlow({
   flow,
-  duration = 3000,
-  onPause,
+  instructionText,
+  duration = 5000,
   isPlaying,
+  isCompiled = false,
+  playMode = "continuous",
+  currentCycle,
+  playbackRevision,
   executionStatus,
   playbackFinished,
 }: {
   flow: ReturnType<typeof buildInstructionFlow>;
+  instructionText?: string;
   duration?: number;
   onPause?: () => void;
   isPlaying?: boolean;
+  isCompiled?: boolean;
+  playMode?: "continuous" | "singleCycle";
+  currentCycle?: number;
+  playbackRevision?: number;
   executionStatus?: SimulationResult["execution_status"];
   playbackFinished?: boolean;
 }) {
-  const transfers = useMemo(() => instructionTransfers(flow), [flow]);
-  const paths = useMemo(() => instructionPaths(flow), [flow]);
-  const timeline = useMemo(
-    () => transferTimeline(transfers, paths, duration, duration),
-    [transfers, paths, duration],
+  const flowDuration = duration || 5000;
+  const [animProgress, setAnimProgress] = useState<number>(() =>
+    flow.actual && !playbackFinished ? (isPlaying ? 0 : 1) : 0,
   );
-  const totalDuration = timeline.reduce(
-    (sum, entry) => sum + entry.duration,
-    0,
+  const [isSubstepPlaying, setIsSubstepPlaying] = useState<boolean>(
+    Boolean(flow.actual && !playbackFinished && (isPlaying ?? false)),
   );
-  const [clock, setClock] = useState({
-    elapsed: 0,
-    running: flow.actual && (isPlaying ?? true),
-    globalPlaying: isPlaying,
-    local: isPlaying == null,
-    scheduleDuration: totalDuration,
+
+  const progressRef = useRef<number>(animProgress);
+  const startTimeRef = useRef<number>(performance.now());
+  const pausedProgressRef = useRef<number>(animProgress);
+  const prevFlowRef = useRef(flow);
+  const prevCycleRef = useRef(currentCycle);
+  const prevDurationRef = useRef(flowDuration);
+  const prevPlayStateRef = useRef({
+    isPlaying: Boolean(isPlaying),
+    playbackRevision,
   });
-  const [detail, setDetail] = useState<"alu" | "pc-select" | "decoder" | null>(
-    null,
-  );
-  const inspect = (unit: "alu" | "pc-select" | "decoder") => {
-    onPause?.();
-    setClock((value) => ({
-      ...value,
-      running: false,
-      elapsed: playbackFinished ? totalDuration : value.elapsed,
-      local: true,
-      globalPlaying: isPlaying,
-    }));
-    setDetail(unit);
-  };
-  // Global Pause also applies to a new frame mounted at the same playback boundary.
-  const globalChanged = isPlaying != null && clock.globalPlaying !== isPlaying;
-  const scaledElapsed =
-    (clock.elapsed * totalDuration) / clock.scheduleDuration;
-  if (globalChanged || clock.scheduleDuration !== totalDuration)
-    setClock({
-      ...clock,
-      scheduleDuration: totalDuration,
-      globalPlaying: isPlaying,
-      running: globalChanged
-        ? isPlaying === true || (clock.local && clock.running)
-        : clock.running,
-      local: globalChanged && isPlaying ? false : clock.local,
-      elapsed:
-        globalChanged &&
-          isPlaying &&
-          (clock.local || clock.elapsed >= clock.scheduleDuration)
-          ? 0
-          : scaledElapsed,
-    });
+
+  // 1. 명령어/사이클 변경 시 진행률 리셋 (재생 중이면 0, 정지 상태면 1, 대기 상태면 0)
   useEffect(() => {
-    if (!clock.running) return;
-    let frame = 0,
-      previous = performance.now();
-    const tick = (now: number) => {
-      // RAF's frame timestamp can precede an effect created later in that same frame.
-      const delta = Math.max(0, now - previous);
-      previous = now;
-      setClock((value) => {
-        if (!value.running) return value;
-        const elapsed = Math.min(totalDuration, value.elapsed + delta);
-        return { ...value, elapsed, running: elapsed < totalDuration };
-      });
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [clock.running, totalDuration]);
-  const activeIndex = timeline.findIndex(
-    (entry) => clock.elapsed < entry.start + entry.duration,
-  );
-  const index = activeIndex < 0 ? timeline.length - 1 : activeIndex;
-  const entry = timeline[index];
-  const finished = playbackFinished || clock.elapsed >= totalDuration;
-  const completionLabel = flow.completed
-    ? "명령어 처리 완료"
-    : flow.error
-      ? "오류 시점 확인 완료"
-      : "설명 재생 완료";
-  const progress = entry.travel
-    ? Math.max(
-      0,
-      Math.min(1, (clock.elapsed - entry.start - entry.lead) / entry.travel),
-    )
-    : Math.min(1, (clock.elapsed - entry.start) / entry.duration);
-  const arrived = useMemo(
-    () => transfers.slice(0, index).map((value) => value.id),
-    [transfers, index],
-  );
-  const seek = useCallback(
-    (target: number) => {
-      onPause?.();
-      setClock({
-        elapsed:
-          timeline[Math.max(0, Math.min(transfers.length - 1, target))].start,
-        running: false,
-        globalPlaying: isPlaying,
-        local: true,
-        scheduleDuration: totalDuration,
-      });
-    },
-    [onPause, timeline, transfers.length, isPlaying, totalDuration],
-  );
-  const chooseUnit = useCallback(
-    (unit: TransferUnit) => {
-      if (unit === "memory" && (flow.load || flow.store)) {
-        seek(transfers.findIndex((value) => value.id === "memory-address"));
+    if (prevFlowRef.current !== flow || prevCycleRef.current !== currentCycle) {
+      prevFlowRef.current = flow;
+      prevCycleRef.current = currentCycle;
+      startTimeRef.current = performance.now();
+      const initialProg = !flow.actual
+        ? 0
+        : playbackFinished
+          ? 1
+          : isPlaying
+            ? 0
+            : 1;
+      progressRef.current = initialProg;
+      pausedProgressRef.current = initialProg;
+      setAnimProgress(initialProg);
+      setIsSubstepPlaying(Boolean(flow.actual && !playbackFinished && isPlaying));
+      if (flow.actual || (currentCycle ?? 0) === 0) {
+        timelineSync.setProgress(currentCycle ?? 0, flow.actual ? initialProg : 0);
+      }
+    }
+  }, [flow, currentCycle, isPlaying, playbackFinished]);
+
+  // 2. 배속 변경 시 현재 상대 진행률 유지
+  useEffect(() => {
+    if (prevDurationRef.current !== flowDuration) {
+      startTimeRef.current =
+        performance.now() - progressRef.current * flowDuration;
+      prevDurationRef.current = flowDuration;
+    }
+  }, [flowDuration]);
+
+  // 3. Play / Pause / singleCycle 제어 (완료 직후 0으로 되돌아가지 않도록 재생 상태 전환 시에만 시작)
+  useEffect(() => {
+    const prevPlay = prevPlayStateRef.current;
+    prevPlayStateRef.current = { isPlaying: Boolean(isPlaying), playbackRevision };
+
+    if (!flow.actual || playbackFinished) {
+      const doneProg = flow.actual ? 1 : 0;
+      progressRef.current = doneProg;
+      pausedProgressRef.current = doneProg;
+      setAnimProgress(doneProg);
+      setIsSubstepPlaying(false);
+      return;
+    }
+
+    if (isPlaying) {
+      const triggerChanged =
+        !prevPlay.isPlaying || prevPlay.playbackRevision !== playbackRevision;
+      if (triggerChanged) {
+        if (playMode === "singleCycle") {
+          startTimeRef.current = performance.now();
+          progressRef.current = 0;
+          pausedProgressRef.current = 0;
+          setAnimProgress(0);
+          timelineSync.setProgress(currentCycle ?? 0, 0);
+        } else if (
+          pausedProgressRef.current > 0 &&
+          pausedProgressRef.current < TIMELINE_END_THRESHOLD
+        ) {
+          startTimeRef.current =
+            performance.now() - pausedProgressRef.current * flowDuration;
+          progressRef.current = pausedProgressRef.current;
+          setAnimProgress(pausedProgressRef.current);
+        } else {
+          startTimeRef.current = performance.now();
+          progressRef.current = 0;
+          pausedProgressRef.current = 0;
+          setAnimProgress(0);
+          timelineSync.setProgress(currentCycle ?? 0, 0);
+        }
+      }
+      setIsSubstepPlaying(true);
+    } else {
+      const sync = timelineSync.getProgress();
+      const snappedToEnd =
+        sync.cycle === (currentCycle ?? 0) &&
+        sync.progress >= TIMELINE_END_THRESHOLD;
+      if (snappedToEnd) {
+        progressRef.current = 1;
+        pausedProgressRef.current = 1;
+        setAnimProgress(1);
+      } else {
+        const cur = progressRef.current;
+        pausedProgressRef.current = cur >= TIMELINE_END_THRESHOLD ? 1.0 : cur;
+      }
+      setIsSubstepPlaying(false);
+    }
+  }, [
+    flow.actual,
+    playbackFinished,
+    isPlaying,
+    playbackRevision,
+    playMode,
+    flowDuration,
+    currentCycle,
+  ]);
+
+  // 4. 60 FPS requestAnimationFrame 루프
+  useEffect(() => {
+    if (!isPlaying || !isSubstepPlaying) {
+      return;
+    }
+
+    const startEpoch = timelineSync.getEpoch();
+    let frameId: number;
+    let lastTick = 0;
+    const minFrameInterval = 16;
+
+    const loop = (now: number) => {
+      // 스텝 이동/점프 등 수동 스냅 이후 cleanup 전 잔여 프레임이 덮어쓰지 않도록 즉시 중단
+      if (timelineSync.getEpoch() !== startEpoch) {
         return;
       }
-      const target = transfers.findIndex(
-        (value) => value.target === unit || value.source === unit,
-      );
-      seek(target < 0 ? 0 : target);
-    },
-    [flow.load, flow.store, seek, transfers],
-  );
-  const toggle = () => {
-    onPause?.();
-    setClock((value) => ({
-      ...value,
-      globalPlaying: isPlaying,
-      local: true,
-      scheduleDuration: totalDuration,
-      running: !value.running,
-      elapsed: finished ? 0 : value.elapsed,
-    }));
-  };
-  const replay = () => {
-    onPause?.();
-    setClock({
-      elapsed: 0,
-      running: true,
-      globalPlaying: isPlaying,
-      local: true,
-      scheduleDuration: totalDuration,
-    });
-  };
-  const button =
-    "rounded-md border border-[var(--ar-border)] px-2.5 py-1.5 text-xs disabled:opacity-35 hover:bg-[var(--ar-header-bg)]";
+      frameId = requestAnimationFrame(loop);
+      if (document.hidden) return;
+      if (now - lastTick < minFrameInterval) return;
+      lastTick = now;
+
+      const cycle = currentCycle ?? 0;
+      const elapsed = Math.max(0, now - startTimeRef.current);
+      const prog = Math.min(1, elapsed / flowDuration);
+      progressRef.current = prog;
+      setAnimProgress(prog);
+      timelineSync.setProgress(cycle, prog);
+
+      if (prog >= 1) {
+        pausedProgressRef.current = 1;
+      }
+    };
+
+    frameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameId);
+  }, [isPlaying, isSubstepPlaying, playbackRevision, flowDuration, currentCycle]);
+
+  const finished = Boolean(!flow.actual || playbackFinished || animProgress >= 1);
+
   return (
     <div
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      data-flow-playing={clock.running}
-      data-flow-elapsed={clock.elapsed}
-      data-flow-step-duration={entry.duration}
+      data-flow-playing={isSubstepPlaying}
+      data-flow-elapsed={Math.round(animProgress * flowDuration)}
+      data-flow-step-duration={flowDuration}
       data-flow-finished={finished}
     >
-      <div className="grid h-[68px] shrink-0 grid-cols-1 content-center gap-1 px-3 py-1 sm:h-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="whitespace-nowrap text-[11px] text-[var(--ar-text-muted)]">
-            {finished
-              ? completionLabel
-              : clock.running
-                ? "흐름 재생 중"
-                : "흐름 일시정지"}{" "}
-            · 전체 {Number((totalDuration / 1000).toFixed(1))}초
-          </span>
-        </div>
-        <div
-          className="flex items-center gap-1.5"
-          role="group"
-          aria-label="데이터 흐름 재생 조작"
-        >
-          <button
-            type="button"
-            className={button}
-            disabled={index === 0}
-            onClick={() => seek(index - 1)}
-            aria-label="이전 흐름"
-          >
-            이전
-          </button>
-          <button
-            type="button"
-            className={button}
-            onClick={toggle}
-            aria-label={clock.running ? "흐름 일시정지" : "흐름 재생"}
-          >
-            {clock.running ? "일시정지" : "재생"}
-          </button>
-          <button
-            type="button"
-            className={button}
-            disabled={index >= transfers.length - 1}
-            onClick={() => seek(index + 1)}
-            aria-label="다음 흐름"
-          >
-            다음
-          </button>
-          <button
-            type="button"
-            className={button}
-            onClick={replay}
-            aria-label="흐름 다시 보기"
-          >
-            다시 보기
-          </button>
-        </div>
-      </div>
       {flow.error && (
         <p role="alert" className="shrink-0 px-3 text-xs text-red-600">
           실행 오류: {flow.error.message ?? flow.error.code}. 확인되지 않은
@@ -234,31 +201,14 @@ export default function SingleInstructionFlow({
       )}
       <div className="min-h-0 flex-1 overflow-hidden px-1 pb-1">
         <InstructionFlowDiagram
-          finished={finished}
-          completionLabel={completionLabel}
-          executionStatus={executionStatus}
           flow={flow}
-          transfer={transfers[index]}
-          progress={progress}
-          index={index}
-          count={transfers.length}
-          arrived={arrived}
-          onUnit={chooseUnit}
-          onInspect={inspect}
+          instructionText={instructionText}
+          animProgress={animProgress}
+          isActiveCycle={Boolean(flow.actual)}
+          isCompiled={isCompiled}
+          executionStatus={executionStatus}
         />
       </div>
-      {detail && (
-        <InstructionHardwareDetail
-          flow={flow}
-          unit={detail}
-          onClose={() => setDetail(null)}
-        />
-      )}
-      <p className="sr-only">
-        시스템 버스는 CPU와 메모리 사이의 주소·데이터·제어 역할을 설명한
-        개념도입니다. 실제 공유 버스 회로나 하드웨어 지연을 재현한 것은
-        아닙니다.
-      </p>
     </div>
   );
 }
