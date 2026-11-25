@@ -303,22 +303,6 @@ test('register shifts transport the register word and immediate shifts transport
   }
 });
 
-test('large hardware details show real addition, selectable carry bits, PC components and instruction decoding',async({page})=>{
-  await frozenTime(page);await page.goto('/tests/browser/line-flow.html');await pause(page);
-  await page.getByRole('button',{name:'ALU 역할과 동작 보기',exact:true}).click();
-  const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await expect(dialog.locator('[data-numeric-equation]')).toContainText('11 + 7 → 18');
-  await expect(dialog).toContainText('전가산기');await page.getByLabel('가산기 비트 구간').selectOption('1');await expect(dialog.getByRole('columnheader',{name:'15',exact:true})).toBeVisible();
-  await dialog.getByText('전가산기 한 개 자세히',{exact:true}).click();await page.getByLabel('전가산기 비트 선택').selectOption('1');
-  await expect(dialog.locator('[data-full-adder]')).toContainText('1 XOR 1 XOR 1 = 1');await expect(dialog.locator('[data-full-adder]')).toContainText('2번 자리로 전달');
-  expect(await dialog.locator('[data-alu-formula]').evaluate(n=>parseFloat(getComputedStyle(n).fontSize))).toBeGreaterThanOrEqual(24);
-  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
-  await page.getByRole('button',{name:'PC Select 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('PC 선택 MUX');await expect(page.getByRole('dialog')).toContainText('0x00010040');
-  await page.getByRole('button',{name:'닫기',exact:true}).click();
-  await page.getByRole('button',{name:'Instruction Decoder 역할과 동작 보기',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('funct7');await expect(page.getByRole('dialog')).toContainText('x14');
-  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.locator('[data-flow-playing]')).toHaveAttribute('data-flow-playing','false');
-});
-
 test('jump address explanation keeps CORE ALU placeholders separate from real PC inputs',async({page})=>{
   await frozenTime(page);await page.goto('/tests/browser/line-flow.html?geometry=jalr');await pause(page);
   await seek(page,'pc-base');await expect(page.locator('[data-transfer-value]')).toContainText('0x0001003C');

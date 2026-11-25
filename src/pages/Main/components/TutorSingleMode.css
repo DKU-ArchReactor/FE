@@ -163,23 +163,23 @@
   box-shadow: 0 1px 4px rgba(16, 185, 129, 0.4);
 }
 
-/* 선택 모드 (파란색 🔵): 은은한 블루 틴트 및 글로우 */
+/* 선택 모드 (싱글=파랑 / 파이프라인=보라): 모드 강조색 틴트 및 글로우 */
 .tutor-single-btn-vertical[data-mode="selected"] {
-  border-color: color-mix(in srgb, #3B82F6 35%, var(--ar-border));
-  background: color-mix(in srgb, #3B82F6 6%, var(--ar-header-bg));
-  color: #2563EB;
-  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08);
+  border-color: color-mix(in srgb, var(--ar-accent) 35%, var(--ar-border));
+  background: color-mix(in srgb, var(--ar-accent) 6%, var(--ar-header-bg));
+  color: var(--ar-accent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ar-accent) 10%, transparent);
 }
 
 .tutor-single-btn-vertical[data-mode="selected"]:not(:disabled):hover {
-  border-color: #3B82F6;
-  color: #1D4ED8;
-  background: color-mix(in srgb, #3B82F6 12%, var(--ar-panel-bg));
-  box-shadow: 0 3px 12px -2px rgba(59, 130, 246, 0.35);
+  border-color: var(--ar-accent);
+  color: var(--ar-accent-hover);
+  background: color-mix(in srgb, var(--ar-accent) 12%, var(--ar-panel-bg));
+  box-shadow: 0 3px 12px -2px color-mix(in srgb, var(--ar-accent) 35%, transparent);
 }
 
 .tutor-single-btn-vertical[data-mode="selected"]:not(:disabled):active {
-  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ar-accent) 40%, transparent);
 }
 
 /* 호버 시 방향으로 살짝 도약/하강 */
@@ -324,10 +324,10 @@
   box-shadow: 0 4px 22px -2px rgba(16, 185, 129, 0.24), 0 0 0 1px rgba(16, 185, 129, 0.28);
 }
 
-/* 2. 사용자가 선택한 상태: 파란색(블루 🔵) 그림자 & 테두리 글로우 */
+/* 2. 사용자가 선택한 상태: 모드 강조색(싱글=파랑 / 파이프라인=보라) 그림자 & 테두리 글로우 */
 .tutor-single-card[data-mode="selected"] {
-  border-color: rgba(59, 130, 246, 0.4);
-  box-shadow: 0 4px 22px -2px rgba(59, 130, 246, 0.24), 0 0 0 1px rgba(59, 130, 246, 0.28);
+  border-color: color-mix(in srgb, var(--ar-accent) 40%, transparent);
+  box-shadow: 0 4px 22px -2px color-mix(in srgb, var(--ar-accent) 24%, transparent), 0 0 0 1px color-mix(in srgb, var(--ar-accent) 28%, transparent);
 }
 
 /* 3. 비활성 피킹 상태: 중립 테두리 (선택 모드) */
@@ -337,8 +337,8 @@
 }
 
 .tutor-single-card-slide.inactive:hover .tutor-single-card[data-mode="inactive"] {
-  border-color: #005FB8;
-  box-shadow: 0 4px 18px -2px rgba(0, 95, 184, 0.25);
+  border-color: var(--ar-accent);
+  box-shadow: 0 4px 18px -2px color-mix(in srgb, var(--ar-accent) 25%, transparent);
 }
 
 /* 4. 실행 모드 비활성 피킹 상태: 선명한 초록색(에메랄드 🟢) 테두리 */
@@ -383,11 +383,31 @@
   border-top-color: #10B981;
 }
 
-/* 선택 모드 활성 카드 내부 동작 분류 뱃지: 블루 톤 통일 */
+/* 선택 모드 활성 카드 내부 요소: 모드 강조색 통일 */
+.tutor-single-card[data-mode="selected"] .tutor-single-tag {
+  background: color-mix(in srgb, var(--ar-accent) 14%, transparent);
+  color: var(--ar-accent);
+  font-weight: 700;
+  border-color: color-mix(in srgb, var(--ar-accent) 35%, transparent);
+}
+
+.tutor-single-card[data-mode="selected"] .tutor-single-code-box {
+  border-left-color: var(--ar-accent);
+}
+
+.tutor-single-card[data-mode="selected"] .tutor-single-meaning-arrow {
+  color: var(--ar-accent);
+}
+
+.tutor-single-card[data-mode="selected"] .tutor-folder-tab.active {
+  color: var(--ar-accent);
+  border-top-color: var(--ar-accent);
+}
+
 .tutor-single-card[data-mode="selected"] .tutor-single-badge {
-  background: color-mix(in srgb, #3B82F6 8%, var(--ar-panel-bg));
-  border-color: color-mix(in srgb, #3B82F6 25%, var(--ar-border));
-  color: #2563EB;
+  background: color-mix(in srgb, var(--ar-accent) 8%, var(--ar-panel-bg));
+  border-color: color-mix(in srgb, var(--ar-accent) 25%, var(--ar-border));
+  color: var(--ar-accent);
 }
 
 /* 실행/선택 상태 뱃지 (● 실행 중 / ● 선택됨) */
@@ -422,14 +442,14 @@
 }
 
 .tutor-mode-badge.selected {
-  background: color-mix(in srgb, #3B82F6 12%, transparent);
-  color: #2563EB;
-  border: 1px solid color-mix(in srgb, #3B82F6 28%, transparent);
+  background: color-mix(in srgb, var(--ar-accent) 12%, transparent);
+  color: var(--ar-accent);
+  border: 1px solid color-mix(in srgb, var(--ar-accent) 28%, transparent);
 }
 
 .tutor-mode-badge.selected .tutor-mode-dot {
-  background: #3B82F6;
-  box-shadow: 0 0 6px #3B82F6;
+  background: var(--ar-accent);
+  box-shadow: 0 0 6px var(--ar-accent);
 }
 
 /* 실행 위치로 복귀 버튼 */
@@ -658,15 +678,15 @@
   color: #059669;
 }
 
-/* 선택 모드 시 '실제 실행 요약' 블록도 파란색 톤으로 통일 */
+/* 선택 모드 시 '실제 실행 요약' 블록도 모드 강조색으로 통일 */
 .tutor-single-card[data-mode="selected"] .tutor-single-observed {
-  background: color-mix(in srgb, #3B82F6 8%, var(--ar-header-bg));
-  border-color: color-mix(in srgb, #3B82F6 30%, var(--ar-border));
-  border-left-color: #3B82F6;
+  background: color-mix(in srgb, var(--ar-accent) 8%, var(--ar-header-bg));
+  border-color: color-mix(in srgb, var(--ar-accent) 30%, var(--ar-border));
+  border-left-color: var(--ar-accent);
 }
 
 .tutor-single-card[data-mode="selected"] .tutor-single-observed-title {
-  color: #2563EB;
+  color: #6D28D9;
 }
 
 .tutor-single-observed-content {

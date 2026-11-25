@@ -9,6 +9,17 @@ import AssistantCompileHint from "./components/AssistantCompileHint";
 import AiAssistantPopup from "@/components/AiAssistantPopup";
 import PlaybackFeedbackOverlay from "./components/PlaybackFeedbackOverlay";
 import { MobileWorkspaceControls } from "./components/MobileWorkspaceControls";
+import TutorialOverlay from "./components/TutorialOverlay";
+import {
+  shouldAutoOpenTutorial,
+  TUTORIAL_DEMO_ACTIVE_ROW,
+  TUTORIAL_DEMO_ASSEMBLY,
+  TUTORIAL_DEMO_CURRENT_DATA,
+  TUTORIAL_DEMO_CYCLE,
+  TUTORIAL_DEMO_MAPPED_ROWS,
+  TUTORIAL_DEMO_PREV_DATA,
+  TUTORIAL_DEMO_SIMULATION,
+} from "./utils/tutorialDemoData";
 
 import type { PanelKey, SectionConfig } from "./types";
 import { getDefaultSections } from "./types";
@@ -53,6 +64,9 @@ const MainPage: React.FC = () => {
   const [tutorSelection,setTutorSelection]=useState<{kind:'c'|'asm';revision:number}>({kind:'asm',revision:0});
   const [editorTarget, setEditorTarget] = useState<"c" | "asm">("c");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(() =>
+    shouldAutoOpenTutorial()
+  );
   const [isMobileCodeView, setIsMobileCodeView] = useState(true);
   const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
   const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
@@ -262,6 +276,40 @@ const MainPage: React.FC = () => {
     setRightViewportIndex((prev) => Math.min(2, prev + 1));
   };
 
+  // 튜토리얼이 열려 있고 아직 컴파일된 시뮬레이션이 없을 때 저장해 둔 기준 사이클 스냅샷을 배경 화면에 표시
+  const useTutorialDemo = isTutorialOpen && !simSession.simulationData;
+  const activeSimData = useTutorialDemo
+    ? TUTORIAL_DEMO_SIMULATION
+    : simSession.simulationData;
+  const activeCurrentData = useTutorialDemo
+    ? TUTORIAL_DEMO_CURRENT_DATA
+    : playback.currentData;
+  const activePrevData = useTutorialDemo
+    ? TUTORIAL_DEMO_PREV_DATA
+    : playback.prevData;
+  const activeCurrentCycle = useTutorialDemo
+    ? TUTORIAL_DEMO_CYCLE
+    : playback.currentCycle;
+  const activeTotalCycles = useTutorialDemo
+    ? TUTORIAL_DEMO_SIMULATION.history.length
+    : playback.totalCycles;
+  const activeSimMode = useTutorialDemo
+    ? "pipeline"
+    : simSession.simulationEngineMode;
+  const activeIsSingle = useTutorialDemo ? false : simSession.isSingleEngine;
+  const activeMappedRows = useTutorialDemo
+    ? TUTORIAL_DEMO_MAPPED_ROWS
+    : simSession.mappedAssemblyRows;
+  const activeAssembly = useTutorialDemo
+    ? TUTORIAL_DEMO_ASSEMBLY
+    : fileMgr.translationAssembly;
+  const activeRow = useTutorialDemo
+    ? TUTORIAL_DEMO_ACTIVE_ROW
+    : playback.currentActiveRow;
+  const activeExecCLine = useTutorialDemo
+    ? TUTORIAL_DEMO_ACTIVE_ROW.sourceLine ?? 1
+    : playback.activeExecutionCLine;
+
   const renderPanel = (panelKey: PanelKey, onCloseTutor?: () => void) => (
     <PanelRenderer
       panelKey={panelKey}
@@ -269,26 +317,26 @@ const MainPage: React.FC = () => {
       onSourceSelection={setSourceSelection}
       tutorSelection={tutorSelection}
       onTutorSelect={kind=>setTutorSelection(value=>({kind,revision:value.revision+1}))}
-      simulationData={simSession.simulationData}
-      currentData={playback.currentData}
-      prevData={playback.prevData}
-      currentCycle={playback.currentCycle}
+      simulationData={activeSimData}
+      currentData={activeCurrentData}
+      prevData={activePrevData}
+      currentCycle={activeCurrentCycle}
       playSpeed={playback.playSpeed}
       onPausePlayback={playback.pauseForFlow}
       singlePlaybackFinished={playback.singlePlaybackFinished}
       playbackRevision={playback.playbackRevision}
       isPlaying={playback.isPlaying}
       playMode={playback.playMode}
-      isStandby={playback.isStandby}
+      isStandby={useTutorialDemo ? false : playback.isStandby}
       loadingMessage={simSession.loadingMessage}
-      simulationMode={simSession.simulationEngineMode}
-      isSingleEngine={simSession.isSingleEngine}
-      currentActiveRow={playback.currentActiveRow}
-      mappedAssemblyRows={simSession.mappedAssemblyRows}
-      activeExecutionCLine={playback.activeExecutionCLine}
+      simulationMode={activeSimMode}
+      isSingleEngine={activeIsSingle}
+      currentActiveRow={activeRow}
+      mappedAssemblyRows={activeMappedRows}
+      activeExecutionCLine={activeExecCLine}
       effectiveSelectedLine={playback.effectiveSelectedLine}
       translationSource={fileMgr.translationSource}
-      translationAssembly={fileMgr.translationAssembly}
+      translationAssembly={activeAssembly}
       cFileName={fileMgr.cFileName}
       fileId={fileMgr.fileId}
       editorTarget={editorTarget}
@@ -368,8 +416,6 @@ const MainPage: React.FC = () => {
     />
   );
 
-  const maxCycle = playback.totalCycles;
-
 const handleMobileCodeSelect = () => {
   setIsMobileCodeView(true);
   setIsMobileAssistantViewport(false);
@@ -401,8 +447,8 @@ const handleMobileViewportSelect = (index: number) => {
       <div className="h-[42px] shrink-0 flex items-stretch gap-2 mb-2 px-3 md:px-0 min-h-0 w-full">
         <div className="flex-1 h-full min-w-0 flex">
           <ControlPanel
-            currentCycle={playback.currentCycle}
-            totalCycles={playback.totalCycles}
+            currentCycle={activeCurrentCycle}
+            totalCycles={activeTotalCycles}
             isPlaying={playback.isPlaying}
             playSpeed={playback.playSpeed}
             onStepBack={playback.handleStepBack}
@@ -412,12 +458,13 @@ const handleMobileViewportSelect = (index: number) => {
             onResetAndPlay={playback.handleResetAndPlay}
             onPlayCurrentCycle={playback.handlePlayCurrentCycle}
             isCyclePlaying={playback.isCyclePlaying}
+            isAtTimelineEnd={playback.isAtTimelineEnd}
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
-            isReady={playback.isSimulationReady}
+            isReady={useTutorialDemo ? true : playback.isSimulationReady}
             isCompiling={fileMgr.translationBusy}
-            mode={simSession.simulationEngineMode}
-            simulationData={simSession.simulationData}
+            mode={activeSimMode}
+            simulationData={activeSimData}
             editorTarget={editorTarget}
             onChangeEditorTarget={(target) => {
               if (fileMgr.translationBusy) return;
@@ -442,8 +489,19 @@ const handleMobileViewportSelect = (index: number) => {
           />
         </div>
 
+        {/* 튜토리얼 가이드 다시 열기 버튼 (데스크톱 상단 컨트롤바 우측 노출) */}
+        <button
+          type="button"
+          onClick={() => setIsTutorialOpen(true)}
+          title="화면 사용법 튜토리얼 보기"
+          aria-label="튜토리얼 열기"
+          className="hidden md:flex h-full aspect-square rounded-lg items-center justify-center cursor-pointer transition-all duration-150 shrink-0 select-none bg-[var(--ar-panel-bg)] hover:bg-[#F3F4F6] text-[#57606A] hover:text-[var(--ar-accent)] border border-[var(--ar-border)] shadow-xs font-mono font-bold text-sm"
+        >
+          ?
+        </button>
+
         {/* AI 어시스턴트 팝업 버튼 (모바일에서는 하단 바텀바로 분리 예정) */}
-        <div className="hidden md:block relative h-full aspect-square shrink-0">
+        <div data-tutorial-id="ai-assistant" className="hidden md:block relative h-full aspect-square shrink-0">
         <button
           ref={aiButtonRef}
           type="button"
@@ -594,6 +652,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
 
           {/* 하단: 튜터 영역 (모바일 숨김) */}
           <div
+            data-tutorial-id="tutor-panel"
             className="hidden md:flex w-full min-h-0 overflow-hidden flex-col p-[1.5px]"
             style={{ flex: 1 }}
           >
@@ -630,7 +689,10 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
         </div>
 
         {/* 슬라이딩 뷰포트 영역 (모바일: 5개 탭 전체 슬라이드 트랙 / md 이상: 우측 3개 뷰포트 트랙) */}
-        <div className="flex w-full flex-1 h-full min-w-0 min-h-0 overflow-hidden relative items-stretch md:pl-1">
+        <div
+          data-tutorial-id="right-section"
+          className="flex w-full flex-1 h-full min-w-0 min-h-0 overflow-hidden relative items-stretch md:pl-1"
+        >
           {canGoPrevViewport && (
             <div className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 mr-1">
               <button
@@ -699,7 +761,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
           />
 
           {canGoNextViewport && (
-            <div className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 ml-1">
+            <div data-tutorial-id="viewport-nav" className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 ml-1">
               <button
                 type="button"
                 onClick={handleGoNextViewport}
@@ -727,13 +789,13 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
 
       {/* 3. 모바일 전용 하단 재생 콘솔 + 바닥 밀착 5버튼 바텀바 (md 미만 노출) */}
       <MobileWorkspaceControls
-        currentCycle={playback.currentCycle}
-        maxCycle={maxCycle}
-        totalCycles={playback.totalCycles}
+        currentCycle={activeCurrentCycle}
+        maxCycle={activeTotalCycles}
+        totalCycles={activeTotalCycles}
         playSpeed={playback.playSpeed}
         isPlaying={playback.isPlaying}
-        isSimulationReady={playback.isSimulationReady}
-        isSingleEngine={simSession.isSingleEngine}
+        isSimulationReady={useTutorialDemo ? true : playback.isSimulationReady}
+        isSingleEngine={activeIsSingle}
         isMobileCodeView={isMobileCodeView}
         isMobileAssistantViewport={isMobileAssistantViewport}
         rightViewportIndex={rightViewportIndex}
@@ -743,21 +805,24 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
         onResetAndPlay={playback.handleResetAndPlay}
         onPlayCurrentCycle={playback.handlePlayCurrentCycle}
         isCyclePlaying={playback.isCyclePlaying}
+        isAtTimelineEnd={playback.isAtTimelineEnd}
         onStepBack={playback.handleStepBack}
         onTogglePlay={playback.handleTogglePlay}
         onStepForward={playback.handleStepForward}
         onSelectCode={handleMobileCodeSelect}
         onSelectViewport={handleMobileViewportSelect}
         onSelectAssistant={handleMobileAssistantSelect}
+        onOpenTutorial={() => setIsTutorialOpen(true)}
       />
 
-      {/* 4. 모바일 전용 튜터 해설 모달 (코드 클릭 시 노출) */}
-      {isMobileTutorModalOpen && simSession.simulationData && (
+      {/* 4. 모바일 전용 튜터 해설 모달 (코드 클릭 시 또는 모바일 튜토리얼 9단계 노출) */}
+      {isMobileTutorModalOpen && activeSimData && (
         <div
           className="fixed inset-0 z-50 md:hidden bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-3 animate-in fade-in duration-150"
           onClick={() => setIsMobileTutorModalOpen(false)}
         >
           <div
+            data-tutorial-id="tutor-panel"
             className="w-full max-h-[72vh] flex flex-col relative rounded-lg overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -768,6 +833,42 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
 
       {/* Play / Pause / Reset / Trash / Check 화면 중앙 애니메이션 피드백 */}
       <PlaybackFeedbackOverlay feedback={playback.playbackFeedback} />
+
+      {/* 반투명 전체 튜토리얼 가이드 오버레이 */}
+      <TutorialOverlay
+        isOpen={isTutorialOpen}
+        onClose={() => {
+          setIsTutorialOpen(false);
+          setIsMobileTutorModalOpen(false);
+          setIsMobileAssistantViewport(false);
+          setIsMobileCodeView(true);
+          setRightViewportIndex(0);
+        }}
+        onChangeViewport={(idx, mobileMode) => {
+          setRightViewportIndex(idx);
+          if (mobileMode === "code") {
+            setIsMobileCodeView(true);
+            setIsMobileAssistantViewport(false);
+            setIsMobileTutorModalOpen(false);
+          } else if (mobileMode === "viewport") {
+            setIsMobileCodeView(false);
+            setIsMobileAssistantViewport(false);
+            setIsMobileTutorModalOpen(false);
+          } else if (mobileMode === "tutor") {
+            setIsMobileCodeView(true);
+            setIsMobileAssistantViewport(false);
+            if (typeof window !== "undefined" && window.innerWidth < 768) {
+              setIsMobileTutorModalOpen(true);
+            }
+          } else if (mobileMode === "assistant") {
+            setIsMobileTutorModalOpen(false);
+            if (typeof window !== "undefined" && window.innerWidth < 768) {
+              setIsMobileCodeView(false);
+              setIsMobileAssistantViewport(true);
+            }
+          }
+        }}
+      />
     </main>
   );
 };

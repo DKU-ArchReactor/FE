@@ -17,12 +17,14 @@ interface MobileWorkspaceControlsProps {
   onResetAndPlay?: () => void;
   onPlayCurrentCycle?: () => void;
   isCyclePlaying?: boolean;
+  isAtTimelineEnd?: boolean;
   onStepBack: () => void;
   onTogglePlay: () => void;
   onStepForward: () => void;
   onSelectCode: () => void;
   onSelectViewport: (index: number) => void;
   onSelectAssistant: () => void;
+  onOpenTutorial?: () => void;
 }
 
 export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = memo(
@@ -43,17 +45,19 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
     onResetAndPlay,
     onPlayCurrentCycle,
     isCyclePlaying = false,
+    isAtTimelineEnd,
     onStepBack,
     onTogglePlay,
     onStepForward,
     onSelectCode,
     onSelectViewport,
     onSelectAssistant,
+    onOpenTutorial,
   }) => {
     return (
       <div className="md:hidden shrink-0 w-full flex flex-col bg-[var(--ar-panel-bg)] border-t border-[var(--ar-border)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] z-30 select-none font-mono">
         {/* 3-1. 하단 시뮬레이션 재생 콘솔 */}
-        <div className="flex flex-col gap-1.5 px-3 py-2">
+        <div data-tutorial-id="mobile-playback" className="flex flex-col gap-1.5 px-3 py-2">
           {/* 1줄: Cycle 표시 + 슬라이더 + 배속 */}
           <div className="flex items-center gap-2.5 w-full min-w-0">
             <div className="flex items-baseline gap-1 shrink-0 text-[#24292F]">
@@ -88,11 +92,11 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
 
             <div className="flex items-center gap-0.5 shrink-0 text-[9.5px]">
               {[
-                { label: "0.5x", speed: 6000 },
-                { label: "1.0x", speed: 3000 },
-                { label: "1.5x", speed: 2000 },
-                { label: "2.0x", speed: 1500 },
-                { label: "3.0x", speed: 1000 },
+                { label: "0.5x", speed: 10000 },
+                { label: "1.0x", speed: 5000 },
+                { label: "1.5x", speed: 3333 },
+                { label: "2.0x", speed: 2500 },
+                { label: "5.0x", speed: 1000 },
               ].map(({ label, speed }) => {
                 const isSelected = Math.abs(playSpeed - speed) < 50;
                 return (
@@ -116,8 +120,8 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             </div>
           </div>
 
-          {/* 2줄: 디버그 재생 컨트롤 버튼 5종 */}
-          <div className="flex items-center justify-center gap-2 bg-[#F3F4F6] p-1 rounded-md border border-[#D0D7DE]">
+          {/* 2줄: 디버그 재생 컨트롤 버튼 5종 + 우측 끝 컴팩트 튜토리얼(?) 버튼 */}
+          <div className="relative flex items-center justify-center gap-2 bg-[#F3F4F6] p-1 rounded-md border border-[#D0D7DE]">
             <button
               type="button"
               onClick={onReset}
@@ -145,8 +149,19 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
                   : "text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:pointer-events-none"
               }`}
             >
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.1}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                <path d="M18.2 3.4v3.4h-3.4" />
+                <path d="M10.6 10.3 12.2 8.8v6.4" />
+                <path d="M10.5 15.2h3.2" />
               </svg>
             </button>
 
@@ -193,7 +208,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             <button
               type="button"
               onClick={onStepForward}
-              disabled={!isSimulationReady || currentCycle >= maxCycle || isCyclePlaying}
+              disabled={!isSimulationReady || (isAtTimelineEnd ?? currentCycle >= maxCycle) || isCyclePlaying}
               title={isCyclePlaying ? "1회 재생 진행 중..." : "한 단계 실행 (Step Over / Forward)"}
               className="p-1.5 rounded text-[#57606A] hover:text-[#24292F] hover:bg-[#E5E7EB] disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none transition-colors cursor-pointer"
             >
@@ -201,6 +216,18 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
+
+            {onOpenTutorial && (
+              <button
+                type="button"
+                onClick={onOpenTutorial}
+                title="화면 사용법 튜토리얼 보기"
+                aria-label="모바일 튜토리얼 열기"
+                className="absolute right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-[#57606A] hover:text-[var(--ar-accent)] bg-white hover:bg-[#E5E7EB] border border-[#D0D7DE] shadow-2xs transition-colors cursor-pointer"
+              >
+                ?
+              </button>
+            )}
           </div>
         </div>
 
@@ -280,6 +307,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
 
           <button
             type="button"
+            data-tutorial-id="mobile-assistant"
             onClick={onSelectAssistant}
             className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
               !isMobileCodeView && isMobileAssistantViewport

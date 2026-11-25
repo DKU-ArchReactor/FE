@@ -39,7 +39,7 @@ type CTabId = 'desc' | 'logic';
 export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   rows,
   source,
-  line,
+  line: providedLine,
   selectedIndex,
   simulation,
   historyIndex,
@@ -61,7 +61,9 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
     kind: requestedView,
   });
 
-  const view = screen.key === selectionKey ? screen.kind : requestedView;
+  const selectedRow = selectedIndex != null ? rows[selectedIndex] : undefined;
+  const line = selectedRow ? selectedRow.sourceLine : providedLine;
+  const view = hasC && line != null ? (screen.key === selectionKey ? screen.kind : requestedView) : 'asm';
 
   // C 매핑 존재 여부 및 ASM 뷰 수직 이동 상태 계산
   const showCSection = hasC && line != null;
@@ -78,7 +80,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
       .filter((row) => {
         if (!hasC) return true;
         if (line != null) return row.sourceLine === line;
-        return row.sourceLine == null || row.isRuntime;
+        return row.sourceLine == null;
       });
   }, [rows, hasC, line]);
 
@@ -90,8 +92,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
   }, [group, selectedIndex]);
 
   const currentRow = group[position] ?? null;
-  const prevRow = position > 0 ? group[position - 1] : null;
-  const nextRow = position < group.length - 1 ? group[position + 1] : null;
   const firstAsmRow = group[0] ?? null;
   const targetAsmRow = currentRow ?? firstAsmRow;
 
@@ -220,38 +220,12 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
     }
   }, [hasC, line, isPlaying, onPausePlayback, selectionKey, isUserSelected, onSelectLine, currentRow]);
 
-  // 키보드 좌우(이전/다음 ASM), 상하(C 롤업/드릴다운) 탐색 핸들러
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (view === 'asm') {
-        if (e.key === 'ArrowLeft' && prevRow) {
-          e.preventDefault();
-          handleNavigateAsm(prevRow, 'prev');
-        } else if (e.key === 'ArrowRight' && nextRow) {
-          e.preventDefault();
-          handleNavigateAsm(nextRow, 'next');
-        } else if (e.key === 'ArrowUp' && hasC && line != null) {
-          e.preventDefault();
-          handleRollUpToC();
-        }
-      } else if (view === 'c') {
-        if (e.key === 'ArrowDown' && targetAsmRow) {
-          e.preventDefault();
-          handleDrillDownToAsm();
-        }
-      }
-    },
-    [view, prevRow, nextRow, hasC, line, handleNavigateAsm, handleRollUpToC, targetAsmRow, handleDrillDownToAsm]
-  );
-
   return (
     <div
       className="tutor-single-container"
       data-view={view}
       data-has-c={showCSection}
-      aria-label="싱글사이클 튜터 네비게이션"
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
+      aria-label="명령어 튜터 네비게이션"
     >
       <div className="tutor-single-vertical-viewport">
         <div
@@ -470,16 +444,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                       : `다음 명령어 사이클로 전진 (L${row.index + 1})`
                   }
                   onClick={isActive ? undefined : () => handleNavigateAsm(row, idx < position ? 'prev' : 'next')}
-                  onKeyDown={
-                    isActive
-                      ? undefined
-                      : (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleNavigateAsm(row, idx < position ? 'prev' : 'next');
-                          }
-                        }
-                  }
                 >
                   <div
                     className="tutor-single-card"
@@ -489,6 +453,11 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                     <div className="tutor-single-card-header">
                       <div className="tutor-header-left">
                         <span className="tutor-single-tag">{`ASM : L${row.index + 1}`}</span>
+                        {hasC && row.sourceLine == null && (
+                          <span className="tutor-single-badge" title="이 명령어와 연결된 C 줄 정보가 없습니다. 명령어의 동작과 실행 결과는 확인할 수 있습니다.">
+                            {rowItem?.source_context === 'startup_source' || rowItem?.source_file?.replace(/\\/g, '/').split('/').at(-1) === 'start.S' ? '프로그램 시작 코드 · C 연결 없음' : '연결된 C 줄 없음'}
+                          </span>
+                        )}
                         {isActive && (
                           <span className={`tutor-mode-badge ${isUserSelected ? 'selected' : 'executing'}`}>
                             <span className="tutor-mode-dot" />
@@ -548,6 +517,13 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                                 <TutorText text={rowInstruction?.explanation ?? ''} />
                               </p>
                             </div>
+                            {hasC && row.sourceLine == null && (
+                              <p className="text-xs leading-relaxed text-[var(--ar-text-muted)] mt-3">
+                                {rowItem?.source_context === 'startup_source' || rowItem?.source_file?.replace(/\\/g, '/').split('/').at(-1) === 'start.S'
+                                  ? '프로그램을 시작할 때 사용하는 start.S 파일에 있는 명령어입니다. 작성한 C 코드의 특정 줄과 직접 연결되지 않아 ASM 기준으로 설명합니다.'
+                                  : '이 명령어와 연결된 C 줄 정보가 없어 ASM 기준으로 설명합니다. C 줄 정보가 없어도 명령어의 동작과 실행 결과는 확인할 수 있습니다.'}
+                              </p>
+                            )}
                             {latest && (
                               <div className="tutor-single-observed">
                                 <div className="tutor-single-observed-title">

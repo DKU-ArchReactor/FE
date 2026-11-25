@@ -145,8 +145,10 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
   const lessonContext = React.useMemo(
     () => ({
       isPlaying,
+      playMode,
       playbackRevision,
       playbackFinished: singlePlaybackFinished,
+      currentCycle,
       flowDurationMs: playSpeed,
       onPausePlayback,
       source: editorTarget === "c" ? translationSource : undefined,
@@ -158,8 +160,10 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     }),
     [
       isPlaying,
+      playMode,
       playbackRevision,
       singlePlaybackFinished,
+      currentCycle,
       playSpeed,
       onPausePlayback,
       editorTarget,
