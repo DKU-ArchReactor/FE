@@ -23,6 +23,7 @@ interface MobileWorkspaceControlsProps {
   onSelectCode: () => void;
   onSelectViewport: (index: number) => void;
   onSelectAssistant: () => void;
+  onOpenTutorial?: () => void;
 }
 
 export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = memo(
@@ -49,11 +50,12 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
     onSelectCode,
     onSelectViewport,
     onSelectAssistant,
+    onOpenTutorial,
   }) => {
     return (
       <div className="md:hidden shrink-0 w-full flex flex-col bg-[var(--ar-panel-bg)] border-t border-[var(--ar-border)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] z-30 select-none font-mono">
         {/* 3-1. 하단 시뮬레이션 재생 콘솔 */}
-        <div className="flex flex-col gap-1.5 px-3 py-2">
+        <div data-tutorial-id="mobile-playback" className="flex flex-col gap-1.5 px-3 py-2">
           {/* 1줄: Cycle 표시 + 슬라이더 + 배속 */}
           <div className="flex items-center gap-2.5 w-full min-w-0">
             <div className="flex items-baseline gap-1 shrink-0 text-[#24292F]">
@@ -116,8 +118,8 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             </div>
           </div>
 
-          {/* 2줄: 디버그 재생 컨트롤 버튼 5종 */}
-          <div className="flex items-center justify-center gap-2 bg-[#F3F4F6] p-1 rounded-md border border-[#D0D7DE]">
+          {/* 2줄: 디버그 재생 컨트롤 버튼 5종 + 우측 끝 컴팩트 튜토리얼(?) 버튼 */}
+          <div className="relative flex items-center justify-center gap-2 bg-[#F3F4F6] p-1 rounded-md border border-[#D0D7DE]">
             <button
               type="button"
               onClick={onReset}
@@ -201,6 +203,18 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
+
+            {onOpenTutorial && (
+              <button
+                type="button"
+                onClick={onOpenTutorial}
+                title="화면 사용법 튜토리얼 보기"
+                aria-label="모바일 튜토리얼 열기"
+                className="absolute right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-[#57606A] hover:text-[var(--ar-accent)] bg-white hover:bg-[#E5E7EB] border border-[#D0D7DE] shadow-2xs transition-colors cursor-pointer"
+              >
+                ?
+              </button>
+            )}
           </div>
         </div>
 
@@ -280,6 +294,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
 
           <button
             type="button"
+            data-tutorial-id="mobile-assistant"
             onClick={onSelectAssistant}
             className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
               !isMobileCodeView && isMobileAssistantViewport

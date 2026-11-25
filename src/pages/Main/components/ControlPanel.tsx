@@ -133,7 +133,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       {/* 1. 모드 알약 버튼군 & 사이클/스텝 정보 및 슬라이더 */}
       <div className="flex items-center justify-between md:justify-start gap-2 md:gap-2.5 flex-1 min-w-0">
         {/* [모드 1]: C - ASM 알약 버튼 (좌측 라벨 명시) */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div data-tutorial-id="mode-target" className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight whitespace-nowrap">
             작성 모드:
           </span>
@@ -176,7 +176,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* [모드 2]: Single - Pipeline 알약 버튼 (좌측 라벨 명시) */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div data-tutorial-id="mode-engine" className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight whitespace-nowrap">
             시뮬레이션 모드:
           </span>
@@ -308,7 +308,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* 2. VS Code 디버그 액션 툴바 (Control Buttons - 모바일 숨김) */}
-      <div className="hidden md:flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] p-0.5 rounded border border-[#D0D7DE]">
+      <div data-tutorial-id="playback-controls" className="hidden md:flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] p-0.5 rounded border border-[#D0D7DE]">
         {/* 1) 초기화 버튼 (정사각형 정지/리셋 아이콘) */}
         <button
           onClick={onReset}
@@ -423,6 +424,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
           );
         })}
+      </div>
       </div>
     </div>
   );

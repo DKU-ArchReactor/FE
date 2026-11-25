@@ -224,6 +224,7 @@ export default function TranslationEditor({
 
   return (
     <section
+      data-tutorial-id="c-section"
       className={`@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border shadow-sm select-none transition-all duration-200 ${
         activeTarget !== "c"
           ? "border-[var(--ar-border)] bg-[#F8FAFC]"
@@ -264,7 +265,7 @@ export default function TranslationEditor({
       </header>
 
       {/* 2단: 헤더 밑 툴바 라인 (버튼 전용 행: C 모드에서는 활성화, ASM 모드에서는 ASM 에디터의 툴바와 100% 동일한 비활성화 스타일) */}
-      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
+      <div data-tutorial-id="c-toolbar" className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           {/* 1. 불러오기 버튼 */}
           <button
