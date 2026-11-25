@@ -127,7 +127,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
   const followsExecution = stageIndex == null && !isUserSelected && manualAsmIndex == null;
   const selectedAsmIndex = stageIndex ?? (followsExecution ? currentActiveAsmIndex : manualAsmIndex);
   const selectedTranslationLine = (followsExecution || stageIndex != null || selectionKind === 'asm' && activeTarget === 'asm') && selectedAsmIndex != null
-    ? effectiveRows[selectedAsmIndex]?.sourceLine ?? providedTranslationLine : providedTranslationLine;
+    ? effectiveRows[selectedAsmIndex]?.sourceLine ?? null : providedTranslationLine;
 
   const selectedRow = useMemo(() => {
     if (selectedAsmIndex !== null && selectedAsmIndex !== undefined && selectedAsmIndex >= 0) {
@@ -136,8 +136,8 @@ const TutorArea: React.FC<TutorAreaProps> = ({
     return null;
   }, [selectedAsmIndex, effectiveRows]);
 
-  const isCrtSelected = Boolean(
-    selectedRow && (selectedRow.isRuntime || (selectedRow.sourceLine === null && providedTranslationLine == null))
+  const isUnmappedSelected = Boolean(
+    selectedRow && selectedRow.sourceLine == null
   );
   const splitView = isCompiled && (activeTarget !== 'asm' || selectedRow != null);
 
@@ -170,10 +170,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
 
   const asmExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
     if (!isCompiled) return [];
-    return effectiveRows.flatMap(row => [
-      { kind: 'asm' as const, text: row.text },
-      ...(row.sourceLine === null || row.isRuntime ? [{ kind: 'crt' as const, text: row.text, pc: row.pc }] : []),
-    ]);
+    return effectiveRows.map(row => ({ kind: 'asm' as const, text: row.text }));
   }, [effectiveRows, isCompiled]);
 
   const cExplanationItems = useMemo<Parameters<typeof fetchTutor>[0]>(() => {
@@ -231,7 +228,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         </div>
         {!isSingleMode && simulationData && <div ref={setPipelineHeader} className="tutor-pipeline-header-controls"/>}
         <div className="flex items-center gap-2 shrink-0">
-          {isUserSelected && (
+          {isSingleMode && isUserSelected && (
             <button
               type="button"
               className="tutor-return-exec-btn mr-0!"
@@ -287,7 +284,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
             <TutorSingleMode
               rows={effectiveRows}
               source={cLines}
-              line={isCrtSelected ? null : selectedTranslationLine}
+              line={isUnmappedSelected ? null : selectedTranslationLine}
               selectedIndex={selectedAsmIndex}
               simulation={simulationData}
               currentCycleData={currentCycleData}
@@ -327,7 +324,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
           <TutorLineSplit
             rows={effectiveRows}
             source={cLines}
-            line={isCrtSelected ? null : selectedTranslationLine}
+            line={isUnmappedSelected ? null : selectedTranslationLine}
             selectedIndex={selectedAsmIndex}
             singleScreen={isSingleMode}
             requestedView={singleIntent.kind}
@@ -353,7 +350,7 @@ const TutorArea: React.FC<TutorAreaProps> = ({
                 : "정상적으로 컴파일된 코드에 한해 라인별 문법 해설과 파이프라인 하드웨어 동작 풀이가 이곳에 제공됩니다."}
             </span>
           </div>
-        ) : activeTarget !== "asm" && isCrtSelected && selectedRow ? (
+        ) : activeTarget !== "asm" && isUnmappedSelected && selectedRow ? (
           <TutorCrtCard
             selectedRow={selectedRow}
             selectedAsmIndex={selectedAsmIndex}

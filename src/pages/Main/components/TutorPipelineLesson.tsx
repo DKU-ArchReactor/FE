@@ -5,7 +5,7 @@ import {analyzeAsmInstruction,fetchTutor,instructionAt} from '../utils/tutorAnal
 import TutorPipelineCarousel from './TutorPipelineCarousel';
 import './TutorCycleCards.css';
 import {buildMultiCycleTraceRows} from '../utils/multiCycleTrace';
-import {explainForwarding,explainStall,explainBubble} from '../utils/tutorReadable';
+import {explainForwarding,explainStall,explainBubble,isForwardingTarget} from '../utils/tutorReadable';
 
 const stages=['IF','ID','EX','MEM','WB'] as const;
 const names={IF:'명령어 인출',ID:'명령어 해독',EX:'연산·조건 판단',MEM:'메모리 접근',WB:'완료·필요 시 레지스터 기록'};
@@ -44,7 +44,7 @@ export default function TutorPipelineLesson({cycle,simulation,rows,source,histor
     const line=row?.sourceLine??value?.source_line;
     const c=line!=null?source[line-1]?.trim():undefined;
     const observation=step?.instruction_observations?.find(item=>item.stage===stage&&value?.pc&&Number(item.pc)===Number(value.pc));
-    const forward=Boolean(!bubble&&!stalled&&events?.forwarding?.has_forwarded&&events.forwarding.assembly?.replace(/\s/g,'')===asm?.replace(/\s/g,''));
+    const forward=!bubble&&!stalled&&isForwardingTarget(events?.forwarding,stage,asm);
     const error=events?.runtime_error?.has_error&&events.runtime_error.stage===stage?events.runtime_error:null;
     const stallExplanation=explainStall(cycle,stage);
     const bubbleStart=Object.entries(traceRow.cells).find(([,value])=>value.isBubble||value.type==='BUBBLE')?.[0];
