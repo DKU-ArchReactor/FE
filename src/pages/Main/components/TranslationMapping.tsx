@@ -396,6 +396,7 @@ export default function TranslationMapping({
 
   return (
     <section
+      data-tutorial-id="asm-section"
       className="@container flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-[var(--ar-border)] bg-[var(--ar-panel-bg)] shadow-sm select-none transition-colors duration-150"
       aria-label="RISC-V 어셈블리 결과"
     >
@@ -431,7 +432,7 @@ export default function TranslationMapping({
       </header>
 
       {/* 2단: 헤더 밑 툴바 라인 */}
-      <div className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
+      <div data-tutorial-id="asm-toolbar" className="shrink-0 flex items-center justify-between gap-1.5 px-3 py-1 bg-[#FAFBFD] border-b border-[#E5E5E5] min-w-0">
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
           <button
             ref={uploadButtonRef}

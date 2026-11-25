@@ -112,12 +112,11 @@ export const isValidStageInst = (buf?: StageBuffer | null): buf is StageBuffer =
     !norm ||
     norm === "bubble" ||
     norm === "empty" ||
-    norm === "nop (bubble)" ||
-    norm === "nop"
+    norm === "nop (bubble)"
   ) {
     return false;
   }
-  if (buf.status === "bubble" || buf.status === "empty" || buf.status === "flushed") {
+  if (buf.status === "bubble" || buf.status === "empty" || buf.status === "flush" || buf.status === "flushed" || buf.flush_info?.is_flushed) {
     return false;
   }
   return true;
