@@ -25,12 +25,7 @@ export function shouldAutoOpenTutorial(): boolean {
   if (params.get("tutorial") === "1") return true;
   if (params.get("tutorial") === "0") return false;
   if (typeof navigator !== "undefined" && navigator.webdriver) return false;
-  try {
-    const hiddenDate = localStorage.getItem(TUTORIAL_HIDE_DATE_KEY);
-    return hiddenDate !== getTodayDateString();
-  } catch {
-    return true;
-  }
+  return true;
 }
 
 export function hideTutorialForToday(): void {

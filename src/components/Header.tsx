@@ -1,4 +1,4 @@
-import { clearAuthTokens, getAuthSession, useAuthSession } from '@/api/authSession';
+import { clearAuthTokens, getAuthSession, getCachedUser, setCachedUser, useAuthSession } from '@/api/authSession';
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getMe } from "@/api/auth";
@@ -9,8 +9,12 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuthSession();
-  const [profile, setProfile] = useState<{ epoch: number; user: UserMeResponse } | null>(null);
-  const user = auth.authenticated && profile?.epoch === auth.epoch ? profile.user : null;
+  const [profile, setProfile] = useState<{ epoch: number; user: UserMeResponse } | null>(() => {
+    const cached = getCachedUser(auth.epoch);
+    return cached ? { epoch: auth.epoch, user: cached } : null;
+  });
+  const cachedUser = auth.authenticated ? getCachedUser(auth.epoch) : null;
+  const user = auth.authenticated ? (profile?.epoch === auth.epoch ? profile.user : cachedUser) : null;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -18,7 +22,10 @@ const Header = () => {
     if (!auth.authenticated) return;
     let active = true;
     getMe().then(data => {
-      if (active && getAuthSession().epoch === auth.epoch) setProfile({ epoch: auth.epoch, user: data });
+      if (active && getAuthSession().epoch === auth.epoch) {
+        setCachedUser(auth.epoch, data);
+        setProfile({ epoch: auth.epoch, user: data });
+      }
     }).catch(() => {
       if (!active || getAuthSession().epoch !== auth.epoch) return;
       clearAuthTokens();

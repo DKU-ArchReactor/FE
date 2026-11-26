@@ -159,6 +159,46 @@ export async function compileTranslation(
   };
 }
 
+export function extractUserAssemblyText(
+  simulationResult: SimulationResult | null
+): string | null {
+  const codeMap = simulationResult?.program?.code_mapping;
+  if (!codeMap || Object.keys(codeMap).length === 0) return null;
+
+  const userProg = simulationResult?.program?.memory_layout?.code?.user_program;
+  const startPc = userProg?.start ? parseInt(userProg.start, 16) : null;
+  const endPc = userProg?.end ? parseInt(userProg.end, 16) : null;
+
+  const entries = Object.entries(codeMap).sort(
+    (a, b) => (parseInt(a[0], 16) >>> 0) - (parseInt(b[0], 16) >>> 0)
+  );
+
+  let filtered = entries;
+  if (
+    startPc !== null &&
+    endPc !== null &&
+    !Number.isNaN(startPc) &&
+    !Number.isNaN(endPc)
+  ) {
+    filtered = entries.filter(([pc]) => {
+      const n = parseInt(pc, 16);
+      return n >= startPc && n <= endPc;
+    });
+  } else if (
+    entries.some(([, item]) => item.source_line !== undefined && item.source_line !== null)
+  ) {
+    filtered = entries.filter(
+      ([, item]) => item.source_line !== undefined && item.source_line !== null
+    );
+  }
+
+  const lines = filtered
+    .map(([, item]) => item.assembly?.trim())
+    .filter((line): line is string => Boolean(line));
+
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
 export async function compileAssemblyDirectly(
   assemblySource: string,
   preferredMode: "single" | "pipeline" = "single",
@@ -178,9 +218,10 @@ export async function compileAssemblyDirectly(
 
   const { singleResult, pipelineResult } = await runDualModeSimulations(result, options);
   const activeResult = preferredMode === "single" ? singleResult : pipelineResult;
+  const assembledText = extractUserAssemblyText(activeResult) ?? assemblySource;
 
   return {
-    assembly: assemblySource,
+    assembly: assembledText,
     simulationResult: activeResult,
     singleSimulationResult: singleResult,
     pipelineSimulationResult: pipelineResult,

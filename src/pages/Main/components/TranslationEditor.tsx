@@ -396,6 +396,11 @@ export default function TranslationEditor({
       </div>
 
       {/* 파일 업로드 및 저장 목록 팝업 */}
+      {activeTarget === 'c' && <p data-testid="basic-c-policy" className="shrink-0 border-b border-[#E5E5E5] bg-[#F8FAFC] px-3 py-1.5 text-[11px] leading-relaxed text-[#57606A]">
+        기초 C · main 내부 정수·고정 배열·조건문·반복문만 지원함.
+        #include 등 전처리기·함수 호출·입출력 미지원.
+        결과는 레지스터·메모리에서 확인 가능.
+      </p>}
       <CFileUploadPopup
         isOpen={isUploadPopupOpen}
         onClose={() => setIsUploadPopupOpen(false)}

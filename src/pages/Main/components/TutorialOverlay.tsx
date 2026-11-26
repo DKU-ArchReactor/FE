@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useIsMobileViewport } from "../types";
-import { hideTutorialForToday } from "../utils/tutorialDemoData";
 
 interface TargetRect {
   top: number;
@@ -352,13 +351,6 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
     onClose();
   }, [onClose, onChangeViewport]);
 
-  const handleHideToday = useCallback(() => {
-    hideTutorialForToday();
-    setStepIndex(0);
-    onChangeViewport?.(0, "code");
-    onClose();
-  }, [onClose, onChangeViewport]);
-
   const handlePrev = useCallback(() => {
     goToStep(stepIndex - 1);
   }, [goToStep, stepIndex]);
@@ -689,15 +681,8 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
           </div>
         </div>
 
-        {/* 더 아래에 [오늘 그만 보기] & [닫기] */}
+        {/* 더 아래에 [닫기] */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleHideToday}
-            className="h-6.5 px-2.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border border-white/15 text-[10.5px] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-md backdrop-blur-md whitespace-nowrap"
-          >
-            <span>오늘 그만 보기</span>
-          </button>
           <button
             type="button"
             onClick={handleClose}
