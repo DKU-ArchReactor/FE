@@ -4,6 +4,20 @@ import type { MappedAssemblyRow } from "../utils/translationCompile";
 import { timelineSync, isMidCycleProgress } from "../utils/timelineSync";
 
 
+export const SINGLE_BASE_SPEED_MS = 10000;
+export const PIPELINE_BASE_SPEED_MS = 5000;
+export const PLAYBACK_SPEED_RATES = [
+  { label: "0.5x", rate: 0.5 },
+  { label: "1.0x", rate: 1.0 },
+  { label: "1.5x", rate: 1.5 },
+  { label: "2.0x", rate: 2.0 },
+  { label: "5.0x", rate: 5.0 },
+] as const;
+
+export function getBasePlaySpeed(isSingle: boolean): number {
+  return isSingle ? SINGLE_BASE_SPEED_MS : PIPELINE_BASE_SPEED_MS;
+}
+
 interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;
   mappedAssemblyRows: MappedAssemblyRow[];
@@ -27,7 +41,14 @@ export function useSimulationPlayback({
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playMode, setPlayMode] = useState<"continuous" | "singleCycle">("continuous");
-  const [playSpeed, setPlaySpeed] = useState<number>(5000);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const basePlaySpeed = getBasePlaySpeed(isSingleEngine);
+  const playSpeed = Math.round(basePlaySpeed / playbackRate);
+  const setPlaySpeed = (speedMs: number) => {
+    if (speedMs > 0) {
+      setPlaybackRate(basePlaySpeed / speedMs);
+    }
+  };
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
 
@@ -311,7 +332,7 @@ export function useSimulationPlayback({
       [`${editorTarget}:single`]: { cycle: 0, isStandby: true },
       [`${editorTarget}:pipeline`]: { cycle: 0, isStandby: true },
     }));
-    setPlaySpeed(5000);
+    setPlaybackRate(1);
     if (playbackClock.current) {
       playbackClock.current = null;
     }
@@ -330,7 +351,7 @@ export function useSimulationPlayback({
       "asm:single": { cycle: 0, isStandby: true },
       "asm:pipeline": { cycle: 0, isStandby: true },
     });
-    setPlaySpeed(5000);
+    setPlaybackRate(1);
     if (playbackClock.current) {
       playbackClock.current = null;
     }

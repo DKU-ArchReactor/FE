@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import { getBasePlaySpeed, PLAYBACK_SPEED_RATES } from "../hooks/useSimulationPlayback";
 
 interface MobileWorkspaceControlsProps {
   currentCycle: number;
@@ -91,13 +92,8 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             />
 
             <div className="flex items-center gap-0.5 shrink-0 text-[9.5px]">
-              {[
-                { label: "0.5x", speed: 10000 },
-                { label: "1.0x", speed: 5000 },
-                { label: "1.5x", speed: 3333 },
-                { label: "2.0x", speed: 2500 },
-                { label: "5.0x", speed: 1000 },
-              ].map(({ label, speed }) => {
+              {PLAYBACK_SPEED_RATES.map(({ label, rate }) => {
+                const speed = Math.round(getBasePlaySpeed(isSingleEngine) / rate);
                 const isSelected = Math.abs(playSpeed - speed) < 50;
                 return (
                   <button

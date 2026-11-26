@@ -102,12 +102,6 @@ function SituationCard({card, active}:{card:PipelineSituation;active:boolean}) {
     <div className="tutor-single-card-header">
       <div className="tutor-header-left">
         <span className="tutor-single-tag" title={card.bubble ? '취소되기 전 명령어' : undefined}>{card.asmLine ? `ASM: L${card.asmLine}` : 'ASM'}</span>
-        {active && (
-          <span className="tutor-mode-badge executing">
-            <span className="tutor-mode-dot" />
-            <span>실행 중</span>
-          </span>
-        )}
         <StageBadge badge={card.badge}/>
         <span className="tutor-single-badge">{card.status}</span>
       </div>

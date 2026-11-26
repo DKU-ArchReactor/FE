@@ -445,11 +445,11 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       12,
       Math.min(vw - width - 12, activeRect.left + (activeRect.width - width) / 2)
     );
-    const estimatedHeight = isRightViewportStep ? 210 : 185;
+    const estimatedHeight = isRightViewportStep ? 165 : 140;
     const rawTop = activeRect.top + (activeRect.height - estimatedHeight) / 2;
     const top = Math.max(
       54,
-      Math.min(vh - estimatedHeight - 16, Math.max(activeRect.top + 10, rawTop))
+      Math.min(vh - estimatedHeight - 108, Math.max(activeRect.top + 10, rawTop))
     );
     return {
       style: { top, left, width },
@@ -513,7 +513,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
         <div className="fixed inset-0 bg-slate-950/62 backdrop-blur-[1px] pointer-events-none z-[101]" />
       )}
 
-      {/* 2. 최상단 헤더 바 (데스크톱 & 모바일 반응형): 워크플로우 진행 상태 + 우상단 [오늘 그만 보기] / [닫기] */}
+      {/* 2. 최상단 헤더 바 (데스크톱 & 모바일 반응형): 워크플로우 진행 상태 및 제목 표시 */}
       <div className="relative z-[115] shrink-0 h-11 px-3 md:px-4 flex items-center justify-between gap-2 bg-slate-950/85 border-b border-white/15 backdrop-blur-md">
         <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
           <span
@@ -524,27 +524,6 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
           <h2 className="text-[11px] md:text-xs font-bold text-white truncate">
             {currentItem.title}
           </h2>
-        </div>
-
-        {/* 우상단 제어 버튼군: 오늘 그만 보기 & 닫기 */}
-        <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleHideToday}
-            className="h-7 px-2 md:px-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-100 hover:text-white border border-white/20 text-[10.5px] md:text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-xs whitespace-nowrap"
-          >
-            <span>오늘 그만 보기</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleClose}
-            aria-label="튜토리얼 닫기"
-            className="h-7 px-2 md:px-2.5 rounded-lg bg-[#BAE6FD] hover:bg-[#7DD3FC] text-slate-900 text-[10.5px] md:text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm whitespace-nowrap"
-          >
-            <span>닫기</span>
-            <span className="text-xs leading-none font-extrabold">✕</span>
-          </button>
         </div>
       </div>
 
@@ -592,7 +571,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
           </div>
 
           {/* 버튼별 핵심 설명 리스트 */}
-          <ul className="space-y-1.5 mb-2.5">
+          <ul className="space-y-1.5">
             {currentItem.buttons.map((btn) => (
               <li
                 key={btn.label}
@@ -607,48 +586,72 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
               </li>
             ))}
           </ul>
+        </div>
+      </div>
 
-          {/* 카드 하단: 파스텔 스텝 인디케이터 점 & [이전] / [다음] 버튼 */}
-          <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
-            {/* 스텝 점 인디케이터 */}
-            <div className="flex items-center gap-1">
-              {TUTORIAL_STEPS.map((s, idx) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => goToStep(idx)}
-                  aria-label={`${s.step}단계: ${s.title}`}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    idx === stepIndex
-                      ? `w-4 ${currentItem.dotColor}`
-                      : "w-1.5 bg-white/25 hover:bg-white/50"
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* 이전 / 다음 워크플로우 이동 버튼 */}
-            <div className="flex items-center gap-1.5 shrink-0">
+      {/* 4. 화면 하단 중앙 고정 컨트롤 바: 진행도 표시 & [이전] / [다음], 그 아래 [오늘 그만 보기] / [닫기] */}
+      <div className="fixed bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 z-[120] pointer-events-auto flex flex-col items-center gap-2">
+        <div className="flex items-center gap-3 px-3.5 py-2 rounded-full bg-slate-900/95 text-white border border-white/15 shadow-2xl backdrop-blur-md">
+          {/* 스텝 점 인디케이터 */}
+          <div className="flex items-center gap-1.5">
+            {TUTORIAL_STEPS.map((s, idx) => (
               <button
+                key={s.id}
                 type="button"
-                onClick={handlePrev}
-                disabled={stepIndex === 0}
-                className="h-7 px-2.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-35 disabled:pointer-events-none text-slate-200 text-[11px] font-semibold transition-colors cursor-pointer"
-              >
-                이전
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className={`h-7 px-3 rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm ${currentItem.nextBtnColor}`}
-              >
-                <span>{stepIndex === totalSteps - 1 ? "완료" : "다음"}</span>
-                {stepIndex < totalSteps - 1 && (
-                  <span className="text-xs leading-none">→</span>
-                )}
-              </button>
-            </div>
+                onClick={() => goToStep(idx)}
+                aria-label={`${s.step}단계: ${s.title}`}
+                className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                  idx === stepIndex
+                    ? `w-4 ${currentItem.dotColor}`
+                    : "w-1.5 bg-white/25 hover:bg-white/50"
+                }`}
+              />
+            ))}
           </div>
+
+          <span className="h-3.5 w-px bg-white/15 shrink-0" aria-hidden="true" />
+
+          {/* 이전 / 다음 워크플로우 이동 버튼 */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handlePrev}
+              disabled={stepIndex === 0}
+              className="h-7 px-2.5 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-35 disabled:pointer-events-none text-slate-200 text-[11px] font-semibold transition-colors cursor-pointer"
+            >
+              이전
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              className={`h-7 px-3.5 rounded-full text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm ${currentItem.nextBtnColor}`}
+            >
+              <span>{stepIndex === totalSteps - 1 ? "완료" : "다음"}</span>
+              {stepIndex < totalSteps - 1 && (
+                <span className="text-xs leading-none">→</span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 더 아래에 [오늘 그만 보기] & [닫기] */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleHideToday}
+            className="h-6.5 px-2.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border border-white/15 text-[10.5px] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-md backdrop-blur-md whitespace-nowrap"
+          >
+            <span>오늘 그만 보기</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="튜토리얼 닫기"
+            className="h-6.5 px-2.5 rounded-full bg-[#BAE6FD] hover:bg-[#7DD3FC] text-slate-900 text-[10.5px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-md whitespace-nowrap"
+          >
+            <span>닫기</span>
+            <span className="text-[11px] leading-none font-extrabold">✕</span>
+          </button>
         </div>
       </div>
     </div>

@@ -248,10 +248,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                     <span className="tutor-single-tag">
                       {line != null ? `C : L${line}` : 'C 코드'}
                     </span>
-                    <span className={`tutor-mode-badge ${isUserSelected ? 'selected' : 'executing'}`}>
-                      <span className="tutor-mode-dot" />
-                      <span>{isUserSelected ? '선택됨' : '실행 중'}</span>
-                    </span>
                     {cAnalysis && (
                       <span className="tutor-single-badge">{cAnalysis.type}</span>
                     )}
@@ -456,12 +452,6 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                         {hasC && row.sourceLine == null && (
                           <span className="tutor-single-badge" title="이 명령어와 연결된 C 줄 정보가 없습니다. 명령어의 동작과 실행 결과는 확인할 수 있습니다.">
                             {rowItem?.source_context === 'startup_source' || rowItem?.source_file?.replace(/\\/g, '/').split('/').at(-1) === 'start.S' ? '프로그램 시작 코드 · C 연결 없음' : '연결된 C 줄 없음'}
-                          </span>
-                        )}
-                        {isActive && (
-                          <span className={`tutor-mode-badge ${isUserSelected ? 'selected' : 'executing'}`}>
-                            <span className="tutor-mode-dot" />
-                            <span>{isUserSelected ? '선택됨' : '실행 중'}</span>
                           </span>
                         )}
                         {rowInstruction && (

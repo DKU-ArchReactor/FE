@@ -67,6 +67,11 @@ const MainPage: React.FC = () => {
   const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(() =>
     shouldAutoOpenTutorial()
   );
+  useEffect(() => {
+    const handleOpenTutorial = () => setIsTutorialOpen(true);
+    window.addEventListener("ar-open-tutorial", handleOpenTutorial);
+    return () => window.removeEventListener("ar-open-tutorial", handleOpenTutorial);
+  }, []);
   const [isMobileCodeView, setIsMobileCodeView] = useState(true);
   const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
   const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
@@ -488,17 +493,6 @@ const handleMobileViewportSelect = (index: number) => {
             }
           />
         </div>
-
-        {/* 튜토리얼 가이드 다시 열기 버튼 (데스크톱 상단 컨트롤바 우측 노출) */}
-        <button
-          type="button"
-          onClick={() => setIsTutorialOpen(true)}
-          title="화면 사용법 튜토리얼 보기"
-          aria-label="튜토리얼 열기"
-          className="hidden md:flex h-full aspect-square rounded-lg items-center justify-center cursor-pointer transition-all duration-150 shrink-0 select-none bg-[var(--ar-panel-bg)] hover:bg-[#F3F4F6] text-[#57606A] hover:text-[var(--ar-accent)] border border-[var(--ar-border)] shadow-xs font-mono font-bold text-sm"
-        >
-          ?
-        </button>
 
         {/* AI 어시스턴트 팝업 버튼 (모바일에서는 하단 바텀바로 분리 예정) */}
         <div data-tutorial-id="ai-assistant" className="hidden md:block relative h-full aspect-square shrink-0">
