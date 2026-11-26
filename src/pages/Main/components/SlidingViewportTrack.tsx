@@ -1,5 +1,5 @@
 import React from "react";
-import type { SectionConfig, PanelKey } from "../types";
+import { useIsMobileViewport, type SectionConfig, type PanelKey } from "../types";
 
 interface SlidingViewportTrackProps {
   sections: SectionConfig[];
@@ -32,21 +32,26 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
   mobileExtraSection,
   mobileViewportIndex,
 }) => {
+  const isMobile = useIsMobileViewport();
   const effectiveMobileIndex = mobileViewportIndex ?? rightViewportIndex;
+  const activeSlideIndex = isMobile ? effectiveMobileIndex : rightViewportIndex;
 
   return (
     <div ref={containerRef} className="flex-1 h-full min-w-0 overflow-hidden relative">
       <div
-        className="flex h-full w-full transition-transform duration-500 ease-in-out translate-x-[var(--mobile-tx)] md:translate-x-[var(--desktop-tx)]"
+        className="flex h-full w-full transition-transform duration-500 ease-in-out translate-x-[var(--active-tx)]"
         style={
           {
-            "--mobile-tx": `-${effectiveMobileIndex * 100}%`,
-            "--desktop-tx": `-${rightViewportIndex * 100}%`,
+            "--active-tx": `-${activeSlideIndex * 100}%`,
           } as React.CSSProperties
         }
       >
         {mobileLeadSection && (
-          <div className="flex md:hidden h-full min-h-0 shrink-0 w-full overflow-hidden flex-col gap-1.5">
+          <div
+            className={`${
+              isMobile ? "flex" : "hidden"
+            } h-full min-h-0 shrink-0 w-full overflow-hidden flex-col gap-1.5`}
+          >
             {mobileLeadSection}
           </div>
         )}
@@ -212,7 +217,11 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
         })}
 
         {mobileExtraSection && (
-          <div className="flex md:hidden h-full min-h-0 shrink-0 w-full overflow-hidden p-[1.5px]">
+          <div
+            className={`${
+              isMobile ? "flex" : "hidden"
+            } h-full min-h-0 shrink-0 w-full overflow-hidden p-[1.5px]`}
+          >
             {mobileExtraSection}
           </div>
         )}

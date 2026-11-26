@@ -9,6 +9,7 @@ import { RISCV_LANGUAGE_ID } from "../utils/riscvLanguage";
 import { getRiscvMonacoThemeName, registerRiscvAndThemes } from "../utils/riscvMonacoTheme";
 import type { StageBuffer, CycleEvents, SimulationResult } from "@/type/simulation";
 import type { FileSummary } from "@/type/file";
+import { isMobileViewport } from "../types";
 import AsmFileUploadPopup from "./AsmFileUploadPopup";
 import { MappingRowList } from "./MappingRowList";
 
@@ -193,7 +194,7 @@ export default function TranslationMapping({
           return;
         }
 
-        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        const isMobile = isMobileViewport();
         if (selectedLineRef.current === clickedLine && isLineNumberClick && !isMobile) {
           onSelectLineRef.current?.(null, null, false);
         } else {
