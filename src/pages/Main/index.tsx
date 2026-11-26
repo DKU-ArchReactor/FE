@@ -197,16 +197,24 @@ const MainPage: React.FC = () => {
   });
 
   const assistantCode = useAssistantCode(
-    fileMgr.translationSource,
-    JSON.stringify([auth.epoch, fileMgr.fileId, fileMgr.cFileName]),
+    { c: fileMgr.translationSource, asm: customAssembly },
+    JSON.stringify([auth.epoch, fileMgr.fileId, fileMgr.cFileName, fileMgr.asmFileName]),
     editorTarget,
     fileMgr.translationBusy,
-    source => {
+    program => {
       setSourceSelection(null);
       handleClearSelection();
-      fileMgr.updateTranslationSource(source, fileMgr.cFileName, true, null, onResetSimulation);
+      setEditorTarget(program.language);
+      if (program.language === 'c') {
+        fileMgr.updateTranslationSource(program.source, fileMgr.cFileName, true, null, onResetSimulation);
+      } else {
+        setCustomAssembly(program.source);
+        fileMgr.setFileId(null);
+        simSession.setAsmError('');
+        onResetSimulation();
+      }
     },
-    JSON.stringify([auth.epoch, null, fileMgr.cFileName]),
+    JSON.stringify([auth.epoch, null, fileMgr.cFileName, fileMgr.asmFileName]),
   );
 
   // 6. 분할 레이아웃 & 스플리터 훅
