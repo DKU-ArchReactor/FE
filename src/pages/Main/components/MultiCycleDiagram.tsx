@@ -154,6 +154,9 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
           {/* 스테이지 컬러 레전드 미니 뱃지 */}
           {isSingleMode ? (
             <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold">
+              <span className="px-1.5 py-0.5 rounded-[4px] bg-[#8DA5BE] text-white">
+                <span className="inline-block translate-y-[1px]">PLAN</span>
+              </span>
               <span className="px-1.5 py-0.5 rounded-[4px] bg-[#22C55E] text-white font-bold shadow-2xs">
                 <span className="inline-block translate-y-[1px]">DONE</span>
               </span>
@@ -592,6 +595,8 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                         }
 
                         const style = STAGE_STYLES[cell.type];
+                        const isPlanned = isSingleMode && cell.type === 'DONE' && cIdx > activeCycleCol;
+                        const label = isSingleMode && cell.type === 'DONE' ? (isPlanned ? 'PLAN' : 'DONE') : cell.label;
 
                         return (
                           <div
@@ -599,18 +604,20 @@ export const MultiCycleDiagram: React.FC<MultiCycleDiagramProps> = ({
                             onClick={() => onJumpToCycle?.(cIdx + 1)}
                             className={`shrink-0 flex items-center justify-center p-0.5 border-r border-[#E5E5E5] cursor-pointer relative transition-colors ${cellBgClass}`}
                             style={{ width: `${COL_WIDTH}px` }}
-                            title={`Clock ${history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${cell.isStall
+                            title={`${isSingleMode ? 'Step' : 'Clock'} ${isSingleMode ? cIdx + 1 : history[cIdx]?.clock ?? cIdx} | ${row.assembly} ➔ ${isSingleMode && cell.type === 'DONE' ? (isPlanned ? '실행 예정' : '실행 완료') : cell.isStall
                                 ? `${cell.stage} 단계 지연 (Stall / EX에 Bubble 삽입)`
                                 : `${cell.stage} 단계 실행 중`
                               }`}
                           >
                             <span
-                              className={`w-full h-full rounded-[4px] text-[9.5px] font-mono tracking-tight flex items-center justify-center select-none text-white transition-colors ${isCurrentCol
-                                  ? `${style.activeBg} font-extrabold shadow-xs`
-                                  : `${style.bg} ${style.hoverBg} font-bold`
+                              className={`w-full h-full rounded-[4px] text-[9.5px] font-mono tracking-tight flex items-center justify-center select-none transition-colors ${isPlanned
+                                  ? 'bg-[#8DA5BE] text-white font-bold hover:bg-[#7C97B2]'
+                                  : isCurrentCol
+                                  ? `${style.activeBg} text-white font-extrabold shadow-xs`
+                                  : `${style.bg} ${style.hoverBg} text-white font-bold`
                                 }`}
                             >
-                              {cell.label}
+                              {label}
                             </span>
                           </div>
                         );
