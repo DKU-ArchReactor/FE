@@ -1,13 +1,37 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
+import { initialSimulationState } from "../utils/initialSimulationState";
 import { timelineSync, isMidCycleProgress } from "../utils/timelineSync";
 
+
+export const SINGLE_BASE_SPEED_MS = 10000;
+export const PIPELINE_BASE_SPEED_MS = 5000;
+export const NON_DATAPATH_BASE_SPEED_MS = 3000;
+export const DATAPATH_VIEWPORT_INDEX = 1;
+export const PLAYBACK_SPEED_RATES = [
+  { label: "0.5x", rate: 0.5 },
+  { label: "1.0x", rate: 1.0 },
+  { label: "1.5x", rate: 1.5 },
+  { label: "2.0x", rate: 2.0 },
+  { label: "5.0x", rate: 5.0 },
+] as const;
+
+export function getBasePlaySpeed(
+  isSingle: boolean,
+  viewportIndex = DATAPATH_VIEWPORT_INDEX,
+): number {
+  if (viewportIndex !== DATAPATH_VIEWPORT_INDEX) {
+    return NON_DATAPATH_BASE_SPEED_MS;
+  }
+  return isSingle ? SINGLE_BASE_SPEED_MS : PIPELINE_BASE_SPEED_MS;
+}
 
 interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;
   mappedAssemblyRows: MappedAssemblyRow[];
   isSingleEngine: boolean;
+  rightViewportIndex?: number;
   editorTarget: "c" | "asm";
   translationSelectedLine: number | null;
   onClearSelection: () => void;
@@ -17,6 +41,7 @@ export function useSimulationPlayback({
   simulationData,
   mappedAssemblyRows,
   isSingleEngine,
+  rightViewportIndex = 0,
   editorTarget,
   translationSelectedLine,
   onClearSelection,
@@ -27,7 +52,14 @@ export function useSimulationPlayback({
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playMode, setPlayMode] = useState<"continuous" | "singleCycle">("continuous");
-  const [playSpeed, setPlaySpeed] = useState<number>(5000);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const basePlaySpeed = getBasePlaySpeed(isSingleEngine, rightViewportIndex);
+  const playSpeed = Math.round(basePlaySpeed / playbackRate);
+  const setPlaySpeed = (speedMs: number) => {
+    if (speedMs > 0) {
+      setPlaybackRate(basePlaySpeed / speedMs);
+    }
+  };
   const [finishedSingleFrame, setFinishedSingleFrame] = useState<CycleHistoryItem | null>(null);
   const [playbackRevision, setPlaybackRevision] = useState(0);
 
@@ -107,17 +139,6 @@ export function useSimulationPlayback({
   // Single-Cycle 및 Pipeline 모드 공통: Step 0 / Cycle 0 (실행 시작 전 대기 상태) 초기 스냅샷
   const initialResetData: CycleHistoryItem | null = useMemo(() => {
     if (!simulationData || !historyList.length) return null;
-    const entryPc = simulationData.program?.entry_point || "0x00010000";
-    const initialRegs: Record<string, string> = {
-      x0: "0x00000000",
-      x1: "0x00000000",
-      x2: "0x7fffeffc", // sp
-    };
-    for (let i = 0; i < 32; i++) {
-      const k = `x${i}`;
-      if (!initialRegs[k]) initialRegs[k] = "0x00000000";
-    }
-
     return {
       clock: 0,
       buffers: {
@@ -177,17 +198,7 @@ export function useSimulationPlayback({
           reason: null,
         },
       },
-      global_result: {
-        current_pc: entryPc,
-        registers: initialRegs,
-        memory_snapshot: {},
-        console_output: "",
-        metrics: {
-          accumulated_instructions: 0,
-          accumulated_stalls: 0,
-          accumulated_forwards: 0,
-        },
-      },
+      global_result: initialSimulationState(simulationData),
     };
   }, [simulationData, historyList.length]);
 
@@ -311,7 +322,7 @@ export function useSimulationPlayback({
       [`${editorTarget}:single`]: { cycle: 0, isStandby: true },
       [`${editorTarget}:pipeline`]: { cycle: 0, isStandby: true },
     }));
-    setPlaySpeed(5000);
+    setPlaybackRate(1);
     if (playbackClock.current) {
       playbackClock.current = null;
     }
@@ -330,7 +341,7 @@ export function useSimulationPlayback({
       "asm:single": { cycle: 0, isStandby: true },
       "asm:pipeline": { cycle: 0, isStandby: true },
     });
-    setPlaySpeed(5000);
+    setPlaybackRate(1);
     if (playbackClock.current) {
       playbackClock.current = null;
     }

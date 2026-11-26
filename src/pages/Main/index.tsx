@@ -1,3 +1,4 @@
+import { useAssistantCode } from './hooks/useAssistantCode';
 import type { EditorSelection } from './utils/assistantSource';
 import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useCallback, useEffect } from "react";
@@ -13,6 +14,7 @@ import TutorialOverlay from "./components/TutorialOverlay";
 import {
   shouldAutoOpenTutorial,
   TUTORIAL_DEMO_ACTIVE_ROW,
+  TUTORIAL_DEMO_SOURCE,
   TUTORIAL_DEMO_ASSEMBLY,
   TUTORIAL_DEMO_CURRENT_DATA,
   TUTORIAL_DEMO_CYCLE,
@@ -67,6 +69,11 @@ const MainPage: React.FC = () => {
   const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(() =>
     shouldAutoOpenTutorial()
   );
+  useEffect(() => {
+    const handleOpenTutorial = () => setIsTutorialOpen(true);
+    window.addEventListener("ar-open-tutorial", handleOpenTutorial);
+    return () => window.removeEventListener("ar-open-tutorial", handleOpenTutorial);
+  }, []);
   const [isMobileCodeView, setIsMobileCodeView] = useState(true);
   const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
   const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
@@ -169,6 +176,7 @@ const MainPage: React.FC = () => {
     simulationData: simSession.simulationData,
     mappedAssemblyRows: simSession.mappedAssemblyRows,
     isSingleEngine: simSession.isSingleEngine,
+    rightViewportIndex,
     editorTarget,
     translationSelectedLine,
     onClearSelection: handleClearSelection,
@@ -187,6 +195,19 @@ const MainPage: React.FC = () => {
   useEffect(() => {
     resetSimulationRef.current = onResetSimulation;
   });
+
+  const assistantCode = useAssistantCode(
+    fileMgr.translationSource,
+    JSON.stringify([auth.epoch, fileMgr.fileId, fileMgr.cFileName]),
+    editorTarget,
+    fileMgr.translationBusy,
+    source => {
+      setSourceSelection(null);
+      handleClearSelection();
+      fileMgr.updateTranslationSource(source, fileMgr.cFileName, true, null, onResetSimulation);
+    },
+    JSON.stringify([auth.epoch, null, fileMgr.cFileName]),
+  );
 
   // 6. 분할 레이아웃 & 스플리터 훅
   const [sections, setSections] = useState<SectionConfig[]>(getDefaultSections);
@@ -276,8 +297,10 @@ const MainPage: React.FC = () => {
     setRightViewportIndex((prev) => Math.min(2, prev + 1));
   };
 
-  // 튜토리얼이 열려 있고 아직 컴파일된 시뮬레이션이 없을 때 저장해 둔 기준 사이클 스냅샷을 배경 화면에 표시
-  const useTutorialDemo = isTutorialOpen && !simSession.simulationData;
+  // 튜토리얼이 열려 있거나 demo 미리보기 모드이고 아직 컴파일된 시뮬레이션이 없을 때 저장해 둔 기준 사이클 스냅샷을 표시
+  const useTutorialDemo =
+    (isTutorialOpen || searchParams.get("demo") === "1") &&
+    !simSession.simulationData;
   const activeSimData = useTutorialDemo
     ? TUTORIAL_DEMO_SIMULATION
     : simSession.simulationData;
@@ -293,10 +316,8 @@ const MainPage: React.FC = () => {
   const activeTotalCycles = useTutorialDemo
     ? TUTORIAL_DEMO_SIMULATION.history.length
     : playback.totalCycles;
-  const activeSimMode = useTutorialDemo
-    ? "pipeline"
-    : simSession.simulationEngineMode;
-  const activeIsSingle = useTutorialDemo ? false : simSession.isSingleEngine;
+  const activeSimMode = simSession.simulationEngineMode;
+  const activeIsSingle = simSession.isSingleEngine;
   const activeMappedRows = useTutorialDemo
     ? TUTORIAL_DEMO_MAPPED_ROWS
     : simSession.mappedAssemblyRows;
@@ -335,9 +356,9 @@ const MainPage: React.FC = () => {
       mappedAssemblyRows={activeMappedRows}
       activeExecutionCLine={activeExecCLine}
       effectiveSelectedLine={playback.effectiveSelectedLine}
-      translationSource={fileMgr.translationSource}
+      translationSource={useTutorialDemo ? TUTORIAL_DEMO_SOURCE : fileMgr.translationSource}
       translationAssembly={activeAssembly}
-      cFileName={fileMgr.cFileName}
+      cFileName={useTutorialDemo ? "tutorial.c" : fileMgr.cFileName}
       fileId={fileMgr.fileId}
       editorTarget={editorTarget}
       customAssembly={customAssembly}
@@ -461,6 +482,7 @@ const handleMobileViewportSelect = (index: number) => {
             isAtTimelineEnd={playback.isAtTimelineEnd}
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
+            rightViewportIndex={rightViewportIndex}
             isReady={useTutorialDemo ? true : playback.isSimulationReady}
             isCompiling={fileMgr.translationBusy}
             mode={activeSimMode}
@@ -488,17 +510,6 @@ const handleMobileViewportSelect = (index: number) => {
             }
           />
         </div>
-
-        {/* 튜토리얼 가이드 다시 열기 버튼 (데스크톱 상단 컨트롤바 우측 노출) */}
-        <button
-          type="button"
-          onClick={() => setIsTutorialOpen(true)}
-          title="화면 사용법 튜토리얼 보기"
-          aria-label="튜토리얼 열기"
-          className="hidden md:flex h-full aspect-square rounded-lg items-center justify-center cursor-pointer transition-all duration-150 shrink-0 select-none bg-[var(--ar-panel-bg)] hover:bg-[#F3F4F6] text-[#57606A] hover:text-[var(--ar-accent)] border border-[var(--ar-border)] shadow-xs font-mono font-bold text-sm"
-        >
-          ?
-        </button>
 
         {/* AI 어시스턴트 팝업 버튼 (모바일에서는 하단 바텀바로 분리 예정) */}
         <div data-tutorial-id="ai-assistant" className="hidden md:block relative h-full aspect-square shrink-0">
@@ -540,6 +551,7 @@ const handleMobileViewportSelect = (index: number) => {
 
       <AiAssistantPopup
         key={auth.epoch}
+        codeEditor={assistantCode}
         sourceSelection={sourceSelection}
         editorLanguage={editorTarget}
         editorContent={editorTarget === 'c' ? fileMgr.translationSource : customAssembly}
@@ -745,6 +757,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
             mobileExtraSection={
               <AiAssistantPopup
                 key={`mobile-${auth.epoch}`}
+                codeEditor={assistantCode}
                 inline
                 sourceSelection={sourceSelection}
                 editorLanguage={editorTarget}

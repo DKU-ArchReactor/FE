@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import { getBasePlaySpeed, PLAYBACK_SPEED_RATES } from "../hooks/useSimulationPlayback";
 
 interface MobileWorkspaceControlsProps {
   currentCycle: number;
@@ -91,13 +92,10 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             />
 
             <div className="flex items-center gap-0.5 shrink-0 text-[9.5px]">
-              {[
-                { label: "0.5x", speed: 10000 },
-                { label: "1.0x", speed: 5000 },
-                { label: "1.5x", speed: 3333 },
-                { label: "2.0x", speed: 2500 },
-                { label: "5.0x", speed: 1000 },
-              ].map(({ label, speed }) => {
+              {PLAYBACK_SPEED_RATES.map(({ label, rate }) => {
+                const speed = Math.round(
+                  getBasePlaySpeed(isSingleEngine, rightViewportIndex) / rate,
+                );
                 const isSelected = Math.abs(playSpeed - speed) < 50;
                 return (
                   <button
@@ -279,13 +277,9 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="truncate">분석·지표</span>
+            <span className="truncate">데이터패스</span>
           </button>
 
           <button
@@ -300,9 +294,13 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
             </svg>
-            <span className="truncate">데이터패스</span>
+            <span className="truncate">분석·지표</span>
           </button>
 
           <button

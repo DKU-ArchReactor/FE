@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import type { SimulationResult } from "@/type/simulation";
 import { timelineSync } from '../utils/timelineSync';
+import { getBasePlaySpeed, PLAYBACK_SPEED_RATES } from '../hooks/useSimulationPlayback';
 
 interface ControlPanelProps {
   currentCycle: number;
@@ -17,6 +18,7 @@ interface ControlPanelProps {
   isAtTimelineEnd?: boolean;
   onJumpToCycle: (cycle: number) => void;
   onChangeSpeed: (speed: number) => void;
+  rightViewportIndex?: number;
   isReady?: boolean; // 시뮬레이션 데이터 준비 여부
   isCompiling?: boolean; // 컴파일 진행 중 여부
   mode?: "single" | "pipeline"; // Single-Cycle(Serial) 또는 5-Stage Pipeline(Parallel) 모드
@@ -43,6 +45,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isAtTimelineEnd,
   onJumpToCycle,
   onChangeSpeed,
+  rightViewportIndex = 0,
   isReady = true,
   isCompiling = false,
   mode = "pipeline",
@@ -384,13 +387,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
       {/* 3. 속도 조절 (모바일 숨김) */}
       <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] pl-2 text-[10px]">
-        {[
-          { label: "0.5x", speed: 10000 },
-          { label: "1.0x", speed: 5000 },
-          { label: "1.5x", speed: 3333 },
-          { label: "2.0x", speed: 2500 },
-          { label: "5.0x", speed: 1000 },
-        ].map(({ label, speed }) => {
+        {PLAYBACK_SPEED_RATES.map(({ label, rate }) => {
+          const speed = Math.round(getBasePlaySpeed(isSingle, rightViewportIndex) / rate);
           const isSelected = Math.abs(playSpeed - speed) < 50;
           return (
             <button

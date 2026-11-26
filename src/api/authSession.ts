@@ -44,5 +44,5 @@ function subscribe(onChange: () => void) {
   };
 }
 export function useAuthSession() {
-  return useSyncExternalStore(subscribe, getAuthSession);
+  return useSyncExternalStore(subscribe, getAuthSession, getAuthSession);
 }

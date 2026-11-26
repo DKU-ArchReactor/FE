@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import LoginPage from "./pages/Auth/Login";
 import SignUpPage from "./pages/Auth/SignUp";
 import MyPage from "./pages/My";
+import NotFoundPage from "./pages/NotFound";
 import Layout from "./layout/Layout";
 import LandingPage from "./pages/Landing";
 
@@ -43,6 +44,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/my" element={<MyPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </Suspense>

@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { learningExamples } from "@/data/learningExamples";
 import { ArchLogo } from "@/components/ArchLogo";
-import { Arrow, BrandMark, ProductPreview, WorkspacePreview } from "./LandingPreviews";
-import { stages } from "./previewState";
+import { Arrow, BrandMark, ProductPreview } from "./LandingPreviews";
 import "./landing.css";
 
 const questions = [
@@ -212,7 +211,6 @@ export default function LandingPage() {
             ))}
           </div>
         </section>
-        <WorkspacePreview />
 
         <section
           className="landing-features landing-section"
@@ -252,79 +250,43 @@ export default function LandingPage() {
               </Link>
             </div>
             <div
-              className="landing-code-illustration"
+              className="landing-code-illustration landing-real-shot-card"
               aria-label="C 코드의 덧셈이 RISC-V 명령어로 실행되는 예시"
             >
-              <div className="landing-mini-editor">
-                <div>
-                  <span className="landing-file-dot" /> main.c{" "}
-                  <span>C SOURCE</span>
-                </div>
-                <pre>
-                  <span>int</span> main() {"{"}
-                  {"\n"}
-                  {"  "}
-                  <span>int</span> a = <b>5</b>;{"\n"}
-                  {"  "}
-                  <span>int</span> b = <b>3</b>;{"\n"}
-                  {"  "}
-                  <em>return</em> a + b;{"\n"}
-                  {"}"}
-                </pre>
+              <div className="landing-illustration-caption">
+                <span className="landing-tiny-dot" /> C 소스 코드 ↔ RISC-V 어셈블리 1:N 매핑 및 실시간 튜터
               </div>
-              <span className="landing-convert-arrow" aria-hidden="true">
-                ↓
+              <div className="landing-real-shot-frame">
+                <img
+                  src="/landing/feature-code-mapping.png"
+                  alt="ArchReactor 실제 C 소스 코드, RISC-V 어셈블리 매핑 및 튜터 해설 화면"
+                  loading="lazy"
+                  className="landing-real-shot-img"
+                />
+              </div>
+              <span className="landing-illustration-footnote">
+                실제 시뮬레이터 에디터 및 튜터 화면
               </span>
-              <div className="landing-asm-result">
-                <span>RISC-V / 1:N 동기화 라인 매핑</span>
-                <code>
-                  <b>add</b> a5, a4, a5
-                </code>
-                <div>
-                  5 <span>+</span> 3 <span>→</span> <strong>8</strong>
-                </div>
-              </div>
             </div>
           </div>
           <div className="landing-feature-row landing-feature-reverse">
-            <div className="landing-pipeline-illustration">
+            <div
+              className="landing-pipeline-illustration landing-real-shot-card"
+              aria-label="5단계 파이프라인 데이터패스 시각화 화면"
+            >
               <div className="landing-illustration-caption">
-                <span className="landing-tiny-dot" /> 서로 다른 실행 방식, 같은
-                계산
+                <span className="landing-tiny-dot" /> IF · ID · EX · MEM · WB 5단계 파이프라인 데이터패스 회로도
               </div>
-              <div className="landing-comparison-label">
-                <b>Single-cycle</b>
-                <span>한 클록에 하나의 명령어</span>
-              </div>
-              <div className="landing-single-timeline">
-                {[1, 2, 3, 4].map((number) => (
-                  <span key={number}>I{number}</span>
-                ))}
-              </div>
-              <div className="landing-comparison-label">
-                <b>5-stage pipeline</b>
-                <span>단계별로 겹쳐지는 명령어</span>
-              </div>
-              <div className="landing-pipeline-timeline">
-                {[0, 1, 2].map((row) => (
-                  <div key={row}>
-                    {Array.from({ length: row }, (_, index) => (
-                      <i key={`empty-${index}`} />
-                    ))}
-                    {stages.map((stage, index) => (
-                      <span
-                        style={{ opacity: 1 - row * 0.2 }}
-                        key={stage}
-                        className={`landing-timeline-stage stage-${index}`}
-                      >
-                        {stage}
-                      </span>
-                    ))}
-                  </div>
-                ))}
+              <div className="landing-real-shot-frame">
+                <img
+                  src="/landing/feature-datapath.png"
+                  alt="ArchReactor 실제 5단계 파이프라인 하드웨어 데이터패스 회로도 화면"
+                  loading="lazy"
+                  className="landing-real-shot-img"
+                />
               </div>
               <span className="landing-illustration-footnote">
-                실행 방식 이해를 위한 개념도
+                실제 시뮬레이터 데이터패스 시각화 화면
               </span>
             </div>
             <div className="landing-feature-copy">
@@ -359,7 +321,7 @@ export default function LandingPage() {
                 대화하듯 물어보세요.
               </h3>
               <p>
-                "포워딩이 일어나는 예제 보여줘"라고 질문하면 AI 어시스턴트가 적절한 코드를 추천하고 바로 설명해 줍니다. 클릭 한 번으로 에디터에 코드를 삽입하고 즉시 파이프라인 흐름을 관찰하세요.
+                현재 작성 중인 C·어셈블리 코드와 실행 중인 사이클의 레지스터·메모리 스냅샷을 자동으로 첨부해 질문할 수 있습니다. 추천 질문 칩으로 코드 흐름부터 해저드·CPI 분석까지 즉시 확인해 보세요.
               </p>
               <Link
                 className="landing-text-link"
@@ -369,78 +331,46 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* 챗봇 대화 일러스트 (01, 02번과 100% 동일한 디자인 톤앤매너) */}
-            <div className="landing-chat-illustration" aria-label="AI 어시스턴트와 대화 및 예제 코드 추천 일러스트">
+            <div
+              className="landing-chat-illustration landing-real-shot-card"
+              aria-label="AI 어시스턴트와 대화 및 예제 코드 추천 일러스트"
+            >
               <div className="landing-illustration-caption">
-                <span className="landing-tiny-dot" /> 대화형 예제 코드 추천 및 에디터 연동
+                <span className="landing-tiny-dot" /> 코드·사이클 컨텍스트 첨부 및 추천 질문 칩
               </div>
-
-              <div className="landing-chat-dialogue">
-                {/* 1. 사용자 질문 말풍선 */}
-                <div className="landing-chat-bubble-user">
-                  데이터 포워딩을 관찰할 수 있는 간단한 어셈블리 예시 코드 보여줘.
-                </div>
-
-                {/* 2. AI 추천 및 에디터 추가 그래픽 뱃지 */}
-                <div className="landing-chat-bubble-ai">
-                  <p className="landing-chat-ai-intro">
-                    연속된 연산으로 EX/MEM 단계 포워딩이 일어나는 예제는 어떤가요?
-                  </p>
-                  <div className="landing-chat-code-card">
-                    <div><span className="cmd">addi</span> t0, zero, 10</div>
-                    <div><span className="cmd">addi</span> t1, zero, 20</div>
-                    <div><span className="cmd">add</span>  t2, t0, t1  <span className="comment"># t0, t1 바로 포워딩!</span></div>
-                  </div>
-                  {/* 버튼 모양의 일러스트 뱃지 (실제 버튼이 아님) */}
-                  <span className="landing-chat-insert-badge" aria-hidden="true">
-                    <span>＋</span> 에디터에 추가하기
-                  </span>
-                </div>
+              <div className="landing-real-shot-frame">
+                <img
+                  src="/landing/feature-ai-assistant.png"
+                  alt="ArchReactor 실제 AI 어시스턴트 팝업 화면"
+                  loading="lazy"
+                  className="landing-real-shot-img"
+                />
               </div>
-
               <span className="landing-illustration-footnote">
-                실시간 컨텍스트 질의응답
+                실제 AI 어시스턴트 플로팅 창 화면
               </span>
             </div>
           </div>
 
           {/* 04: 해저드 진단 & CPI 성능 분석 */}
           <div className="landing-feature-row landing-feature-reverse">
-            <div className="landing-hazard-illustration" aria-label="해저드 감지 및 CPI 성능 분석 일러스트">
+            <div
+              className="landing-hazard-illustration landing-real-shot-card"
+              aria-label="해저드 감지 및 CPI 성능 분석 일러스트"
+            >
               <div className="landing-illustration-caption">
-                <span className="landing-tiny-dot" /> 하드웨어 제어 감지 및 실행 효율 측정
+                <span className="landing-tiny-dot" /> 멀티사이클 타이밍 다이어그램 & 실시간 CPI 성능 지표
               </div>
-
-              <div className="landing-cpi-meter">
-                <div className="landing-cpi-meter-info">
-                  <span>실시간 성능 프로파일링</span>
-                  <strong>평균 클록 사이클 (CPI)</strong>
-                </div>
-                <div className="landing-cpi-value">
-                  1.18 <small>Cycles/Inst</small>
-                </div>
+              <div className="landing-real-shot-frame">
+                <img
+                  src="/landing/feature-metrics-timing.png"
+                  alt="ArchReactor 실제 멀티사이클 파이프라인 타이밍 다이어그램 및 CPI 성능 분석 화면"
+                  loading="lazy"
+                  className="landing-real-shot-img"
+                />
               </div>
-
-              <div className="landing-hazard-badges-grid">
-                <div className="landing-hazard-card is-forwarding">
-                  <span className="landing-hazard-tag">포워딩</span>
-                  <strong>Data Hazard</strong>
-                  <p>EX/MEM 바이패스로 딜레이 0 해소</p>
-                </div>
-                <div className="landing-hazard-card is-stall">
-                  <span className="landing-hazard-tag">스톨 삽입</span>
-                  <strong>Load-Use</strong>
-                  <p>1클록 지연 버블을 통한 하드웨어 제어</p>
-                </div>
-                <div className="landing-hazard-card is-flush">
-                  <span className="landing-hazard-tag">플러시</span>
-                  <strong>Control Hazard</strong>
-                  <p>분기 예측 실패 시 파이프라인 무효화</p>
-                </div>
-              </div>
-
               <span className="landing-illustration-footnote">
-                하드웨어 해저드 자동 프로파일링
+                실제 멀티사이클 타이밍 & CPI 분석 화면
               </span>
             </div>
             <div className="landing-feature-copy">
