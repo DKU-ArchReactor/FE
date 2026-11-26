@@ -1,8 +1,10 @@
 import { useAssistantSelection } from '../hooks/useAssistantSelection';
 import type { EditorSelection } from '../utils/assistantSource';
 import { useMemo, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
+import { FileNameModal, SaveAuthNoticeModal } from "./FileNameModal";
 import { getAccessToken } from "@/api/authSession";
 import { mapAssembly, type MappedAssemblyRow } from "../utils/translationCompile";
 import { RISCV_LANGUAGE_ID } from "../utils/riscvLanguage";
@@ -363,28 +365,22 @@ export default function TranslationMapping({
     );
   }, [selectedLine, currentActiveStep, stageBuffers, mode, activeTarget, rows, isSimulated, assembly]);
 
+  const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
+  const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [isAuthNoticeOpen, setIsAuthNoticeOpen] = useState(false);
   const isLoggedIn = !!getAccessToken();
 
-  const handleSaveAsmClick = async () => {
+  const performSaveAsm = async (inputName: string) => {
     if (busy || isSaving || !assembly?.trim()) return;
-    if (!isLoggedIn) {
-      alert("파일 저장은 로그인 후 이용할 수 있습니다.");
-      return;
+    let targetName = inputName.trim();
+    if (!targetName) return;
+    if (!targetName.toLowerCase().endsWith(".s") && !targetName.toLowerCase().endsWith(".asm")) {
+      targetName += ".s";
     }
 
     setIsSaving(true);
     try {
-      const inputName = window.prompt("저장할 어셈블리 파일 이름을 입력해 주세요:", "main.s");
-      if (!inputName || !inputName.trim()) {
-        setIsSaving(false);
-        return;
-      }
-      let targetName = inputName.trim();
-      if (!targetName.toLowerCase().endsWith(".s") && !targetName.toLowerCase().endsWith(".asm")) {
-        targetName += ".s";
-      }
-
       const res = await onSave?.(targetName);
       if (res !== false) {
         setAsmSaveSuccess(true);
@@ -393,6 +389,15 @@ export default function TranslationMapping({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveAsmClick = () => {
+    if (busy || isSaving || !assembly?.trim()) return;
+    if (!isLoggedIn) {
+      setIsAuthNoticeOpen(true);
+      return;
+    }
+    setIsNameModalOpen(true);
   };
 
   return (
@@ -558,6 +563,30 @@ export default function TranslationMapping({
         currentFileId={currentFileId}
         onOpenSavedFile={onOpenSavedFile}
         mode={mode}
+      />
+
+      <FileNameModal
+        isOpen={isNameModalOpen}
+        title="어셈블리 파일 저장"
+        description="저장할 어셈블리 파일 이름을 입력해 주세요."
+        defaultValue="main.s"
+        placeholder="main.s"
+        onConfirm={(raw) => {
+          setIsNameModalOpen(false);
+          const lower = raw.toLowerCase();
+          const name = lower.endsWith(".s") || lower.endsWith(".asm") ? raw : `${raw}.s`;
+          void performSaveAsm(name);
+        }}
+        onClose={() => setIsNameModalOpen(false)}
+      />
+
+      <SaveAuthNoticeModal
+        isOpen={isAuthNoticeOpen}
+        onClose={() => setIsAuthNoticeOpen(false)}
+        onLogin={() => {
+          setIsAuthNoticeOpen(false);
+          navigate("/login");
+        }}
       />
 
       {/* 본문: ASM 직접 작성 모드일 때는 Monaco Editor, C 모드일 때는 매핑 뷰 */}

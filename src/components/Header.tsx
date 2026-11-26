@@ -76,6 +76,16 @@ const Header = () => {
               튜토리얼
             </button>
           )}
+          {isActive("/my") && (
+            <button
+              type="button"
+              onClick={() => navigate("/simulator")}
+              title="시뮬레이터로 이동"
+              className="text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer whitespace-nowrap text-[#57606A] hover:text-[#24292F]"
+            >
+              시뮬레이터
+            </button>
+          )}
         </div>
 
         {/* 우측: 유저 메뉴 */}

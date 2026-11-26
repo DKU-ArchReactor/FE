@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { AddTaskFileModal, TaskFileDetailModal } from "./TaskFileModals";
+import { AddTaskFileModal, DeleteConfirmModal, TaskFileDetailModal } from "./TaskFileModals";
 import { useTaskFiles } from "../hooks/useTaskFiles";
 
 const TaskList = () => {
@@ -12,6 +12,7 @@ const TaskList = () => {
     setErrorMsg,
     selectedIds,
     isDeleting,
+    deleteTarget,
     isAddModalOpen,
     setIsAddModalOpen,
     newTitle,
@@ -28,6 +29,8 @@ const TaskList = () => {
     handleToggleSelectAll,
     handleDeleteSingle,
     handleDeleteSelected,
+    confirmDelete,
+    closeDeleteModal,
     handleAddButtonClick,
     handleFileChange,
     handleSaveNewFile,
@@ -212,6 +215,19 @@ const TaskList = () => {
         detailFile={detailFile}
         onClose={() => setDetailFile(null)}
         onMoveToSimulator={handleMoveToSimulator}
+      />
+
+      {/* 3. 파일 삭제 확인 모달 */}
+      <DeleteConfirmModal
+        isOpen={deleteTarget !== null}
+        message={
+          deleteTarget?.mode === "single"
+            ? `'${deleteTarget.title}' 파일을 삭제하시겠습니까?`
+            : `선택한 ${deleteTarget?.count ?? 0}개의 파일을 모두 삭제하시겠습니까?`
+        }
+        isDeleting={isDeleting}
+        onConfirm={() => void confirmDelete()}
+        onClose={closeDeleteModal}
       />
     </div>
   );

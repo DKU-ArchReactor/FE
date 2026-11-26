@@ -1,11 +1,13 @@
 import { useAssistantSelection } from '../hooks/useAssistantSelection';
 import type { EditorSelection } from '../utils/assistantSource';
 import { useRef, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import type { FileSummary } from "@/type/file";
 import { isMobileViewport } from "../types";
 import CFileUploadPopup from "./CFileUploadPopup";
+import { FileNameModal, SaveAuthNoticeModal } from "./FileNameModal";
 
 type Props = {
   onSourceSelection?: (selection: EditorSelection | null) => void;
@@ -72,35 +74,15 @@ export default function TranslationEditor({
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // 업로드 팝업 상태 및 참조
+  const navigate = useNavigate();
   const [isUploadPopupOpen, setIsUploadPopupOpen] = useState(false);
+  const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [isAuthNoticeOpen, setIsAuthNoticeOpen] = useState(false);
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
 
-  // 서버에 현재 소스 코드 저장 핸들러
-  const handleSaveClick = async () => {
-    if (busy || isSaving) return;
-    if (!isLoggedIn) {
-      alert("파일 저장은 로그인 후 이용할 수 있습니다.");
-      return;
-    }
-
+  const performSave = async (targetName: string) => {
     setIsSaving(true);
     try {
-      let targetName = fileName;
-      if (!targetName || targetName === "main.c") {
-        const inputName = window.prompt(
-          "저장할 파일 이름을 입력해 주세요:",
-          targetName || "main.c"
-        );
-        if (!inputName || !inputName.trim()) {
-          setIsSaving(false);
-          return;
-        }
-        targetName = inputName.trim();
-        if (!targetName.toLowerCase().endsWith(".c")) {
-          targetName += ".c";
-        }
-      }
-
       const res = await onSave?.(targetName);
       if (res !== false) {
         setSaveSuccess(true);
@@ -109,6 +91,21 @@ export default function TranslationEditor({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // 서버에 현재 소스 코드 저장 핸들러
+  const handleSaveClick = async () => {
+    if (busy || isSaving) return;
+    if (!isLoggedIn) {
+      setIsAuthNoticeOpen(true);
+      return;
+    }
+
+    if (!fileName || fileName === "main.c") {
+      setIsNameModalOpen(true);
+      return;
+    }
+    await performSave(fileName);
   };
 
   useEffect(() => {
@@ -414,6 +411,28 @@ export default function TranslationEditor({
         currentFileId={currentFileId}
         onOpenSavedFile={onOpenSavedFile}
         mode={mode}
+      />
+
+      <FileNameModal
+        isOpen={isNameModalOpen}
+        title="C 파일 저장"
+        description="저장할 C 파일 이름을 입력해 주세요."
+        defaultValue={fileName || "main.c"}
+        placeholder="main.c"
+        onConfirm={(name) => {
+          setIsNameModalOpen(false);
+          void performSave(name);
+        }}
+        onClose={() => setIsNameModalOpen(false)}
+      />
+
+      <SaveAuthNoticeModal
+        isOpen={isAuthNoticeOpen}
+        onClose={() => setIsAuthNoticeOpen(false)}
+        onLogin={() => {
+          setIsAuthNoticeOpen(false);
+          navigate("/login");
+        }}
       />
 
       {/* 본문: C 모드일 때는 Monaco Editor, ASM 모드일 때는 비활성화 안내 뷰 (코드는 상태에 온전히 보존됨) */}
