@@ -233,6 +233,8 @@ export interface SimulationResult {
     current_pc?: string;
     registers?: Record<string, string>;
     memory_snapshot?: Record<string, string>;
+    console_output?: string;
+    active_stack_pointer?: string;
     metrics?: Partial<GlobalResult['metrics']>;
   };
   assistant_context?: ExecutionDescriptor;
@@ -247,6 +249,7 @@ export interface SimulationResult {
     entry_point: string;
     instruction_words: number;
     data_words: number;
+    initial_stack_pointer?: string;
     code_mapping?: Record<
       string,
       {
@@ -255,7 +258,6 @@ export interface SimulationResult {
         source_line?: number | null;
       }
     >;
-    initial_stack_pointer?: string;
     memory_regions?: Array<{
       name: string;
       start: string;
