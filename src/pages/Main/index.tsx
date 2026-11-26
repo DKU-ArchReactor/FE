@@ -13,6 +13,7 @@ import TutorialOverlay from "./components/TutorialOverlay";
 import {
   shouldAutoOpenTutorial,
   TUTORIAL_DEMO_ACTIVE_ROW,
+  TUTORIAL_DEMO_SOURCE,
   TUTORIAL_DEMO_ASSEMBLY,
   TUTORIAL_DEMO_CURRENT_DATA,
   TUTORIAL_DEMO_CYCLE,
@@ -335,9 +336,9 @@ const MainPage: React.FC = () => {
       mappedAssemblyRows={activeMappedRows}
       activeExecutionCLine={activeExecCLine}
       effectiveSelectedLine={playback.effectiveSelectedLine}
-      translationSource={fileMgr.translationSource}
+      translationSource={useTutorialDemo ? TUTORIAL_DEMO_SOURCE : fileMgr.translationSource}
       translationAssembly={activeAssembly}
-      cFileName={fileMgr.cFileName}
+      cFileName={useTutorialDemo ? "tutorial.c" : fileMgr.cFileName}
       fileId={fileMgr.fileId}
       editorTarget={editorTarget}
       customAssembly={customAssembly}
