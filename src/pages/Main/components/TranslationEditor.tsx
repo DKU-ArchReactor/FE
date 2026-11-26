@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import type { FileSummary } from "@/type/file";
+import { isMobileViewport } from "../types";
 import CFileUploadPopup from "./CFileUploadPopup";
 
 type Props = {
@@ -132,7 +133,7 @@ export default function TranslationEditor({
       const clickedLine = e.target.position?.lineNumber;
       if (clickedLine) {
         lastMouseSelectTimeRef.current = Date.now();
-        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+        const isMobile = isMobileViewport();
         if (selectedLineRef.current === clickedLine && (!isMobile || !isLineNumberClick)) {
           onSelectLineRef.current?.(null, null, false);
         } else {

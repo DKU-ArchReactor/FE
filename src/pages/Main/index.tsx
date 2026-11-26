@@ -24,7 +24,11 @@ import {
 } from "./utils/tutorialDemoData";
 
 import type { PanelKey, SectionConfig } from "./types";
-import { getDefaultSections } from "./types";
+import {
+  getDefaultSections,
+  isMobileViewport,
+  useIsMobileViewport,
+} from "./types";
 import { useResizableLayout } from "./hooks/useResizableLayout";
 import { useSimulationPlayback } from "./hooks/useSimulationPlayback";
 import { useSimulationSession } from "./hooks/useSimulationSession";
@@ -98,15 +102,13 @@ const MainPage: React.FC = () => {
     };
   }, []);
 
+  const isMobile = useIsMobileViewport();
+
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsMobileAssistantViewport(false);
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    if (!isMobile) {
+      setIsMobileAssistantViewport(false);
+    }
+  }, [isMobile]);
 
   const [isMobileTutorModalOpen, setIsMobileTutorModalOpen] = useState(false);
   const [customAssembly, setCustomAssembly] = useState<string>(DEFAULT_CUSTOM_ASSEMBLY);
@@ -263,7 +265,7 @@ const MainPage: React.FC = () => {
       [simSession.simulationEngineMode]: { line, asmIndex },
     }));
     if ((line !== null || asmIndex !== null) && openTutorModal && simSession.simulationData) {
-      if (typeof window !== "undefined" && window.innerWidth < 768) {
+      if (isMobileViewport()) {
         setIsMobileTutorModalOpen(true);
       }
     } else if (line === null && asmIndex === null) {
@@ -464,7 +466,9 @@ const handleMobileViewportSelect = (index: number) => {
 
   return (
     <main
-      className={`flex-1 flex flex-col px-0 pb-0 pt-2 md:px-4 md:pb-3 md:pt-2.5 w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
+      className={`flex-1 flex flex-col ${
+        isMobile ? "px-0 pb-0 pt-2" : "px-4 pb-3 pt-2.5"
+      } w-full h-full min-h-0 overflow-hidden relative transition-colors duration-500 ${
         playback.isPlaying
           ? simSession.isSingleEngine
             ? "is-playing-single-light"
@@ -473,7 +477,11 @@ const handleMobileViewportSelect = (index: number) => {
       }`}
     >
       {/* 1. 최상단 제어 바 */}
-      <div className="h-[42px] shrink-0 flex items-stretch gap-2 mb-2 px-3 md:px-0 min-h-0 w-full">
+      <div
+        className={`h-[42px] shrink-0 flex items-stretch gap-2 mb-2 ${
+          isMobile ? "px-3" : "px-0"
+        } min-h-0 w-full`}
+      >
         <div className="flex-1 h-full min-w-0 flex">
           <ControlPanel
             currentCycle={activeCurrentCycle}
@@ -519,8 +527,13 @@ const handleMobileViewportSelect = (index: number) => {
           />
         </div>
 
-        {/* AI 어시스턴트 팝업 버튼 (모바일에서는 하단 바텀바로 분리 예정) */}
-        <div data-tutorial-id="ai-assistant" className="hidden md:block relative h-full aspect-square shrink-0">
+        {/* AI 어시스턴트 팝업 버튼 (모바일에서는 하단 바텀바로 분리) */}
+        <div
+          data-tutorial-id="ai-assistant"
+          className={`${
+            isMobile ? "hidden" : "block"
+          } relative h-full aspect-square shrink-0`}
+        >
         <button
           ref={aiButtonRef}
           type="button"
@@ -573,10 +586,12 @@ const handleMobileViewportSelect = (index: number) => {
         anchorRef={aiButtonRef}
       />
 
-      {/* 2. 메인 워크스페이스 분할 레이아웃 (모바일: 탭별 100% 풀화면 전환 / md 이상: 좌우 고정 분할) */}
+      {/* 2. 메인 워크스페이스 분할 레이아웃 (모바일: 탭별 100% 풀화면 전환 / 데스크톱: 좌우 고정 분할) */}
       <div
         ref={mainWorkspaceRef}
-        className={`flex-1 flex flex-col md:flex-row px-3 pb-2 md:px-0 md:pb-0 w-full min-h-0 overflow-hidden items-stretch ${
+        className={`flex-1 flex ${
+          isMobile ? "flex-col px-3 pb-2" : "flex-row px-0 pb-0"
+        } w-full min-h-0 overflow-hidden items-stretch ${
           resizingLeftPane ||
           resizingLeftVertical ||
           resizingLeftCodeCol
@@ -587,26 +602,30 @@ const handleMobileViewportSelect = (index: number) => {
         {/* 좌측 고정 패널: 상단(C/ASM 에디터) + 하단(튜터) (데스크톱 전용, 모바일에서는 슬라이딩 트랙 0번 슬라이드로 동작) */}
         <div
           ref={leftPaneContainerRef}
-className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:flex-none h-full min-h-0 overflow-hidden md:pr-1.5"
+          className={`${
+            isMobile
+              ? "hidden"
+              : "flex flex-none w-[var(--left-pane-w)] pr-1.5"
+          } flex-col h-full min-h-0 overflow-hidden`}
           style={{ "--left-pane-w": `${leftPaneWidth}%` } as React.CSSProperties}
         >
-          {/* 상단: C 소스 + ASM (모바일: 세로 1:1 배치 & 전체 높이 / md 이상: 가로 분할 & 비율 높이) */}
+          {/* 상단: C 소스 + ASM */}
           <div
-            className="flex flex-col w-full flex-1 md:flex-none h-full md:h-[var(--left-top-h)] min-h-0 overflow-hidden"
+            className="flex flex-col w-full flex-none h-[var(--left-top-h)] min-h-0 overflow-hidden"
             style={{ "--left-top-h": `calc((100% - 6px) * ${leftTopHeightPercent / 100})` } as React.CSSProperties}
           >
             <div
               ref={leftTopContainerRef}
-              className="flex-1 flex flex-col md:flex-row gap-1.5 md:gap-0 w-full min-h-0 overflow-hidden"
+              className="flex-1 flex flex-row gap-0 w-full min-h-0 overflow-hidden"
             >
               <div
-                className="flex flex-col w-full md:w-[var(--c-col-w)] flex-1 md:flex-none md:h-full min-h-0 overflow-hidden p-[1.5px]"
+                className="flex flex-col w-[var(--c-col-w)] flex-none h-full min-h-0 overflow-hidden p-[1.5px]"
                 style={{ "--c-col-w": `${leftCodeColRatio}%` } as React.CSSProperties}
               >
                 {renderPanel("cSource")}
               </div>
 
-              {/* C 소스와 ASM 사이 분할 스플리터 (모바일 숨김) */}
+              {/* C 소스와 ASM 사이 분할 스플리터 */}
               <div
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -623,7 +642,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
                   setLeftCodeColRatio(50);
                 }}
                 title="드래그하여 C 코드와 ASM 영역 너비 조절 (더블클릭: 50:50 리셋)"
-                className="hidden md:flex w-2.5 -mx-0.5 relative items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
+                className="flex w-2.5 -mx-0.5 relative items-center justify-center cursor-col-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
               >
                 <div
                   className={`w-[3px] rounded-full transition-all duration-200 ${
@@ -635,14 +654,14 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
               </div>
 
               <div
-                className="flex flex-col w-full md:flex-1 md:h-full min-h-0 overflow-hidden p-[1.5px]"
+                className="flex flex-col w-full flex-1 h-full min-h-0 overflow-hidden p-[1.5px]"
               >
                 {renderPanel("source")}
               </div>
             </div>
           </div>
 
-          {/* 상단(에디터)과 하단(튜터) 사이 세로 분할 스플리터 (모바일 숨김) */}
+          {/* 상단(에디터)과 하단(튜터) 사이 세로 분할 스플리터 */}
           <div
             onMouseDown={(e) => {
               e.preventDefault();
@@ -659,7 +678,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
               setLeftTopHeightPercent(56);
             }}
             title="위아래로 드래그하여 코드 영역과 튜터 높이 비율 조절 (더블클릭: 56:44 기본 리셋)"
-            className="hidden md:flex h-2.5 -my-0.5 relative items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
+            className="flex h-2.5 -my-0.5 relative items-center justify-center cursor-row-resize group shrink-0 z-20 hover:bg-[var(--ar-accent)]/10 rounded-sm transition-colors"
           >
             <div
               className={`h-[3px] rounded-full transition-all duration-200 ${
@@ -670,10 +689,10 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
             />
           </div>
 
-          {/* 하단: 튜터 영역 (모바일 숨김) */}
+          {/* 하단: 튜터 영역 */}
           <div
             data-tutorial-id="tutor-panel"
-            className="hidden md:flex w-full min-h-0 overflow-hidden flex-col p-[1.5px]"
+            className="flex w-full min-h-0 overflow-hidden flex-col p-[1.5px]"
             style={{ flex: 1 }}
           >
             {renderPanel("tutor")}
@@ -697,7 +716,9 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
             setLeftPaneWidth(50);
           }}
           title="드래그하여 좌측 에디터 영역과 우측 뷰포트 너비 조절 (더블클릭: 50:50 기본 리셋)"
-          className="hidden md:flex w-2.5 relative items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[var(--ar-accent)]/10 rounded-md transition-colors"
+          className={`${
+            isMobile ? "hidden" : "flex"
+          } w-2.5 relative items-center justify-center cursor-col-resize group shrink-0 z-30 hover:bg-[var(--ar-accent)]/10 rounded-md transition-colors`}
         >
           <div
             className={`w-[4px] rounded-full transition-all duration-200 ${
@@ -708,13 +729,19 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
           />
         </div>
 
-        {/* 슬라이딩 뷰포트 영역 (모바일: 5개 탭 전체 슬라이드 트랙 / md 이상: 우측 3개 뷰포트 트랙) */}
+        {/* 슬라이딩 뷰포트 영역 (모바일: 5개 탭 전체 슬라이드 트랙 / 데스크톱: 우측 3개 뷰포트 트랙) */}
         <div
           data-tutorial-id="right-section"
-          className="flex w-full flex-1 h-full min-w-0 min-h-0 overflow-hidden relative items-stretch md:pl-1"
+          className={`flex w-full flex-1 h-full min-w-0 min-h-0 overflow-hidden relative items-stretch ${
+            isMobile ? "" : "pl-1"
+          }`}
         >
           {canGoPrevViewport && (
-            <div className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 mr-1">
+            <div
+              className={`${
+                isMobile ? "hidden" : "flex"
+              } w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 mr-1`}
+            >
               <button
                 type="button"
                 onClick={handleGoPrevViewport}
@@ -782,7 +809,12 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
           />
 
           {canGoNextViewport && (
-            <div data-tutorial-id="viewport-nav" className="hidden md:flex w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 ml-1">
+            <div
+              data-tutorial-id="viewport-nav"
+              className={`${
+                isMobile ? "hidden" : "flex"
+              } w-5 shrink-0 items-stretch select-none animate-in fade-in duration-200 ml-1`}
+            >
               <button
                 type="button"
                 onClick={handleGoNextViewport}
@@ -837,9 +869,9 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
       />
 
       {/* 4. 모바일 전용 튜터 해설 모달 (코드 클릭 시 또는 모바일 튜토리얼 9단계 노출) */}
-      {isMobileTutorModalOpen && activeSimData && (
+      {isMobile && isMobileTutorModalOpen && activeSimData && (
         <div
-          className="fixed inset-0 z-50 md:hidden bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-3 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-3 animate-in fade-in duration-150"
           onClick={() => setIsMobileTutorModalOpen(false)}
         >
           <div
@@ -878,12 +910,12 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
           } else if (mobileMode === "tutor") {
             setIsMobileCodeView(true);
             setIsMobileAssistantViewport(false);
-            if (typeof window !== "undefined" && window.innerWidth < 768) {
+            if (isMobileViewport()) {
               setIsMobileTutorModalOpen(true);
             }
           } else if (mobileMode === "assistant") {
             setIsMobileTutorModalOpen(false);
-            if (typeof window !== "undefined" && window.innerWidth < 768) {
+            if (isMobileViewport()) {
               setIsMobileCodeView(false);
               setIsMobileAssistantViewport(true);
             }

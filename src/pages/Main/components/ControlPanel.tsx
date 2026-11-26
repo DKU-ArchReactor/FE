@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useRef } from 'react';
 import type { SimulationResult } from "@/type/simulation";
 import { timelineSync } from '../utils/timelineSync';
 import { getBasePlaySpeed, PLAYBACK_SPEED_RATES } from '../hooks/useSimulationPlayback';
+import { useIsMobileViewport } from '../types';
 
 interface ControlPanelProps {
   currentCycle: number;
@@ -53,6 +54,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onChangeEditorTarget,
   onChangeSimulationMode,
 }) => {
+  const isMobile = useIsMobileViewport();
   const isSingle = mode === "single";
   // Single 모드 및 Pipeline 모드 모두 Cycle 0(초기 Reset 대기) ~ Cycle totalCycles까지 0~totalCycles 이동
   const maxCycle = totalCycles;
@@ -107,9 +109,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const initialPct = maxCycle > 0 ? Math.min(100, Math.max(0, (continuousPosRef.current / maxCycle) * 100)) : 0;
 
   return (
-    <div className="flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] px-3 md:px-3.5 flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono">
+    <div
+      className={`flex-1 h-full bg-[var(--ar-panel-bg)] rounded-lg shadow-sm border border-[var(--ar-border)] ${
+        isMobile ? "px-3" : "px-3.5"
+      } flex items-center justify-between gap-3 transition-colors duration-150 select-none font-mono`}
+    >
       {/* 1. 모드 알약 버튼군 & 사이클/스텝 정보 및 슬라이더 */}
-      <div className="flex items-center justify-between md:justify-start gap-2 md:gap-2.5 flex-1 min-w-0">
+      <div
+        className={`flex items-center ${
+          isMobile ? "justify-between gap-2" : "justify-start gap-2.5"
+        } flex-1 min-w-0`}
+      >
         {/* [모드 1]: C - ASM 알약 버튼 (좌측 라벨 명시) */}
         <div data-tutorial-id="mode-target" className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] text-[var(--ar-text-muted)] font-semibold tracking-tight whitespace-nowrap">
@@ -191,7 +201,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* [스텝 / 사이클 정보] */}
-        <div className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[#24292F] ml-0.5 w-[84px]">
+        <div
+          className={`${
+            isMobile ? "hidden" : "flex"
+          } items-baseline gap-1.5 shrink-0 text-[#24292F] ml-0.5 w-[84px]`}
+        >
           <span className="text-[10px] text-[#57606A] uppercase tracking-wider font-medium shrink-0 w-10 text-right">
             {isSingle ? "Step:" : "Cycle:"}
           </span>
@@ -211,7 +225,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
         
-        <div className="hidden md:flex flex-1 min-w-0 items-center gap-2 relative h-full">
+        <div
+          className={`${
+            isMobile ? "hidden" : "flex"
+          } flex-1 min-w-0 items-center gap-2 relative h-full`}
+        >
           {/* 타임라인 트랙 컨테이너: 가로 바 자체가 세로 정중앙(items-center)에 위치 */}
           <div className="relative w-full h-3 flex items-center">
             {/* 상단 사이클 위치를 나타내는 작은 점들 (트랙 바 위쪽으로 absolute 띄움) */}
@@ -286,7 +304,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* 2. VS Code 디버그 액션 툴바 (Control Buttons - 모바일 숨김) */}
-      <div data-tutorial-id="playback-controls" className="hidden md:flex items-center gap-2 shrink-0">
+      <div
+        data-tutorial-id="playback-controls"
+        className={`${
+          isMobile ? "hidden" : "flex"
+        } items-center gap-2 shrink-0`}
+      >
       <div className="flex items-center gap-0.5 shrink-0 bg-[#F3F4F6] p-0.5 rounded border border-[#D0D7DE]">
         {/* 1) 초기화 버튼 (정사각형 정지/리셋 아이콘) */}
         <button
@@ -386,7 +409,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* 3. 속도 조절 (모바일 숨김) */}
-      <div className="hidden md:flex items-center gap-1 shrink-0 border-l border-[#D0D7DE] pl-2 text-[10px]">
+      <div
+        className={`${
+          isMobile ? "hidden" : "flex"
+        } items-center gap-1 shrink-0 border-l border-[#D0D7DE] pl-2 text-[10px]`}
+      >
         {PLAYBACK_SPEED_RATES.map(({ label, rate }) => {
           const speed = Math.round(getBasePlaySpeed(isSingle, rightViewportIndex) / rate);
           const isSelected = Math.abs(playSpeed - speed) < 50;

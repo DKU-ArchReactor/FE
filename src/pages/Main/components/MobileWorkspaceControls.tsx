@@ -1,5 +1,6 @@
 import React, { memo } from "react";
 import { getBasePlaySpeed, PLAYBACK_SPEED_RATES } from "../hooks/useSimulationPlayback";
+import { useIsMobileViewport } from "../types";
 
 interface MobileWorkspaceControlsProps {
   currentCycle: number;
@@ -55,8 +56,14 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
     onSelectAssistant,
     onOpenTutorial,
   }) => {
+    const isMobile = useIsMobileViewport();
+
     return (
-      <div className="md:hidden shrink-0 w-full flex flex-col bg-[var(--ar-panel-bg)] border-t border-[var(--ar-border)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] z-30 select-none font-mono">
+      <div
+        className={`${
+          isMobile ? "flex" : "hidden"
+        } shrink-0 w-full flex-col bg-[var(--ar-panel-bg)] border-t border-[var(--ar-border)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] z-30 select-none font-mono`}
+      >
         {/* 3-1. 하단 시뮬레이션 재생 콘솔 */}
         <div data-tutorial-id="mobile-playback" className="flex flex-col gap-1.5 px-3 py-2">
           {/* 1줄: Cycle 표시 + 슬라이더 + 배속 */}
