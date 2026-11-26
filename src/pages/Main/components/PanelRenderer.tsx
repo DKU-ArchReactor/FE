@@ -301,7 +301,11 @@ export const PanelRenderer: React.FC<PanelRendererProps> = ({
     case "registers":
       return (
         <RegisterVisualizer
-          registers={currentData?.global_result.registers ?? EMPTY_REGISTERS}
+          registers={
+            currentData?.global_result.registers ??
+            simulationData?.initial_state?.registers ??
+            EMPTY_REGISTERS
+          }
           prevRegisters={prevData?.global_result.registers}
           playSpeed={playSpeed}
           cycle={currentCycle}
