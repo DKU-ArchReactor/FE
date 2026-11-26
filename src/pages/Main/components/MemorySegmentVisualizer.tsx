@@ -103,15 +103,27 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
     }
   }, [cycle, memorySnapshot, prevMemorySnapshot, playSpeed]);
 
-  // 사용자가 코드를 펼쳤거나 실행 중 PC가 변경되었을 때, 현재 실행 중인 명령어(data-active="true") 위치로 자동 포커싱
+  // 사용자가 코드를 펼쳤거나 실행 중 PC가 변경되었을 때, 현재 실행 중인 명령어(data-active="true") 위치로 내부 세로 스크롤만 이동 (부모 슬라이드 트랙 scrollLeft 오염 방지)
   React.useEffect(() => {
-    if (isUserCodeExpanded && userCodeScrollRef.current) {
-      const activeEl = userCodeScrollRef.current.querySelector<HTMLElement>('[data-active="true"]');
+    const container = userCodeScrollRef.current;
+    if (isUserCodeExpanded && container) {
+      const activeEl = container.querySelector<HTMLElement>('[data-active="true"]');
       if (activeEl) {
-        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        const cRect = container.getBoundingClientRect();
+        const aRect = activeEl.getBoundingClientRect();
+        if (aRect.top < cRect.top || aRect.bottom > cRect.bottom) {
+          const targetTop =
+            container.scrollTop +
+            (aRect.top - cRect.top) -
+            (cRect.height - aRect.height) / 2;
+          container.scrollTo({
+            top: Math.max(0, targetTop),
+            behavior: 'smooth',
+          });
+        }
       } else {
         // 활성 명령어가 없으면 시작 지점(하단)으로 이동
-        userCodeScrollRef.current.scrollTop = userCodeScrollRef.current.scrollHeight;
+        container.scrollTop = container.scrollHeight;
       }
     }
   }, [isUserCodeExpanded, currentPc, userInstructions.length]);

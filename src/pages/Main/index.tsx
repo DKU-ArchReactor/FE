@@ -73,13 +73,21 @@ const MainPage: React.FC = () => {
   const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(() =>
     shouldAutoOpenTutorial()
   );
-  useEffect(() => {
-    const handleOpenTutorial = () => setIsTutorialOpen(true);
-    window.addEventListener("ar-open-tutorial", handleOpenTutorial);
-    return () => window.removeEventListener("ar-open-tutorial", handleOpenTutorial);
-  }, []);
   const [isMobileCodeView, setIsMobileCodeView] = useState(true);
   const [isMobileAssistantViewport, setIsMobileAssistantViewport] = useState(false);
+
+  const handleOpenTutorial = useCallback(() => {
+    setRightViewportIndex(0);
+    setIsMobileCodeView(true);
+    setIsMobileAssistantViewport(false);
+    setIsMobileTutorModalOpen(false);
+    setIsTutorialOpen(true);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("ar-open-tutorial", handleOpenTutorial);
+    return () => window.removeEventListener("ar-open-tutorial", handleOpenTutorial);
+  }, [handleOpenTutorial]);
   const [assistantHint, setAssistantHint] = useState<{ workspace: string; language: 'c' | 'asm' } | null>(null);
   const assistantHintTimerRef = useRef<number | null>(null);
   const aiPopupOpenRef = useRef(isAiPopupOpen);
@@ -865,7 +873,7 @@ const handleMobileViewportSelect = (index: number) => {
         onSelectCode={handleMobileCodeSelect}
         onSelectViewport={handleMobileViewportSelect}
         onSelectAssistant={handleMobileAssistantSelect}
-        onOpenTutorial={() => setIsTutorialOpen(true)}
+        onOpenTutorial={handleOpenTutorial}
       />
 
       {/* 4. 모바일 전용 튜터 해설 모달 (코드 클릭 시 또는 모바일 튜토리얼 9단계 노출) */}
@@ -876,7 +884,7 @@ const handleMobileViewportSelect = (index: number) => {
         >
           <div
             data-tutorial-id="tutor-panel"
-            className="w-full max-h-[72vh] flex flex-col relative rounded-lg overflow-hidden shadow-2xl"
+            className="w-full max-h-[72dvh] flex flex-col relative rounded-lg overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {renderPanel("tutor", () => setIsMobileTutorModalOpen(false))}
