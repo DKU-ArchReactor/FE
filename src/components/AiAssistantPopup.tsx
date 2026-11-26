@@ -316,11 +316,13 @@ export const AiAssistantPopup: React.FC<Props> = ({
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white">
           {/* 추천 질문 칩 바 */}
           <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] border-b border-[#E5E5E5] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
-          {codeEditor && <button type="button" disabled={!canSend}
-            onClick={() => setInputMessage(`반복문으로 1부터 10까지 합을 구하는 ${editorLanguage.toUpperCase()} 예제를 만들어줘.`)}
-            className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] whitespace-nowrap disabled:opacity-50">
-            ✍️ {editorLanguage.toUpperCase()} 예제 생성
-          </button>}
+            {codeEditor && ['C', 'ASM'].map(language => (
+              <button key={language} type="button" disabled={!canSend}
+                onClick={() => setInputMessage(`반복문으로 1부터 10까지 합을 구하는 ${language} 예제를 만들어줘.`)}
+                className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] whitespace-nowrap shrink-0 disabled:opacity-50">
+                ✍️ {language} 예제 생성
+              </button>
+            ))}
             {QUESTION_EXAMPLES.map((example) => (
               <button
                 key={example.label}

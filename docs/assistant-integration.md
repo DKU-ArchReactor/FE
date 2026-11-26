@@ -163,8 +163,9 @@ BE PR #14의 실행 답변은 서버 검증이 끝난 후 하나의 `delta`와 `
 
 ## Generated C and ASM code application
 
-The assistant can replace either editor with generated code. The example-generation
-chip follows the active C/ASM mode. Completed answers with closed `c` or `asm`
+The assistant can replace either editor with generated code. The top suggestion bar always offers
+separate “C 예제 생성” and “ASM 예제 생성” buttons, regardless of editor mode.
+Each button prepares a request for its named language in the input field. Completed answers with closed `c` or `asm`
 fences show language-specific apply buttons; `assembly`, `riscv` and `risc-v` also
 identify ASM. The answer is the preview, and the replacement notice makes clear
 that applying a candidate replaces the entire source of that language.
