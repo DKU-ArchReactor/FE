@@ -641,7 +641,9 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       {/* 4. 화면 하단 중앙 고정 컨트롤 바: 진행도 표시 & [이전] / [다음], 그 아래 [오늘 그만 보기] / [닫기] */}
       <div
         className={`fixed ${
-          isMobile ? "bottom-3" : "bottom-4"
+          isMobile
+            ? "bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))]"
+            : "bottom-4"
         } left-1/2 -translate-x-1/2 z-[120] pointer-events-auto flex flex-col items-center gap-2`}
       >
         <div className="flex items-center gap-3 px-3.5 py-2 rounded-full bg-slate-900/95 text-white border border-white/15 shadow-2xl backdrop-blur-md">
