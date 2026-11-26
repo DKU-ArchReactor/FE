@@ -27,9 +27,14 @@ const MemorySegmentVisualizer: React.FC<MemorySegmentVisualizerProps> = ({
   playSpeed = 1000,
   cycle = 0,
 }) => {
-  const memorySnapshot = currentData?.global_result.memory_snapshot ?? EMPTY_MEMORY_SNAPSHOT;
+  const memorySnapshot =
+    currentData?.global_result.memory_snapshot ??
+    simulationData?.initial_state?.memory_snapshot ??
+    EMPTY_MEMORY_SNAPSHOT;
   const prevMemorySnapshot = prevData?.global_result.memory_snapshot;
-  const currentPc = currentData?.global_result.current_pc?.toLowerCase();
+  const currentPc =
+    currentData?.global_result.current_pc?.toLowerCase() ??
+    simulationData?.initial_state?.current_pc?.toLowerCase();
   const [isUserCodeExpanded, setIsUserCodeExpanded] = React.useState(true);
   const userCodeScrollRef = React.useRef<HTMLDivElement>(null);
   const stackScrollRef = React.useRef<HTMLDivElement>(null);
