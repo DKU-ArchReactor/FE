@@ -102,6 +102,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
     sourceUnsupported,
     canSend,
     handleSendMessage,
+    resetChat,
   } = useAssistantChat({
     isOpen,
     authenticated,
@@ -247,8 +248,22 @@ export const AiAssistantPopup: React.FC<Props> = ({
             </div>
           </div>
 
-          {!inline && (
-            <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              disabled={messages.length <= 1 && !isThinking && !localError}
+              onClick={(e) => {
+                e.stopPropagation();
+                resetChat();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              title="대화 내역 초기화 (새 대화)"
+              className="h-6 px-2 rounded flex items-center gap-1 text-[11px] font-medium text-[#57606A] hover:text-[#1F2328] hover:bg-black/5 disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <span>새 대화</span>
+            </button>
+            {!inline && (
+              <>
               <button
                 type="button"
                 onClick={(e) => {
@@ -308,8 +323,9 @@ export const AiAssistantPopup: React.FC<Props> = ({
                   <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" />
                 </svg>
               </button>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </header>
 
         {/* 대화 본문 */}
