@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { validateBasicC } from '@/api/build';
-import type { CodeLanguage, CodeProgram } from '../utils/assistantCode';
+import { stripCodeComments, type CodeLanguage, type CodeProgram } from '../utils/assistantCode';
 
 export interface CodeSnapshot {
   sources: Record<CodeLanguage, string>;
@@ -25,15 +25,20 @@ export function useAssistantCode(sources: Record<CodeLanguage, string>, identity
   // Invalidate on a source/identity change, including edits later restored to the same text.
   if (undo && (sources[undo.language] !== undo.after || identity !== undo.identity)) setUndo(null);
   const apply = async (program: CodeProgram, expected: CodeSnapshot, signal?: AbortSignal): Promise<boolean> => {
-    if (signal?.aborted || busyRef.current || current.current !== expected || !program.source.trim()) return false;
+    const cleanSource = stripCodeComments(program.source, program.language);
+    const sanitized: CodeProgram = {
+      ...program,
+      source: cleanSource ? `${cleanSource}\n` : '',
+    };
+    if (signal?.aborted || busyRef.current || current.current !== expected || !sanitized.source.trim()) return false;
     validation.current?.abort();
     const controller = new AbortController();
     validation.current = controller;
     const cancel = () => controller.abort();
     signal?.addEventListener('abort', cancel, { once: true });
     try {
-      if (program.language === 'c') {
-        const result = await validateBasicC(program.source, controller.signal);
+      if (sanitized.language === 'c') {
+        const result = await validateBasicC(sanitized.source, controller.signal);
         if (!result.valid) {
           const diagnostic = result.diagnostics[0];
           throw new Error(diagnostic
@@ -43,11 +48,11 @@ export function useAssistantCode(sources: Record<CodeLanguage, string>, identity
       }
       // An edit, mode/file switch, compile, or newer application can win the race.
       if (controller.signal.aborted || busyRef.current || current.current !== expected) return false;
-      const before = sources[program.language];
-      if (program.source !== before) {
-        setUndo({ before, after: program.source, language: program.language, identity: appliedIdentity });
+      const before = sources[sanitized.language];
+      if (sanitized.source !== before) {
+        setUndo({ before, after: sanitized.source, language: sanitized.language, identity: appliedIdentity });
       }
-      onChange(program);
+      onChange(sanitized);
       return true;
     } finally {
       signal?.removeEventListener('abort', cancel);

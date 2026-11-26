@@ -1004,11 +1004,35 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.8"
               />
               <text
-                x="380"
-                y="33"
+                x="350"
+                y="24"
                 dominantBaseline="central"
                 fill={ifPcMuxToPcActive ? "#991B1B" : "#94A3B8"}
-                fontSize="18"
+                fontSize="11"
+                fontWeight="bold"
+                fontFamily="monospace"
+                textAnchor="middle"
+              >
+                1
+              </text>
+              <text
+                x="410"
+                y="24"
+                dominantBaseline="central"
+                fill={ifPcMuxToPcActive ? "#991B1B" : "#94A3B8"}
+                fontSize="11"
+                fontWeight="bold"
+                fontFamily="monospace"
+                textAnchor="middle"
+              >
+                0
+              </text>
+              <text
+                x="380"
+                y="38"
+                dominantBaseline="central"
+                fill={ifPcMuxToPcActive ? "#991B1B" : "#94A3B8"}
+                fontSize="14"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -1782,11 +1806,35 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.8"
               />
               <text
-                x="395"
-                y="684"
+                x="365"
+                y="675"
                 dominantBaseline="central"
                 fill={exAluSrcToAluActive ? "#15803D" : "#94A3B8"}
-                fontSize="18"
+                fontSize="11"
+                fontWeight="bold"
+                fontFamily="monospace"
+                textAnchor="middle"
+              >
+                0
+              </text>
+              <text
+                x="425"
+                y="675"
+                dominantBaseline="central"
+                fill={exAluSrcToAluActive ? "#15803D" : "#94A3B8"}
+                fontSize="11"
+                fontWeight="bold"
+                fontFamily="monospace"
+                textAnchor="middle"
+              >
+                1
+              </text>
+              <text
+                x="395"
+                y="689"
+                dominantBaseline="central"
+                fill={exAluSrcToAluActive ? "#15803D" : "#94A3B8"}
+                fontSize="14"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
@@ -2227,11 +2275,35 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
                 strokeWidth="2.8"
               />
               <text
-                x="450"
-                y="1277"
+                x="420"
+                y="1268"
                 dominantBaseline="central"
                 fill={wbAluBypassActive || wbDmemReadDataActive ? "#6D28D9" : "#94A3B8"}
-                fontSize="18"
+                fontSize="11"
+                fontWeight="bold"
+                fontFamily="monospace"
+                textAnchor="middle"
+              >
+                0
+              </text>
+              <text
+                x="480"
+                y="1268"
+                dominantBaseline="central"
+                fill={wbAluBypassActive || wbDmemReadDataActive ? "#6D28D9" : "#94A3B8"}
+                fontSize="11"
+                fontWeight="bold"
+                fontFamily="monospace"
+                textAnchor="middle"
+              >
+                1
+              </text>
+              <text
+                x="450"
+                y="1282"
+                dominantBaseline="central"
+                fill={wbAluBypassActive || wbDmemReadDataActive ? "#6D28D9" : "#94A3B8"}
+                fontSize="14"
                 fontWeight="bold"
                 fontFamily="sans-serif"
                 textAnchor="middle"
