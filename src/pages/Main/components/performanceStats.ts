@@ -6,8 +6,8 @@ export function performanceStats(simulationData: SimulationResult | null, curren
   const history = simulationData?.history ?? [];
   const single = simulationData?.simulator?.mode === 'single' ||
     simulationData?.simulator?.pipeline_model === 'single-cycle';
-  const index = Math.min(Math.max(0, Math.floor(currentCycle) - (single ? 1 : 0)), history.length - 1);
-  const beforeExecution = !history.length || (single && currentCycle === 0);
+  const index = Math.min(Math.max(0, Math.floor(currentCycle) - 1), history.length - 1);
+  const beforeExecution = !history.length || currentCycle === 0;
   const frame = beforeExecution ? undefined : history[index];
   const cycles = beforeExecution ? 0 : index + 1;
   const metrics = frame?.global_result?.metrics;
