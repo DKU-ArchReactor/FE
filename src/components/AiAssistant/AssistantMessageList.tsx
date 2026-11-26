@@ -7,6 +7,8 @@ const AssistantMarkdown = lazy(() =>
 
 interface AssistantMessageListProps {
   messages: Message[];
+  onApplyProgram?: (id: string, program: string) => void;
+  codeApplyDisabled?: boolean;
   isSingle: boolean;
   isThinking: boolean;
   responsePhase: "waiting" | "receiving" | null;
@@ -16,7 +18,7 @@ interface AssistantMessageListProps {
 }
 
 export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
-  ({ messages, isSingle, isThinking, responsePhase, canSend, isOpen, onRetryQuestion }) => {
+  ({ messages, isSingle, isThinking, responsePhase, canSend, isOpen, onRetryQuestion, onApplyProgram, codeApplyDisabled }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -53,6 +55,16 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
               ) : (
                 msg.text
               )}
+              {msg.sender === 'ai' && msg.programs?.length && onApplyProgram ? <div className="mt-2 space-y-1">
+                <p className="text-[10px]">적용하면 C 코드 전체가 교체됩니다.</p>
+                {msg.programs.map((program, index) => <button key={index} type="button"
+                  disabled={isThinking || codeApplyDisabled}
+                  className="mr-2 rounded border border-[#D0D7DE] px-2 py-1 disabled:opacity-40"
+                  onClick={() => onApplyProgram(msg.id, program)}>
+                  C 코드에 적용{msg.programs!.length > 1 ? ` (${index + 1})` : ''}
+                </button>)}
+              </div> : null}
+              {msg.codeNotice && <p role="status" className="mt-1 text-[11px]">{msg.codeNotice}</p>}
               {msg.sender === "user" && (
                 <p className="mt-1 text-[10px]" data-testid="question-context">
                   {msg.requestedContext
