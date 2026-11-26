@@ -30,7 +30,17 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
 
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-3 select-text text-xs leading-relaxed">
-        {messages.map((msg, index) => (
+        {messages.map((msg, index) => {
+          const isEmptyPendingAi =
+            isThinking &&
+            msg.sender === "ai" &&
+            !msg.text &&
+            !msg.notice &&
+            !msg.context &&
+            !msg.programs?.length &&
+            !msg.codeNotice;
+          if (isEmptyPendingAi) return null;
+          return (
           <div
             key={msg.id}
             className={`flex flex-col gap-1 ${msg.sender === "user" ? "items-end" : "items-start"}`}
@@ -115,7 +125,8 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = memo(
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {/* AI 응답 대기 로딩 */}
         {isThinking && (

@@ -286,6 +286,21 @@ export function useAssistantChat({
     setMessages(prev => prev.map(message => message.id === id ? { ...message, codeNotice } : message));
   }, []);
 
+  const resetChat = useCallback(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setResponsePhase(null);
+    setLocalError('');
+    setMessages([
+      {
+        id: "welcome",
+        sender: "ai",
+        text: "코드와 실행 과정에서 궁금한 점을 물어보세요.",
+        time: "방금 전",
+      },
+    ]);
+  }, []);
+
   return {
     autoApply,
     targetLanguage,
@@ -317,5 +332,6 @@ export function useAssistantChat({
     sourceUnsupported,
     canSend,
     handleSendMessage,
+    resetChat,
   };
 }
