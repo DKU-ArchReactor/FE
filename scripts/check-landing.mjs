@@ -89,15 +89,10 @@ try {
   );
   for (const example of learningExamples)
     assert.ok(html.includes(`/simulator?example=${example.id}`));
-  assert.ok(html.includes("실제 작업 화면 불러오기"));
-  assert.equal(
-    html.includes("<iframe"),
-    false,
-    "The real workspace must wait for an explicit click.",
-  );
-  assert.ok(html.includes("재생 버튼을 눌러 보세요"));
+  assert.ok(html.includes("ArchReactor 실제 작업 공간 미리보기"));
+  assert.ok(html.includes("직접 사용해 보기"));
   console.log(
-    "Landing checks passed: preview states, example entry, draft preservation, example links, and deferred workspace loading.",
+    "Landing checks passed: preview states, example entry, draft preservation, example links, and hero live workspace preview.",
   );
   if (process.argv.includes("--examples"))
     console.log(

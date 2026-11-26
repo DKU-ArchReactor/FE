@@ -282,8 +282,10 @@ const MainPage: React.FC = () => {
     setRightViewportIndex((prev) => Math.min(2, prev + 1));
   };
 
-  // 튜토리얼이 열려 있고 아직 컴파일된 시뮬레이션이 없을 때 저장해 둔 기준 사이클 스냅샷을 배경 화면에 표시
-  const useTutorialDemo = isTutorialOpen && !simSession.simulationData;
+  // 튜토리얼이 열려 있거나 demo 미리보기 모드이고 아직 컴파일된 시뮬레이션이 없을 때 저장해 둔 기준 사이클 스냅샷을 표시
+  const useTutorialDemo =
+    (isTutorialOpen || searchParams.get("demo") === "1") &&
+    !simSession.simulationData;
   const activeSimData = useTutorialDemo
     ? TUTORIAL_DEMO_SIMULATION
     : simSession.simulationData;
@@ -299,10 +301,8 @@ const MainPage: React.FC = () => {
   const activeTotalCycles = useTutorialDemo
     ? TUTORIAL_DEMO_SIMULATION.history.length
     : playback.totalCycles;
-  const activeSimMode = useTutorialDemo
-    ? "pipeline"
-    : simSession.simulationEngineMode;
-  const activeIsSingle = useTutorialDemo ? false : simSession.isSingleEngine;
+  const activeSimMode = simSession.simulationEngineMode;
+  const activeIsSingle = simSession.isSingleEngine;
   const activeMappedRows = useTutorialDemo
     ? TUTORIAL_DEMO_MAPPED_ROWS
     : simSession.mappedAssemblyRows;

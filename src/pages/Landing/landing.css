@@ -434,6 +434,11 @@
   grid-template-columns: 1.08fr 1.3fr 0.68fr;
   min-height: 243px;
 }
+.landing-hero-live-workspace {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
 .landing-demo-source,
 .landing-demo-cpu,
 .landing-demo-registers {
@@ -1001,8 +1006,67 @@
   display: block;
   font-size: 7px;
   color: #a4b0c1;
-  margin-top: 17px;
+  margin-top: 14px;
   text-align: right;
+}
+.landing-real-shot-card {
+  padding: 20px 22px !important;
+  display: flex;
+  flex-direction: column;
+}
+.landing-real-shot-card .landing-illustration-caption {
+  margin-bottom: 14px;
+}
+.landing-real-shot-frame {
+  border-radius: 11px;
+  overflow: hidden;
+  border: 1px solid #dce5f2;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(45, 72, 115, 0.1);
+}
+.landing-real-shot-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+.landing-workspace-shot-button {
+  position: relative;
+  overflow: hidden;
+  padding: 0 !important;
+  min-height: 360px;
+}
+.landing-workspace-shot-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: brightness(0.94);
+  transition: transform 0.35s ease, filter 0.35s ease;
+}
+.landing-workspace-shot-button:hover .landing-workspace-shot-img {
+  transform: scale(1.015);
+  filter: brightness(0.88);
+}
+.landing-workspace-shot-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.32) 0%, rgba(15, 23, 42, 0.65) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: #ffffff;
+}
+.landing-workspace-shot-overlay strong {
+  color: #ffffff !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.landing-workspace-shot-overlay span,
+.landing-workspace-shot-overlay small {
+  color: rgba(255, 255, 255, 0.9) !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 .landing-detail-features {
   display: grid;
