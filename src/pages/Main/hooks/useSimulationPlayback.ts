@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { SimulationResult, CycleHistoryItem } from "@/type/simulation";
 import type { MappedAssemblyRow } from "../utils/translationCompile";
+import { initialSimulationState } from "../utils/initialSimulationState";
 import { timelineSync, isMidCycleProgress } from "../utils/timelineSync";
 
 
@@ -128,17 +129,6 @@ export function useSimulationPlayback({
   // Single-Cycle 및 Pipeline 모드 공통: Step 0 / Cycle 0 (실행 시작 전 대기 상태) 초기 스냅샷
   const initialResetData: CycleHistoryItem | null = useMemo(() => {
     if (!simulationData || !historyList.length) return null;
-    const entryPc = simulationData.program?.entry_point || "0x00010000";
-    const initialRegs: Record<string, string> = {
-      x0: "0x00000000",
-      x1: "0x00000000",
-      x2: "0x7fffeffc", // sp
-    };
-    for (let i = 0; i < 32; i++) {
-      const k = `x${i}`;
-      if (!initialRegs[k]) initialRegs[k] = "0x00000000";
-    }
-
     return {
       clock: 0,
       buffers: {
@@ -198,17 +188,7 @@ export function useSimulationPlayback({
           reason: null,
         },
       },
-      global_result: {
-        current_pc: entryPc,
-        registers: initialRegs,
-        memory_snapshot: {},
-        console_output: "",
-        metrics: {
-          accumulated_instructions: 0,
-          accumulated_stalls: 0,
-          accumulated_forwards: 0,
-        },
-      },
+      global_result: initialSimulationState(simulationData),
     };
   }, [simulationData, historyList.length]);
 
