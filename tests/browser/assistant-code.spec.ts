@@ -10,7 +10,66 @@ const answer = '1부터 10까지 합을 반환합니다.\n\n```c\n' + code + '``
 const frame = (event: object) => `data: ${JSON.stringify(event)}\n\n`;
 const sse = (text = answer, reason = 'end_turn') => frame({type:'delta', text}) + frame({type:'done', stop_reason: reason});
 const input = (page: Page) => page.getByPlaceholder('C 코드나 파이프라인에 대해 질문하세요...').filter({visible:true});
+
+for (const automatic of [false, true]) {
+  test(`unsupported C cannot replace the editor (${automatic ? 'automatic' : 'manual'})`, async ({page}) => {
+    await setup(page);
+    const unsupported = '#include <stdio.h>\nint main(void) { printf("hello"); return 0; }\n';
+    await page.route('**/api/v1/assistant/chat', route => route.fulfill({contentType:'text/event-stream',body:sse('```c\n'+unsupported+'```')}));
+    let checked = '';
+    await page.route('**/api/v1/build/validate-c', route => {
+      checked = route.request().postDataJSON().content;
+      return route.fulfill({json:{policy:'basic-c-v1',valid:false,diagnostics:[{
+        code:'PREPROCESSOR_NOT_ALLOWED',line:1,column:1,message:'전처리 지시문은 지원하지 않습니다.',
+      }]}});
+    });
+    await send(page, automatic ? 'C 예제를 만들어서 편집기에 넣어줘' : 'C 예제를 만들어줘');
+    if (!automatic) await page.getByRole('button',{name:'C 코드에 적용',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'1행 1열'})).toContainText('적용하지 않았습니다');
+    expect(checked).toBe(unsupported);
+    await expect(page.getByLabel('C 원문')).toHaveValue(original);
+    await expect(page.getByRole('button',{name:'코드 적용 되돌리기'})).toHaveCount(0);
+  });
+}
+
+for (const response of ['unavailable', 'malformed']) {
+  test(`C validation fails closed on ${response}`, async ({page}) => {
+    await setup(page);
+    await page.route('**/api/v1/assistant/chat', route => route.fulfill({contentType:'text/event-stream',body:sse()}));
+    await page.route('**/api/v1/build/validate-c', route => response === 'unavailable'
+      ? route.fulfill({status:503,json:{detail:'unavailable'}})
+      : route.fulfill({json:{valid:true}}));
+    await send(page, 'C 예제를 만들어서 편집기에 넣어줘');
+    await expect(page.getByText(/지원 범위를 확인하지 못해 적용하지 않았습니다/)).toBeVisible();
+    await expect(page.getByLabel('C 원문')).toHaveValue(original);
+  });
+}
+
+for (const change of ['edit', 'busy', 'close']) {
+  test(`validation in flight protects ${change}`, async ({page}) => {
+    await setup(page);
+    let release!: () => void;
+    let started = false;
+    const waiting = new Promise<void>(resolve => {release = resolve;});
+    await page.route('**/api/v1/assistant/chat', route => route.fulfill({contentType:'text/event-stream',body:sse()}));
+    await page.route('**/api/v1/build/validate-c', async route => {
+      started = true;
+      await waiting;
+      await route.fulfill({json:{policy:'basic-c-v1',valid:true,diagnostics:[]}});
+    });
+    await send(page, 'C 예제를 만들어서 편집기에 넣어줘');
+    await expect.poll(() => started).toBe(true);
+    if (change === 'edit') await page.getByLabel('C 원문').fill('int main(void){return 7;}');
+    if (change === 'busy') await page.getByRole('button',{name:'toggle busy'}).click();
+    if (change === 'close') await page.getByRole('button',{name:'close chat',exact:true}).click();
+    release();
+    if (change === 'close') await page.getByRole('button',{name:'open chat'}).click();
+    await expect(page.getByText(/자동 적용하지 않았습니다|지원 범위를 확인하지 못해/)).toBeVisible();
+    await expect(page.getByLabel('C 원문')).toHaveValue(change === 'edit' ? 'int main(void){return 7;}' : original);
+  });
+}
 async function setup(page: Page) {
+  await page.route('**/api/v1/build/validate-c', route => route.fulfill({json:{policy:'basic-c-v1',valid:true,diagnostics:[]}}));
   await page.addInitScript(() => localStorage.setItem('access_token', 'test-only'));
   await page.route('**/api/v1/assistant/status', route => route.fulfill({json:{enabled:true,code:'TEST',editor_source_supported:true}}));
   await page.goto('/tests/browser/code-harness.html');
@@ -31,7 +90,7 @@ test('manual application, undo, and undo disabled after subsequent edits', async
   const apply = page.getByRole('button', {name:'C 코드에 적용',exact:true});
   await expect(apply).toBeVisible();
   await expect(page.getByLabel('C 원문')).toHaveValue(original);
-  expect(payload.messages[0].content).toContain('main 함수를 포함한');
+  expect(payload.messages[0].content).toContain('int main(void) 함수 하나만');
   expect(Object.keys(payload).sort()).toEqual(['editor_source','messages']);
   await apply.click();
   await expect(page.getByLabel('C 원문')).toHaveValue(code);

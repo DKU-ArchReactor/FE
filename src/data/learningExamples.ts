@@ -30,7 +30,7 @@ export const learningExamples = [
       "배열에서 두 값을 읽고 더하며 Load와 레지스터의 변화를 살펴보세요.",
     result: "a0 = 42",
     source:
-      "volatile int values[2] = {12, 30};\n\nint main(void) {\n    int first = values[0];\n    int second = values[1];\n    return first + second;\n}\n",
+      "int main(void) {\n    volatile int values[2] = {12, 30};\n    int first = values[0];\n    int second = values[1];\n    return first + second;\n}\n",
   },
 ] as const;
 
