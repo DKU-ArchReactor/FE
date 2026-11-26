@@ -161,46 +161,46 @@ BE PR #14의 실행 답변은 서버 검증이 끝난 후 하나의 `delta`와 `
 검증: Node 테스트 34개, Playwright 21개, production build 및 변경 TypeScript 파일 lint 통과. `/tests/browser/validated-response.html`에서 대기, 단일 delta, 완료, 근거 확인 실패, 오류, 연결 종료를 직접 조작할 수 있습니다. 이 화면은 API를 모두 모의 처리하며 실제 SOLID 평가나 운영 배포 검증을 대신하지 않습니다. 다른 로컬 서버와 충돌 시 `PLAYWRIGHT_PORT=4184 npm run test:browser`로 별도 포트를 사용할 수 있습니다.
 
 
-## Generated C code application
+## Generated C and ASM code application
 
-The assistant can replace the C editor with generated code. The “C 예제 생성”
-chip prepares a short complete-program request. Completed answers containing closed
-`c` fences show “C 코드에 적용” buttons, one per candidate, with an explicit
-whole-editor replacement label. The answer itself remains the code preview.
+The assistant can replace either editor with generated code. The example-generation
+chip follows the active C/ASM mode. Completed answers with closed `c` or `asm`
+fences show language-specific apply buttons; `assembly`, `riscv` and `risc-v` also
+identify ASM. The answer is the preview, and the replacement notice makes clear
+that applying a candidate replaces the entire source of that language.
 
-“생성 후 C 코드에 자동 적용” applies one candidate when the answer completes.
-Explicit phrases such as “C 코드 영역에 넣어줘” select this checkbox as a
-convenience; users can uncheck it before sending. Questions, negations and quoted
-instructions are conservatively kept manual. Natural-language matching is not a
-general intent classifier; use the checkbox for unrecognized wording. No model
-output can enable automatic application by itself.
+There is no automatic-application checkbox. Regular generation requests remain
+manual. Explicit requests such as “ASM 코드 영역에 넣어줘” apply a single candidate
+automatically after completion. Questions, negations and quoted instructions remain
+manual. A response in a different language from the requested target also requires
+manual application. Natural-language matching is conservative, not a general intent
+classifier; unrecognized requests can use the apply button. Model output cannot
+turn automatic application on.
 
 The existing `messages`/`editor_source` request and `delta`/`done` SSE protocol are
-unchanged. A generation request asks for one complete `main` program in a C fence
-and short prose outside it. Explicit ASM generation stays unchanged. Candidates
-are extracted only after successful `end_turn` or `stop` completion, never from a
-streaming, cancelled, truncated or failed answer. Empty, unlabelled, foreign-language,
-unclosed, NUL-containing and over-64-KiB candidates are rejected. Multiple candidates
-require manual choice. A closed fence is not a guarantee of valid or correct C;
-compilation is still a separate user action.
+unchanged. Generation prompts request a complete C `main` program or an RV32IM
+RISC-V assembly program with a `main` entry point, returning its result in `a0`.
+The requested language takes precedence over the active mode; otherwise mode is the
+fallback. Candidates are extracted only after successful `end_turn` or `stop`,
+never from streaming, cancelled, truncated or failed answers. Empty, unlabelled,
+unsupported-language, unclosed, NUL-containing and oversized blocks are rejected.
+Multiple candidates require a manual choice, including mixed C/ASM answers.
 
-Automatic application captures the source, file/account identity and editor mode at
-send time. Any intervening source edit (even edit then restore), file or mode change
-prevents automatic replacement; compiling also disables application. A user can
-review the result and apply it manually to the current C editor. Automatic requests
-attach the entire active source when source attachment is enabled, rather than a
-selected fragment, so whole-program changes have the full source available.
+Automatic application captures both sources, file/account identity and editor mode
+at send time. An intervening source edit (even edit then restore), file or mode
+change prevents automatic replacement; compilation disables application. Automatic
+requests attach the entire active source when source attachment is enabled.
 
-Applying code clears source selection, compiled assembly, saved-build association,
-simulation caches and playback through the existing source-update path. It neither
-saves a remote file nor compiles or runs code. “코드 적용 되돌리기” restores the
-previous source for the most recent application. Subsequent edits or a file/account
-change clear this undo action. Desktop and mobile assistants share application/undo
-state; browser refresh does not retain the undo snapshot.
+Applying a candidate switches to its language's editor, preserves the other source,
+and clears source selection, saved-file association, simulation caches and playback.
+It does not save, compile or run code. “코드 적용 되돌리기” restores the most recent
+application's previous source and switches to its editor. Editing that source or
+changing file/account clears undo; changing editor mode alone preserves it. Desktop
+and mobile assistants share application/undo state; refresh does not retain undo.
 
-Validation uses local mocked SSE and compiler/simulator responses: unit tests cover
-fence parsing, intent convenience matching and prompt preparation; Playwright covers
-manual/automatic application, undo, stale edits/files/modes, cancellation, incomplete
-answers, multiple candidates, the actual Monaco editor, simulation invalidation and
-new-source compilation requests. Live SOLID generation and production deployment
-are separate checks; these tests do not assert that generated C compiles successfully.
+Validation uses mocked SSE and compiler/simulator responses. Unit tests cover fence
+parsing, explicit intent and language selection. Browser tests cover C/ASM application,
+mode switching, undo, stale changes, cancellation, incomplete answers, multiple
+candidates, Monaco updates, simulation invalidation and compilation requests. Live
+SOLID generation and deployment are separate checks; recognizing a code fence does
+not establish that the generated program compiles or produces a correct result.

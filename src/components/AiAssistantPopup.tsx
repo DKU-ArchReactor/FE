@@ -74,7 +74,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
 
   const {
     autoApply,
-    setAutoApplyOverride,
+    targetLanguage,
     applyProgram,
     inputMessage,
     setInputMessage,
@@ -317,16 +317,16 @@ export const AiAssistantPopup: React.FC<Props> = ({
           {/* 추천 질문 칩 바 */}
           <div aria-label="추천 질문" tabIndex={0} className="shrink-0 min-w-0 p-2 bg-[#F8F9FA] border-b border-[#E5E5E5] flex flex-nowrap items-center gap-1.5 overflow-x-auto text-[11px]">
           {codeEditor && <button type="button" disabled={!canSend}
-            onClick={() => { setInputMessage('반복문으로 1부터 10까지 합을 구하는 C 예제를 만들어줘.'); setAutoApplyOverride(false); }}
+            onClick={() => setInputMessage(`반복문으로 1부터 10까지 합을 구하는 ${editorLanguage.toUpperCase()} 예제를 만들어줘.`)}
             className="px-2 py-0.5 rounded-full border border-[#D0D7DE] dark:border-[#3E3E42] whitespace-nowrap disabled:opacity-50">
-            ✍️ C 예제 생성
+            ✍️ {editorLanguage.toUpperCase()} 예제 생성
           </button>}
             {QUESTION_EXAMPLES.map((example) => (
               <button
                 key={example.label}
                 type="button"
                 disabled={!canSend}
-                onClick={() => { setInputMessage(example.question + BRIEF_ANSWER_REQUEST); setAutoApplyOverride(false); }}
+                onClick={() => setInputMessage(example.question + BRIEF_ANSWER_REQUEST)}
                 title={example.question}
                 className={`px-2 py-0.5 rounded-full border border-[#D0D7DE] bg-white ${
                   isSingle
@@ -354,15 +354,10 @@ export const AiAssistantPopup: React.FC<Props> = ({
 
           {/* 하단 입력 폼 */}
           <footer className="shrink-0 p-2.5 bg-[#F6F8FA] border-t border-[#E5E5E5]">
-          {codeEditor && <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
-            <label className="flex items-center gap-1">
-              <input type="checkbox" checked={autoApply} disabled={isThinking || codeEditor.disabled}
-                onChange={event => setAutoApplyOverride(event.target.checked)} />
-              생성 후 C 코드에 자동 적용
-            </label>
+          {codeEditor && (autoApply || codeEditor.canUndo) && <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
             {codeEditor.canUndo && <button type="button" disabled={isThinking} className="underline disabled:opacity-40"
               onClick={codeEditor.undo}>코드 적용 되돌리기</button>}
-            {autoApply && <p className="w-full text-[10px]">완성된 코드로 C 영역 전체를 교체합니다. 적용 후 되돌릴 수 있습니다.</p>}
+            {autoApply && <p className="w-full text-[10px]">완성된 코드로 {targetLanguage.toUpperCase()} 영역 전체를 교체합니다. 적용 후 되돌릴 수 있습니다.</p>}
           </div>}
             <form
               onSubmit={(e) => {
@@ -374,7 +369,7 @@ export const AiAssistantPopup: React.FC<Props> = ({
               <input
                 type="text"
                 value={inputMessage}
-                onChange={(e) => { setInputMessage(e.target.value); setAutoApplyOverride(null); }}
+                onChange={(e) => setInputMessage(e.target.value)}
                 placeholder="C 코드나 파이프라인에 대해 질문하세요..."
                 disabled={!canSend}
                 maxLength={8000}

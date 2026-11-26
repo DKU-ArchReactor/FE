@@ -1,4 +1,4 @@
-import { codeGenerationQuestion, extractCPrograms, requestsCodeApplication } from '@/pages/Main/utils/assistantCode';
+import { codeGenerationQuestion, extractCodePrograms, requestedCodeLanguage, requestsCodeApplication, type CodeProgram } from '@/pages/Main/utils/assistantCode';
 import type { useAssistantCode } from '@/pages/Main/hooks/useAssistantCode';
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { ExecutionContext, ExecutionReference } from '@/type/assistant';
@@ -13,7 +13,7 @@ export interface Message {
   text: string;
   time: string;
   complete?: boolean;
-  programs?: string[];
+  programs?: CodeProgram[];
   codeNotice?: string;
   notice?: string;
   context?: ExecutionReference;
@@ -47,8 +47,8 @@ export function useAssistantChat({
   codeEditor,
 }: UseAssistantChatParams) {
   const [inputMessage, setInputMessage] = useState("");
-  const [autoApplyOverride, setAutoApplyOverride] = useState<boolean | null>(null);
-  const autoApply = autoApplyOverride ?? requestsCodeApplication(inputMessage);
+  const autoApply = requestsCodeApplication(inputMessage);
+  const targetLanguage = requestedCodeLanguage(inputMessage, editorLanguage);
   const latestCodeEditor = useRef(codeEditor);
   useLayoutEffect(() => { latestCodeEditor.current = codeEditor; }, [codeEditor]);
   const [attachSource, setAttachSource] = useState(true);
@@ -136,8 +136,9 @@ export function useAssistantChat({
     setLocalError('');
     if (sourceUnsupported) return;
 
-    const applyOnComplete = Boolean(codeEditor) && (autoApplyOverride ?? requestsCodeApplication(text));
+    const applyOnComplete = Boolean(codeEditor) && requestsCodeApplication(text);
     const originalSnapshot = codeEditor?.snapshot;
+    const requestedLanguage = requestedCodeLanguage(text, editorLanguage);
     let context: ExecutionContext | undefined;
     let editorSource;
     try {
@@ -186,7 +187,6 @@ export function useAssistantChat({
       },
     ]);
     setInputMessage('');
-    setAutoApplyOverride(null);
     setResponsePhase("waiting");
 
     const updateReply = (change: (message: Message) => Message) => {
@@ -235,13 +235,15 @@ export function useAssistantChat({
         editorSource
       );
       if (successfullyCompleted && !controller.signal.aborted) {
-        const programs = extractCPrograms(responseText);
+        const programs = extractCodePrograms(responseText);
         let codeNotice: string | undefined;
         if (applyOnComplete) {
           if (programs.length !== 1) {
-            codeNotice = programs.length ? 'C 코드가 여러 개라 자동 적용하지 않았습니다. 적용할 코드를 선택해 주세요.' : '완성된 C 코드 블록이 없어 적용하지 않았습니다. 전체 C 코드로 다시 요청해 주세요.';
+            codeNotice = programs.length ? '코드가 여러 개라 자동 적용하지 않았습니다. 적용할 코드를 선택해 주세요.' : '완성된 C 또는 ASM 코드 블록이 없어 적용하지 않았습니다. 전체 코드로 다시 요청해 주세요.';
+          } else if (programs[0].language !== requestedLanguage) {
+            codeNotice = `요청한 ${requestedLanguage.toUpperCase()} 코드가 아니어서 자동 적용하지 않았습니다. 코드를 확인한 뒤 적용해 주세요.`;
           } else if (originalSnapshot && latestCodeEditor.current?.apply(programs[0], originalSnapshot)) {
-            codeNotice = 'C 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.';
+            codeNotice = `${programs[0].language.toUpperCase()} 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.`;
           } else {
             codeNotice = '편집 내용이나 작업 상태가 바뀌어 자동 적용하지 않았습니다. 코드를 확인한 뒤 적용해 주세요.';
           }
@@ -263,19 +265,19 @@ export function useAssistantChat({
     }
   };
 
-  const applyProgram = useCallback((id: string, program: string) => {
+  const applyProgram = useCallback((id: string, program: CodeProgram) => {
     const editor = latestCodeEditor.current;
     const applied = editor?.apply(program, editor.snapshot);
     setMessages(prev => prev.map(message => message.id === id ? {
       ...message, codeNotice: applied
-        ? 'C 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.'
-        : 'C 편집 모드에서 작업이 끝난 뒤 다시 적용해 주세요.',
+        ? `${program.language.toUpperCase()} 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.`
+        : '작업이 끝난 뒤 다시 적용해 주세요.',
     } : message));
   }, []);
 
   return {
     autoApply,
-    setAutoApplyOverride,
+    targetLanguage,
     applyProgram,
     inputMessage,
     setInputMessage,
