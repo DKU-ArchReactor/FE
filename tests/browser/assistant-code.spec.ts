@@ -126,8 +126,8 @@ test('real workspace applies to Monaco, invalidates old run, and sends new sourc
   });
   await page.route('**/api/v1/tutor/explain', route => route.fulfill({json:{items:[]}}));
   await page.goto('/pipeline');
-  await page.getByTitle('C 코드 컴파일 및 어셈블리 변환',{exact:true}).click();
-  const next = page.getByTitle('한 단계 실행 (Step Over / Forward)',{exact:true}).filter({visible:true});
+  await page.getByTitle('C 코드 컴파일 및 어셈블리 변환',{exact:true}).filter({visible:true}).click();
+  const next = page.getByTitle('다음 스텝 실행 (Step Forward)',{exact:true}).filter({visible:true});
   await expect(next).toBeEnabled();
   await page.getByTitle('ArchReactor AI 어시스턴트 열기',{exact:true}).click();
   await send(page,'반복문 예제를 만들어서 편집기에 넣어줘');
@@ -136,7 +136,7 @@ test('real workspace applies to Monaco, invalidates old run, and sends new sourc
   await page.getByTitle('창 닫기',{exact:true}).click();
   await expect(page.locator('.monaco-editor').first()).toContainText('sum');
   await expect(next).toBeDisabled();
-  await page.getByTitle('C 코드 컴파일 및 어셈블리 변환',{exact:true}).click();
+  await page.getByTitle('C 코드 컴파일 및 어셈블리 변환',{exact:true}).filter({visible:true}).click();
   await expect.poll(() => compiled?.content).toBe(code);
   expect(compiled.file_id).toBeUndefined();
   await page.screenshot({path:'test-results/assistant-code-workspace.png'});
