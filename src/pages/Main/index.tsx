@@ -176,6 +176,7 @@ const MainPage: React.FC = () => {
     simulationData: simSession.simulationData,
     mappedAssemblyRows: simSession.mappedAssemblyRows,
     isSingleEngine: simSession.isSingleEngine,
+    rightViewportIndex,
     editorTarget,
     translationSelectedLine,
     onClearSelection: handleClearSelection,
@@ -481,6 +482,7 @@ const handleMobileViewportSelect = (index: number) => {
             isAtTimelineEnd={playback.isAtTimelineEnd}
             onJumpToCycle={playback.handleJumpToCycle}
             onChangeSpeed={playback.setPlaySpeed}
+            rightViewportIndex={rightViewportIndex}
             isReady={useTutorialDemo ? true : playback.isSimulationReady}
             isCompiling={fileMgr.translationBusy}
             mode={activeSimMode}
