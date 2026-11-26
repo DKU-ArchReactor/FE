@@ -1,7 +1,17 @@
 import { useSyncExternalStore } from "react";
+import type { UserMeResponse } from "@/type/auth";
 
 let previousToken: string | null | undefined;
 let session = { epoch: 0, authenticated: false };
+let cachedProfile: { epoch: number; user: UserMeResponse } | null = null;
+
+export function getCachedUser(epoch: number): UserMeResponse | null {
+  return cachedProfile?.epoch === epoch ? cachedProfile.user : null;
+}
+
+export function setCachedUser(epoch: number, user: UserMeResponse): void {
+  cachedProfile = { epoch, user };
+}
 
 export function getAccessToken(): string | null {
   return localStorage.getItem("access_token");
@@ -18,6 +28,7 @@ export function setAuthTokens(accessToken: string, tokenType?: string): void {
 export function clearAuthTokens(): void {
   localStorage.removeItem("access_token");
   localStorage.removeItem("token_type");
+  cachedProfile = null;
   notifyAuthChanged();
 }
 

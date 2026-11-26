@@ -19,7 +19,6 @@
   color: inherit;
 }
 .landing-page button {
-  font: inherit;
   cursor: pointer;
 }
 .landing-page button:disabled {

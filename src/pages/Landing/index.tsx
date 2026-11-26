@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { learningExamples } from "@/data/learningExamples";
 import { ArchLogo } from "@/components/ArchLogo";
+import { clearAuthTokens, getAuthSession, getCachedUser, setCachedUser, useAuthSession } from "@/api/authSession";
+import { getMe } from "@/api/auth";
+import type { UserMeResponse } from "@/type/auth";
 import { Arrow, BrandMark, ProductPreview } from "./LandingPreviews";
 import "./landing.css";
 
@@ -31,6 +34,34 @@ const questions = [
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const auth = useAuthSession();
+  const [profile, setProfile] = useState<{ epoch: number; user: UserMeResponse } | null>(() => {
+    const cached = getCachedUser(auth.epoch);
+    return cached ? { epoch: auth.epoch, user: cached } : null;
+  });
+  const user = auth.authenticated
+    ? (profile?.epoch === auth.epoch ? profile.user : getCachedUser(auth.epoch))
+    : null;
+
+  useEffect(() => {
+    if (!auth.authenticated) return;
+    let active = true;
+    getMe()
+      .then((data) => {
+        if (active && getAuthSession().epoch === auth.epoch) {
+          setCachedUser(auth.epoch, data);
+          setProfile({ epoch: auth.epoch, user: data });
+        }
+      })
+      .catch(() => {
+        if (!active || getAuthSession().epoch !== auth.epoch) return;
+        clearAuthTokens();
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.authenticated, auth.epoch]);
   const legacyFileId =
     new URLSearchParams(location.search).get("fileId") ||
     (location.state as { fileId?: string } | null)?.fileId;
@@ -81,13 +112,53 @@ export default function LandingPage() {
               자주 묻는 질문
             </a>
           </nav>
-          <div className="landing-nav-actions">
-            <Link className="landing-login" to="/login">
-              로그인
-            </Link>
-            <Link className="landing-button landing-nav-start" to="/simulator">
-              시작하기
-            </Link>
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0 font-sans">
+            {user ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate("/my")}
+                  title="마이페이지로 이동"
+                  className="text-xs font-medium text-[#24292F] hover:opacity-80 transition-opacity cursor-pointer whitespace-nowrap px-1 py-0.5 rounded"
+                >
+                  <strong className="text-[var(--ar-accent)] font-semibold">{user.name}</strong>님
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearAuthTokens();
+                    setProfile(null);
+                  }}
+                  className="inline-flex text-xs font-medium text-[#57606A] hover:text-[#CF222E] transition-colors cursor-pointer whitespace-nowrap px-1 py-0.5"
+                >
+                  로그아웃
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/my")}
+                  className="hidden md:inline-flex text-xs font-semibold text-white bg-[var(--ar-accent)] hover:opacity-90 px-3 py-1 rounded transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  마이페이지
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  className="text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer whitespace-nowrap text-[#57606A] hover:text-[#24292F]"
+                >
+                  로그인
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/signup")}
+                  className="hidden md:inline-flex text-xs font-semibold px-2.5 py-1 rounded bg-[var(--ar-accent)] hover:opacity-90 text-white transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  회원가입
+                </button>
+              </>
+            )}
             <button
               className="landing-menu-toggle"
               type="button"
