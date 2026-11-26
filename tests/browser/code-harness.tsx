@@ -23,6 +23,7 @@ function Harness() {
     <button onClick={() => setBusy(!busy)}>toggle busy</button>
     <button onClick={() => setIdentity('file-two')}>switch file</button>
     <button onClick={() => setOpen(true)}>open chat</button>
+    <button onClick={() => setOpen(false)}>close chat</button>
     <div style={{ width: 440, height: 700 }}>
       <AiAssistantPopup inline codeEditor={editor} editorContent={language === 'c' ? source : assembly} editorLanguage={language}
         authenticated simulation={null} currentData={null} mode="pipeline" beforeExecution

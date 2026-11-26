@@ -17,4 +17,6 @@ test('build diagnostics show nonfatal inspection warnings, saved streams and fai
   await page.getByRole('button',{name:'빌드 로그 보기'}).click();
   await expect(page.getByText('syntax failure',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'저장된 로그 다시 불러오기'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Policy failure'}).click();
+  await expect(page.getByRole('alert')).toHaveText('3행 5열: 함수 호출은 지원하지 않습니다.');
 });

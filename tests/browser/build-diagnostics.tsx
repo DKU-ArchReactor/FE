@@ -10,6 +10,6 @@ apiConfig.defaults.adapter = async config => {
 };
 function Harness() {
   const [result,setResult] = useState<BuildCompileResponse|null>({status:'success',build_id:'saved',log:'inline log',analysis_error:'inspection unavailable'});
-  return <><button onClick={()=>setResult({status:'failed',build_id:null,log:'syntax failure'})}>Failed build</button><button onClick={()=>setResult({status:'success',build_id:'legacy',log:'legacy inline'})}>Legacy build</button><BuildStatusBar result={result} busy={false} hasSimulation={false}/></>;
+  return <><button onClick={()=>setResult({status:'failed',build_id:null,log:'syntax failure'})}>Failed build</button><button onClick={()=>setResult({status:'failed',build_id:null,log:'policy failure',diagnostics:[{code:'FUNCTION_CALL_NOT_ALLOWED',line:3,column:5,message:'함수 호출은 지원하지 않습니다.'}]})}>Policy failure</button><button onClick={()=>setResult({status:'success',build_id:'legacy',log:'legacy inline'})}>Legacy build</button><BuildStatusBar result={result} busy={false} hasSimulation={false}/></>;
 }
 createRoot(document.getElementById('root')!).render(<Harness/>);

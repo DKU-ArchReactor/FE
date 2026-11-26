@@ -30,11 +30,10 @@ const C_TEMPLATES = [
   },
   {
     title: "배열과 메모리 접근 (Array & Memory)",
-    desc: "전역 배열 메모리에서 값을 로드·연산 후 다시 저장",
+    desc: "main 내부 배열에서 값을 로드·연산 후 다시 저장",
     fileName: "memory.c",
-    code: `volatile int values[2] = {12, 30};
-
-int main(void) {
+    code: `int main(void) {
+    volatile int values[2] = {12, 30};
     int first = values[0];
     int second = values[1];
     values[1] = first + second;

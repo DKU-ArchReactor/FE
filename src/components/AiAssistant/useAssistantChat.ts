@@ -242,10 +242,15 @@ export function useAssistantChat({
             codeNotice = programs.length ? '코드가 여러 개라 자동 적용하지 않았습니다. 적용할 코드를 선택해 주세요.' : '완성된 C 또는 ASM 코드 블록이 없어 적용하지 않았습니다. 전체 코드로 다시 요청해 주세요.';
           } else if (programs[0].language !== requestedLanguage) {
             codeNotice = `요청한 ${requestedLanguage.toUpperCase()} 코드가 아니어서 자동 적용하지 않았습니다. 코드를 확인한 뒤 적용해 주세요.`;
-          } else if (originalSnapshot && latestCodeEditor.current?.apply(programs[0], originalSnapshot)) {
-            codeNotice = `${programs[0].language.toUpperCase()} 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.`;
           } else {
-            codeNotice = '편집 내용이나 작업 상태가 바뀌어 자동 적용하지 않았습니다. 코드를 확인한 뒤 적용해 주세요.';
+            try {
+              const applied = originalSnapshot && await latestCodeEditor.current?.apply(programs[0], originalSnapshot, controller.signal);
+              codeNotice = applied
+                ? `${programs[0].language.toUpperCase()} 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.`
+                : '편집 내용이나 작업 상태가 바뀌어 자동 적용하지 않았습니다. 코드를 확인한 뒤 적용해 주세요.';
+            } catch (error) {
+              codeNotice = error instanceof Error ? error.message : 'C 코드 검사에 실패해 적용하지 않았습니다.';
+            }
           }
         }
         updateReply(m => ({ ...m, programs, codeNotice }));
@@ -265,14 +270,20 @@ export function useAssistantChat({
     }
   };
 
-  const applyProgram = useCallback((id: string, program: CodeProgram) => {
+  const applyProgram = useCallback(async (id: string, program: CodeProgram) => {
     const editor = latestCodeEditor.current;
-    const applied = editor?.apply(program, editor.snapshot);
-    setMessages(prev => prev.map(message => message.id === id ? {
-      ...message, codeNotice: applied
+    if (program.language === 'c') setMessages(prev => prev.map(message => message.id === id
+      ? { ...message, codeNotice: 'C 코드 지원 범위를 검사하고 있습니다.' } : message));
+    let codeNotice: string;
+    try {
+      const applied = editor && await editor.apply(program, editor.snapshot);
+      codeNotice = applied
         ? `${program.language.toUpperCase()} 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.`
-        : '작업이 끝난 뒤 다시 적용해 주세요.',
-    } : message));
+        : '편집 내용이나 작업 상태가 바뀌었습니다. 확인한 뒤 다시 적용해 주세요.';
+    } catch (error) {
+      codeNotice = error instanceof Error ? error.message : 'C 코드 검사에 실패해 적용하지 않았습니다.';
+    }
+    setMessages(prev => prev.map(message => message.id === id ? { ...message, codeNotice } : message));
   }, []);
 
   return {

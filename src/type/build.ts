@@ -1,4 +1,16 @@
 import type { TutorBundle } from "@/pages/Main/utils/tutorAnalysis";
+export interface SourceDiagnostic {
+    code: string;
+    message: string;
+    line: number;
+    column: number;
+}
+
+export interface BasicCValidation {
+    policy: 'basic-c-v1';
+    valid: boolean;
+    diagnostics: SourceDiagnostic[];
+}
 export interface BuildCompileRequest {
     file_id?: string;
     content?: string;
@@ -8,6 +20,7 @@ export interface BuildCompileRequest {
 }
 
 export interface BuildCompileResponse {
+    diagnostics?: SourceDiagnostic[];
     analysis?: BuildAnalysis | null;
     analysis_error?: string | null;
     tutor?: TutorBundle | null;
