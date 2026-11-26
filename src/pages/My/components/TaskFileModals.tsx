@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import type { FileDetail } from "@/type/file";
 
 type AddTaskFileModalProps = {
@@ -180,6 +180,71 @@ export const TaskFileDetailModal: React.FC<TaskFileDetailModalProps> = ({
             </>
           )
         )}
+      </div>
+    </div>
+  );
+};
+
+type DeleteConfirmModalProps = {
+  isOpen: boolean;
+  message: string;
+  isDeleting: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+};
+
+export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
+  isOpen,
+  message,
+  isDeleting,
+  onConfirm,
+  onClose,
+}) => {
+  useEffect(() => {
+    if (!isOpen || isDeleting) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isDeleting, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
+      onClick={() => {
+        if (!isDeleting) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="파일 삭제 확인"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm p-6"
+      >
+        <h3 className="text-base font-bold text-slate-800">파일 삭제</h3>
+        <p className="mt-2 text-sm text-slate-600 leading-relaxed">{message}</p>
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold cursor-pointer disabled:opacity-50"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold shadow-sm shadow-rose-200 cursor-pointer disabled:opacity-50"
+          >
+            {isDeleting ? "삭제 중..." : "삭제"}
+          </button>
+        </div>
       </div>
     </div>
   );

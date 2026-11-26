@@ -3,6 +3,10 @@ import { getFiles, saveFile, getFileById, deleteFile } from "@/api/file";
 import { getAccessToken } from "@/api/authSession";
 import type { FileSummary, FileDetail } from "@/type/file";
 
+export type DeleteTarget =
+  | { mode: "single"; fileId: string; title: string }
+  | { mode: "selected"; count: number };
+
 export function useTaskFiles() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -13,6 +17,7 @@ export function useTaskFiles() {
   // 다중 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   // + 버튼 파일 추가 미리보기/저장 모달 상태
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -71,47 +76,59 @@ export function useTaskFiles() {
     }
   };
 
-  // 개별 삭제
-  const handleDeleteSingle = async (fileId: string, title: string, e: React.MouseEvent) => {
+  // 개별 삭제 요청 (모달 열기)
+  const handleDeleteSingle = (fileId: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`'${title}' 파일을 삭제하시겠습니까?`)) return;
-
-    setIsDeleting(true);
-    try {
-      await deleteFile(fileId);
-      setFiles((prev) => prev.filter((f) => f.file_id !== fileId));
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(fileId);
-        return next;
-      });
-      if (detailFile?.file_id === fileId) {
-        setDetailFile(null);
-      }
-    } catch {
-      setErrorMsg("파일 삭제 중 오류가 발생했습니다.");
-    } finally {
-      setIsDeleting(false);
-    }
+    setDeleteTarget({ mode: "single", fileId, title });
   };
 
-  // 선택된 파일 일괄 삭제
-  const handleDeleteSelected = async () => {
+  // 선택된 파일 일괄 삭제 요청 (모달 열기)
+  const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`선택한 ${selectedIds.size}개의 파일을 모두 삭제하시겠습니까?`)) return;
+    setDeleteTarget({ mode: "selected", count: selectedIds.size });
+  };
+
+  const closeDeleteModal = useCallback(() => {
+    if (isDeleting) return;
+    setDeleteTarget(null);
+  }, [isDeleting]);
+
+  // 모달 확인 시 실제 삭제 실행
+  const confirmDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
 
     setIsDeleting(true);
     try {
-      const targetIds = Array.from(selectedIds);
-      await Promise.all(targetIds.map((id) => deleteFile(id)));
-      setFiles((prev) => prev.filter((f) => !selectedIds.has(f.file_id)));
-      if (detailFile && selectedIds.has(detailFile.file_id)) {
-        setDetailFile(null);
+      if (deleteTarget.mode === "single") {
+        const { fileId } = deleteTarget;
+        await deleteFile(fileId);
+        setFiles((prev) => prev.filter((f) => f.file_id !== fileId));
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(fileId);
+          return next;
+        });
+        if (detailFile?.file_id === fileId) {
+          setDetailFile(null);
+        }
+      } else {
+        const targetIds = Array.from(selectedIds);
+        await Promise.all(targetIds.map((id) => deleteFile(id)));
+        setFiles((prev) => prev.filter((f) => !selectedIds.has(f.file_id)));
+        if (detailFile && selectedIds.has(detailFile.file_id)) {
+          setDetailFile(null);
+        }
+        setSelectedIds(new Set());
       }
-      setSelectedIds(new Set());
+      setDeleteTarget(null);
     } catch {
-      setErrorMsg("일부 파일 삭제 중 오류가 발생했습니다.");
-      void fetchFileList();
+      if (deleteTarget.mode === "single") {
+        setErrorMsg("파일 삭제 중 오류가 발생했습니다.");
+      } else {
+        setErrorMsg("일부 파일 삭제 중 오류가 발생했습니다.");
+        void fetchFileList();
+      }
+      setDeleteTarget(null);
     } finally {
       setIsDeleting(false);
     }
@@ -188,6 +205,7 @@ export function useTaskFiles() {
     setErrorMsg,
     selectedIds,
     isDeleting,
+    deleteTarget,
     isAddModalOpen,
     setIsAddModalOpen,
     newTitle,
@@ -204,6 +222,8 @@ export function useTaskFiles() {
     handleToggleSelectAll,
     handleDeleteSingle,
     handleDeleteSelected,
+    confirmDelete,
+    closeDeleteModal,
     handleAddButtonClick,
     handleFileChange,
     handleSaveNewFile,
