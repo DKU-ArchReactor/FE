@@ -228,7 +228,7 @@ export function useSimulationSession({
     callbacks: Pick<
       SimulationCallbacks,
       "onSimulationComplete" | "triggerPlaybackFeedback" | "onCompilationComplete"
-    >
+    > & { onAssembled?: (assembledText: string) => void }
   ) => {
     const request = beginRequest();
     let compiledResult: BuildCompileResponse | null = null;
@@ -261,11 +261,16 @@ export function useSimulationSession({
       if (!request.isCurrent()) return;
 
       if (compiledResult) setBuildResult(compiledResult);
+      const finalWorkspaceKey =
+        target === "asm" ? JSON.stringify([assembly, getAuthSession().epoch]) : targetWorkspaceKey;
+      if (target === "asm") {
+        callbacks.onAssembled?.(assembly);
+      }
       setSessions((prev) => ({
         ...prev,
         [target]: {
           ...prev[target],
-          resultWorkspace: targetWorkspaceKey,
+          resultWorkspace: finalWorkspaceKey,
           activeBuildId: buildId ?? null,
           activeSimulationToken: simulationToken ?? null,
           simulationCache: {
@@ -310,7 +315,7 @@ export function useSimulationSession({
     callbacks: Pick<
       SimulationCallbacks,
       "onSimulationComplete" | "triggerPlaybackFeedback" | "onCompilationComplete"
-    >
+    > & { onAssembled?: (assembledText: string) => void }
   ) => {
     if (!translationSource.trim() || translationBusy) return;
     await executeCompileAndSimulation(
@@ -333,7 +338,7 @@ export function useSimulationSession({
     callbacks: Pick<
       SimulationCallbacks,
       "onSimulationComplete" | "triggerPlaybackFeedback" | "onCompilationComplete"
-    >
+    > & { onAssembled?: (assembledText: string) => void }
   ) => {
     if (!customAssembly.trim() || translationBusy) return;
     await executeCompileAndSimulation(

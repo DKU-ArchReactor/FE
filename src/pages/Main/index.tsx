@@ -436,6 +436,7 @@ const MainPage: React.FC = () => {
           onCompilationComplete,
           onSimulationComplete: playback.handleSimulationComplete,
           triggerPlaybackFeedback: playback.triggerPlaybackFeedback,
+          onAssembled: (assembled) => setCustomAssembly(assembled),
         });
       }}
       onResetCustomAssembly={() => {
