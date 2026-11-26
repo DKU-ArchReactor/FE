@@ -36,8 +36,22 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
   const effectiveMobileIndex = mobileViewportIndex ?? rightViewportIndex;
   const activeSlideIndex = isMobile ? effectiveMobileIndex : rightViewportIndex;
 
+  React.useEffect(() => {
+    if (containerRef.current && containerRef.current.scrollLeft !== 0) {
+      containerRef.current.scrollLeft = 0;
+    }
+  }, [activeSlideIndex, isMobile, containerRef]);
+
   return (
-    <div ref={containerRef} className="flex-1 h-full min-w-0 overflow-hidden relative">
+    <div
+      ref={containerRef}
+      onScroll={(e) => {
+        if (e.currentTarget.scrollLeft !== 0) {
+          e.currentTarget.scrollLeft = 0;
+        }
+      }}
+      className="flex-1 h-full min-w-0 overflow-hidden relative"
+    >
       <div
         className="flex h-full w-full transition-transform duration-500 ease-in-out translate-x-[var(--active-tx)]"
         style={
@@ -95,9 +109,9 @@ export const SlidingViewportTrack: React.FC<SlidingViewportTrackProps> = ({
                         }
                         style={
                           isMetricsFixed
-                            ? { flex: "0 1 auto", maxHeight: "min(60%, calc(100% - 40vh))" }
+                            ? { flex: "0 1 auto", maxHeight: "min(60%, calc(100% - 40dvh))" }
                             : isTimingDiagram
-                            ? { flex: `${flexVal} 1 0%`, minHeight: "max(40%, 40vh)" }
+                            ? { flex: `${flexVal} 1 0%`, minHeight: "max(40%, 40dvh)" }
                             : { flex: `${flexVal} 1 0%` }
                         }
                       >

@@ -6,7 +6,7 @@ const NotFoundPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="flex-1 min-h-[calc(100vh-48px)] w-full bg-[#F6F8FA] flex flex-col items-center justify-center px-4 py-12 select-none">
+    <div className="flex-1 min-h-[calc(100dvh-48px)] w-full bg-[#F6F8FA] flex flex-col items-center justify-center px-4 py-12 select-none">
       <div className="w-full max-w-md bg-white rounded-2xl border border-[#D0D7DE] shadow-sm p-8 flex flex-col items-center text-center">
         <div className="w-14 h-14 rounded-2xl bg-[#005FB8]/10 border border-[#005FB8]/20 flex items-center justify-center text-[#005FB8] mb-4">
           <ArchLogo className="w-8 h-8 text-current" />
