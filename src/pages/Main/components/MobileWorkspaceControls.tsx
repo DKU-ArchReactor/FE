@@ -236,12 +236,12 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
           </div>
         </div>
 
-        {/* 3-2. 바닥 밀착 5버튼 바텀바 (코드 + 뷰포트 3종 + 어시스턴트) */}
-        <nav className="grid grid-cols-5 h-12 border-t border-[var(--ar-border)] bg-[var(--ar-header-bg)] font-sans">
+        {/* 3-2. 바닥 밀착 5버튼 바텀바 (코드 + 뷰포트 3종 + 어시스턴트, 하단 제스처 바 여백 포함) */}
+        <nav className="grid grid-cols-5 pt-0.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t border-[var(--ar-border)] bg-[var(--ar-header-bg)] font-sans">
           <button
             type="button"
             onClick={onSelectCode}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+            className={`h-12 flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
               isMobileCodeView
                 ? isSingleEngine
                   ? "text-[#005FB8] bg-[#005FB8]/8 font-bold"
@@ -258,7 +258,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
           <button
             type="button"
             onClick={() => onSelectViewport(0)}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+            className={`h-12 flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
               !isMobileCodeView && !isMobileAssistantViewport && rightViewportIndex === 0
                 ? isSingleEngine
                   ? "text-[#005FB8] bg-[#005FB8]/8 font-bold"
@@ -275,7 +275,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
           <button
             type="button"
             onClick={() => onSelectViewport(1)}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+            className={`h-12 flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
               !isMobileCodeView && !isMobileAssistantViewport && rightViewportIndex === 1
                 ? isSingleEngine
                   ? "text-[#005FB8] bg-[#005FB8]/8 font-bold"
@@ -292,7 +292,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
           <button
             type="button"
             onClick={() => onSelectViewport(2)}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+            className={`h-12 flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
               !isMobileCodeView && !isMobileAssistantViewport && rightViewportIndex === 2
                 ? isSingleEngine
                   ? "text-[#005FB8] bg-[#005FB8]/8 font-bold"
@@ -314,7 +314,7 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
             type="button"
             data-tutorial-id="mobile-assistant"
             onClick={onSelectAssistant}
-            className={`flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+            className={`h-12 flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
               !isMobileCodeView && isMobileAssistantViewport
                 ? isSingleEngine
                   ? "text-[#005FB8] bg-[#005FB8]/8 font-bold"
