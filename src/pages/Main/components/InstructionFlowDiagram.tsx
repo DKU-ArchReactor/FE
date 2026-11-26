@@ -631,12 +631,18 @@ export default function InstructionFlowDiagram({
           />
         )}
         <text
-          x={b.x + b.w / 2}
+          x={
+            unit === "mux"
+              ? b.x + b.w / 2 - 5
+              : unit === "operand-mux"
+                ? b.x + b.w / 2 + 5
+                : b.x + b.w / 2
+          }
           y={b.y + b.h / 2}
           dominantBaseline="central"
           textAnchor="middle"
           fontFamily="sans-serif"
-          fontSize={18}
+          fontSize={mux ? 14 : 18}
           fontWeight="bold"
           fill={textColor}
         >
@@ -653,6 +659,62 @@ export default function InstructionFlowDiagram({
               ))
             : TITLES[unit]}
         </text>
+        {unit === "mux" && (
+          <>
+            <text
+              x={b.x + b.w - 9}
+              y={sy(350)}
+              dominantBaseline="central"
+              textAnchor="end"
+              fontFamily="monospace"
+              fontSize={12}
+              fontWeight="bold"
+              fill={textColor}
+            >
+              1
+            </text>
+            <text
+              x={b.x + b.w - 9}
+              y={sy(410)}
+              dominantBaseline="central"
+              textAnchor="end"
+              fontFamily="monospace"
+              fontSize={12}
+              fontWeight="bold"
+              fill={textColor}
+            >
+              0
+            </text>
+          </>
+        )}
+        {unit === "operand-mux" && (
+          <>
+            <text
+              x={b.x + 9}
+              y={sy(726)}
+              dominantBaseline="central"
+              textAnchor="start"
+              fontFamily="monospace"
+              fontSize={12}
+              fontWeight="bold"
+              fill={textColor}
+            >
+              0
+            </text>
+            <text
+              x={b.x + 9}
+              y={sy(770)}
+              dominantBaseline="central"
+              textAnchor="start"
+              fontFamily="monospace"
+              fontSize={12}
+              fontWeight="bold"
+              fill={textColor}
+            >
+              1
+            </text>
+          </>
+        )}
       </g>
     );
   };
