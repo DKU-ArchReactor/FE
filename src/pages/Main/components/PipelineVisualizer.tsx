@@ -280,7 +280,7 @@ const PipelineVisualizer: React.FC<PipelineVisualizerProps> = ({
 
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [isPlaying, isSubstepPlaying, flowDuration, currentCycle]);
+  }, [isPlaying, isSubstepPlaying, playbackRevision, flowDuration, currentCycle]);
 
   const isSingle = mode === "single";
 

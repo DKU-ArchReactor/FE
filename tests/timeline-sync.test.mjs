@@ -223,10 +223,10 @@ function mountPlaybackRig(mode = "pipeline") {
   const rows = [{ pc: "0x10004", text: "addi a0, a0, 1", sourceLine: 1 }];
 
   let playback = null;
-  function Harness() {
+  function Harness({ simulationData = simData } = {}) {
     const clear = React.useCallback(() => {}, []);
     const pb = useSimulationPlayback({
-      simulationData: simData,
+      simulationData,
       mappedAssemblyRows: rows,
       isSingleEngine: mode === "single",
       editorTarget: "c",
@@ -262,7 +262,7 @@ function mountPlaybackRig(mode = "pipeline") {
       isReady: pb.isSimulationReady,
       isCompiling: false,
       mode,
-      simulationData: simData,
+      simulationData,
       editorTarget: "c",
     });
   }
@@ -286,6 +286,48 @@ function mountPlaybackRig(mode = "pipeline") {
   };
 
   return { React, root, container, Harness, tsMod, findButton, clickEv, getPlayback: () => playback, cleanup };
+}
+
+for (const mode of ["single", "pipeline"]) {
+  for (const emptyResult of [null, { history: [] }]) {
+    test(`${mode}: cleared execution history shows 0/0 instead of the previous cycle (${emptyResult === null ? "null" : "empty"})`, async () => {
+      const rig = mountPlaybackRig(mode);
+      const { React, root, container, Harness, getPlayback, findButton } = rig;
+      try {
+        await React.act(async () => {
+          root.render(React.createElement(Harness));
+        });
+        await React.act(async () => {
+          getPlayback().handleJumpToCycle(4);
+        });
+        assert.equal(getPlayback().currentCycle, 4);
+
+        // Compilation invalidates the old result; a failed compile leaves it empty.
+        await React.act(async () => {
+          root.render(React.createElement(Harness, { simulationData: emptyResult }));
+        });
+        assert.equal(getPlayback().currentCycle, 0);
+        assert.equal(getPlayback().totalCycles, 0);
+        assert.equal(getPlayback().isSimulationReady, false);
+        assert.match(container.textContent, mode === "single" ? /Step:\s*0\s*\/0/i : /Cycle:\s*0\s*\/0/i);
+        assert.equal(findButton("다음").disabled, true);
+
+        // Temporarily hidden cached results retain their position when restored.
+        await React.act(async () => {
+          root.render(React.createElement(Harness));
+        });
+        assert.equal(getPlayback().currentCycle, 4);
+        assert.equal(getPlayback().totalCycles, 5);
+        await React.act(async () => {
+          getPlayback().handleSimulationComplete();
+        });
+        assert.equal(getPlayback().currentCycle, 0);
+      } finally {
+        await React.act(async () => { root.unmount(); });
+        rig.cleanup();
+      }
+    });
+  }
 }
 
 test("isMidCycleProgress distinguishes (~] playback from ] completion", () => {

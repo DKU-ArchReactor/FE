@@ -96,7 +96,8 @@ export function useSimulationPlayback({
   }
 
   const rawCycle = modeStates[currentKey].cycle;
-  const currentCycle = historyList.length > 0 ? Math.min(rawCycle, historyList.length) : rawCycle;
+  // Keep cached mode positions, but never display a cycle beyond the available history.
+  const currentCycle = Math.min(rawCycle, totalCycles);
   const isStandby = modeStates[currentKey].isStandby;
 
   const setCurrentCycle: React.Dispatch<React.SetStateAction<number>> = (action) => {
