@@ -6,6 +6,8 @@ import { timelineSync, isMidCycleProgress } from "../utils/timelineSync";
 
 export const SINGLE_BASE_SPEED_MS = 10000;
 export const PIPELINE_BASE_SPEED_MS = 5000;
+export const NON_DATAPATH_BASE_SPEED_MS = 3000;
+export const DATAPATH_VIEWPORT_INDEX = 1;
 export const PLAYBACK_SPEED_RATES = [
   { label: "0.5x", rate: 0.5 },
   { label: "1.0x", rate: 1.0 },
@@ -14,7 +16,13 @@ export const PLAYBACK_SPEED_RATES = [
   { label: "5.0x", rate: 5.0 },
 ] as const;
 
-export function getBasePlaySpeed(isSingle: boolean): number {
+export function getBasePlaySpeed(
+  isSingle: boolean,
+  viewportIndex = DATAPATH_VIEWPORT_INDEX,
+): number {
+  if (viewportIndex !== DATAPATH_VIEWPORT_INDEX) {
+    return NON_DATAPATH_BASE_SPEED_MS;
+  }
   return isSingle ? SINGLE_BASE_SPEED_MS : PIPELINE_BASE_SPEED_MS;
 }
 
@@ -22,6 +30,7 @@ interface UseSimulationPlaybackProps {
   simulationData: SimulationResult | null;
   mappedAssemblyRows: MappedAssemblyRow[];
   isSingleEngine: boolean;
+  rightViewportIndex?: number;
   editorTarget: "c" | "asm";
   translationSelectedLine: number | null;
   onClearSelection: () => void;
@@ -31,6 +40,7 @@ export function useSimulationPlayback({
   simulationData,
   mappedAssemblyRows,
   isSingleEngine,
+  rightViewportIndex = 0,
   editorTarget,
   translationSelectedLine,
   onClearSelection,
@@ -42,7 +52,7 @@ export function useSimulationPlayback({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playMode, setPlayMode] = useState<"continuous" | "singleCycle">("continuous");
   const [playbackRate, setPlaybackRate] = useState<number>(1);
-  const basePlaySpeed = getBasePlaySpeed(isSingleEngine);
+  const basePlaySpeed = getBasePlaySpeed(isSingleEngine, rightViewportIndex);
   const playSpeed = Math.round(basePlaySpeed / playbackRate);
   const setPlaySpeed = (speedMs: number) => {
     if (speedMs > 0) {

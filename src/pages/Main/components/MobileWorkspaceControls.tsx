@@ -93,7 +93,9 @@ export const MobileWorkspaceControls: React.FC<MobileWorkspaceControlsProps> = m
 
             <div className="flex items-center gap-0.5 shrink-0 text-[9.5px]">
               {PLAYBACK_SPEED_RATES.map(({ label, rate }) => {
-                const speed = Math.round(getBasePlaySpeed(isSingleEngine) / rate);
+                const speed = Math.round(
+                  getBasePlaySpeed(isSingleEngine, rightViewportIndex) / rate,
+                );
                 const isSelected = Math.abs(playSpeed - speed) < 50;
                 return (
                   <button
