@@ -397,9 +397,9 @@ export default function TranslationEditor({
 
       {/* 파일 업로드 및 저장 목록 팝업 */}
       {activeTarget === 'c' && <p data-testid="basic-c-policy" className="shrink-0 border-b border-[#E5E5E5] bg-[#F8FAFC] px-3 py-1.5 text-[11px] leading-relaxed text-[#57606A]">
-        기초 C · int main(void) 하나에서 정수 변수·고정 크기 배열·조건문·반복문을 사용하세요.
-        전처리 지시문(#include 등), 함수 호출·입출력, 전역 선언·포인터·실수형은 지원하지 않습니다.
-        입력값은 코드에 지정하고 결과는 레지스터·메모리에서 확인하세요.
+        기초 C · main 내부 정수·고정 배열·조건문·반복문만 지원함.
+        #include 등 전처리기·함수 호출·입출력 미지원.
+        결과는 레지스터·메모리에서 확인 가능.
       </p>}
       <CFileUploadPopup
         isOpen={isUploadPopupOpen}
