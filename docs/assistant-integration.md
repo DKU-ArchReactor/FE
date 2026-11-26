@@ -181,7 +181,11 @@ The existing `messages`/`editor_source` request and `delta`/`done` SSE protocol 
 unchanged. Generation prompts request a complete C `main` program or an RV32IM
 RISC-V assembly program with a `main` entry point, returning its result in `a0`.
 The requested language takes precedence over the active mode; otherwise mode is the
-fallback. Candidates are extracted only after successful `end_turn` or `stop`,
+fallback. Requests to create, show or recommend an example instruct the model to
+choose one suitable example itself, state any assumptions briefly, and return exactly
+one complete program in one code block without asking the user to select a candidate
+or confirm a topic. This is a generation instruction, not a guarantee of model output;
+the multiple-candidate safeguard remains for unexpected responses. Candidates are extracted only after successful `end_turn` or `stop`,
 never from streaming, cancelled, truncated or failed answers. Empty, unlabelled,
 unsupported-language, unclosed, NUL-containing and oversized blocks are rejected.
 Multiple candidates require a manual choice, including mixed C/ASM answers.

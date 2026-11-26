@@ -46,3 +46,17 @@ test('explicit destinations determine the target language with editor mode as fa
     ['C 코드를 어셈블리 편집기에 넣어줘', 'c', 'asm'],
   ]) assert.equal(requestedCodeLanguage(text, fallback), expected, text);
 });
+
+test('example requests choose one complete program without a candidate-selection turn', () => {
+  for (const language of ['c', 'asm']) {
+    for (const request of ['예제를 만들어줘', '반복문 예제 추천해줘', '예시 보여줘', '만들어줘 반복문 예제', 'Show me a sample program', 'Give me an example']) {
+      const question = codeGenerationQuestion(request, false, language);
+      assert.ok(question.startsWith(request), request);
+      assert.match(question, /후보나 주제를 나열하거나.*선택 또는 추가 확인을 요구하지 마/);
+      assert.match(question, /대표 예제 하나를 직접 정해 바로 작성/);
+      assert.match(question, /완성된 프로그램 정확히 하나와 코드 블록 정확히 하나/);
+      assert.ok(question.includes('```' + language));
+    }
+  }
+  assert.equal(codeGenerationQuestion('이 예제의 동작을 설명해줘', false), '이 예제의 동작을 설명해줘');
+});

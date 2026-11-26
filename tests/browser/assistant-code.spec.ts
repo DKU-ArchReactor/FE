@@ -234,3 +234,19 @@ test('mixed C and ASM candidates require a choice and apply to the chosen editor
   await expect(page.getByLabel('ASM 원문')).toHaveValue(asmCode);
   await expect(page.getByLabel('C 원문')).toHaveValue(original);
 });
+
+test('example recommendations send a single-program instruction and can be applied immediately', async ({page}) => {
+  await setup(page);
+  let payload: any;
+  await page.route('**/api/v1/assistant/chat', route => {
+    payload = route.request().postDataJSON();
+    return route.fulfill({contentType:'text/event-stream',body:sse()});
+  });
+  await send(page, '반복문 예제 추천해줘');
+  const apply = page.getByRole('button', {name:'C 코드에 적용',exact:true});
+  await expect(apply).toHaveCount(1);
+  expect(payload.messages[0].content).toContain('선택 또는 추가 확인을 요구하지 마');
+  expect(payload.messages[0].content).toContain('완성된 프로그램 정확히 하나와 코드 블록 정확히 하나');
+  await apply.click();
+  await expect(page.getByLabel('C 원문')).toHaveValue(code);
+});
