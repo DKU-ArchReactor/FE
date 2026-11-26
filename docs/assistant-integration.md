@@ -159,3 +159,48 @@ BE PR #14의 실행 답변은 서버 검증이 끝난 후 하나의 `delta`와 `
 서버의 고정 실행 근거 확인 실패 문구는 서비스 안내로 분류합니다. `done.context`가 있더라도 성공한 분석의 참고 실행 배지를 붙이지 않고, 해당 질문/답변을 다음 대화 이력에서 제외합니다. `질문 다시 입력`은 입력창만 채우며 자동 재요청하지 않습니다. 현재 SSE에 판별 상태 필드가 없으므로 고정 문구를 정확히 비교합니다(주변 공백 제외). 서버 문구가 바뀌면 이 목록도 함께 갱신해야 합니다.
 
 검증: Node 테스트 34개, Playwright 21개, production build 및 변경 TypeScript 파일 lint 통과. `/tests/browser/validated-response.html`에서 대기, 단일 delta, 완료, 근거 확인 실패, 오류, 연결 종료를 직접 조작할 수 있습니다. 이 화면은 API를 모두 모의 처리하며 실제 SOLID 평가나 운영 배포 검증을 대신하지 않습니다. 다른 로컬 서버와 충돌 시 `PLAYWRIGHT_PORT=4184 npm run test:browser`로 별도 포트를 사용할 수 있습니다.
+
+
+## Generated C code application
+
+The assistant can replace the C editor with generated code. The “C 예제 생성”
+chip prepares a short complete-program request. Completed answers containing closed
+`c` fences show “C 코드에 적용” buttons, one per candidate, with an explicit
+whole-editor replacement label. The answer itself remains the code preview.
+
+“생성 후 C 코드에 자동 적용” applies one candidate when the answer completes.
+Explicit phrases such as “C 코드 영역에 넣어줘” select this checkbox as a
+convenience; users can uncheck it before sending. Questions, negations and quoted
+instructions are conservatively kept manual. Natural-language matching is not a
+general intent classifier; use the checkbox for unrecognized wording. No model
+output can enable automatic application by itself.
+
+The existing `messages`/`editor_source` request and `delta`/`done` SSE protocol are
+unchanged. A generation request asks for one complete `main` program in a C fence
+and short prose outside it. Explicit ASM generation stays unchanged. Candidates
+are extracted only after successful `end_turn` or `stop` completion, never from a
+streaming, cancelled, truncated or failed answer. Empty, unlabelled, foreign-language,
+unclosed, NUL-containing and over-64-KiB candidates are rejected. Multiple candidates
+require manual choice. A closed fence is not a guarantee of valid or correct C;
+compilation is still a separate user action.
+
+Automatic application captures the source, file/account identity and editor mode at
+send time. Any intervening source edit (even edit then restore), file or mode change
+prevents automatic replacement; compiling also disables application. A user can
+review the result and apply it manually to the current C editor. Automatic requests
+attach the entire active source when source attachment is enabled, rather than a
+selected fragment, so whole-program changes have the full source available.
+
+Applying code clears source selection, compiled assembly, saved-build association,
+simulation caches and playback through the existing source-update path. It neither
+saves a remote file nor compiles or runs code. “코드 적용 되돌리기” restores the
+previous source for the most recent application. Subsequent edits or a file/account
+change clear this undo action. Desktop and mobile assistants share application/undo
+state; browser refresh does not retain the undo snapshot.
+
+Validation uses local mocked SSE and compiler/simulator responses: unit tests cover
+fence parsing, intent convenience matching and prompt preparation; Playwright covers
+manual/automatic application, undo, stale edits/files/modes, cancellation, incomplete
+answers, multiple candidates, the actual Monaco editor, simulation invalidation and
+new-source compilation requests. Live SOLID generation and production deployment
+are separate checks; these tests do not assert that generated C compiles successfully.

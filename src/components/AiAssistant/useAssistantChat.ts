@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { codeGenerationQuestion, extractCPrograms, requestsCodeApplication } from '@/pages/Main/utils/assistantCode';
+import type { useAssistantCode } from '@/pages/Main/hooks/useAssistantCode';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { ExecutionContext, ExecutionReference } from '@/type/assistant';
 import { captureEditorSource, selectedEditorSource, type EditorSelection } from '@/pages/Main/utils/assistantSource';
 import type { SimulationResult, CycleHistoryItem } from '@/type/simulation';
@@ -11,6 +13,8 @@ export interface Message {
   text: string;
   time: string;
   complete?: boolean;
+  programs?: string[];
+  codeNotice?: string;
   notice?: string;
   context?: ExecutionReference;
   requestedContext?: ExecutionContext;
@@ -18,6 +22,7 @@ export interface Message {
 }
 
 interface UseAssistantChatParams {
+  codeEditor?: ReturnType<typeof useAssistantCode>;
   isOpen: boolean;
   authenticated: boolean;
   simulation: SimulationResult | null;
@@ -39,8 +44,13 @@ export function useAssistantChat({
   editorLanguage,
   editorContent,
   sourceSelection,
+  codeEditor,
 }: UseAssistantChatParams) {
   const [inputMessage, setInputMessage] = useState("");
+  const [autoApplyOverride, setAutoApplyOverride] = useState<boolean | null>(null);
+  const autoApply = autoApplyOverride ?? requestsCodeApplication(inputMessage);
+  const latestCodeEditor = useRef(codeEditor);
+  useLayoutEffect(() => { latestCodeEditor.current = codeEditor; }, [codeEditor]);
   const [attachSource, setAttachSource] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -126,13 +136,15 @@ export function useAssistantChat({
     setLocalError('');
     if (sourceUnsupported) return;
 
+    const applyOnComplete = Boolean(codeEditor) && (autoApplyOverride ?? requestsCodeApplication(text));
+    const originalSnapshot = codeEditor?.snapshot;
     let context: ExecutionContext | undefined;
     let editorSource;
     try {
       editorSource = captureEditorSource(
         attachSource,
         editorLanguage,
-        sourceContent,
+        applyOnComplete ? editorContent : sourceContent,
         status?.editor_source_supported === true
       );
       if (attach) {
@@ -157,7 +169,7 @@ export function useAssistantChat({
         ? {
             language: editorSource.language,
             characters: [...editorSource.content].length,
-            label: sourceLabel,
+            label: applyOnComplete ? `${editorLanguage.toUpperCase()} 원문 전체` : sourceLabel,
           }
         : undefined,
     };
@@ -174,17 +186,19 @@ export function useAssistantChat({
       },
     ]);
     setInputMessage('');
+    setAutoApplyOverride(null);
     setResponsePhase("waiting");
 
     const updateReply = (change: (message: Message) => Message) => {
       setMessages((prev) => prev.map((message) => (message.id === replyId ? change(message) : message)));
     };
     let responseText = '';
+    let successfullyCompleted = false;
     try {
       const history: ChatMessage[] = [
         ...messages.filter((m) => m.id !== 'welcome' && m.complete),
         userMsg,
-      ].map((m) => ({ role: m.sender === 'ai' ? 'assistant' : 'user', content: m.text }));
+      ].map((m) => ({ role: m.sender === 'ai' ? 'assistant' : 'user', content: m.id === userMsg.id ? codeGenerationQuestion(m.text, applyOnComplete, editorLanguage) : m.text }));
 
       await streamChat(
         history,
@@ -198,7 +212,8 @@ export function useAssistantChat({
           }
           if (event.type === 'done') {
             const serviceNotice = isServiceNotice(responseText);
-            const complete = event.stop_reason === 'end_turn' && !serviceNotice;
+            const complete = ['end_turn', 'stop'].includes(event.stop_reason) && !serviceNotice;
+            successfullyCompleted = complete;
             setMessages((prev) => prev.map((m) => (m.id === userMsg.id ? { ...m, complete } : m)));
             updateReply((m) => ({
               ...m,
@@ -208,7 +223,7 @@ export function useAssistantChat({
               notice:
                 event.stop_reason === 'max_tokens'
                   ? '답변 길이 한도에 도달했습니다. 이어서 질문해 주세요.'
-                  : event.stop_reason !== 'end_turn'
+                  : !['end_turn', 'stop'].includes(event.stop_reason)
                     ? '모델이 답변 생성을 종료했습니다.'
                     : serviceNotice
                       ? '질문을 구체적으로 바꿔 다시 입력할 수 있습니다.'
@@ -219,6 +234,20 @@ export function useAssistantChat({
         context,
         editorSource
       );
+      if (successfullyCompleted && !controller.signal.aborted) {
+        const programs = extractCPrograms(responseText);
+        let codeNotice: string | undefined;
+        if (applyOnComplete) {
+          if (programs.length !== 1) {
+            codeNotice = programs.length ? 'C 코드가 여러 개라 자동 적용하지 않았습니다. 적용할 코드를 선택해 주세요.' : '완성된 C 코드 블록이 없어 적용하지 않았습니다. 전체 C 코드로 다시 요청해 주세요.';
+          } else if (originalSnapshot && latestCodeEditor.current?.apply(programs[0], originalSnapshot)) {
+            codeNotice = 'C 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.';
+          } else {
+            codeNotice = '편집 내용이나 작업 상태가 바뀌어 자동 적용하지 않았습니다. 코드를 확인한 뒤 적용해 주세요.';
+          }
+        }
+        updateReply(m => ({ ...m, programs, codeNotice }));
+      }
     } catch (error) {
       const notice = controller.signal.aborted
         ? '답변 생성을 중단했습니다.'
@@ -234,7 +263,20 @@ export function useAssistantChat({
     }
   };
 
+  const applyProgram = useCallback((id: string, program: string) => {
+    const editor = latestCodeEditor.current;
+    const applied = editor?.apply(program, editor.snapshot);
+    setMessages(prev => prev.map(message => message.id === id ? {
+      ...message, codeNotice: applied
+        ? 'C 코드에 적용했습니다. 컴파일하여 결과를 확인하세요.'
+        : 'C 편집 모드에서 작업이 끝난 뒤 다시 적용해 주세요.',
+    } : message));
+  }, []);
+
   return {
+    autoApply,
+    setAutoApplyOverride,
+    applyProgram,
     inputMessage,
     setInputMessage,
     attachSource,

@@ -1,3 +1,4 @@
+import { useAssistantCode } from './hooks/useAssistantCode';
 import type { EditorSelection } from './utils/assistantSource';
 import { useAuthSession } from '@/api/authSession';
 import React, { useState, useRef, useCallback, useEffect } from "react";
@@ -193,6 +194,19 @@ const MainPage: React.FC = () => {
   useEffect(() => {
     resetSimulationRef.current = onResetSimulation;
   });
+
+  const assistantCode = useAssistantCode(
+    fileMgr.translationSource,
+    JSON.stringify([auth.epoch, fileMgr.fileId, fileMgr.cFileName]),
+    editorTarget,
+    fileMgr.translationBusy,
+    source => {
+      setSourceSelection(null);
+      handleClearSelection();
+      fileMgr.updateTranslationSource(source, fileMgr.cFileName, true, null, onResetSimulation);
+    },
+    JSON.stringify([auth.epoch, null, fileMgr.cFileName]),
+  );
 
   // 6. 분할 레이아웃 & 스플리터 훅
   const [sections, setSections] = useState<SectionConfig[]>(getDefaultSections);
@@ -535,6 +549,7 @@ const handleMobileViewportSelect = (index: number) => {
 
       <AiAssistantPopup
         key={auth.epoch}
+        codeEditor={assistantCode}
         sourceSelection={sourceSelection}
         editorLanguage={editorTarget}
         editorContent={editorTarget === 'c' ? fileMgr.translationSource : customAssembly}
@@ -740,6 +755,7 @@ className="hidden md:flex flex-col w-full md:w-[var(--left-pane-w)] flex-1 md:fl
             mobileExtraSection={
               <AiAssistantPopup
                 key={`mobile-${auth.epoch}`}
+                codeEditor={assistantCode}
                 inline
                 sourceSelection={sourceSelection}
                 editorLanguage={editorTarget}
