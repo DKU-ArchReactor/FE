@@ -228,7 +228,13 @@ const TutorArea: React.FC<TutorAreaProps> = ({
         </div>
         {!isSingleMode && !isUserSelected && simulationData && <div ref={setPipelineHeader} className="tutor-pipeline-header-controls"/>}
         <div className="flex items-center gap-2 shrink-0">
-          {isSingleMode && isUserSelected && (
+          {simulationData && (isUserSelected || !isSingleMode || shouldShowSingleCard) && (
+            <span className={`tutor-mode-badge ${isUserSelected ? 'selected' : 'executing'}`}>
+              <span className="tutor-mode-dot" />
+              <span>{isUserSelected ? '선택됨' : '실행 중'}</span>
+            </span>
+          )}
+          {isUserSelected && (
             <button
               type="button"
               className="tutor-return-exec-btn mr-0!"

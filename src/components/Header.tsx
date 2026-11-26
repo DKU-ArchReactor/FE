@@ -58,6 +58,17 @@ const Header = () => {
               </span>
             </div>
           </div>
+
+          {isActive("/simulator") && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("ar-open-tutorial"))}
+              title="화면 사용법 튜토리얼 보기"
+              className="text-xs font-semibold px-2 py-1 rounded transition-colors cursor-pointer whitespace-nowrap text-[#57606A] hover:text-[#24292F]"
+            >
+              튜토리얼
+            </button>
+          )}
         </div>
 
         {/* 우측: 유저 메뉴 */}

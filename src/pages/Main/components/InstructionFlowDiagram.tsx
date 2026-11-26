@@ -664,7 +664,7 @@ export default function InstructionFlowDiagram({
     >
       <div ref={area} className="min-h-0 flex-1 overflow-hidden">
         <svg
-          viewBox="-40 40 1240 1400"
+          viewBox="-25 40 1190 1450"
           preserveAspectRatio="xMidYMid meet"
           className="ar-single-flow-diagram block h-full w-full font-sans"
           role="group"
@@ -745,6 +745,8 @@ export default function InstructionFlowDiagram({
             </g>
           )}
 
+          {/* CPU / MEMORY 본체 (좌우/하단 여백 축소 및 크기 확대) */}
+          <g data-datapath-body="true" transform="translate(-74, -26) scale(1.11)">
           {/* CPU / MEMORY 영역 */}
           <rect
             x="130"
@@ -1205,6 +1207,7 @@ export default function InstructionFlowDiagram({
               )}
             </g>
           )}
+          </g>
         </svg>
       </div>
     </div>
