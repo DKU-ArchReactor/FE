@@ -36,3 +36,9 @@ jobs:
 
       - name: 5. MAIN S3 버킷에 업로드
         run: aws s3 sync ./dist s3://archreactor --delete
+
+      - name: 6. CloudFront 캐시 무효화 (Invalidation)
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
