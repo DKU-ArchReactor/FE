@@ -15,7 +15,7 @@ function App() {
       fallback={
         <div
           role="status"
-          className="flex min-h-screen items-center justify-center text-sm text-slate-500"
+          className="flex min-h-dvh items-center justify-center text-sm text-slate-500"
         >
           작업 공간을 불러오는 중이에요…
         </div>

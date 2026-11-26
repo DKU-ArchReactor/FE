@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useIsMobileViewport } from "../types";
 import { hideTutorialForToday } from "../utils/tutorialDemoData";
 
 interface TargetRect {
@@ -286,6 +287,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   onChangeViewport,
 }) => {
   const visible = isOpen;
+  const isMobile = useIsMobileViewport();
 
   const [stepIndex, setStepIndex] = useState(0);
   const [rects, setRects] = useState<Record<string, TargetRect>>({});
@@ -293,18 +295,20 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   const totalSteps = TUTORIAL_STEPS.length;
   const currentItem = TUTORIAL_STEPS[stepIndex] ?? TUTORIAL_STEPS[0];
 
-  // 데스크톱과 모바일에서 실제로 화면에 표시되고 있는(width > 0 && height > 0) 요소를 탐색하여 측정
+  // 데스크톱과 모바일에서 실제로 화면 뷰포트 안에 표시되고 있는(width > 0 && height > 0) 요소를 탐색하여 측정
   const measureTargets = useCallback(() => {
     if (typeof document === "undefined") return;
+    const viewportW = typeof window !== "undefined" ? window.innerWidth : 1440;
     const nextRects: Record<string, TargetRect> = {};
     for (const id of MEASURED_IDS) {
       const elements = document.querySelectorAll<HTMLElement>(
         `[data-tutorial-id="${id}"]`
       );
+      let fallbackRect: TargetRect | null = null;
       for (const el of elements) {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.height > 0) {
-          nextRects[id] = {
+          const candidate: TargetRect = {
             top: r.top,
             left: r.left,
             width: r.width,
@@ -314,8 +318,17 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
             centerX: r.left + r.width / 2,
             centerY: r.top + r.height / 2,
           };
-          break;
+          if (r.right > 4 && r.left < viewportW - 4) {
+            nextRects[id] = candidate;
+            break;
+          }
+          if (!fallbackRect) {
+            fallbackRect = candidate;
+          }
         }
+      }
+      if (!nextRects[id] && fallbackRect) {
+        nextRects[id] = fallbackRect;
       }
     }
     setRects(nextRects);
@@ -358,14 +371,24 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
     }
   }, [stepIndex, totalSteps, handleClose, goToStep]);
 
-  // 단계 전환 후 모바일 슬라이드 트랙 애니메이션(300ms) 및 모달 마운트 시점에 맞춰 연속 측정
+  const onChangeViewportRef = React.useRef(onChangeViewport);
+  useEffect(() => {
+    onChangeViewportRef.current = onChangeViewport;
+  }, [onChangeViewport]);
+
+  // 단계 전환 후 모바일 슬라이드 트랙 애니메이션(500ms) 및 모달 마운트 시점에 맞춰 연속 측정
   useEffect(() => {
     if (!visible) return;
+    const targetStep = TUTORIAL_STEPS[stepIndex] ?? TUTORIAL_STEPS[0];
+    onChangeViewportRef.current?.(targetStep.viewportIndex, targetStep.mobileMode);
+
     const rafId = window.requestAnimationFrame(measureTargets);
     const t1 = window.setTimeout(measureTargets, 120);
     const t2 = window.setTimeout(measureTargets, 340);
+    const t3 = window.setTimeout(measureTargets, 550);
     window.addEventListener("resize", measureTargets);
     window.addEventListener("scroll", measureTargets, true);
+    window.addEventListener("transitionend", measureTargets, true);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -384,11 +407,13 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       window.cancelAnimationFrame(rafId);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
       window.removeEventListener("resize", measureTargets);
       window.removeEventListener("scroll", measureTargets, true);
+      window.removeEventListener("transitionend", measureTargets, true);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [visible, stepIndex, measureTargets, handleClose, handleNext, handlePrev]);
+  }, [visible, stepIndex, isMobile, measureTargets, handleClose, handleNext, handlePrev]);
 
   if (!visible) return null;
 
@@ -514,28 +539,48 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       )}
 
       {/* 2. 최상단 헤더 바 (데스크톱 & 모바일 반응형): 워크플로우 진행 상태 및 제목 표시 */}
-      <div className="relative z-[115] shrink-0 h-11 px-3 md:px-4 flex items-center justify-between gap-2 bg-slate-950/85 border-b border-white/15 backdrop-blur-md">
-        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+      <div
+        className={`relative z-[115] shrink-0 h-11 ${
+          isMobile ? "px-3" : "px-4"
+        } flex items-center justify-between gap-2 bg-slate-950/85 border-b border-white/15 backdrop-blur-md`}
+      >
+        <div
+          className={`flex items-center ${
+            isMobile ? "gap-1.5" : "gap-2"
+          } min-w-0`}
+        >
           <span
-            className={`px-2 py-0.5 rounded-full text-[10px] md:text-[10.5px] font-bold shrink-0 ${currentItem.badgeColor}`}
+            className={`px-2 py-0.5 rounded-full ${
+              isMobile ? "text-[10px]" : "text-[10.5px]"
+            } font-bold shrink-0 ${currentItem.badgeColor}`}
           >
             STEP {currentItem.step}/{totalSteps}
           </span>
-          <h2 className="text-[11px] md:text-xs font-bold text-white truncate">
+          <h2
+            className={`${
+              isMobile ? "text-[11px]" : "text-xs"
+            } font-bold text-white truncate`}
+          >
             {currentItem.title}
           </h2>
         </div>
       </div>
 
       {/* 3. 현재 워크플로우 단계의 어두운 설명 카드 + 파스텔 포인트 (데스크톱 & 모바일 위치 동기화) */}
-      <div className="relative z-[110] flex-1 min-h-0 flex items-center justify-center p-3 md:p-0 pointer-events-none">
+      <div
+        className={`relative z-[110] flex-1 min-h-0 flex items-center justify-center ${
+          isMobile ? "p-3" : "p-0"
+        } pointer-events-none`}
+      >
         <div
           style={activeRect ? cardStyle : undefined}
           className={`${
             activeRect ? "fixed" : "w-full max-w-sm"
           } pointer-events-auto rounded-xl bg-slate-900/95 text-white border ${
             currentItem.borderColor
-          } p-3 md:p-3.5 shadow-2xl backdrop-blur-md transition-all duration-200 ease-out`}
+          } ${
+            isMobile ? "p-3" : "p-3.5"
+          } shadow-2xl backdrop-blur-md transition-all duration-200 ease-out`}
         >
           {/* 상단 버튼을 가리키는 위쪽 세모 화살표(▲) */}
           {arrow?.dir === "up" && (
@@ -575,10 +620,14 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
             {currentItem.buttons.map((btn) => (
               <li
                 key={btn.label}
-                className="text-[10.5px] md:text-[11px] leading-snug flex items-baseline gap-1.5"
+                className={`${
+                  isMobile ? "text-[10.5px]" : "text-[11px]"
+                } leading-snug flex items-baseline gap-1.5`}
               >
                 <span
-                  className={`px-1.5 py-0.5 rounded font-mono font-bold text-[9.5px] md:text-[10px] border shrink-0 ${currentItem.tagColor}`}
+                  className={`px-1.5 py-0.5 rounded font-mono font-bold ${
+                    isMobile ? "text-[9.5px]" : "text-[10px]"
+                  } border shrink-0 ${currentItem.tagColor}`}
                 >
                   {btn.label}
                 </span>
@@ -590,7 +639,11 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       </div>
 
       {/* 4. 화면 하단 중앙 고정 컨트롤 바: 진행도 표시 & [이전] / [다음], 그 아래 [오늘 그만 보기] / [닫기] */}
-      <div className="fixed bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 z-[120] pointer-events-auto flex flex-col items-center gap-2">
+      <div
+        className={`fixed ${
+          isMobile ? "bottom-3" : "bottom-4"
+        } left-1/2 -translate-x-1/2 z-[120] pointer-events-auto flex flex-col items-center gap-2`}
+      >
         <div className="flex items-center gap-3 px-3.5 py-2 rounded-full bg-slate-900/95 text-white border border-white/15 shadow-2xl backdrop-blur-md">
           {/* 스텝 점 인디케이터 */}
           <div className="flex items-center gap-1.5">
