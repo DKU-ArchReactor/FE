@@ -1,4 +1,4 @@
-import type { BuildCompileResponse } from "@/type/build";
+import type { BuildAnalysis, BuildCompileResponse } from "@/type/build";
 import { getAuthSession } from '@/api/authSession';
 import { RequestGeneration } from '../utils/assistantContext';
 import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
@@ -8,6 +8,7 @@ import {
   compileAssemblyDirectly,
   mapAssembly,
   extractAssemblyFromSimulation,
+  withRuntimeContext,
 } from "../utils/translationCompile";
 import { runSimulation } from "@/api/simulation";
 import type { PlaybackFeedbackType } from "../components/PlaybackFeedbackOverlay";
@@ -22,6 +23,7 @@ type TargetSessionState = {
   };
   activeBuildId: string | null;
   activeSimulationToken: string | null;
+  analysis: BuildAnalysis | null;
 };
 
 const initialTargetState: TargetSessionState = {
@@ -29,6 +31,7 @@ const initialTargetState: TargetSessionState = {
   simulationCache: { single: null, pipeline: null },
   activeBuildId: null,
   activeSimulationToken: null,
+  analysis: null,
 };
 
 type UseSimulationSessionParams = {
@@ -101,6 +104,7 @@ export function useSimulationSession({
   const loadingMessage = translationBusy ? "컴파일 및 시뮬레이션 데이터를 불러오는 중입니다..." : null;
   const activeBuildId = currentSession.activeBuildId;
   const activeSimulationToken = currentSession.activeSimulationToken;
+  const currentAnalysis = isCurrentWorkspaceReady ? currentSession.analysis : null;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -112,13 +116,13 @@ export function useSimulationSession({
   const mappedAssemblyRows = useMemo(() => {
     if (translationBusy) return [];
     const fromSim = extractAssemblyFromSimulation(simulationData);
-    if (fromSim.length > 0) return fromSim;
-    if (isCurrentWorkspaceReady && buildResult?.analysis?.instructions.length) {
-      return buildResult.analysis.instructions.map(item => ({ pc: item.pc, text: item.assembly, sourceLine: item.source_line, isRuntime: false }));
+    if (fromSim.length > 0) return withRuntimeContext(fromSim, currentAnalysis);
+    if (currentAnalysis?.instructions.length) {
+      return currentAnalysis.instructions.map(item => ({ pc: item.pc, text: item.assembly, sourceLine: item.source_line, isRuntime: false, runtimeContext: item.runtime_context }));
     }
     if (!translationAssembly) return [];
     return mapAssembly(translationAssembly, 1000);
-  }, [translationBusy, simulationData, translationAssembly, buildResult, isCurrentWorkspaceReady]);
+  }, [translationBusy, simulationData, translationAssembly, currentAnalysis]);
 
   const clearSimulationCache = (target?: SimulationTarget) => {
     requests.current.invalidate();
@@ -140,6 +144,7 @@ export function useSimulationSession({
           resultWorkspace: "",
           activeBuildId: null,
           activeSimulationToken: null,
+          analysis: null,
           simulationCache: { single: null, pipeline: null },
         },
       }));
@@ -151,6 +156,7 @@ export function useSimulationSession({
           resultWorkspace: "",
           activeBuildId: null,
           activeSimulationToken: null,
+          analysis: null,
           simulationCache: { single: null, pipeline: null },
         },
       }));
@@ -169,6 +175,7 @@ export function useSimulationSession({
             resultWorkspace: "",
             activeBuildId: null,
             activeSimulationToken: null,
+            analysis: null,
             simulationCache: { single: null, pipeline: null },
           },
         };
@@ -189,6 +196,7 @@ export function useSimulationSession({
             resultWorkspace: "",
             activeBuildId: null,
             activeSimulationToken: null,
+            analysis: null,
             simulationCache: { single: null, pipeline: null },
           },
         };
@@ -241,6 +249,7 @@ export function useSimulationSession({
         resultWorkspace: "",
         activeBuildId: null,
         activeSimulationToken: null,
+        analysis: null,
         simulationCache: { single: null, pipeline: null },
       },
     }));
@@ -273,6 +282,7 @@ export function useSimulationSession({
           resultWorkspace: finalWorkspaceKey,
           activeBuildId: buildId ?? null,
           activeSimulationToken: simulationToken ?? null,
+          analysis: (compiledResult as BuildCompileResponse | null)?.analysis ?? null,
           simulationCache: {
             single: singleSimulationResult ?? null,
             pipeline: pipelineSimulationResult ?? null,
@@ -302,6 +312,7 @@ export function useSimulationSession({
           [target]: {
             ...prev[target],
             resultWorkspace: targetWorkspaceKey,
+            analysis: (compiledResult as BuildCompileResponse | null)?.analysis ?? null,
           },
         }));
       }

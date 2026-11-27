@@ -34,5 +34,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
           aws-region: ap-northeast-2
 
-      - name: 5. DEV S3 버킷에 업로드
+      - name: 5. 배포 대상 AWS 계정 확인
+        # Frontend hosting stays in the existing account by explicit project approval.
+        # The Blank Canvas account requirement applies to backend workloads.
+        run: |
+          ACTUAL_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          if [ "$ACTUAL_ACCOUNT_ID" != "186004631653" ]; then
+            echo "::error::Expected frontend hosting account 186004631653, got $ACTUAL_ACCOUNT_ID."
+            exit 1
+          fi
+
+      - name: 6. DEV S3 버킷에 업로드
         run: aws s3 sync ./dist s3://archreactor-dev --delete

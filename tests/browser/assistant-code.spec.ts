@@ -309,3 +309,17 @@ test('example recommendations send a single-program instruction and can be appli
   await apply.click();
   await expect(page.getByLabel('C 원문')).toHaveValue(code);
 });
+
+test('validated allocation example preserves stdlib include and volatile globals on apply', async ({page}) => {
+  await setup(page);
+  const source = '#include <stdlib.h>\nvolatile int total;\nint main(void) {\n  int *p = malloc(2 * sizeof(int));\n  if (p == NULL) return 1;\n  p[0] = 42;\n  total = p[0];\n  free(p);\n  return total;\n}\n';
+  let checked = '';
+  await page.route('**/api/v1/build/validate-c', route => {
+    checked = route.request().postDataJSON().content;
+    return route.fulfill({json:{policy:'basic-c-v1',valid:true,diagnostics:[]}});
+  });
+  await page.route('**/api/v1/assistant/chat', route => route.fulfill({contentType:'text/event-stream',body:sse('```c\n'+source+'```')}));
+  await send(page, '동적 할당 C 예제를 만들어서 편집기에 넣어줘');
+  await expect(page.getByLabel('C 원문')).toHaveValue(source);
+  expect(checked).toBe(source);
+});

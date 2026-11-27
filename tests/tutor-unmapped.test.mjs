@@ -5,6 +5,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {loadTutor} from './load-tutor-component.mjs';
 
 const {TutorSingleMode}=loadTutor('TutorSingleMode.tsx');
+const {TutorCrtCard}=loadTutor('TutorSections.tsx');
 const rows=[
   {pc:'0x10000',text:'auipc ra, 0',sourceLine:null},
   {pc:'0x10004',text:'jalr ra, ra, 20',sourceLine:null},
@@ -48,4 +49,20 @@ test('missing source metadata does not claim startup or hide the instruction mea
   const html=render(1);
   assert.match(html,/C 줄 정보가 없어도 명령어의 동작과 실행 결과는 확인할 수 있습니다/);
   assert.doesNotMatch(html,/프로그램 시작 코드|start.S 파일/);
+});
+
+test('single and pipeline tutor show verified allocator context alongside instruction meaning',()=>{
+  const runtimeContext={function:'free',label:'free 내부',summary:'힙 블록을 다시 사용할 수 있게 합니다.',detail:'값을 지우지 않아 이전 값이 남을 수 있습니다.'};
+  rows[1].runtimeContext=runtimeContext;
+  try {
+    for (const html of [render(1),renderToStaticMarkup(createElement(TutorCrtCard,{
+      selectedRow:rows[1],selectedAsmIndex:1,totalRowsCount:rows.length,simulationData:simulation,
+    }))]) {
+      assert.match(html,/내부 코드 설명/);
+      assert.match(html,/free 내부/);
+      assert.match(html,/이전 값이 남을 수/);
+      assert.match(html.replace(/<[^>]*>/g,''),/동작: jalr ra, ra, 20/);
+      assert.doesNotMatch(html,/소스 위치 미확인|C: L2 설명 보기/);
+    }
+  } finally { delete rows[1].runtimeContext; }
 });

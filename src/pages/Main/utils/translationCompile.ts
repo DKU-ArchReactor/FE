@@ -1,4 +1,4 @@
-import type { BuildCompileResponse } from "@/type/build";
+import type { BuildAnalysis, BuildCompileResponse, RuntimeContext } from "@/type/build";
 import { compileCode } from "@/api/build";
 import { runSimulation } from "@/api/simulation";
 import type { SimulationResult } from "@/type/simulation";
@@ -8,7 +8,16 @@ export type MappedAssemblyRow = {
   text: string;
   isRuntime?: boolean;
   pc?: string;
+  runtimeContext?: RuntimeContext | null;
 };
+
+/** Attach context only by an exact PC from the current build; never by ASM text. */
+export function withRuntimeContext(rows: MappedAssemblyRow[], analysis?: BuildAnalysis | null): MappedAssemblyRow[] {
+  const contexts = new Map(analysis?.instructions.map(item => [Number.parseInt(item.pc, 16), item.runtime_context]));
+  return rows.map(row => ({ ...row,
+    runtimeContext: row.pc ? contexts.get(Number.parseInt(row.pc, 16)) ?? null : null,
+  }));
+}
 
 export function extractAssemblyFromSimulation(
   simulationResult: SimulationResult | null

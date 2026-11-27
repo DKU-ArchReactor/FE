@@ -19,7 +19,7 @@ export const TutorCrtCard: React.FC<{
 }> = ({ selectedRow, selectedAsmIndex, simulationData, historyIndex }) => {
   const crtInfo = {
     instructionDetail: analyzeAsmInstruction(selectedRow.text, instructionAt(simulationData?.tutor, selectedRow.pc)?.explanation),
-    title: '연결된 C 줄 없음',
+    title: selectedRow.runtimeContext?.label ?? '연결된 C 줄 없음',
     role: 'C 코드와의 연결 정보',
     summary: '이 명령어와 연결된 C 줄 정보가 없습니다. 프로그램 실행을 돕는 코드이거나, C 줄 정보가 포함되지 않은 코드일 수 있습니다.',
     detail: 'C 줄 정보가 없어도 명령어의 동작과 실제 실행 결과를 확인할 수 있습니다. C 줄 정보가 없다는 이유만으로 초기화나 main 호출을 수행하는 코드라고 판단하지 않습니다.',
@@ -31,7 +31,7 @@ export const TutorCrtCard: React.FC<{
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
               <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-[#F0F0F0] text-[#8C959F] whitespace-nowrap shrink-0">
-                소스 위치 미확인
+                {selectedRow.runtimeContext ? '내부 코드' : '소스 위치 미확인'}
               </span>
               <strong className="text-xs font-bold text-slate-800">
                 {crtInfo.title}
@@ -52,6 +52,13 @@ export const TutorCrtCard: React.FC<{
           </span>
         </div>
 
+        {selectedRow.runtimeContext && (
+          <section aria-label="내부 코드 설명" className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs leading-relaxed">
+            <p>{selectedRow.runtimeContext.summary}</p>
+            <p className="mt-2">{selectedRow.runtimeContext.detail}</p>
+            <p className="mt-2 text-slate-600">작성한 C 코드 대신 실행을 돕는 내부 함수에 속한 명령어입니다.</p>
+          </section>
+        )}
         <p className="text-[13px] leading-6 text-[var(--ar-text-primary)]">
           <TutorText
             text={
@@ -77,13 +84,13 @@ export const TutorCrtCard: React.FC<{
               <div>
                 <strong className="text-slate-900 font-bold">{crtInfo.role}</strong>
                 <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                  {tutorReadingText(crtInfo.summary)}
+                  {tutorReadingText(selectedRow.runtimeContext?.summary ?? crtInfo.summary)}
                 </p>
               </div>
             </div>
 
             <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-[13px] text-[var(--ar-text-muted)] leading-7">
-              <p>{tutorReadingText(crtInfo.detail)}</p>
+              <p>{tutorReadingText(selectedRow.runtimeContext?.detail ?? crtInfo.detail)}</p>
             </div>
 
             <div className="p-2 rounded bg-slate-100/70 border border-slate-200/80 text-[10px] text-slate-500 flex items-start gap-1.5">
