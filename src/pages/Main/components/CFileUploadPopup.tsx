@@ -30,10 +30,11 @@ const C_TEMPLATES = [
   },
   {
     title: "배열과 메모리 접근 (Array & Memory)",
-    desc: "main 내부 배열에서 값을 로드·연산 후 다시 저장",
+    desc: "volatile 전역 배열에서 값을 로드·연산 후 다시 저장",
     fileName: "memory.c",
-    code: `int main(void) {
-    volatile int values[2] = {12, 30};
+    code: `volatile int values[2] = {12, 30};
+
+int main(void) {
     int first = values[0];
     int second = values[1];
     values[1] = first + second;
@@ -55,6 +56,23 @@ const C_TEMPLATES = [
         max = b;
     }
     return max;
+}
+`,
+  },
+  {
+    title: "동적 할당과 해제 (Heap Allocation)",
+    desc: "malloc으로 배열을 할당하고 계산 후 free로 해제",
+    fileName: "allocation.c",
+    code: `#include <stdlib.h>
+
+int main(void) {
+    int *values = malloc(2 * sizeof(int));
+    if (values == NULL) return 1;
+    values[0] = 12;
+    values[1] = 30;
+    int sum = values[0] + values[1];
+    free(values);
+    return sum;
 }
 `,
   },

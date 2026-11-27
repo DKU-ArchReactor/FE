@@ -33,9 +33,17 @@ export interface BuildCompileResponse {
     simulation_token_expires_in?: number | null;
 }
 
+export interface RuntimeContext {
+  function: string;
+  label: string;
+  summary: string;
+  detail: string;
+}
+
 export interface BuildAnalysis {
   disassembly: string;
-  instructions: { pc: string; assembly: string; source_line: number | null; source_file?: string | null }[];
+  instructions: { pc: string; assembly: string; source_line: number | null; source_file?: string | null;
+    function?: string | null; runtime_context?: RuntimeContext | null }[];
   source_map: Record<string, string[]>;
   sections: { name: string; size: number; address: string }[];
   mapping_available: boolean;
