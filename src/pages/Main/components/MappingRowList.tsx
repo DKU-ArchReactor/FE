@@ -478,9 +478,9 @@ export const MappingRowList: React.FC<MappingRowListProps> = ({
                           ? "bg-emerald-100 text-emerald-800 font-semibold"
                           : "bg-[#F0F0F0] text-[#8C959F] group-hover:text-[#57606A]"
                     }`}
-                  title="대응하는 C 소스 위치가 확인되지 않았습니다. CRT 여부는 줄 정보만으로 확정할 수 없습니다."
+                  title={row.runtimeContext ? `${row.runtimeContext.summary} 클릭하면 튜터에서 내부 코드 설명을 확인할 수 있습니다.` : '대응하는 C 소스 위치가 확인되지 않았습니다. CRT 여부는 줄 정보만으로 확정할 수 없습니다.'}
                 >
-                  미매핑
+                  {row.runtimeContext?.label ?? '미매핑'}
                 </span>
               )}
             </div>

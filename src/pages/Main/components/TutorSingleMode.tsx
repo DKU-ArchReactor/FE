@@ -80,9 +80,9 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
       .filter((row) => {
         if (!hasC) return true;
         if (line != null) return row.sourceLine === line;
-        return row.sourceLine == null;
+        return row.sourceLine == null && (!selectedRow?.runtimeContext || row.runtimeContext?.function === selectedRow.runtimeContext.function);
       });
-  }, [rows, hasC, line]);
+  }, [rows, hasC, line, selectedRow]);
 
   // 현재 선택된 ASM 명령어의 그룹 내 위치 (0 <= position < group.length)
   const position = useMemo(() => {
@@ -451,7 +451,7 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                         <span className="tutor-single-tag">{`ASM : L${row.index + 1}`}</span>
                         {hasC && row.sourceLine == null && (
                           <span className="tutor-single-badge" title="이 명령어와 연결된 C 줄 정보가 없습니다. 명령어의 동작과 실행 결과는 확인할 수 있습니다.">
-                            {rowItem?.source_context === 'startup_source' || rowItem?.source_file?.replace(/\\/g, '/').split('/').at(-1) === 'start.S' ? '프로그램 시작 코드 · C 연결 없음' : '연결된 C 줄 없음'}
+                            {row.runtimeContext?.label ?? (rowItem?.source_context === 'startup_source' || rowItem?.source_file?.replace(/\\/g, '/').split('/').at(-1) === 'start.S' ? '프로그램 시작 코드 · C 연결 없음' : '연결된 C 줄 없음')}
                           </span>
                         )}
                         {rowInstruction && (
@@ -501,13 +501,21 @@ export const TutorSingleMode: React.FC<TutorSingleModeProps> = ({
                             <div className="tutor-single-code-box">
                               <code>{tutorDecimalText(row.text)}</code>
                             </div>
+                            {row.runtimeContext && (
+                              <section aria-label="내부 코드 설명" className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs leading-relaxed">
+                                <strong>{row.runtimeContext.label}</strong>
+                                <p className="mt-1">{row.runtimeContext.summary}</p>
+                                <p className="mt-2">{row.runtimeContext.detail}</p>
+                                <p className="mt-2 text-slate-600">작성한 C 코드 대신 실행을 돕는 내부 함수에 속한 명령어입니다.</p>
+                              </section>
+                            )}
                             <div className="tutor-single-meaning">
                               <span className="tutor-single-meaning-arrow" aria-hidden="true">→</span>
                               <p className="tutor-single-meaning-text">
                                 <TutorText text={rowInstruction?.explanation ?? ''} />
                               </p>
                             </div>
-                            {hasC && row.sourceLine == null && (
+                            {hasC && row.sourceLine == null && !row.runtimeContext && (
                               <p className="text-xs leading-relaxed text-[var(--ar-text-muted)] mt-3">
                                 {rowItem?.source_context === 'startup_source' || rowItem?.source_file?.replace(/\\/g, '/').split('/').at(-1) === 'start.S'
                                   ? '프로그램을 시작할 때 사용하는 start.S 파일에 있는 명령어입니다. 작성한 C 코드의 특정 줄과 직접 연결되지 않아 ASM 기준으로 설명합니다.'

@@ -6,7 +6,18 @@ const source = readFileSync(new URL('../src/pages/Main/utils/translationCompile.
   .replace('import { compileCode } from "@/api/build";', 'const compileCode = (...args) => globalThis.compileFixture(...args);')
   .replace('import { runSimulation } from "@/api/simulation";', 'const runSimulation = (...args) => globalThis.simFixture(...args);');
 const { outputText } = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}});
-const {compileTranslation, compileAssemblyDirectly} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const {compileTranslation, compileAssemblyDirectly, withRuntimeContext} = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+
+test('runtime context joins by PC without guessing from identical ASM or retaining stale metadata', () => {
+  const context = {function:'malloc',label:'malloc 내부',summary:'할당',detail:'블록 검색'};
+  const rows = [{pc:'0x000100AA',text:'ret',sourceLine:null}, {pc:'0x100ac',text:'ret',sourceLine:4}];
+  const enriched = withRuntimeContext(rows, {instructions:[{pc:'0x100aa',runtime_context:context}]});
+  assert.equal(enriched[0].runtimeContext, context);
+  assert.equal(enriched[1].runtimeContext, null);
+  assert.equal(enriched[1].sourceLine, 4);
+  assert.equal(withRuntimeContext(enriched, null)[0].runtimeContext, null);
+  assert.equal(rows[0].runtimeContext, undefined);
+});
 
 test('compile diagnostics arrive before simulation and survive runtime failure', async () => {
   const events = [];

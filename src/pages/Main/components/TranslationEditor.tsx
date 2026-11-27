@@ -394,9 +394,8 @@ export default function TranslationEditor({
 
       {/* 파일 업로드 및 저장 목록 팝업 */}
       {activeTarget === 'c' && <p data-testid="basic-c-policy" className="shrink-0 border-b border-[#E5E5E5] bg-[#F8FAFC] px-3 py-1.5 text-[11px] leading-relaxed text-[#57606A]">
-        main 하나 · 전역 변수·volatile·포인터·동적 할당(4 KiB) 지원함.
-        stdlib.h·malloc/calloc/realloc/free 허용. 입출력 미지원.
-        결과는 레지스터·메모리에서 확인 가능.
+        main 하나 · 전역변수·volatile·포인터·동적 할당(4 KiB) 지원함.<br />
+        입출력 미지원 · 결과는 레지스터·메모리에서 확인함.
       </p>}
       <CFileUploadPopup
         isOpen={isUploadPopupOpen}
